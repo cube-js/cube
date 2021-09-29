@@ -5,7 +5,7 @@ const pool = new Pool({
   port: process.env.CUBEJS_DB_PORT,
   user: process.env.CUBEJS_DB_USER,
   password: process.env.CUBEJS_DB_PASS,
-  database: process.env.CUBEJS_DB_NAME
+  database: process.env.CUBEJS_DB_NAME,
 });
 
 const updatestatusQuery = `
@@ -18,10 +18,10 @@ const updatestatusQuery = `
     id = 1;
 `;
 
-pool.query(updatestatusQuery,(err, res) => {
-  console.log(err, res);
+pool.query(updatestatusQuery, () => {
+  console.log('ok');
   pool.end();
-  });
+});
 
 // exports.updateStatus = async () => {
 //   const client = await pool.connect();

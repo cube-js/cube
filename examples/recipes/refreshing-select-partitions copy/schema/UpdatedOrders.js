@@ -1,7 +1,3 @@
-// const updateStatus = require('../fetch').updateStatus;
-
-// updateStatus();
-
 cube(`UpdatedOrders`, {
   sql: `SELECT * FROM public.orders`,
 
@@ -29,14 +25,15 @@ cube(`UpdatedOrders`, {
 
   preAggregations: {
     orders: {
+      type: `rollup`,
+      external: true,
       measures: [],
       dimensions: [CUBE.number, CUBE.status, CUBE.createdAt, CUBE.updatedAt],
       timeDimension: CUBE.createdAt,
       granularity: `day`,
       partitionGranularity: `month`,
       refreshKey: {
-        sql: `SELECT max(updated_at) FROM public.orders`,
-        every: `1 second`,
+        sql: `SELECT max(updated_at) FROM public.orders WHERE ${FILTER_PARAMS.UpdatedOrders.createdAt.filter('created_at')`
       },
     },
   },
