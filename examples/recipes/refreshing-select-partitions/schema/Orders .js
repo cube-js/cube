@@ -24,7 +24,7 @@ cube(`Orders`, {
   },
 
   preAggregations: {
-    orders: {
+    Orders: {
       type: `rollup`,
       external: true,
       dimensions: [CUBE.number, CUBE.status, CUBE.createdAt, CUBE.updatedAt],
@@ -32,7 +32,7 @@ cube(`Orders`, {
       granularity: `day`,
       partitionGranularity: `month`,
       refreshKey: {
-        sql: `SELECT max(updated_at) FROM public.orders`
+        sql: `SELECT max(updated_at) FROM public.orders WHERE ${FILTER_PARAMS.Orders.createdAt.filter('created_at')}`
       },
     },
   },

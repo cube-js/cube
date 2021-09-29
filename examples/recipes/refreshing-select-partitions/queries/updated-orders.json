@@ -1,8 +1,0 @@
-{
-  "dimensions": [
-    "UpdatedOrders.number",
-    "UpdatedOrders.status",
-    "UpdatedOrders.createdAt",
-    "UpdatedOrders.updatedAt"
-  ]
-}
