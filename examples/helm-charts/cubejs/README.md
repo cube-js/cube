@@ -179,7 +179,7 @@ cubestore:
 | `config.devMode`                   | If true, enables development mode                                                                                               | `false` |
 | `config.debug`                     | If true, enables debug logging                                                                                                  | `false` |
 | `config.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
-| `config.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                                           | `true`  |
+| `config.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                   | `true`  |
 | `config.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
 | `config.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
 | `config.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
@@ -369,11 +369,12 @@ cubestore:
 
 ## Ingress parameters
 
-| Name                  | Description                                                                     | Value                    |
-| --------------------- | ------------------------------------------------------------------------------- | ------------------------ |
-| `ingress.enabled`     | Set to true to enable ingress record generation                                 | `false`                  |
-| `ingress.hostname`    | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local`           |
-| `ingress.path`        | The Path to Cubejs                                                              | `/`                      |
-| `ingress.pathPrefix`  | The PathPrefix                                                                  | `ImplementationSpecific` |
-| `ingress.annotations` | Ingress annotations                                                             | `{}`                     |
-| `ingress.tls`         | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`                  |
+| Name                       | Description                                                                     | Value                    |
+| -------------------------- | ------------------------------------------------------------------------------- | ------------------------ |
+| `ingress.enabled`          | Set to true to enable ingress record generation                                 | `false`                  |
+| `ingress.hostname`         | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local`           |
+| `ingress.path`             | The Path to Cubejs                                                              | `/`                      |
+| `ingress.pathPrefix`       | The PathPrefix                                                                  | `ImplementationSpecific` |
+| `ingress.ingressClassName` | The Ingress class name                                                          |                          |
+| `ingress.annotations`      | Ingress annotations                                                             | `{}`                     |
+| `ingress.tls`              | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`                  |

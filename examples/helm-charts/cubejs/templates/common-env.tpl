@@ -61,21 +61,17 @@
 - name: CUBEJS_TOPIC_NAME
   value: {{ .Values.config.topicName | quote }}
 {{- end }}
-
-
-{{/*
+{{- /*
 If global.redis.enabled = true,
 we set the default value for CUBEJS_REDIS_URL
 and CUBEJS_REDIS_PASSWORD to the default value
 provided by bitnami/redis if these values
 are not set explicitly.
-
 Otherwise, when global.redis.enabled = false,
 we require you to set the CUBEJS_REDIS_URL and
 CUBEJS_REDIS_PASSWORD.
-*/}}
-
-{{- if .Values.global.redis.enabled }}
+*/ -}}
+{{- if ((.Values.global).redis).enabled }}
 {{- if .Values.redis.url }}
 - name: CUBEJS_REDIS_URL
   value: {{ .Values.redis.url | quote }}
@@ -378,20 +374,17 @@ CUBEJS_REDIS_PASSWORD.
   value: {{ .Value.database.ssl.passPhrase | quote }}
 {{- end }}
 {{- end }}
-
-{{/*
+{{- /*
 If global.cubestore.enabled = true,
 we set the default value for cubestore.host
 and cubestore.port to the default value
 defined in the Cube Store Chart if these values
 are not set explicitly.
-
 Otherwise, when global.cubestore.enabled = false,
 we require you to set the cubestore.host and
 cubestore.port.
-*/}}
-
-{{- if .Values.global.cubestore.enabled }}
+*/ -}}
+{{- if ((.Values.global).cubestore).enabled }}
 {{- if .Values.cubestore.host }}
 - name: CUBEJS_CUBESTORE_HOST
   value: {{ .Values.cubestore.host | quote | required "cubestore.host is required" }}
