@@ -1,7 +1,7 @@
-import { ChartType, Query } from '@cubejs-client/core';
+import { ChartType, PivotConfig, Query } from '@cubejs-client/core';
 import { Tabs } from 'antd';
 import equals from 'fast-deep-equal';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import { event } from '../../events';
@@ -73,7 +73,10 @@ export function QueryTabs({
     ],
   });
 
-  const [drilldownQuery, setDrilldownQuery] = useState<Query | null>(null);
+  const [drilldownConfig, setDrilldownConfig] = useState<{
+    query?: Query | null;
+    pivotConfig?: PivotConfig | null;
+  }>({});
 
   useEffect(() => {
     window['__cubejsPlayground'] = {
@@ -156,7 +159,12 @@ export function QueryTabs({
             setSlowQuery(queryId, isQuerySlow);
             isQuerySlow && setSlowQueryFromCache(queryId, false);
           },
-          onQueryDrilldown: (ddQuery) => setDrilldownQuery(ddQuery),
+          onQueryDrilldown: (query, pivotConfig) => {
+            setDrilldownConfig({
+              query,
+              pivotConfig,
+            });
+          },
         };
       },
     };
@@ -227,7 +235,7 @@ export function QueryTabs({
   function handleDrilldownModalClose() {
     const MODAL_ANIMATION_TIME = 300; // ms
     setTimeout(() => {
-      setDrilldownQuery(null);
+      setDrilldownConfig({});
     }, MODAL_ANIMATION_TIME);
   }
 
@@ -283,9 +291,10 @@ export function QueryTabs({
           closable={tabs.length > 1}
         >
           {children(tab, handleTabSave)}
-          {drilldownQuery ? (
+          {drilldownConfig.query ? (
             <DrilldownModal
-              query={drilldownQuery}
+              query={drilldownConfig.query}
+              pivotConfig={drilldownConfig.pivotConfig}
               onClose={handleDrilldownModalClose}
             />
           ) : null}

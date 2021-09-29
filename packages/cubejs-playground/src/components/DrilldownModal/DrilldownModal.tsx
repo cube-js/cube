@@ -1,21 +1,16 @@
-import React, { CSSProperties } from 'react';
+import React, { CSSProperties, useLayoutEffect } from 'react';
 import { Button, Col, Modal, Row, Spin } from 'antd';
 import { Query } from '@cubejs-client/core';
 import { useCubeQuery } from '@cubejs-client/react';
 import { FatalError } from '../../atoms';
 import { TableQueryRenderer } from './TableQueryRenderer';
 
-interface DrilldownModalProps {
-  query: Query;
-  onClose: () => void;
-}
-
 const modalStyle: CSSProperties = {
   top: 50,
   minWidth: 450,
 };
 
-export function DrilldownModal({ query, onClose }: DrilldownModalProps) {
+export function DrilldownModal({ query, onClose, pivotConfig }) {
   const [isOpen, setIsOpen] = React.useState(true);
   const { resultSet, isLoading, error } = useCubeQuery(query, {
     skip: !query,
@@ -48,7 +43,7 @@ export function DrilldownModal({ query, onClose }: DrilldownModalProps) {
         </Row>
       ) : null}
       {resultSet && !isLoading ? (
-        <TableQueryRenderer resultSet={resultSet} pivotConfig={{}} />
+        <TableQueryRenderer resultSet={resultSet} pivotConfig={pivotConfig} />
       ) : null}
     </Modal>
   );
