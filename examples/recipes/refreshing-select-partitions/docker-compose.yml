@@ -30,7 +30,7 @@ services:
       POSTGRES_PASSWORD: example
       POSTGRES_DB: localDB
     volumes:
-      - ./scripts:/docker-entrypoint-initdb.d
+      - ./db-scripts:/docker-entrypoint-initdb.d
 
   query:
     image: cfmanteiga/alpine-bash-curl-jq
@@ -46,4 +46,4 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/node
-    entrypoint: ["sh", "node/queries/data-updater.sh"]
+    entrypoint: ["sh", "node/data-updater/data-updater.sh"]
