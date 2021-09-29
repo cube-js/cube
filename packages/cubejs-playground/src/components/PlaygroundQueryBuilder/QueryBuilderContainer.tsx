@@ -1,5 +1,5 @@
 import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { CubeProvider } from '@cubejs-client/react';
+import { CubeContext, CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router';
@@ -67,20 +67,26 @@ export function QueryBuilderContainer({
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
-      <RollupDesignerContext apiUrl={apiUrl!}>
-        <ChartRendererStateProvider>
-          <StyledCard bordered={false}>
-            <QueryTabsRenderer
-              apiUrl={apiUrl!}
-              token={currentToken!}
-              dashboardSource={props.dashboardSource}
-              securityContextToken={securityContextToken}
-              onTabChange={props.onTabChange}
-              onSecurityContextModalOpen={() => setIsModalOpen(true)}
-            />
-          </StyledCard>
-        </ChartRendererStateProvider>
-      </RollupDesignerContext>
+      <CubeContext.Consumer>
+        {({ cubejsApi }) =>
+          cubejsApi ? (
+            <RollupDesignerContext apiUrl={apiUrl!}>
+              <ChartRendererStateProvider>
+                <StyledCard bordered={false}>
+                  <QueryTabsRenderer
+                    apiUrl={apiUrl!}
+                    token={currentToken!}
+                    dashboardSource={props.dashboardSource}
+                    securityContextToken={securityContextToken}
+                    onTabChange={props.onTabChange}
+                    onSecurityContextModalOpen={() => setIsModalOpen(true)}
+                  />
+                </StyledCard>
+              </ChartRendererStateProvider>
+            </RollupDesignerContext>
+          ) : null
+        }
+      </CubeContext.Consumer>
     </CubeProvider>
   );
 }

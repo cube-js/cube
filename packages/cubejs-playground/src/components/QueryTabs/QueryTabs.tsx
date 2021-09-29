@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import { event } from '../../events';
 import { useLocalStorage } from '../../hooks';
 import { QueryLoadResult } from '../ChartRenderer/ChartRenderer';
+import { DrilldownModal } from '../DrilldownModal/DrilldownModal';
 import { useChartRendererStateMethods } from './ChartRendererStateProvider';
 
 const { TabPane } = Tabs;
@@ -71,6 +72,8 @@ export function QueryTabs({
       },
     ],
   });
+
+  const [drilldownQuery, setDrilldownQuery] = useState<Query | null>(null);
 
   useEffect(() => {
     window['__cubejsPlayground'] = {
@@ -153,6 +156,7 @@ export function QueryTabs({
             setSlowQuery(queryId, isQuerySlow);
             isQuerySlow && setSlowQueryFromCache(queryId, false);
           },
+          onQueryDrilldown: (ddQuery) => setDrilldownQuery(ddQuery),
         };
       },
     };
@@ -220,6 +224,13 @@ export function QueryTabs({
     saveTabs({ activeId, tabs });
   }
 
+  function handleDrilldownModalClose() {
+    const MODAL_ANIMATION_TIME = 300; // ms
+    setTimeout(() => {
+      setDrilldownQuery(null);
+    }, MODAL_ANIMATION_TIME);
+  }
+
   if (!ready || !queryTabs.activeId) {
     return null;
   }
@@ -272,6 +283,12 @@ export function QueryTabs({
           closable={tabs.length > 1}
         >
           {children(tab, handleTabSave)}
+          {drilldownQuery ? (
+            <DrilldownModal
+              query={drilldownQuery}
+              onClose={handleDrilldownModalClose}
+            />
+          ) : null}
         </TabPane>
       ))}
     </StyledTabs>
