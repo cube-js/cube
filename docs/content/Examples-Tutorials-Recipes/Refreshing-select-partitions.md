@@ -1,6 +1,6 @@
 ---
 title: Refreshing Select Partitions
-permalink: /recipes/refreshing-select-partiotions
+permalink: /recipes/refreshing-select-partitions
 category: Examples & Tutorials
 subCategory: Query acceleration
 menuOrder: 6
@@ -8,7 +8,7 @@ menuOrder: 6
 
 ## Use case
 
-We have a dataset with shop orders and we want to aggregate data while having
+We have a dataset with orders and we want to aggregate data while having
 decent performance. Orders have a created time, so we can use
 [partitioning](https://cube.dev/docs/caching/using-pre-aggregations#partitioning)
 by time to optimize pre-aggregations build and refresh time. The problem is the
@@ -61,9 +61,9 @@ As you can see, we defined custom
 that will check a new value of the `updated_at` property. The refresh key is
 evaluated for each partition separately. For example, if we will update order
 from august and update their `update_at` property, the current refresh key will
-update **for all partiotitions**. There is how it looks in the Cube logs:
+update **for all partitions**. There is how it looks in the Cube logs:
 
-```logs
+```bash
 Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
 --
   SELECT max(updated_at) FROM public.orders
@@ -81,10 +81,10 @@ Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
 --
 ```
 
-Note that the query for two partiotions is the same. It's the reason why **all
+Note that the query for two partitions is the same. It's the reason why **all
 partitions** will be update.
 
-Well, how to fix this and update only august partiotion? We can use the
+Well, how to fix this and update only august partition? We can use the
 [`FITER_PARAMS`](https://cube.dev/docs/schema/reference/cube#filter-params) for
 that!
 
@@ -109,7 +109,7 @@ preAggregations: {
 Cube will filter data by `created_at` property and apply the refresh key for it.
 There is how it looks in the Cube logs:
 
-```logs
+```bash
 Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
 --
   select min(("updated_orders".created_at::timestamptz AT TIME ZONE 'UTC')) from public.orders AS "updated_orders"
@@ -131,4 +131,4 @@ Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
   SELECT max(updated_at) FROM public.orders WHERE created_at >= '2021-09-01T00:00:00.000Z'::timestamptz AND created_at <= '2021-09-30T23:59:59.999Z'::timestamptz
 ```
 
-Note that Cube checks the refresh kay value using date range over the `created_at` property. With this refresh key only one partition will be update.
+Note that Cube checks the refresh key value using date range over the `created_at` property. With this refresh key only one partition will be update.

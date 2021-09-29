@@ -39,3 +39,11 @@ services:
     volumes:
       - .:/query
     entrypoint: ["sh", "query/queries/run.sh"]
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/node
+    entrypoint: ["sh", "node/queries/data-updater.sh"]
