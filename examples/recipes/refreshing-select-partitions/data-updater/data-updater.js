@@ -20,7 +20,7 @@ const updatestatusQuery = `
 
 pool.query(updatestatusQuery, (err) => {
   if (err) {
-    console.log(err.stack);
+    console.log(err);
   } else {
     console.log('Order successfully updated');
   }
