@@ -2,16 +2,14 @@ version: '2.2'
 
 services:
   cubestore:
-    image: cubejs/cubestore:arm64-experimental-v2021-07-29
+    image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_REMOTE_DIR=/cube/data
     volumes:
       - .cubestore:/cube/data
 
   cube:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: cubejs/cube:latest
     ports:
       - 4000:4000
       - 3000:3000

@@ -1,3 +1,1 @@
-module.exports = {
-    scheduledRefreshTimer: 5,
-};
+module.exports = {};
