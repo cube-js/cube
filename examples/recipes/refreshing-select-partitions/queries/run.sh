@@ -19,7 +19,6 @@ done
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${ordersQuery}" -o ordersResponse.json
 curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${updatedOrdersQuery}" -o updatedOrdersResponse.json
 
-
 echo "Orders:"
 jq ".data" ordersResponse.json
 
@@ -32,4 +31,17 @@ echo "Updated orders:"
 jq ".data" updatedOrdersResponse.json
 
 echo "Updated Orders pre-aggregations:"
+jq ".usedPreAggregations" updatedOrdersResponse.json
+
+
+# Wait for the order update
+sleep 10
+
+# Send the query
+curl "$host":"$port"/"$loadUrl" -H "Authorization: ${token}" -G -s --data-urlencode "query=${updatedOrdersQuery}" -o updatedOrdersResponse.json
+
+echo "Updated orders new:"
+jq ".data" updatedOrdersResponse.json
+
+echo "Updated Orders new pre-aggregations:"
 jq ".usedPreAggregations" updatedOrdersResponse.json

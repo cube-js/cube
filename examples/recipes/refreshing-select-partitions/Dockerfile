@@ -1,4 +1,5 @@
-FROM node:14
+FROM node:14-alpine
 
 COPY . .
-RUN npm install
+RUN apk --no-cache add curl \
+    && npm install
