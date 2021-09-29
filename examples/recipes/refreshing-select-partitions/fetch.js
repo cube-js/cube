@@ -1,11 +1,11 @@
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  host: process.env.CUBEJS_DB_HOST,
-  port: process.env.CUBEJS_DB_PORT,
-  user: process.env.CUBEJS_DB_USER,
-  password: process.env.CUBEJS_DB_PASS,
-  database: process.env.CUBEJS_DB_NAME,
+  host: `postgres`,
+  port: 5432,
+  user: `postgres`,
+  password: `example`,
+  database: `localDB`,
 });
 
 const updatestatusQuery = `
@@ -18,8 +18,12 @@ const updatestatusQuery = `
     id = 1;
 `;
 
-pool.query(updatestatusQuery, (err, res) => {
-  console.log(err, res);
-  console.log("OKOKOKOKOKOKOKOKvOKOKOKOKOKOKOKOKOKOKOKOK")
+pool.query(updatestatusQuery, (err) => {
+  if (err) {
+    console.log(err.stack);
+  } else {
+    console.log('Order successfully updated');
+  }
+
   pool.end();
 });

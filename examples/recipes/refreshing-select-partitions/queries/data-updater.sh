@@ -9,6 +9,6 @@ until curl -s "$host":"$port"/"$readyzUrl" > /dev/null; do
   sleep 1
 done
 
-sleep 15
+sleep 10
 
 node node/fetch.js

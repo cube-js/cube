@@ -2,7 +2,7 @@ version: '2.2'
 
 services:
   cubestore:
-    image: cubejs/cubestore:latest
+    image: cubejs/cubestore:arm64-experimental-v2021-07-29
     environment:
       - CUBESTORE_REMOTE_DIR=/cube/data
     volumes:
