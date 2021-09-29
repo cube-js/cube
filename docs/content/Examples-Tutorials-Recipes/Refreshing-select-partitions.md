@@ -32,7 +32,6 @@ orders, including number and status:
 | 2   | 2      | completed  | 2021-08-20 13:21:38 | 2021-08-22 13:10:38 |
 | 3   | 3      | shipped    | 2021-09-01 10:27:38 | 2021-09-02 01:12:38 |
 | 4   | 4      | completed  | 2021-09-20 10:27:38 | 2021-09-20 10:27:38 |
-| ... | ...    | ...        | ...                 | ...                 |
 
 In our case, each order has `created_at` and `update_at` properties. The
 `update_at` property is the last order update timestamp. To create a
