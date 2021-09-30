@@ -169,7 +169,9 @@ them is been updated when order changed their status:
 // Pre-aggregations for orders before update:
 {
   "dev_pre_aggregations.orders__orders": {
-    "targetTableName": "(SELECT * FROM dev_pre_aggregations.orders__orders20210801_qgajzwit_mdtjpixm_1glan84 UNION ALL SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
+    "targetTableName": "(
+      SELECT * FROM dev_pre_aggregations.orders__orders20210801_qgajzwit_mdtjpixm_1glan84 UNION ALL 
+      SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
     "refreshKeyValues": [
       {},
       {}
@@ -209,7 +211,9 @@ them is been updated when order changed their status:
 // Pre-aggregations for orders after update:
 {
   "dev_pre_aggregations.orders__orders": {
-    "targetTableName": "(SELECT * FROM dev_pre_aggregations.orders__orders20210801_lx4b2bkg_mdtjpixm_1glana3 UNION ALL SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
+    "targetTableName": "(
+      SELECT * FROM dev_pre_aggregations.orders__orders20210801_lx4b2bkg_mdtjpixm_1glana3 UNION ALL 
+      SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
     "refreshKeyValues": [
       {},
       {}
