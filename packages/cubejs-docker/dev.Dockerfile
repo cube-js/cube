@@ -1,4 +1,4 @@
-FROM node:12.22.1 AS base
+FROM node:12.22.6 AS base
 
 ARG IMAGE_VERSION=dev
 

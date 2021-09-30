@@ -1,4 +1,4 @@
-FROM node:12.22.1-alpine3.12
+FROM node:12.22.6-alpine3.12
 
 ARG IMAGE_VERSION=dev
 
