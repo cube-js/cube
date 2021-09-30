@@ -8,8 +8,8 @@ menuOrder: 6
 
 ## Use case
 
-We have a dataset with orders and we want to aggregate data while having
-decent performance. Orders have a created time, so we can use
+We have a dataset with orders and we want to aggregate data while having decent
+performance. Orders have a created time, so we can use
 [partitioning](https://cube.dev/docs/caching/using-pre-aggregations#partitioning)
 by time to optimize pre-aggregations build and refresh time. The problem is the
 order can change status after a long time. In this case we want to rebuild only
@@ -130,4 +130,97 @@ Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
   SELECT max(updated_at) FROM public.orders WHERE created_at >= '2021-09-01T00:00:00.000Z'::timestamptz AND created_at <= '2021-09-30T23:59:59.999Z'::timestamptz
 ```
 
-Note that Cube checks the refresh key value using date range over the `created_at` property. With this refresh key only one partition will be update.
+Note that Cube checks the refresh key value using date range over the
+`created_at` property. With this refresh key only one partition will be update.
+
+## Result
+
+We have received orders from two partitions of pre-aggregation and only one of
+them is been updated when order changed their status:
+
+```javascript
+// Orders before update:
+[
+  {
+    "Orders.number": "1",
+    "Orders.status": "processing",
+    "Orders.createdAt": "2021-08-10T14:26:40.000",
+    "Orders.updatedAt": "2021-08-10T14:26:40.000"
+  },
+  {
+    "Orders.number": "2",
+    "Orders.status": "completed",
+    "Orders.createdAt": "2021-08-20T13:21:38.000",
+    "Orders.updatedAt": "2021-08-20T13:21:38.000"
+  },
+  {
+    "Orders.number": "3",
+    "Orders.status": "shipped",
+    "Orders.createdAt": "2021-09-01T10:27:38.000",
+    "Orders.updatedAt": "2021-09-01T10:27:38.000"
+  },
+  {
+    "Orders.number": "4",
+    "Orders.status": "completed",
+    "Orders.createdAt": "2021-09-20T10:27:38.000",
+    "Orders.updatedAt": "2021-09-20T10:27:38.000"
+  }
+]
+// Pre-aggregations for orders before update:
+{
+  "dev_pre_aggregations.orders__orders": {
+    "targetTableName": "(SELECT * FROM dev_pre_aggregations.orders__orders20210801_qgajzwit_mdtjpixm_1glan84 UNION ALL SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
+    "refreshKeyValues": [
+      {},
+      {}
+    ]
+  }
+}
+```
+
+```javascript
+// Orders after update:
+[
+  {
+    "Orders.number": "1",
+    "Orders.status": "shipped",
+    "Orders.createdAt": "2021-08-10T14:26:40.000",
+    "Orders.updatedAt": "2021-09-30T06:45:28.000"
+  },
+  {
+    "Orders.number": "2",
+    "Orders.status": "completed",
+    "Orders.createdAt": "2021-08-20T13:21:38.000",
+    "Orders.updatedAt": "2021-08-20T13:21:38.000"
+  },
+  {
+    "Orders.number": "3",
+    "Orders.status": "shipped",
+    "Orders.createdAt": "2021-09-01T10:27:38.000",
+    "Orders.updatedAt": "2021-09-01T10:27:38.000"
+  },
+  {
+    "Orders.number": "4",
+    "Orders.status": "completed",
+    "Orders.createdAt": "2021-09-20T10:27:38.000",
+    "Orders.updatedAt": "2021-09-20T10:27:38.000"
+  }
+]
+// Pre-aggregations for orders after update:
+{
+  "dev_pre_aggregations.orders__orders": {
+    "targetTableName": "(SELECT * FROM dev_pre_aggregations.orders__orders20210801_lx4b2bkg_mdtjpixm_1glana3 UNION ALL SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
+    "refreshKeyValues": [
+      {},
+      {}
+    ]
+  }
+}
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/refreshing-select-partitions)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.
