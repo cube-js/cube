@@ -1,6 +1,7 @@
 import React from 'react';
-import { useDeepCompareMemo } from 'use-deep-compare';
 import { Table } from 'antd';
+
+import useDeepMemo from '../../hooks/deep-memo';
 
 const TABLE_PAGE_SIZE = 50;
 
@@ -47,7 +48,7 @@ const formatTableData = (columns, data) => {
 };
 
 export function TableQueryRenderer({ resultSet, pivotConfig }) {
-  const [tableColumns, dataSource] = useDeepCompareMemo(() => {
+  const [tableColumns, dataSource] = useDeepMemo(() => {
     const columns = resultSet.tableColumns(pivotConfig);
     return [
       columns,

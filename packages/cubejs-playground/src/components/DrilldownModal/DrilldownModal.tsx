@@ -1,8 +1,9 @@
-import React, { CSSProperties, useLayoutEffect } from 'react';
-import { Button, Col, Modal, Row, Spin } from 'antd';
-import { Query } from '@cubejs-client/core';
+import React, { CSSProperties } from 'react';
+import { Button, Modal } from 'antd';
 import { useCubeQuery } from '@cubejs-client/react';
-import { FatalError } from '../../atoms';
+
+import { CubeLoader, FatalError } from '../../atoms';
+
 import { TableQueryRenderer } from './TableQueryRenderer';
 
 const modalStyle: CSSProperties = {
@@ -18,7 +19,6 @@ export function DrilldownModal({ query, onClose, pivotConfig }) {
 
   const handleCancel = () => {
     setIsOpen(false);
-    onClose();
   };
 
   return (
@@ -27,21 +27,16 @@ export function DrilldownModal({ query, onClose, pivotConfig }) {
       visible={isOpen}
       onCancel={handleCancel}
       width="auto"
-      footer={[
+      footer={
         <Button key="close" onClick={handleCancel}>
           Close
-        </Button>,
-      ]}
+        </Button>
+      }
+      afterClose={onClose}
       centered
     >
       {error ? <FatalError error={error} /> : null}
-      {isLoading && !error ? (
-        <Row justify="center">
-          <Col>
-            <Spin />
-          </Col>
-        </Row>
-      ) : null}
+      {isLoading && !error ? <CubeLoader /> : null}
       {resultSet && !isLoading ? (
         <TableQueryRenderer resultSet={resultSet} pivotConfig={pivotConfig} />
       ) : null}

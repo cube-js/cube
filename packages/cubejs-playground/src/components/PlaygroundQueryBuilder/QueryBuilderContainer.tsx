@@ -1,11 +1,11 @@
 import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { CubeContext, CubeProvider } from '@cubejs-client/react';
+import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
-import { Button } from '../../atoms';
+import { Button, CubeLoader } from '../../atoms';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
 // import { LightningIcon } from '../../shared/icons/LightningIcon';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
@@ -65,28 +65,26 @@ export function QueryBuilderContainer({
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
 
+  if (!cubejsApi) {
+    return <CubeLoader />;
+  }
+
   return (
     <CubeProvider cubejsApi={cubejsApi}>
-      <CubeContext.Consumer>
-        {({ cubejsApi }) =>
-          cubejsApi ? (
-            <RollupDesignerContext apiUrl={apiUrl!}>
-              <ChartRendererStateProvider>
-                <StyledCard bordered={false}>
-                  <QueryTabsRenderer
-                    apiUrl={apiUrl!}
-                    token={currentToken!}
-                    dashboardSource={props.dashboardSource}
-                    securityContextToken={securityContextToken}
-                    onTabChange={props.onTabChange}
-                    onSecurityContextModalOpen={() => setIsModalOpen(true)}
-                  />
-                </StyledCard>
-              </ChartRendererStateProvider>
-            </RollupDesignerContext>
-          ) : null
-        }
-      </CubeContext.Consumer>
+      <RollupDesignerContext apiUrl={apiUrl!}>
+        <ChartRendererStateProvider>
+          <StyledCard bordered={false}>
+            <QueryTabsRenderer
+              apiUrl={apiUrl!}
+              token={currentToken!}
+              dashboardSource={props.dashboardSource}
+              securityContextToken={securityContextToken}
+              onTabChange={props.onTabChange}
+              onSecurityContextModalOpen={() => setIsModalOpen(true)}
+            />
+          </StyledCard>
+        </ChartRendererStateProvider>
+      </RollupDesignerContext>
     </CubeProvider>
   );
 }

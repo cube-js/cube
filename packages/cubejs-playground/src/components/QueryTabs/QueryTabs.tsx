@@ -233,10 +233,7 @@ export function QueryTabs({
   }
 
   function handleDrilldownModalClose() {
-    const MODAL_ANIMATION_TIME = 300; // ms
-    setTimeout(() => {
-      setDrilldownConfig({});
-    }, MODAL_ANIMATION_TIME);
+    setDrilldownConfig({});
   }
 
   if (!ready || !queryTabs.activeId) {
