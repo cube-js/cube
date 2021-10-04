@@ -16,7 +16,7 @@ const regexTimeInterval = Joi.string().custom((value, helper) => {
   if (value.match(/^(-?\d+) (minute|hour|day|week|month|year)$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|year)$/` });
+    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
   }
 });
 
@@ -210,7 +210,7 @@ const OriginalSqlSchema = condition(
   })
 );
 
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
+const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
 
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
 const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments'];
