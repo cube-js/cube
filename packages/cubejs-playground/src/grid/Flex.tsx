@@ -24,8 +24,20 @@ export const Flex = styled.div<FlexProps>`
   margin: ${margin};
 `;
 
-function gap({ gap }: FlexProps) {
+function gap({ gap, direction }: FlexProps) {
   if (gap) {
+    if (direction === 'column') {
+      return css`
+        & > div {
+          margin-bottom: ${gap * STEP}px};
+        }
+
+        & > div:last-child {
+          margin-bottom: 0;
+        }
+      `;
+    }
+
     return css`
       & > div {
         margin-right: ${gap * STEP}px};

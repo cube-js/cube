@@ -75,3 +75,13 @@ Return "true" if the API pathType field is supported
 {{- end -}}
 {{- end -}}
 
+{{/*
+Return "true" if the API ingressClassName field is supported
+*/}}
+{{- define "cubejs.ingress.supportsIngressClassname" -}}
+{{- if semverCompare "<1.18-0" .Capabilities.KubeVersion.Version -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}

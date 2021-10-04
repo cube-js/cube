@@ -31,6 +31,8 @@ services:
       - CUBEJS_DEV_MODE=true
     volumes:
       - .:/cube/conf
+      # Prevent dev dependencies leaking
+      - .empty:/cube/conf/node_modules/@cubejs-backend/
 ```
 
 ## 2. Run Cube.js

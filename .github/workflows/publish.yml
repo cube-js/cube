@@ -282,7 +282,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          DOCKER_IMAGE=cubejs/cube
+          DOCKER_IMAGE=cubejs/cubestore
           VERSION=noop
           if [ "${{ github.event_name }}" = "schedule" ]; then
             VERSION=nightly
@@ -409,7 +409,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y llvm --version 9.0.1
+        run: choco install -y --force llvm --version 9.0.1
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v2.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}

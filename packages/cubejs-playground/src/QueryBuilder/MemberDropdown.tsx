@@ -3,7 +3,7 @@ import { AvailableCube } from '@cubejs-client/react';
 import { ButtonProps, Input, Menu as AntdMenu } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
-import { TCubeMember } from '@cubejs-client/core';
+import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
 import useDeepMemo from '../hooks/deep-memo';
@@ -43,7 +43,10 @@ const SearchMenuItem = styled(Menu.Item)`
   }
 `;
 
-function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
+function filterMembersByKeys(
+  members: AvailableCube<CubeMember>[],
+  keys: string[]
+) {
   const cubeNames = keys.map((key) => key.split('.')[0]);
 
   return members
@@ -56,10 +59,14 @@ function filterMembersByKeys(members: AvailableCube[], keys: string[]) {
     });
 }
 
+function visibilityFilter({ isVisible }: CubeMember) {
+  return isVisible === undefined || isVisible;
+}
+
 type MemberDropdownProps = {
-  availableCubes: AvailableCube[];
+  availableCubes: AvailableCube<CubeMember>[];
   showNoMembersPlaceholder?: boolean;
-  onClick: (member: TCubeMember) => void;
+  onClick: (member: BaseCubeMember) => void;
 } & ButtonProps;
 
 export default function MemberMenu({
@@ -73,7 +80,9 @@ export default function MemberMenu({
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
   const index = flexSearch.current;
-  const hasMembers = availableCubes.some((cube) => cube.members.length > 0);
+  const hasMembers = availableCubes.some(
+    (cube) => cube.members.filter(visibilityFilter).length > 0
+  );
 
   const indexedMembers = useDeepMemo(() => {
     getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
@@ -105,8 +114,6 @@ export default function MemberMenu({
     ? filterMembersByKeys(availableCubes, filteredKeys)
     : availableCubes;
 
-  // console.log('availableMembers', availableMembers);
-
   return (
     <ButtonDropdown
       {...buttonProps}
@@ -137,17 +144,23 @@ export default function MemberMenu({
                 />
               </SearchMenuItem>
 
-              {members.map((cube) =>
-                cube.members.length > 0 ? (
+              {members.map((cube) => {
+                const members = cube.members.filter(visibilityFilter);
+
+                if (!members.length) {
+                  return null;
+                }
+
+                return (
                   <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
-                    {cube.members.map((m) => (
+                    {members.map((m) => (
                       <Menu.Item key={m.name} data-testid={m.name}>
                         {m.shortTitle}
                       </Menu.Item>
                     ))}
                   </Menu.ItemGroup>
-                ) : null
-              )}
+                );
+              })}
             </>
           ) : showNoMembersPlaceholder ? (
             <Menu.Item disabled>No members found</Menu.Item>

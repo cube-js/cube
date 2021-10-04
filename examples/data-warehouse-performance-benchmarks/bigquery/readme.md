@@ -30,31 +30,35 @@ Start the Node.js app.
 node bq-api.js
 ```
 
-Run the k6 load test.
+Run the k6 load test for 200 virtual users.
 
 ```bash
-docker run -i --add-host=host.docker.internal:host-gateway loadimpact/k6 run --vus 30 --duration 10s - <k6-bq.js
+k6 run k6-bq.js
 ```
 
 My tests returned:
 
 ```
-data_received..................: 26 kB 2.2 kB/s
-data_sent......................: 16 kB 1.3 kB/s
-http_req_blocked...............: avg=88.02µs  min=3µs      med=10.13µs  max=2.85ms   p(90)=308.29µs p(95)=526.44µs
-http_req_connecting............: avg=65.69µs  min=0s       med=0s       max=2.81ms   p(90)=210.63µs p(95)=401.97µs
-http_req_duration..............: avg=960.02ms min=718.96ms med=880.58ms max=1.48s    p(90)=1.44s    p(95)=1.46s   
-  { expected_response:true }...: avg=960.02ms min=718.96ms med=880.58ms max=1.48s    p(90)=1.44s    p(95)=1.46s   
-http_req_failed................: 0.00% ✓ 0         ✗ 174 
-http_req_receiving.............: avg=134.17µs min=35.25µs  med=134.19µs max=262.33µs p(90)=193.58µs p(95)=208.91µs
-http_req_sending...............: avg=43.24µs  min=11.27µs  med=41.51µs  max=136.78µs p(90)=71.46µs  p(95)=86.83µs 
-http_req_tls_handshaking.......: avg=0s       min=0s       med=0s       max=0s       p(90)=0s       p(95)=0s      
-http_req_waiting...............: avg=959.84ms min=718.79ms med=880.39ms max=1.48s    p(90)=1.44s    p(95)=1.46s   
-http_reqs......................: 174   14.666624/s
-iteration_duration.............: avg=1.96s    min=1.71s    med=1.88s    max=2.48s    p(90)=2.44s    p(95)=2.46s   
-iterations.....................: 174   14.666624/s
-vus............................: 24    min=24      max=30
-vus_max........................: 30    min=30      max=30
+running (40.0s), 000/200 VUs, 591 complete and 74 interrupted iterations
+default ✓ [======================================] 200 VUs  10s
+
+     data_received..................: 90 kB 2.2 kB/s
+     data_sent......................: 53 kB 1.3 kB/s
+     http_req_blocked...............: avg=99.2µs  min=1.67µs   med=4.03µs  max=4.24ms   p(90)=127.24µs p(95)=594.97µs
+     http_req_connecting............: avg=65.99µs min=0s       med=0s      max=2.06ms   p(90)=74.42µs  p(95)=485.42µs
+     http_req_duration..............: avg=2.57s   min=805.87ms med=2.42s   max=6.36s    p(90)=3.8s     p(95)=3.98s   
+       { expected_response:true }...: avg=2.57s   min=805.87ms med=2.42s   max=6.36s    p(90)=3.8s     p(95)=3.98s   
+     http_req_failed................: 0.00% ✓ 0        ✗ 591  
+     http_req_receiving.............: avg=91.32µs min=29.96µs  med=77.26µs max=817.65µs p(90)=156.68µs p(95)=179.56µs
+     http_req_sending...............: avg=216.6µs min=8.41µs   med=22.31µs max=7.51ms   p(90)=65.16µs  p(95)=685.81µs
+     http_req_tls_handshaking.......: avg=0s      min=0s       med=0s      max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=2.57s   min=805.8ms  med=2.42s   max=6.36s    p(90)=3.8s     p(95)=3.98s   
+     http_reqs......................: 591   14.77134/s
+     iteration_duration.............: avg=2.57s   min=805.97ms med=2.42s   max=6.36s    p(90)=3.8s     p(95)=3.98s   
+     iterations.....................: 591   14.77134/s
+     vus............................: 74    min=74     max=200
+     vus_max........................: 200   min=200    max=200
+
 ```
 
 ## Load Test Node.js API with Cube
@@ -68,28 +72,32 @@ node cube-api.js
 Run the k6 load test.
 
 ```bash
-docker run -i --add-host=host.docker.internal:host-gateway loadimpact/k6 run --vus 30 --duration 10s - <k6-cube-local.js
+k6 run k6-cube-local.js
 ```
 
 My tests returned:
 
 ```
-data_received..................: 32 kB 3.1 kB/s
-data_sent......................: 19 kB 1.8 kB/s
-http_req_blocked...............: avg=386.86µs min=5.66µs   med=10.64µs  max=12ms     p(90)=127.55µs p(95)=419.63µs
-http_req_connecting............: avg=237.78µs min=0s       med=0s       max=11.93ms  p(90)=94.08µs  p(95)=311.99µs
-http_req_duration..............: avg=482.6ms  min=428.14ms med=478.46ms max=587.81ms p(90)=516.86ms p(95)=528ms   
-  { expected_response:true }...: avg=482.6ms  min=428.14ms med=478.46ms max=587.81ms p(90)=516.86ms p(95)=528ms   
-http_req_failed................: 0.00% ✓ 0         ✗ 210 
-http_req_receiving.............: avg=146.35µs min=72.9µs   med=139.83µs max=386.55µs p(90)=201.13µs p(95)=212.34µs
-http_req_sending...............: avg=81.32µs  min=21.35µs  med=47.16µs  max=3.59ms   p(90)=77.26µs  p(95)=153.73µs
-http_req_tls_handshaking.......: avg=0s       min=0s       med=0s       max=0s       p(90)=0s       p(95)=0s      
-http_req_waiting...............: avg=482.37ms min=427.83ms med=478.14ms max=587.6ms  p(90)=516.62ms p(95)=527.85ms
-http_reqs......................: 210   20.115602/s
-iteration_duration.............: avg=1.48s    min=1.42s    med=1.47s    max=1.58s    p(90)=1.52s    p(95)=1.52s   
-iterations.....................: 210   20.115602/s
-vus............................: 30    min=30      max=30
-vus_max........................: 30    min=30      max=30
+running (12.3s), 000/200 VUs, 1013 complete and 0 interrupted iterations
+default ✓ [======================================] 200 VUs  10s
+
+     data_received..................: 154 kB 13 kB/s
+     data_sent......................: 81 kB  6.6 kB/s
+     http_req_blocked...............: avg=157.08µs min=1.56µs   med=6.84µs  max=10.48ms  p(90)=393.37µs p(95)=1.02ms  
+     http_req_connecting............: avg=142.47µs min=0s       med=0s      max=10.37ms  p(90)=360.18µs p(95)=983.48µs
+     http_req_duration..............: avg=2.19s    min=772.42ms med=2.27s   max=3.51s    p(90)=2.37s    p(95)=2.63s   
+       { expected_response:true }...: avg=2.19s    min=772.42ms med=2.27s   max=3.51s    p(90)=2.37s    p(95)=2.63s   
+     http_req_failed................: 0.00%  ✓ 0         ✗ 1013 
+     http_req_receiving.............: avg=120.02µs min=33.11µs  med=115.1µs max=392.55µs p(90)=194.46µs p(95)=209.77µs
+     http_req_sending...............: avg=117.34µs min=8.01µs   med=40.55µs max=1.86ms   p(90)=250.06µs p(95)=528.91µs
+     http_req_tls_handshaking.......: avg=0s       min=0s       med=0s      max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=2.19s    min=772.25ms med=2.27s   max=3.51s    p(90)=2.37s    p(95)=2.63s   
+     http_reqs......................: 1013   82.388192/s
+     iteration_duration.............: avg=2.19s    min=775.15ms med=2.27s   max=3.51s    p(90)=2.37s    p(95)=2.63s   
+     iterations.....................: 1013   82.388192/s
+     vus............................: 25     min=25      max=200
+     vus_max........................: 200    min=200     max=200
+
 ```
 
 
@@ -98,28 +106,32 @@ vus_max........................: 30    min=30      max=30
 Run the k6 load test.
 
 ```bash
-docker run -i --add-host=host.docker.internal:host-gateway loadimpact/k6 run --vus 30 --duration 10s - <k6-cube-cloud.js
+k6 run k6-cube-cloud.js
 ```
 
 My tests returned:
 
 ```
-data_received..................: 1.5 MB 138 kB/s
-data_sent......................: 124 kB 11 kB/s
-http_req_blocked...............: avg=51.78ms  min=721ns    med=995ns    max=470.28ms p(90)=451.58ms p(95)=461.92ms
-http_req_connecting............: avg=15.48ms  min=0s       med=0s       max=140.1ms  p(90)=136.41ms p(95)=137.6ms 
-http_req_duration..............: avg=180.66ms min=144.24ms med=160.42ms max=312.64ms p(90)=286.72ms p(95)=300.21ms
-  { expected_response:true }...: avg=180.66ms min=144.24ms med=160.42ms max=312.64ms p(90)=286.72ms p(95)=300.21ms
-http_req_failed................: 0.00%  ✓ 0         ✗ 267 
-http_req_receiving.............: avg=361.96µs min=191.76µs med=302.54µs max=9.27ms   p(90)=393.71µs p(95)=432.89µs
-http_req_sending...............: avg=355.82µs min=187.82µs med=328.27µs max=1.47ms   p(90)=464.66µs p(95)=549.13µs
-http_req_tls_handshaking.......: avg=28.21ms  min=0s       med=0s       max=260.25ms p(90)=243.01ms p(95)=252.49ms
-http_req_waiting...............: avg=179.95ms min=143.66ms med=159.78ms max=311.93ms p(90)=286.04ms p(95)=299.5ms 
-http_reqs......................: 267    23.954856/s
-iteration_duration.............: avg=1.23s    min=1.14s    med=1.16s    max=1.77s    p(90)=1.75s    p(95)=1.75s   
-iterations.....................: 267    23.954856/s
-vus............................: 24     min=24      max=30
-vus_max........................: 30     min=30      max=30
+running (11.3s), 000/200 VUs, 1320 complete and 0 interrupted iterations
+default ✓ [======================================] 200 VUs  10s
+
+     data_received..................: 8.5 MB 751 kB/s
+     data_sent......................: 631 kB 56 kB/s
+     http_req_blocked...............: avg=72.78ms  min=318ns    med=1.1µs    max=663.03ms p(90)=425.83ms p(95)=517.25ms
+     http_req_connecting............: avg=22.07ms  min=0s       med=0s       max=166.97ms p(90)=140.46ms p(95)=149.7ms 
+     http_req_duration..............: avg=1.56s    min=574.29ms med=1.46s    max=2.85s    p(90)=2.21s    p(95)=2.33s   
+       { expected_response:true }...: avg=1.56s    min=574.29ms med=1.46s    max=2.85s    p(90)=2.21s    p(95)=2.33s   
+     http_req_failed................: 0.00%  ✓ 0          ✗ 1320 
+     http_req_receiving.............: avg=26.6ms   min=47.55µs  med=194.95µs max=152.74ms p(90)=135.72ms p(95)=137.19ms
+     http_req_sending...............: avg=274.17µs min=45.28µs  med=183.92µs max=14.65ms  p(90)=295.29µs p(95)=345.87µs
+     http_req_tls_handshaking.......: avg=48.89ms  min=0s       med=0s       max=496.98ms p(90)=272.02ms p(95)=347.98ms
+     http_req_waiting...............: avg=1.54s    min=573.83ms med=1.43s    max=2.71s    p(90)=2.19s    p(95)=2.32s   
+     http_reqs......................: 1320   116.817149/s
+     iteration_duration.............: avg=1.64s    min=574.74ms med=1.52s    max=3.34s    p(90)=2.29s    p(95)=2.54s   
+     iterations.....................: 1320   116.817149/s
+     vus............................: 66     min=66       max=200
+     vus_max........................: 200    min=200      max=200
+
 ```
 
 
@@ -129,20 +141,20 @@ Load testing three different approaches resulted in vastly different performance
 
 The Node.js app using the BigQuery SDK had these request duration percentiles:
 ```
-p(90)=1.44s
-p(95)=1.46s
+p(90)=3.8s
+p(95)=3.98s   
 ```
 
 The Node.js app using Cube Cloud to access BigQuery had these request duration percentiles:
 ```
-p(90)=516.86ms
-p(95)=528ms
+p(90)=2.37s
+p(95)=2.63s 
 ```
 
 Load testing the Cube Cloud API directly resulted in these request duration percentiles:
 ```
-p(90)=286.72ms
-p(95)=300.21ms
+p(90)=2.21s
+p(95)=2.33s
 ```
 
 This shows a significant improvement in performance when using Cube with pre-aggregations and caching.

@@ -12,6 +12,8 @@ import { QueryStream } from './QueryStream';
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  // Revert mapping for internal pre-aggregations
+  HLL_POSTGRES: 'hll',
 };
 
 const NativeTypeToPostgresType: Record<string, string> = {};
@@ -25,6 +27,8 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   bpchar: 'varchar',
   // Numeric is an alias
   numeric: 'decimal',
+  // External mapping
+  hll: 'HLL_POSTGRES',
 };
 
 const timestampDataTypes = [
@@ -35,23 +39,18 @@ const timestampDataTypes = [
   // @link TypeId.TIMESTAMPTZ
   1184
 ];
-const timestampTypeParser = (val: any) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+const hllTypeParser = (val: string) => Buffer.from(
+  // Postgres uses prefix as \x for encoding
+  val.substr(2),
+  'hex'
+).toString('base64');
 
 export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
 };
-
-function getTypeParser(dataType: TypeId, format: TypeFormat | undefined) {
-  const isTimestamp = timestampDataTypes.includes(dataType);
-  if (isTimestamp) {
-    return timestampTypeParser;
-  }
-
-  const parser = types.getTypeParser(dataType, format);
-  return (val: any) => parser(val);
-}
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
@@ -95,24 +94,38 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
   }
 
+  protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
+    const isTimestamp = timestampDataTypes.includes(dataTypeID);
+    if (isTimestamp) {
+      return timestampTypeParser;
+    }
+
+    const typeName = this.getPostgresTypeForField(dataTypeID);
+    if (typeName === 'hll') {
+      // We are using base64 encoding as main format for all HLL sketches, but in pg driver it uses binary encoding
+      return hllTypeParser;
+    }
+
+    const parser = types.getTypeParser(dataTypeID, format);
+    return (val: any) => parser(val);
+  };
+
   /**
    * It's not possible to detect user defined types via constant oids
    * For example HLL extensions is using CREATE TYPE HLL which will generate a new pg_type with different oids
    */
   protected userDefinedTypes: Record<string, string> | null = null;
 
-  protected getPostgresTypeForField(field: FieldDef) {
-    if (field.dataTypeID in NativeTypeToPostgresType) {
-      return NativeTypeToPostgresType[field.dataTypeID].toLowerCase();
+  protected getPostgresTypeForField(dataTypeID: number): string | null {
+    if (dataTypeID in NativeTypeToPostgresType) {
+      return NativeTypeToPostgresType[dataTypeID].toLowerCase();
     }
 
-    if (this.userDefinedTypes && field.dataTypeID in this.userDefinedTypes) {
-      return this.userDefinedTypes[field.dataTypeID].toLowerCase();
+    if (this.userDefinedTypes && dataTypeID in this.userDefinedTypes) {
+      return this.userDefinedTypes[dataTypeID].toLowerCase();
     }
 
-    throw new Error(
-      `Unable to detect type for field "${field.name}" with dataTypeID: ${field.dataTypeID}`
-    );
+    return null;
   }
 
   public async testConnection(): Promise<void> {
@@ -153,6 +166,22 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     await this.loadUserDefinedTypes(conn);
   }
 
+  protected mapFields(fields: FieldDef[]) {
+    return fields.map((f) => {
+      const postgresType = this.getPostgresTypeForField(f.dataTypeID);
+      if (!postgresType) {
+        throw new Error(
+          `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
+        );
+      }
+
+      return ({
+        name: f.name,
+        type: this.toGenericType(postgresType)
+      });
+    });
+  }
+
   public async stream(
     query: string,
     values: unknown[],
@@ -165,7 +194,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
       const queryStream = new QueryStream(query, values, {
         types: {
-          getTypeParser,
+          getTypeParser: this.getTypeParser,
         },
         highWaterMark
       });
@@ -174,10 +203,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
       return {
         rowStream,
-        types: meta.map((f: any) => ({
-          name: f.name,
-          type: this.toGenericType(this.getPostgresTypeForField(f))
-        })),
+        types: this.mapFields(meta),
         release: async () => {
           await conn.release();
         }
@@ -199,7 +225,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         text: query,
         values: values || [],
         types: {
-          getTypeParser,
+          getTypeParser: this.getTypeParser,
         },
       });
       return res;
@@ -221,10 +247,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const res = await this.queryResponse(query, values);
     return {
       rows: res.rows,
-      types: res.fields.map(f => ({
-        name: f.name,
-        type: this.toGenericType(this.getPostgresTypeForField(f))
-      })),
+      types: this.mapFields(res.fields),
     };
   }
 

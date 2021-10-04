@@ -98,6 +98,8 @@ type IndexDescription = {
 export type PreAggregationDescription = {
   preAggregationId: string;
   priority: number;
+  dataSource: string;
+  external: boolean;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -450,7 +452,7 @@ export class PreAggregationLoader {
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
         if (!versionEntryByStructureVersion) {
-          throw new Error('One or more pre-aggregation tables could not be found to satisfy that query');
+          throw new Error('Your configuration restricts query requests to only be served from pre-aggregations, and no pre-aggregation was found matching this query. Either update your pre-aggregations or disable rollup only mode in your Cube.js configuration.');
         }
 
         // the rollups are being maintained independently of this instance of cube.js,
@@ -1019,7 +1021,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.dataSource = options.dataSource;
+    this.dataSource = preAggregation.dataSource;
   }
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {

@@ -6,14 +6,6 @@ import { CopyOutlined } from '@ant-design/icons';
 import PrismCode from '../PrismCode';
 import { copyToClipboard } from '../utils';
 
-type CodeSnippetProps = {
-  code: string;
-  language?: string;
-  style?: CSSProperties;
-  copyMessage?: string;
-  theme?: 'dark' | 'light';
-};
-
 const StyledCodeSnippet = styled.div`
   display: flex;
   border-radius: 4px;
@@ -54,6 +46,14 @@ const ButtonWrapper = styled.div`
     );
   }
 `;
+
+type CodeSnippetProps = {
+  code: string;
+  language?: string;
+  style?: CSSProperties;
+  copyMessage?: string;
+  theme?: 'dark' | 'light';
+};
 
 export function CodeSnippet({
   code,

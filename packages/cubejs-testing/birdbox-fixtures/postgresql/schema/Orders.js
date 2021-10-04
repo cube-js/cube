@@ -10,22 +10,19 @@ cube(`Orders`, {
   UNION ALL
   select 5 as id, 600 as amount, 'shipped' status
   `,
-
   measures: {
     count: {
-      type: `count`
+      type: `count`,
     },
-
     totalAmount: {
       sql: `amount`,
-      type: `sum`
-    }
+      type: `sum`,
+    },
   },
-
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });

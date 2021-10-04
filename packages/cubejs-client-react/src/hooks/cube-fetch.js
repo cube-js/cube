@@ -22,22 +22,23 @@ export function useCubeFetch(method, options = {}) {
     const cubejsApi = options.cubejsApi || context?.cubejsApi;
     const query = loadOptions.query || options.query;
 
-    if (!cubejsApi) {
-      throw new Error('Cube.js API client is not provided');
-    }
+    const queryCondition = method === 'meta' ? true : query && isQueryPresent(query);
 
-    if ((ignoreSkip || !skip) && query && isQueryPresent(query)) {
+    if (cubejsApi && (ignoreSkip || !skip) && queryCondition) {
       setError(null);
       setResponse({
         isLoading: true,
         response: null,
       });
 
+      const coreOptions = {
+        mutexObj: mutexRef.current,
+        mutexKey: method,
+      };
+      const args = method === 'meta' ? [coreOptions] : [query, coreOptions];
+
       try {
-        const response = await cubejsApi[method](query, {
-          mutexObj: mutexRef.current,
-          mutexKey: method,
-        });
+        const response = await cubejsApi[method](...args);
 
         if (isMounted()) {
           setResponse({
@@ -45,9 +46,9 @@ export function useCubeFetch(method, options = {}) {
             isLoading: false,
           });
         }
-      } catch (err) {
+      } catch (error) {
         if (isMounted()) {
-          setError(err);
+          setError(error);
           setResponse({
             isLoading: false,
             response: null,

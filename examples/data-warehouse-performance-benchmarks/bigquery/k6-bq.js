@@ -1,8 +1,11 @@
 import http from 'k6/http';
-import { sleep } from 'k6';
+const vus = 200;
+export let options = {
+  vus: vus,
+  duration: '10s',
+};
 
 export default function () {
-  const url = 'http://host.docker.internal:8080/';
+  const url = 'http://localhost:8080/';
   http.get(url);
-  sleep(1);
 }

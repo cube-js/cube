@@ -8,7 +8,7 @@ const FeedbackBlock = (props: propsType) => {
   const { page } = props;
   const [date, setDate] = useState('');
   const [feedback, setFeedbackState] = useState('');
-  const [feedbackMessage, setFeedbackMessageState] = useState('');
+  const [isShowThanks, setShowThanks] = useState(false);
 
   const setFeedback = (state: string, page: string) => {
     if (feedback) {
@@ -20,19 +20,21 @@ const FeedbackBlock = (props: propsType) => {
     event('page_feedback_like', { page, date, feedback: state });
   };
   const setFeedbackMessage = (message: string) => {
-    setFeedbackMessageState(message);
-    event('page_feedback_comment', { page, date, feedback, comment: message });
+    if (message) {
+      event('page_feedback_comment', { page, date, feedback, comment: message });
+    }
+    setShowThanks(true);
   };
   const clearFeedback = () => {
     setFeedbackState('');
-    setFeedbackMessageState('');
   }
 
-  if (feedbackMessage) {
+  if (isShowThanks) {
     return (
       <div className={styles.thanksBlock}>Thank you for the feedback!</div>
     );
   }
+  
   return (
     <div className={styles.feedbackBlock}>
       <div className={styles.feedbackBlock__wrap}>

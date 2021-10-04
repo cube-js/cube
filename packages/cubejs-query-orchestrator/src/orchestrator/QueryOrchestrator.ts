@@ -231,9 +231,12 @@ export class QueryOrchestrator {
   public async getPreAggregationPreview(requestId: string, preAggregation: PreAggregationDescription) {
     if (!preAggregation) return [];
     const [query] = preAggregation.previewSql;
+    const { external } = preAggregation;
+
     const data = await this.fetchQuery({
       continueWait: true,
       query,
+      external,
       preAggregations: [
         preAggregation
       ],

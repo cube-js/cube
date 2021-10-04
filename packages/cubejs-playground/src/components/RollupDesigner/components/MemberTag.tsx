@@ -29,7 +29,12 @@ export function MemberTag({
   ...props
 }: MemberTagProps & TagProps) {
   return (
-    <StyledTag closable visible {...props}>
+    <StyledTag
+      data-testid={`member-tag-${cubeName}.${name}`}
+      closable
+      visible
+      {...props}
+    >
       {cubeName} <b>{name}</b>
     </StyledTag>
   );
