@@ -23,6 +23,7 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
+use crate::streaming::{StreamingService, StreamingServiceImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -887,7 +888,14 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
+                StreamingServiceImpl::new(i.get_service_typed().await, i.get_service_typed().await)
             })
             .await;
 

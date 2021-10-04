@@ -52,6 +52,9 @@ jobs:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
           CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
+          TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
+          TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
         with:
           command: test
           args: --manifest-path rust/Cargo.toml -j 1

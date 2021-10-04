@@ -460,6 +460,7 @@ mod tests {
                     None,
                     Vec::new(),
                     true,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -535,6 +536,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                 )
                 .await
                 .unwrap();

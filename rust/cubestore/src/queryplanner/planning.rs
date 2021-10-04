@@ -983,6 +983,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -1008,6 +1010,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -1035,6 +1039,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
 
         i

@@ -200,7 +200,16 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let name = TablePath {
             table: IdRow::new(
                 u64::MAX,
-                Table::new(table.to_string(), u64::MAX, Vec::new(), None, None, false),
+                Table::new(
+                    table.to_string(),
+                    u64::MAX,
+                    Vec::new(),
+                    None,
+                    None,
+                    false,
+                    None,
+                    None,
+                ),
             ),
             schema: Arc::new(IdRow::new(0, metastore::Schema::new(schema.to_string()))),
         };

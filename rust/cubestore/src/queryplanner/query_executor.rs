@@ -30,7 +30,7 @@ use datafusion::logical_plan::{Expr, LogicalPlan};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
+use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
@@ -301,7 +301,18 @@ impl CubeTable {
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
-        let partition_projection = projection.as_ref().map(|p| {
+        let projection_with_seq_column = projection.as_ref().map(|p| {
+            if let Some(seq_column) = self.index_snapshot.table_path.table.get_row().seq_column() {
+                let mut with_seq = p.clone();
+                if !with_seq.iter().any(|s| *s == seq_column.get_index()) {
+                    with_seq.push(seq_column.get_index());
+                }
+                with_seq
+            } else {
+                p.clone()
+            }
+        });
+        let partition_projection = projection_with_seq_column.as_ref().map(|p| {
             let mut partition_projection = Vec::with_capacity(p.len());
             for table_col_i in p {
                 let name = table_cols[*table_col_i].get_name();
@@ -363,7 +374,7 @@ impl CubeTable {
         }
 
         // We might need extra projection to re-order data.
-        if let Some(projection) = projection {
+        if let Some(projection) = projection_with_seq_column.as_ref() {
             let partition_projection = partition_projection.unwrap();
             let mut final_reorder = Vec::with_capacity(projection.len());
             for table_col_i in projection {
@@ -397,7 +408,7 @@ impl CubeTable {
             }
         }
 
-        let projected_schema = if let Some(p) = projection {
+        let projected_schema = if let Some(p) = projection_with_seq_column.as_ref() {
             Arc::new(Schema::new(
                 p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
@@ -420,9 +431,61 @@ impl CubeTable {
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
         });
+        let unique_key_columns = self
+            .index_snapshot()
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
 
-        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
-        {
+        let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
+            let sort_columns = self
+                .index_snapshot()
+                .index
+                .get_row()
+                .columns()
+                .iter()
+                .take(self.index_snapshot.index.get_row().sort_key_size() as usize)
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(
+                        c.get_name(),
+                        &schema,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut exec: Arc<dyn ExecutionPlan> =
+                Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
+            // TODO we need ensure seq column is never used in partition key otherwise we can't do shared nothing execution across partitions
+            exec = Arc::new(LastRowByUniqueKeyExec::try_new(
+                exec,
+                key_columns
+                    .iter()
+                    .map(|c| {
+                        datafusion::physical_plan::expressions::Column::new_with_schema(
+                            c.get_name().as_str(),
+                            &schema,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?);
+            if let Some(projection) = projection.as_ref() {
+                let s = exec.schema();
+                let proj_exprs = projection
+                    .iter()
+                    .map(|c| {
+                        let name = table_cols[*c].get_name();
+                        let col = datafusion::physical_plan::expressions::Column::new(
+                            name,
+                            s.index_of(name)?,
+                        );
+                        let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                        Ok((col, name.clone()))
+                    })
+                    .collect::<Result<Vec<_>, CubeError>>()?;
+                exec = Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
+            }
+            exec
+        } else if let Some(join_columns) = self.index_snapshot.sort_on() {
             let join_columns = join_columns
                 .iter()
                 .map(|c| {

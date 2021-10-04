@@ -50,6 +50,7 @@ pub mod remotefs;
 pub mod scheduler;
 pub mod sql;
 pub mod store;
+pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;
@@ -411,6 +412,18 @@ impl From<tokio::sync::AcquireError> for CubeError {
 impl From<warp::Error> for CubeError {
     fn from(v: warp::Error) -> Self {
         return CubeError::from_error(v);
+    }
+}
+
+impl From<json::Error> for CubeError {
+    fn from(v: json::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<url::ParseError> for CubeError {
+    fn from(v: url::ParseError) -> Self {
+        CubeError::from_error(v)
     }
 }
 

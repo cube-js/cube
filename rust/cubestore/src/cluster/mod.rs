@@ -521,6 +521,9 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
+        // TODO cancellation of orphaned jobs through JoinHandle
+        // TODO no timeouts for streaming jobs
+        // TODO reschedule failed streaming jobs
         let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
         mem::drop(rx);
         heart_beat_timer.await?;
