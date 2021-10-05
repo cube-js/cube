@@ -77,10 +77,106 @@ mod tests {
     use crate::table::parquet::{arrow_schema, ParquetTableStore};
     use crate::table::{Row, TableValue};
     use crate::util::decimal::Decimal;
-    use arrow::array::BooleanArray;
+    use arrow::array::{
+        ArrayRef, BooleanArray, Float64Array, Int64Array, Int64Decimal4Array, StringArray,
+        TimestampMicrosecondArray,
+    };
     use arrow::record_batch::RecordBatch;
+    use itertools::Itertools;
+    use parquet::data_type::DataType;
+    use parquet::file::reader::FileReader;
+    use parquet::file::reader::SerializedFileReader;
+    use parquet::file::statistics::{Statistics, TypedStatistics};
+    use pretty_assertions::assert_eq;
     use std::sync::Arc;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn column_statistics() {
+        let index = Index::try_new(
+            "table".to_string(),
+            1,
+            vec![
+                Column::new("str".to_string(), ColumnType::String, 0),
+                Column::new("int".to_string(), ColumnType::Int, 1),
+                Column::new("time".to_string(), ColumnType::Timestamp, 2),
+                Column::new(
+                    "decimal".to_string(),
+                    ColumnType::Decimal {
+                        scale: 4,
+                        precision: 5,
+                    },
+                    3,
+                ),
+                Column::new("float".to_string(), ColumnType::Float, 4),
+                Column::new("bool".to_string(), ColumnType::Boolean, 5),
+            ],
+            6,
+        )
+        .unwrap();
+
+        let dest_file = NamedTempFile::new().unwrap();
+        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+
+        let data: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec![
+                Some("b"),
+                None,
+                Some("ab"),
+                Some("abc"),
+            ])),
+            Arc::new(Int64Array::from(vec![None, Some(3), Some(1), Some(2)])),
+            Arc::new(TimestampMicrosecondArray::from(vec![
+                Some(6),
+                Some(4),
+                None,
+                Some(5),
+            ])),
+            Arc::new(Int64Decimal4Array::from(vec![
+                Some(9),
+                Some(7),
+                Some(8),
+                None,
+            ])),
+            Arc::new(Float64Array::from(vec![
+                Some(3.3),
+                None,
+                Some(1.1),
+                Some(2.2),
+            ])),
+            Arc::new(BooleanArray::from(vec![
+                None,
+                Some(true),
+                Some(false),
+                Some(true),
+            ])),
+        ];
+        // TODO: check floats use total_cmp.
+
+        store
+            .write_data(dest_file.path().to_str().unwrap(), data)
+            .unwrap();
+
+        let r = SerializedFileReader::new(dest_file.into_file()).unwrap();
+
+        assert_eq!(r.num_row_groups(), 1);
+        let columns = r.metadata().row_group(0).columns();
+        let columns = columns
+            .iter()
+            .map(|c| print_min_max(c.statistics()))
+            .join("\n");
+
+        assert_eq!(
+            columns,
+            // strings shown as byte arrays. 97, 98, 99 are codes for 'a', 'b', 'c'.
+            "min: [97, 98], max: [98]\
+           \nmin: 1, max: 3\
+           \nmin: 4, max: 6\
+           \nmin: 7, max: 9\
+           \nmin: 1.1, max: 3.3\
+           \nmin: false, max: true"
+        );
+    }
 
     #[tokio::test]
     async fn gutter() {
@@ -272,5 +368,26 @@ mod tests {
         w.write_data(file, data.clone()).unwrap();
         let r = concat_record_batches(&w.read_columns(file).unwrap());
         assert_eq_columns!(r.columns(), &data);
+    }
+
+    fn print_min_max_typed<T: DataType>(s: &TypedStatistics<T>) -> String {
+        format!("min: {}, max: {}", s.min(), s.max())
+    }
+
+    fn print_min_max(s: Option<&Statistics>) -> String {
+        let s = match s {
+            Some(s) => s,
+            None => return "<null>".to_string(),
+        };
+        match s {
+            Statistics::Boolean(t) => print_min_max_typed(t),
+            Statistics::Int32(t) => print_min_max_typed(t),
+            Statistics::Int64(t) => print_min_max_typed(t),
+            Statistics::Int96(t) => print_min_max_typed(t),
+            Statistics::Float(t) => print_min_max_typed(t),
+            Statistics::Double(t) => print_min_max_typed(t),
+            Statistics::ByteArray(t) => print_min_max_typed(t),
+            Statistics::FixedLenByteArray(t) => print_min_max_typed(t),
+        }
     }
 }
