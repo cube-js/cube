@@ -302,10 +302,17 @@ impl CubeTable {
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
         let projection_with_seq_column = projection.as_ref().map(|p| {
-            if let Some(seq_column) = self.index_snapshot.table_path.table.get_row().seq_column() {
+            let table = self.index_snapshot.table_path.table.get_row();
+            if let Some(mut key_columns) = table.unique_key_columns() {
+                key_columns.push(table.seq_column().expect(&format!(
+                    "Seq column is undefined for table: {}",
+                    table.get_table_name()
+                )));
                 let mut with_seq = p.clone();
-                if !with_seq.iter().any(|s| *s == seq_column.get_index()) {
-                    with_seq.push(seq_column.get_index());
+                for column in key_columns {
+                    if !with_seq.iter().any(|s| *s == column.get_index()) {
+                        with_seq.push(column.get_index());
+                    }
                 }
                 with_seq
             } else {

@@ -303,7 +303,8 @@ export class BaseDriver {
     return this.uploadTableWithIndexes(table, columns, tableData, []);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

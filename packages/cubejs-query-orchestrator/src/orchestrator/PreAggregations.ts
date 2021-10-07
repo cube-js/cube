@@ -898,7 +898,7 @@ export class PreAggregationLoader {
 
     await saveCancelFn(
       externalDriver.uploadTableWithIndexes(
-        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry)
+        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
       )
     );
 

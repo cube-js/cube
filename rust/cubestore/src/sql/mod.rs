@@ -599,7 +599,7 @@ impl SqlService for SqlServiceImpl {
                     };
                     let source = self
                         .db
-                        .create_or_update_source(name.to_string(), creds?)
+                        .create_or_update_source(name.value.to_string(), creds?)
                         .await?;
                     Ok(Arc::new(DataFrame::from(vec![source])))
                 } else {

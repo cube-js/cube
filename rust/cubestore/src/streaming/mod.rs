@@ -2,6 +2,7 @@ use crate::config::injection::DIService;
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
+use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
@@ -236,10 +237,8 @@ impl KSqlStreamingSource {
                                     ColumnType::Timestamp => {
                                         match value {
                                             // TODO schema conversions
-                                            JsonValue::Short(v) => Ok(TableValue::String(v.to_string())),
-                                            JsonValue::String(v) => Ok(TableValue::String(v.to_string())),
-                                            JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.into()))),
-                                            JsonValue::Boolean(v) => Ok(TableValue::Boolean(v)),
+                                            JsonValue::Short(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
+                                            JsonValue::String(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
                                             JsonValue::Null => Ok(TableValue::Null),
                                             x => Err(CubeError::internal(format!(
                                                 "ksql source returned {:?} as row value but only primitive values are supported",
@@ -332,7 +331,7 @@ impl StreamingSource for KSqlStreamingSource {
         }
         let res = builder
             .json(&KSqlQuery {
-                sql: format!("SELECT * FROM {} EMIT CHANGES;", self.table),
+                sql: format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
             })
             .send()
             .await?;
