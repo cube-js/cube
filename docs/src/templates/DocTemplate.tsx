@@ -66,6 +66,7 @@ const MyH3 = (props) => {
   }
   return <h3 name={kebabCase(props.children)} {...props} />;
 };
+const MyH4 = (props) => <h4 name={kebabCase(props.children)} {...props} />;
 
 const components = {
   DangerBox,
@@ -80,6 +81,7 @@ const components = {
   GitHubFolderLink,
   h2: MyH2,
   h3: MyH3,
+  h4: MyH4,
 };
 
 const MDX = (props) => (
