@@ -3867,7 +3867,7 @@ async fn ksql_simple(service: Box<dyn SqlClient>) {
             .unwrap();
 
         service.exec_query("CREATE SCHEMA test").await.unwrap();
-        service.exec_query("CREATE TABLE test.events_by_type (event text, count int) unique key (event) location 'stream://ksql/events_by_type'").await.unwrap();
+        service.exec_query("CREATE TABLE test.events_by_type (event text, count int) unique key (event) location 'stream://ksql/EVENTS_BY_TYPE'").await.unwrap();
         for _ in 0..100 {
             let res = service
                 .exec_query(
