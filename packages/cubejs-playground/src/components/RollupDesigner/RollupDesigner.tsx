@@ -285,7 +285,7 @@ export function RollupDesigner({
           . Please consider removing not additive measures like `countDistinct`
           or `avg`. You can also try to use{' '}
           <Link
-            href="https://cube.dev/docs/schema/reference/pre-aggregations#type-originalsql"
+            href="https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-originalsql"
             target="_blank"
           >
             originalSql
