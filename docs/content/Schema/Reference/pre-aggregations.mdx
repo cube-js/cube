@@ -157,9 +157,14 @@ version.
 </WarningBox>
 
 Cube.js is capable of performing joins between separate pre-aggregations,
-thereby avoiding a call to the source database. This functionality also allows
-for cross-database joins; you can have a data schema for a MySQL database,
-another for Postgres, and then use `rollupJoin` to join their pre-aggregations:
+thereby avoiding excessive queries to the source database.
+
+In the following example, we have a `Users` cube with a `usersRollup`
+pre-aggregation, and an `Orders` cube with an `ordersRollup` pre-aggregation,
+and an `ordersWithUsersRollup` pre-aggregation. Note the type of
+`ordersWithUsersRollup` is `rollupJoin`, and that this pre-aggregation has a
+special property `rollups` which is an array containing references to both
+"source" rollups.
 
 ```javascript
 // `schema/Users.js` - a schema representing all users, retrieved from MySQL
@@ -510,8 +515,8 @@ You can incrementally refresh partitioned rollups by setting
 <WarningBox>
 
 Partition tables are refreshed as a whole. When a new partition table is
-available, it replaces the old one. Old partition tables are collected by
-a garbage collection mechanism. Append is never used to add new rows to the
+available, it replaces the old one. Old partition tables are collected by a
+garbage collection mechanism. Append is never used to add new rows to the
 existing tables.
 
 </WarningBox>
@@ -584,8 +589,8 @@ underlying SQL calculations every time it builds new rollup tables.
 
 `originalSql` pre-aggregations **must only** be used when [storing
 pre-aggregations on the source database][ref-caching-using-preaggs-internal].
-This also means that `originalSql` pre-aggregations require `readOnly: false`
-to be set on their respective database driver.
+This also means that `originalSql` pre-aggregations require `readOnly: false` to
+be set on their respective database driver.
 
 </WarningBox>
 
