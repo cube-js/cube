@@ -118,15 +118,15 @@ lazy_static! {
 
 impl Config {
     pub fn default() -> Config {
-        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
+        let query_timeout = env::var("CUBESQL_QUERY_TIMEOUT")
             .ok()
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                bind_address: Some(env::var("CUBESTORE_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESTORE_PORT")
+                bind_address: Some(env::var("CUBESQL_BIND_ADDR").ok().unwrap_or(
+                    format!("0.0.0.0:{}", env::var("CUBESQL_PORT")
                             .ok()
                             .map(|v| v.parse::<u16>().unwrap())
                             .unwrap_or(3306u16)),
