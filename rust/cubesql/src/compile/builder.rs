@@ -107,19 +107,19 @@ impl QueryBuilder {
                 measures: Some(self.measures.clone()),
                 dimensions: Some(self.dimensions.clone()),
                 segments: Some(self.segments.clone()),
-                time_dimensions: if self.time_dimensions.len() > 0 {
+                time_dimensions: if !self.time_dimensions.is_empty() {
                     Some(self.time_dimensions.clone())
                 } else {
                     None
                 },
-                order: if self.order.len() > 0 {
+                order: if !self.order.is_empty() {
                     Some(self.order.clone())
                 } else {
                     None
                 },
                 limit: self.limit,
                 offset: self.offset,
-                filters: if self.filters.len() > 0 {
+                filters: if !self.filters.is_empty() {
                     Some(self.filters.clone())
                 } else {
                     None

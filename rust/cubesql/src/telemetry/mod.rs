@@ -49,7 +49,7 @@ impl EventSender {
                 let mut events = self.events.lock().await;
                 mem::swap(&mut to_send, &mut events);
             }
-            if let Err(_) = EventSender::send_events(to_send).await {
+            if EventSender::send_events(to_send).await.is_err() {
                 // println!("Send Error: {}", e);
             }
         }
@@ -93,9 +93,9 @@ impl EventSender {
                 return Ok(());
             }
         }
-        Err(CubeError::internal(format!(
-            "Send events error: shouldn't get there"
-        )))
+        Err(CubeError::internal(
+            "Send events error: shouldn't get there".to_string(),
+        ))
     }
 }
 

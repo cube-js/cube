@@ -13,9 +13,7 @@ use log::error;
 use mockall::automock;
 
 use std::env;
-use std::fmt::Display;
 
-use std::str::FromStr;
 use std::sync::Arc;
 
 use tokio::task::JoinHandle;

@@ -104,7 +104,7 @@ pub async fn get_service<T: ?Sized + Send + Sync + 'static>(
         .read()
         .await
         .get(name)
-        .expect(&format!("Service is not found: {}", name))
+        .unwrap_or_else(|| panic!("Service is not found: {}", name))
         .read()
         .await
         .is_none()
@@ -120,7 +120,7 @@ pub async fn get_service<T: ?Sized + Send + Sync + 'static>(
             let factories = injector.factories.read().await;
             let factory = factories
                 .get(name)
-                .expect(&format!("Service not found: {}", name));
+                .unwrap_or_else(|| panic!("Service not found: {}", name));
             let service = factory(injector.clone()).await;
             // println!("Setting service: {}", name);
             *service_opt = Some(service);

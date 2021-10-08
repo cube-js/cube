@@ -115,7 +115,7 @@ impl Row {
                 ColumnType::MYSQL_TYPE_TINY => {
                     let column_value = match value {
                         serde_json::Value::Null => TableValue::Null,
-                        serde_json::Value::Bool(v) => TableValue::Boolean(v.clone()),
+                        serde_json::Value::Bool(v) => TableValue::Boolean(*v),
                         v => {
                             error!(
                                 "Unable to map value {:?} to MYSQL_TYPE_TINY (boolean) (returning null)",

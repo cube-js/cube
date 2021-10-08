@@ -34,7 +34,7 @@ impl SchemaServiceDefaultImpl {
         cube_config.bearer_access_token = Some(ctx.access_token.clone());
         cube_config.base_path = ctx.base_path.clone();
 
-        return cube_config;
+        cube_config
     }
 }
 
@@ -43,7 +43,7 @@ crate::di_service!(SchemaServiceDefaultImpl, [SchemaService]);
 #[async_trait]
 impl SchemaService for SchemaServiceDefaultImpl {
     async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
-        let response = cube_api::meta_v1(&self.get_client_config_for_ctx(&ctx)).await?;
+        let response = cube_api::meta_v1(&self.get_client_config_for_ctx(ctx)).await?;
 
         let ctx = if let Some(cubes) = response.cubes {
             TenantContext { cubes }
@@ -64,7 +64,7 @@ impl SchemaService for SchemaServiceDefaultImpl {
             query_type: Some("multi".to_string()),
         };
         let response =
-            cube_api::load_v1(&self.get_client_config_for_ctx(&ctx), Some(request)).await?;
+            cube_api::load_v1(&self.get_client_config_for_ctx(ctx), Some(request)).await?;
 
         Ok(response)
     }

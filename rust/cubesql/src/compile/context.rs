@@ -60,10 +60,10 @@ impl QueryContext {
             if let Some(r) = self.aliases.get(column_name) {
                 // @todo Resolve without match!
                 match r {
-                    Selection::Dimension(d) => return Some(Selection::Dimension(d.clone())),
-                    Selection::Measure(d) => return Some(Selection::Measure(d.clone())),
+                    Selection::Dimension(d) => Some(Selection::Dimension(d.clone())),
+                    Selection::Measure(d) => Some(Selection::Measure(d.clone())),
                     Selection::TimeDimension(d, g) => {
-                        return Some(Selection::TimeDimension(d.clone(), g.clone()))
+                        Some(Selection::TimeDimension(d.clone(), g.clone()))
                     }
                     s => panic!("Unable to map this selection type: {:?}", s),
                 }
@@ -98,15 +98,11 @@ impl QueryContext {
         // MAKEDATE(YEAR(order_date), 1) + INTERVAL QUARTER(order_date) QUARTER - INTERVAL 1 QUARTER
         {
             let left_regexp = Regex::new(r"MAKEDATE\(YEAR\((?P<column>[a-z_]+)\), 1\) \+ INTERVAL QUARTER\([a-zA-Z_]+\) QUARTER - INTERVAL 1 QUARTER").unwrap();
-            if let Some(identifiers) = left_regexp.captures(&expr_as_str) {
-                let identifier = identifiers.name(&"column").unwrap().as_str();
-                let result = if let Some(dimension) =
-                    self.find_dimension_for_identifier(&identifier.to_string())
-                {
-                    Some(Selection::TimeDimension(dimension, "quarter".to_string()))
-                } else {
-                    None
-                };
+            if let Some(identifiers) = left_regexp.captures(expr_as_str) {
+                let identifier = identifiers.name("column").unwrap().as_str();
+                let result = self
+                    .find_dimension_for_identifier(&identifier.to_string())
+                    .map(|dimension| Selection::TimeDimension(dimension, "quarter".to_string()));
 
                 return Ok(result);
             };
@@ -120,14 +116,10 @@ impl QueryContext {
         expr: &ast::Expr,
     ) -> CompilationResult<Option<Selection>> {
         match expr {
-            ast::Expr::BinaryOp { .. } => {
-                return Ok(self.find_selection_for_binary_op(&expr.to_string())?);
-            }
-            ast::Expr::Function(f) => {
-                return Ok(self.find_selection_for_function(&f)?);
-            }
+            ast::Expr::BinaryOp { .. } => self.find_selection_for_binary_op(&expr.to_string()),
+            ast::Expr::Function(f) => self.find_selection_for_function(f),
             ast::Expr::Identifier(i) => {
-                return Ok(self.find_selection_for_identifier(&i.value.to_string(), false));
+                Ok(self.find_selection_for_identifier(&i.value.to_string(), false))
             }
             _ => {
                 return Err(CompilationError::Unsupported(format!(
@@ -291,10 +283,7 @@ impl QueryContext {
                             .to_lowercase()
                             .eq(&possible_dimension_name)
                     }) {
-                        Ok(Some(Selection::TimeDimension(
-                            r.clone(),
-                            granularity.clone(),
-                        )))
+                        Ok(Some(Selection::TimeDimension(r.clone(), granularity)))
                     } else {
                         Ok(None)
                     }
@@ -320,7 +309,7 @@ impl QueryContext {
                 _ => Ok(None),
             }
         } else if aggregate_functions.contains(&fn_name.as_str()) {
-            if f.args.len() == 0 {
+            if f.args.is_empty() {
                 return Err(CompilationError::User(
                     "Unable to use aggregation function without arguments".to_string(),
                 ));
@@ -353,7 +342,7 @@ impl QueryContext {
                 ));
             }
 
-            let mut call_agg_type = fn_name.clone();
+            let mut call_agg_type = fn_name;
 
             if f.distinct {
                 call_agg_type += &"Distinct".to_string();
@@ -393,7 +382,7 @@ impl QueryContext {
                                 // @todo Should we throw an exception?
                             };
 
-                            Ok(Some(Selection::Measure(measure.clone())))
+                            Ok(Some(Selection::Measure(measure)))
                         }
                         Selection::Dimension(t) | Selection::TimeDimension(t, _) => {
                             Err(CompilationError::User(format!(
@@ -412,7 +401,7 @@ impl QueryContext {
                     Ok(None)
                 }
             }
-        } else if fn_name.to_string().to_lowercase().eq("measure") {
+        } else if fn_name.to_lowercase().eq("measure") {
             if f.args.len() == 1 {
                 let possible_measure_name = self.unpack_identifier_from_arg(&f.args[0])?;
 

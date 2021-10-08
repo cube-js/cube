@@ -71,12 +71,12 @@ fn compile_select_expr(
     builder: &mut QueryBuilder,
     mb_alias: Option<String>,
 ) -> CompilationResult<()> {
-    if let Some(selection) = ctx.find_selection_for_expr(&expr)? {
+    if let Some(selection) = ctx.find_selection_for_expr(expr)? {
         match selection {
             Selection::TimeDimension(dimension, granularity) => {
                 if let Some(alias) = mb_alias.clone() {
                     ctx.with_alias(
-                        alias.clone(),
+                        alias,
                         Selection::TimeDimension(dimension.clone(), granularity.clone()),
                     );
                 };
@@ -84,7 +84,7 @@ fn compile_select_expr(
                 builder.with_time_dimension(
                     V1LoadRequestQueryTimeDimension {
                         dimension: dimension.name.clone(),
-                        granularity: granularity.clone(),
+                        granularity,
                         date_range: None,
                     },
                     CompiledQueryFieldMeta {
@@ -96,7 +96,7 @@ fn compile_select_expr(
             }
             Selection::Measure(measure) => {
                 if let Some(alias) = mb_alias.clone() {
-                    ctx.with_alias(alias.clone(), Selection::Measure(measure.clone()));
+                    ctx.with_alias(alias, Selection::Measure(measure.clone()));
                 };
 
                 builder.with_measure(
@@ -110,7 +110,7 @@ fn compile_select_expr(
             }
             Selection::Dimension(dimension) => {
                 if let Some(alias) = mb_alias.clone() {
-                    ctx.with_alias(alias.clone(), Selection::Dimension(dimension.clone()));
+                    ctx.with_alias(alias, Selection::Dimension(dimension.clone()));
                 };
 
                 builder.with_dimension(
@@ -161,13 +161,11 @@ impl TryFrom<CompiledExpression> for String {
             } else {
                 "false".to_string()
             }),
-            CompiledExpression::StringLiteral(v) => Ok(v.to_string()),
+            CompiledExpression::StringLiteral(v) => Ok(v),
             CompiledExpression::DateLiteral(date) => Ok(date.to_rfc3339()),
-            CompiledExpression::NumberLiteral(n, is_negative) => Ok(format!(
-                "{}{}",
-                if is_negative { "-" } else { "" },
-                n.to_string()
-            )),
+            CompiledExpression::NumberLiteral(n, is_negative) => {
+                Ok(format!("{}{}", if is_negative { "-" } else { "" }, n))
+            }
             _ => Err(CompilationError::Internal(format!(
                 "Unable to convert CompiledExpression to String: {:?}",
                 value
@@ -212,9 +210,7 @@ fn compile_expression(
         ast::Expr::UnaryOp { expr, op } => match op {
             ast::UnaryOperator::Minus => match *expr.clone() {
                 ast::Expr::Value(value) => match value {
-                    ast::Value::Number(v, _) => {
-                        Ok(CompiledExpression::NumberLiteral(v.clone(), true))
-                    }
+                    ast::Value::Number(v, _) => Ok(CompiledExpression::NumberLiteral(v, true)),
                     _ => Err(CompilationError::User(format!(
                         "Unsupported value: {:?}",
                         value
@@ -307,8 +303,8 @@ fn compiled_binary_op_expr(
     right: &Box<ast::Expr>,
     ctx: &QueryContext,
 ) -> CompilationResult<CompiledFilterTree> {
-    let left = compile_expression(&left, ctx)?;
-    let right = compile_expression(&right, ctx)?;
+    let left = compile_expression(left, ctx)?;
+    let right = compile_expression(right, ctx)?;
 
     let (selection_to_filter, filter) = match (&left, &right) {
         (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
@@ -371,9 +367,9 @@ fn compiled_binary_op_expr(
                     if *v {
                         CompiledFilter::SegmentFilter { member }
                     } else {
-                        return Err(CompilationError::Unsupported(format!(
-                            "Unable to use false as value for filtering segment",
-                        )));
+                        return Err(CompilationError::Unsupported(
+                            "Unable to use false as value for filtering segment".to_string(),
+                        ));
                     }
                 }
                 _ => {
@@ -448,8 +444,8 @@ fn compiled_binary_op_logical(
     right: &Box<ast::Expr>,
     ctx: &QueryContext,
 ) -> CompilationResult<CompiledFilterTree> {
-    let left = compile_where_expression(&left, ctx)?;
-    let right = compile_where_expression(&right, ctx)?;
+    let left = compile_where_expression(left, ctx)?;
+    let right = compile_where_expression(right, ctx)?;
 
     match op {
         ast::BinaryOperator::And => Ok(binary_op_create_node_and(left, right)?),
@@ -631,7 +627,7 @@ fn optimize_where_filters(
                     } => {
                         if operator.eq(&"inDateRange".to_string()) {
                             let filter_pushdown = builder.push_date_range_for_time_dimenssion(
-                                &member,
+                                member,
                                 json!(values.as_ref().unwrap()),
                             );
                             if filter_pushdown {
@@ -807,7 +803,7 @@ fn compile_order(
     ctx: &QueryContext,
     builder: &mut QueryBuilder,
 ) -> CompilationResult<()> {
-    if order_by.len() > 0 {
+    if !order_by.is_empty() {
         for order_expr in order_by.iter() {
             match &order_expr.expr {
                 ast::Expr::Identifier(i) => {
@@ -884,10 +880,10 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                     }
                 }
                 ast::SelectItem::UnnamedExpr(expr) => {
-                    compile_select_expr(&expr, ctx, &mut builder, None)?
+                    compile_select_expr(expr, ctx, &mut builder, None)?
                 }
                 ast::SelectItem::ExprWithAlias { expr, alias } => {
-                    compile_select_expr(&expr, ctx, &mut builder, Some(alias.to_string()))?
+                    compile_select_expr(expr, ctx, &mut builder, Some(alias.to_string()))?
                 }
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
@@ -934,7 +930,7 @@ fn compile_statement(
         ast::Statement::Query(q) => {
             match &q.body {
                 sqlparser::ast::SetExpr::Select(select) => {
-                    if select.cluster_by.len() > 0 {
+                    if !select.cluster_by.is_empty() {
                         return Err(CompilationError::Unsupported(
                             "Query with CLUSTER BY instruction(s)".to_string(),
                         ));
@@ -953,7 +949,7 @@ fn compile_statement(
                     }
 
                     let from_table = if select.from.len() == 1 {
-                        if select.from[0].joins.len() > 0 {
+                        if !select.from[0].joins.is_empty() {
                             return Err(CompilationError::Unsupported(
                                 "Query with JOIN instruction(s)".to_string(),
                             ));
@@ -1000,22 +996,20 @@ fn compile_statement(
                         compile_order(&q.order_by, &ctx, &mut builder)?;
 
                         if let Some(selection) = &select.selection {
-                            compile_where(&selection, &ctx, &mut builder)?;
+                            compile_where(selection, &ctx, &mut builder)?;
                         }
 
-                        return Ok(builder.build());
+                        Ok(builder.build())
                     } else {
                         return Err(CompilationError::Unknown(format!(
                             "Unknown cube: {}",
-                            table_name.clone()
+                            table_name
                         )));
                     }
                 }
-                _ => {
-                    return Err(CompilationError::Unsupported(
-                        "Unsupported Query".to_string(),
-                    ))
-                }
+                _ => Err(CompilationError::Unsupported(
+                    "Unsupported Query".to_string(),
+                )),
             }
 
             // println!("{:?}", q);
@@ -1035,7 +1029,7 @@ pub fn convert_sql_to_cube_query(
     tenant: &ctx::TenantContext,
 ) -> CompilationResult<CompiledQuery> {
     let dialect = MySqlDialect {};
-    let parse_result = Parser::parse_sql(&dialect, &query);
+    let parse_result = Parser::parse_sql(&dialect, query);
 
     match parse_result {
         Err(error) => Err(CompilationError::User(format!(

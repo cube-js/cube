@@ -431,65 +431,63 @@ impl Backend {
                 ],
                 values
             )))
-        } else {
-            if !ignore {
-                trace!("query was not detected");
+        } else if !ignore {
+            trace!("query was not detected");
 
-                let auth_ctx = if self.context.is_some() {
-                    self.context.as_ref().unwrap()
-                } else {
-                    return Err(CubeError::user("must be auth".to_string()))
-                };
+            let auth_ctx = if self.context.is_some() {
+                self.context.as_ref().unwrap()
+            } else {
+                return Err(CubeError::user("must be auth".to_string()))
+            };
 
-                let ctx = self.schema
-                    .get_ctx_for_tenant(&auth_ctx)
-                    .await?;
+            let ctx = self.schema
+                .get_ctx_for_tenant(auth_ctx)
+                .await?;
 
-                let compiled_query = convert_sql_to_cube_query(&query, &ctx)?;
+            let compiled_query = convert_sql_to_cube_query(&query, &ctx)?;
 
-                debug!("Request {}", json!(compiled_query.request).to_string());
-                debug!("Meta {:?}", compiled_query.meta);
+            debug!("Request {}", json!(compiled_query.request).to_string());
+            debug!("Meta {:?}", compiled_query.meta);
 
-                let response = self.schema
-                    .request(compiled_query.request, &auth_ctx)
-                    .await?;
+            let response = self.schema
+                .request(compiled_query.request, auth_ctx)
+                .await?;
 
-                let mut columns: Vec<dataframe::Column> = vec![];
+            let mut columns: Vec<dataframe::Column> = vec![];
 
-                for column_meta in &compiled_query.meta {
-                    columns.push(dataframe::Column::new(
-                        column_meta.column_to.clone(),
-                        column_meta.column_type.clone()
-                    ));
-                }
-
-                let mut rows: Vec<dataframe::Row> = vec![];
-
-                if let Some(result) = response.results.first() {
-                    debug!("Columns {:?}", columns);
-                    debug!("Hydration mapping {:?}", compiled_query.meta);
-                    trace!("Response from Cube.js {:?}", result.data);
-
-                    for row in result.data.iter() {
-                        if let Some(record) = row.as_object() {
-                            rows.push(
-                                Row::hydrate_from_response(&compiled_query.meta, record)
-                            );
-                        } else {
-                            error!(
-                                "Unable to map row to DataFrame::Row: {:?}, skipping row",
-                                row
-                            );
-                        }
-                    }
-
-                    return Ok(Arc::new(DataFrame::new(
-                        columns,
-                        rows
-                    )))
-                }
-
+            for column_meta in &compiled_query.meta {
+                columns.push(dataframe::Column::new(
+                    column_meta.column_to.clone(),
+                    column_meta.column_type
+                ));
             }
+
+            let mut rows: Vec<dataframe::Row> = vec![];
+
+            if let Some(result) = response.results.first() {
+                debug!("Columns {:?}", columns);
+                debug!("Hydration mapping {:?}", compiled_query.meta);
+                trace!("Response from Cube.js {:?}", result.data);
+
+                for row in result.data.iter() {
+                    if let Some(record) = row.as_object() {
+                        rows.push(
+                            Row::hydrate_from_response(&compiled_query.meta, record)
+                        );
+                    } else {
+                        error!(
+                            "Unable to map row to DataFrame::Row: {:?}, skipping row",
+                            row
+                        );
+                    }
+                }
+
+                return Ok(Arc::new(DataFrame::new(
+                    columns,
+                    rows
+                )))
+            }
+
         }
 
         // if start.elapsed().unwrap().as_millis() > 200 && query_lower.starts_with("select") {
