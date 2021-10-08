@@ -130,6 +130,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
 }
 
@@ -159,6 +160,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
       exportBucket: this.getExportBucket(),
+      resultPrefetch: 1,
       ...config
     };
   }
