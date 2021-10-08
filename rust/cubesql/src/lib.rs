@@ -219,18 +219,18 @@ impl From<hex::FromHexError> for CubeError {
 
 impl From<base64::DecodeError> for CubeError {
     fn from(v: base64::DecodeError) -> Self {
-        return CubeError::from_error(v);
+        CubeError::from_error(v)
     }
 }
 
 impl From<tempfile::PathPersistError> for CubeError {
     fn from(v: tempfile::PathPersistError) -> Self {
-        return CubeError::from_error(v);
+        CubeError::from_error(v)
     }
 }
 
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
-        return CubeError::from_error(v);
+        CubeError::from_error(v)
     }
 }
