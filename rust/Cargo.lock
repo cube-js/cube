@@ -1040,6 +1040,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "cubesql"
+version = "0.28.0"
+dependencies = [
+ "async-compression",
+ "async-std 0.99.12",
+ "async-trait",
+ "base64 0.13.0",
+ "bigdecimal 0.2.0",
+ "bincode",
+ "bumpalo",
+ "byteorder",
+ "bytes 0.5.6",
+ "chrono",
+ "csv",
+ "cubeclient",
+ "enum_primitive",
+ "futures 0.3.16",
+ "futures-timer 3.0.2",
+ "hex",
+ "http-auth-basic",
+ "itertools 0.9.0",
+ "lazy_static",
+ "log",
+ "lru",
+ "mockall",
+ "msql-srv",
+ "mysql_common 0.26.0",
+ "nanoid",
+ "num 0.3.1",
+ "parquet-format",
+ "paste",
+ "pin-project-lite 0.2.7",
+ "rand 0.8.4",
+ "regex",
+ "reqwest 0.11.4",
+ "scopeguard",
+ "serde",
+ "serde_bytes",
+ "serde_derive",
+ "serde_json",
+ "simple_logger",
+ "smallvec 1.6.1",
+ "sqlparser 0.10.1-alpha.0",
+ "tarpc",
+ "tempfile",
+ "tokio 1.9.0",
+ "tokio-stream",
+ "tokio-util 0.6.7",
+ "tracing",
+ "tracing-futures",
+ "uuid",
+ "warp",
+]
+
+[[package]]
 name = "cubestore"
 version = "0.1.0"
 dependencies = [
@@ -1101,7 +1156,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.6.1",
- "sqlparser",
+ "sqlparser 0.9.0",
  "tarpc",
  "tempfile",
  "tokio 1.9.0",
@@ -1166,7 +1221,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.5",
  "smallvec 1.6.1",
- "sqlparser",
+ "sqlparser 0.9.0",
  "tokio 1.9.0",
  "tokio-stream",
  "tracing",
@@ -4082,6 +4137,14 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 name = "sqlparser"
 version = "0.9.0"
 source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=c3c77dd2aa408a7cb0c9f27e5e9fc1b101351dcd#c3c77dd2aa408a7cb0c9f27e5e9fc1b101351dcd"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "sqlparser"
+version = "0.10.1-alpha.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff#c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff"
 dependencies = [
  "log",
 ]
