@@ -96,9 +96,6 @@ pub trait ConfigObj: DIService {
 
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
-    pub cube_url: String,
-    pub cube_token: String,
-    //
     pub bind_address: Option<String>,
     pub query_timeout: u64,
 }
@@ -121,31 +118,6 @@ lazy_static! {
         tokio::sync::RwLock::new(false);
 }
 
-fn env_bool(name: &str, default: bool) -> bool {
-    env::var(name)
-        .ok()
-        .map(|x| match x.as_str() {
-            "0" => false,
-            "1" => true,
-            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
-        })
-        .unwrap_or(default)
-}
-
-fn env_parse<T>(name: &str, default: T) -> T
-where
-    T: FromStr,
-    T::Err: Display,
-{
-    env::var(name)
-        .ok()
-        .map(|x| match x.parse::<T>() {
-            Ok(v) => v,
-            Err(e) => panic!("could not parse value for '{}': {}", name, e),
-        })
-        .unwrap_or(default)
-}
-
 impl Config {
     pub fn default() -> Config {
         let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
@@ -155,14 +127,6 @@ impl Config {
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                // cube_url: env::var("CUBESQL_CUBE_URL")
-                //     .ok()
-                //     .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
-                // cube_token: env::var("CUBESQL_CUBE_TOKEN")
-                //     .ok()
-                //     .unwrap_or_else(|| panic!("CUBESQL_CUBE_TOKEN is a required ENV variable")),
-                cube_url: "will be overided in transport".to_string(),
-                cube_token: "will be overided in transport".to_string(),
                 bind_address: Some(env::var("CUBESTORE_BIND_ADDR").ok().unwrap_or(
                     format!("0.0.0.0:{}", env::var("CUBESTORE_PORT")
                             .ok()
@@ -179,8 +143,6 @@ impl Config {
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                cube_url: "test".to_string(),
-                cube_token: "test".to_string(),
                 bind_address: None,
                 query_timeout,
             }),
