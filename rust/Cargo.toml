@@ -6,4 +6,5 @@ members = [
     "cubehll",
     "cubezetasketch",
     "cuberpc",
+    "cubeclient"
 ]
