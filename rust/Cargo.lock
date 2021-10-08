@@ -1007,7 +1007,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tokio 1.9.0",
- "truelayer-extensions",
  "url",
  "uuid",
  "wiremock",
@@ -1049,24 +1048,17 @@ dependencies = [
  "byteorder",
  "bytes 0.5.6",
  "chrono",
- "csv",
  "cubeclient",
- "enum_primitive",
  "futures 0.3.16",
- "futures-timer 3.0.2",
  "lazy_static",
  "log",
- "lru",
  "mockall",
  "msql-srv",
  "mysql_common 0.26.0",
  "nanoid",
- "num 0.3.1",
- "paste",
  "regex",
  "reqwest 0.11.4",
  "serde",
- "serde_bytes",
  "serde_derive",
  "serde_json",
  "simple_logger",
@@ -1074,8 +1066,6 @@ dependencies = [
  "sqlparser 0.10.1-alpha.0",
  "tokio 1.9.0",
  "tokio-util 0.6.7",
- "tracing",
- "tracing-futures",
  "uuid",
 ]
 
@@ -4811,15 +4801,6 @@ name = "treeline"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
-
-[[package]]
-name = "truelayer-extensions"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f736ce5fd1e4fa5d0208ac4d663f31bb773f49c3a960ff242165072dea41e3"
-dependencies = [
- "tokio 1.9.0",
-]
 
 [[package]]
 name = "try-lock"

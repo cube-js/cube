@@ -23,7 +23,7 @@ use crate::mysql::dataframe::DataFrame;
 use crate::mysql::dataframe::Row;
 use crate::mysql::dataframe::TableValue;
 use crate::schema::V1CubeMetaExt;
-use crate::schema::{SchemaService, V1CubeMetaDimensionExt};
+use crate::schema::{SchemaService};
 use crate::CubeError;
 use sqlparser::ast::{ShowCreateObject, Statement};
 
