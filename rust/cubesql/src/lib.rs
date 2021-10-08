@@ -11,7 +11,6 @@
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
 #![feature(arc_new_cyclic)]
-#![feature(str_split_once)]
 #![feature(bindings_after_at)]
 
 #[macro_use]
@@ -140,12 +139,6 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
     }
 }
 
-impl From<bigdecimal::ParseBigDecimalError> for CubeError {
-    fn from(v: bigdecimal::ParseBigDecimalError) -> Self {
-        CubeError::internal(v.to_string())
-    }
-}
-
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
         CubeError::internal(v.to_string())
@@ -211,20 +204,8 @@ impl From<std::num::ParseFloatError> for CubeError {
     }
 }
 
-impl From<hex::FromHexError> for CubeError {
-    fn from(v: hex::FromHexError) -> Self {
-        CubeError::from_error(v)
-    }
-}
-
 impl From<base64::DecodeError> for CubeError {
     fn from(v: base64::DecodeError) -> Self {
-        CubeError::from_error(v)
-    }
-}
-
-impl From<tempfile::PathPersistError> for CubeError {
-    fn from(v: tempfile::PathPersistError) -> Self {
         CubeError::from_error(v)
     }
 }
