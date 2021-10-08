@@ -1007,7 +1007,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tokio 1.9.0",
- "truelayer-extensions",
  "url",
  "uuid",
  "wiremock",
@@ -1037,6 +1036,37 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "cubesql"
+version = "0.28.0"
+dependencies = [
+ "async-trait",
+ "base64 0.13.0",
+ "bincode",
+ "byteorder",
+ "bytes 0.5.6",
+ "chrono",
+ "cubeclient",
+ "futures 0.3.16",
+ "lazy_static",
+ "log",
+ "mockall",
+ "msql-srv",
+ "mysql_common 0.26.0",
+ "nanoid",
+ "regex",
+ "reqwest 0.11.4",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "simple_logger",
+ "smallvec 1.6.1",
+ "sqlparser 0.10.1-alpha.0",
+ "tokio 1.9.0",
+ "tokio-util 0.6.7",
+ "uuid",
 ]
 
 [[package]]
@@ -1101,7 +1131,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.6.1",
- "sqlparser",
+ "sqlparser 0.9.0",
  "tarpc",
  "tempfile",
  "tokio 1.9.0",
@@ -1166,7 +1196,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.5",
  "smallvec 1.6.1",
- "sqlparser",
+ "sqlparser 0.9.0",
  "tokio 1.9.0",
  "tokio-stream",
  "tracing",
@@ -4087,6 +4117,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlparser"
+version = "0.10.1-alpha.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff#c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "standback"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4763,15 +4801,6 @@ name = "treeline"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7f741b240f1a48843f9b8e0444fb55fb2a4ff67293b50a9179dfd5ea67f8d41"
-
-[[package]]
-name = "truelayer-extensions"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f736ce5fd1e4fa5d0208ac4d663f31bb773f49c3a960ff242165072dea41e3"
-dependencies = [
- "tokio 1.9.0",
-]
 
 [[package]]
 name = "try-lock"

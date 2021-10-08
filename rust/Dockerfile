@@ -20,7 +20,9 @@ COPY cubehll cubehll
 COPY cubezetasketch cubezetasketch
 COPY cuberpc cuberpc
 COPY cubestore-sql-tests cubestore-sql-tests
+# @todo CubeSQL & CubeClient will be moved to another workspace in near time.
 COPY cubeclient cubeclient
+COPY cubesql cubesql
 COPY cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs
