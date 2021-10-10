@@ -298,6 +298,7 @@ dependencies = [
  "async-trait",
  "cubeclient",
  "cubesql",
+ "log",
  "neon",
  "serde",
  "serde_derive",

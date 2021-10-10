@@ -20,6 +20,7 @@ async-trait = "0.1.36"
 serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_json = "1.0.56"
+log = "=0.4.11"
 
 [dependencies.neon]
 version = "0.10.0-alpha.2"

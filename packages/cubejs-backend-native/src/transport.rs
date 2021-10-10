@@ -1,3 +1,4 @@
+use log::trace;
 use neon::prelude::*;
 
 use async_trait::async_trait;
@@ -89,10 +90,10 @@ impl NodeBridgeTransport {
 #[async_trait]
 impl SchemaService for NodeBridgeTransport {
     async fn get_ctx_for_tenant(&self, _ctx: &AuthContext) -> Result<TenantContext, CubeError> {
-        println!("[transport] Meta ->");
+        trace!("[transport] Meta ->");
 
         let response: V1MetaResponse = self.send_request(self.on_meta.clone(), None).await?;
-        println!("[transport] Meta <- {:?}", response);
+        trace!("[transport] Meta <- {:?}", response);
 
         Ok(TenantContext {
             cubes: response.cubes.unwrap_or(vec![]),
@@ -104,13 +105,13 @@ impl SchemaService for NodeBridgeTransport {
         query: V1LoadRequestQuery,
         _ctx: &AuthContext,
     ) -> Result<V1LoadResponse, CubeError> {
-        println!("[transport] Request ->");
+        trace!("[transport] Request ->");
 
         let request = serde_json::to_string(&query)?;
         let response: V1LoadResponse = self
             .send_request(self.on_load.clone(), Some(request))
             .await?;
-        println!("[transport] Request <- {:?}", response);
+        trace!("[transport] Request <- {:?}", response);
 
         Ok(response)
     }
