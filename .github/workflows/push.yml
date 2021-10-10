@@ -55,7 +55,13 @@ jobs:
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -188,7 +194,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -256,7 +268,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
