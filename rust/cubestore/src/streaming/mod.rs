@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::SystemTime;
 use warp::hyper::body::Bytes;
 
 #[async_trait]
@@ -93,7 +94,11 @@ impl StreamingService for StreamingServiceImpl {
             .row_stream(
                 table.get_row().get_columns().clone(),
                 seq_column.clone(),
-                0, // TODO store initial sequence number
+                (SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis()
+                    * 1000) as u64, // TODO store initial sequence number
             )
             .await?;
 
@@ -110,6 +115,7 @@ impl StreamingService for StreamingServiceImpl {
             for row in rows {
                 append_row(&mut builders, table_cols, &row);
             }
+            // TODO send to node which owns the partition
             let new_chunks = self
                 .chunk_store
                 .partition_data(

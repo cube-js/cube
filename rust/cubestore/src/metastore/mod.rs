@@ -25,7 +25,7 @@ use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
-use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus};
+use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus, JobType};
 use crate::metastore::partition::PartitionIndexKey;
 use crate::metastore::source::{
     Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
@@ -790,6 +790,15 @@ pub trait MetaStore: DIService + Send + Sync {
 
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
+    async fn get_job_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+    ) -> Result<Option<IdRow<Job>>, CubeError>;
+    async fn get_orphaned_jobs(
+        &self,
+        orphaned_timeout: Duration,
+    ) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
     async fn start_processing_job(
         &self,
@@ -3124,6 +3133,44 @@ impl MetaStore for RocksMetaStore {
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError> {
         self.read_operation(move |db_ref| {
             Ok(JobRocksTable::new(db_ref).get_row_or_not_found(job_id)?)
+        })
+        .await
+    }
+
+    async fn get_job_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let result = jobs_table.get_rows_by_index(
+                &JobIndexKey::RowReference(row_reference, job_type),
+                &JobRocksIndex::RowReference,
+            )?;
+            Ok(result.into_iter().next())
+        })
+        .await
+    }
+
+    async fn get_orphaned_jobs(
+        &self,
+        orphaned_timeout: Duration,
+    ) -> Result<Vec<IdRow<Job>>, CubeError> {
+        let duration = chrono::Duration::from_std(orphaned_timeout).unwrap();
+        self.read_operation(move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let time = Utc::now();
+            let all_jobs = jobs_table
+                .all_rows()?
+                .into_iter()
+                .filter(|j| {
+                    let duration1 =
+                        time.signed_duration_since(j.get_row().last_heart_beat().clone());
+                    duration1 > duration
+                })
+                .collect::<Vec<_>>();
+            Ok(all_jobs)
         })
         .await
     }

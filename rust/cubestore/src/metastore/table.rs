@@ -132,6 +132,10 @@ impl Table {
             .as_ref()
             .map(|c| &self.columns[*c as usize])
     }
+
+    pub fn is_stream_location(location: &str) -> bool {
+        location.starts_with("stream:")
+    }
 }
 
 impl Column {

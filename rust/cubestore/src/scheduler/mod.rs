@@ -1,12 +1,15 @@
 use crate::cluster::Cluster;
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
+use crate::metastore::table::Table;
 use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
+use crate::util::WorkerLoop;
 use crate::CubeError;
 use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::time::Duration;
+use futures_timer::Delay;
 use log::error;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
@@ -25,6 +28,7 @@ pub struct SchedulerImpl {
     gc_loop: Mutex<DataGCLoop>,
     gc_sender: UnboundedSender<GCTimedTask>,
     config: Arc<dyn ConfigObj>,
+    reconcile_loop: WorkerLoop,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -50,6 +54,7 @@ impl SchedulerImpl {
             gc_loop: Mutex::new(gc_loop),
             gc_sender,
             config,
+            reconcile_loop: WorkerLoop::new("Reconcile"),
         }
     }
 
@@ -57,6 +62,7 @@ impl SchedulerImpl {
         scheduler: Arc<SchedulerImpl>,
     ) -> Vec<JoinHandle<Result<(), CubeError>>> {
         let scheduler2 = scheduler.clone();
+        let scheduler3 = scheduler.clone();
         vec![
             cube_ext::spawn(async move {
                 let mut gc_loop = scheduler
@@ -67,6 +73,17 @@ impl SchedulerImpl {
                 Ok(())
             }),
             cube_ext::spawn(async move { Self::run_scheduler(scheduler2).await }),
+            cube_ext::spawn(async move {
+                scheduler3
+                    .reconcile_loop
+                    .process(
+                        scheduler3.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(30)).await),
+                        async move |s, _| s.reconcile().await,
+                    )
+                    .await;
+                Ok(())
+            }),
         ]
     }
 
@@ -96,8 +113,45 @@ impl SchedulerImpl {
         }
     }
 
+    pub async fn reconcile(&self) -> Result<(), CubeError> {
+        let orphaned_jobs = self
+            .meta_store
+            .get_orphaned_jobs(Duration::from_secs(120))
+            .await?;
+        for job in orphaned_jobs {
+            log::info!("Removing orphaned job: {:?}", job);
+            self.meta_store.delete_job(job.get_id()).await?;
+        }
+        // Using get_tables_with_path due to it's cached
+        let tables = self.meta_store.get_tables_with_path().await?;
+        for table in tables.iter() {
+            if table.table.get_row().is_ready() {
+                if let Some(locations) = table.table.get_row().locations() {
+                    for location in locations.iter() {
+                        if Table::is_stream_location(location) {
+                            let job = self
+                                .meta_store
+                                .get_job_by_ref(
+                                    RowKey::Table(TableId::Tables, table.table.get_id()),
+                                    JobType::TableImportCSV(location.to_string()),
+                                )
+                                .await?;
+                            if job.is_none() {
+                                self.schedule_table_import(table.table.get_id(), &[location])
+                                    .await?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        Ok(self.stop_sender.send(true)?)
+        self.stop_sender.send(true)?;
+        self.reconcile_loop.stop();
+        Ok(())
     }
 
     async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
@@ -204,6 +258,7 @@ impl SchedulerImpl {
                 if let RowKey::Table(TableId::Partitions, partition_id) =
                     job.get_row().row_reference()
                 {
+                    // TODO remove partition itself after chunks are repartitioned
                     if self
                         .meta_store
                         .get_partition_chunk_sizes(*partition_id)

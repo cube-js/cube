@@ -18,6 +18,7 @@ use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::table::Table;
 use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
@@ -503,6 +504,15 @@ impl JobRunner {
         Ok(())
     }
 
+    fn job_timeout(&self, job: &IdRow<Job>) -> Option<Duration> {
+        if let JobType::TableImportCSV(location) = job.get_row().job_type() {
+            if Table::is_stream_location(location) {
+                return None;
+            }
+        }
+        Some(Duration::from_secs(600))
+    }
+
     async fn run_local(&self, job: IdRow<Job>) -> Result<(), CubeError> {
         let start = SystemTime::now();
         let job_id = job.get_id();
@@ -522,9 +532,12 @@ impl JobRunner {
         });
         debug!("Running job: {:?}", job);
         // TODO cancellation of orphaned jobs through JoinHandle
-        // TODO no timeouts for streaming jobs
-        // TODO reschedule failed streaming jobs
-        let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
+        let res = if let Some(duration) = self.job_timeout(&job) {
+            timeout(duration, self.route_job(job.get_row())).await
+        } else {
+            Ok(self.route_job(job.get_row()).await)
+        };
+
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(_) = res {
