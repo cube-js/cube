@@ -16,7 +16,7 @@ use datafusion::cube_ext;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
+use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
@@ -171,7 +171,18 @@ impl CompactionService for CompactionServiceImpl {
             None => Arc::new(EmptyExec::new(false, schema.clone())),
         };
 
-        let records = merge_chunks(key_size, main_table, new).await?;
+        let table = self
+            .meta_store
+            .get_table_by_id(index.get_row().table_id())
+            .await?;
+
+        let records = merge_chunks(
+            key_size,
+            main_table,
+            new,
+            table.get_row().unique_key_columns(),
+        )
+        .await?;
         let count_and_min = write_to_files(
             records,
             total_rows as usize,
@@ -399,6 +410,7 @@ async fn merge_chunks(
     key_size: usize,
     l: Arc<dyn ExecutionPlan>,
     r: Vec<ArrayRef>,
+    unique_key_columns: Option<Vec<&crate::metastore::Column>>,
 ) -> Result<SendableRecordBatchStream, CubeError> {
     let schema = l.schema();
     let r = RecordBatch::try_new(schema.clone(), r)?;
@@ -413,9 +425,24 @@ async fn merge_chunks(
         l,
         Arc::new(MemoryExec::try_new(&[vec![r]], schema, None)?),
     ]);
-    Ok(MergeSortExec::try_new(Arc::new(inputs), key)?
-        .execute(0)
-        .await?)
+    let mut res: Arc<dyn ExecutionPlan> = Arc::new(MergeSortExec::try_new(Arc::new(inputs), key)?);
+
+    if let Some(key_columns) = unique_key_columns {
+        res = Arc::new(LastRowByUniqueKeyExec::try_new(
+            res.clone(),
+            key_columns
+                .iter()
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(
+                        c.get_name().as_str(),
+                        &res.schema(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )?)
+    }
+
+    Ok(res.execute(0).await?)
 }
 
 #[cfg(test)]

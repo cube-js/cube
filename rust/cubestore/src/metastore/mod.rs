@@ -2614,6 +2614,22 @@ impl MetaStore for RocksMetaStore {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = PartitionRocksTable::new(db_ref.clone());
             let chunk_table = ChunkRocksTable::new(db_ref.clone());
+            let indexes_table = IndexRocksTable::new(db_ref.clone());
+            let tables_table = TableRocksTable::new(db_ref.clone());
+
+            // Rows are compacted using unique key columns and totals don't match
+            let skip_row_count_sanity_check = if let Some(current) = current_active.iter().next() {
+                let current_partition =
+                    table.get_row(*current)?.ok_or(CubeError::internal(format!(
+                        "Current partition is not found during swap active: {}",
+                        current
+                    )))?;
+                let index = indexes_table.get_row_or_not_found(current_partition.get_row().get_index_id())?;
+                let table = tables_table.get_row_or_not_found(index.get_row().table_id())?;
+                table.get_row().unique_key_columns().is_some()
+            } else {
+                false
+            };
 
             let mut deactivated_row_count = 0;
             let mut activated_row_count = 0;
@@ -2672,7 +2688,7 @@ impl MetaStore for RocksMetaStore {
                 chunk_table.update_with_fn(*chunk_id, |row| row.deactivate(), batch_pipe)?;
             }
 
-            if activated_row_count != deactivated_row_count {
+            if !skip_row_count_sanity_check && activated_row_count != deactivated_row_count {
                 return Err(CubeError::internal(format!(
                     "Deactivated row count ({}) doesn't match activated row count ({}) during swap of partition ({}) and ({}) chunks to new partitions ({})",
                     deactivated_row_count,
