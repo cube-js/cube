@@ -12,12 +12,12 @@ impl JsAsyncChannel {
         Self { callback }
     }
 
-    fn resolve(&self, result: String) -> () {
+    fn resolve(&self, result: String) {
         let callback = &self.callback;
         callback(Ok(result))
     }
 
-    fn reject(&self) -> () {
+    fn reject(&self) {
         let callback = &self.callback;
         callback(Err(CubeError::internal(
             "Async channel was rejected".to_string(),

@@ -96,7 +96,7 @@ impl SchemaService for NodeBridgeTransport {
         trace!("[transport] Meta <- {:?}", response);
 
         Ok(TenantContext {
-            cubes: response.cubes.unwrap_or(vec![]),
+            cubes: response.cubes.unwrap_or_default(),
         })
     }
 
