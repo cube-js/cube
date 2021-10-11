@@ -5447,7 +5447,7 @@
   dependencies:
     moment-range "*"
 
-"@types/mysql@^2.15.15", "@types/mysql@^2.15.17":
+"@types/mysql@^2.15.15", "@types/mysql@^2.15.17", "@types/mysql@^2.15.19":
   version "2.15.19"
   resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.19.tgz#d158927bb7c1a78f77e56de861a3b15cae0e7aed"
   integrity sha512-wSRg2QZv14CWcZXkgdvHbbV2ACufNy5EgI8mBBxnJIptchv7DBy/h53VMa2jDhyo0C9MO4iowE6z9vF8Ja1DkQ==
@@ -5472,7 +5472,7 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.50.tgz#e9b2e85fafc15f2a8aa8fdd41091b983da5fd6ee"
   integrity sha512-5ImO01Fb8YsEOYpV+aeyGYztcYcjGsBvN4D7G5r1ef2cuQOpymjWNQi5V0rKHE6PC2ru3HkoUr/Br2/8GUA84w==
 
-"@types/node@^10.0.10", "@types/node@^10.17.49", "@types/node@^10.17.51", "@types/node@^10.17.54", "@types/node@^10.17.55", "@types/node@^10.17.60":
+"@types/node@^10", "@types/node@^10.0.10", "@types/node@^10.17.49", "@types/node@^10.17.51", "@types/node@^10.17.54", "@types/node@^10.17.55", "@types/node@^10.17.60":
   version "10.17.60"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-10.17.60.tgz#35f3d6213daed95da7f0f73e75bcc6980e90597b"
   integrity sha512-F0KIgDJfy2nA3zMLmWGKxcH2ZVEtCZXHHdOQs2gSaQ27+lNeEfGxzkIw90aXswATX7AZ33tahPbzy6KAfUreVw==
