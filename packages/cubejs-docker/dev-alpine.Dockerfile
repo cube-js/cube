@@ -8,7 +8,10 @@ ENV CI=0
 
 RUN apk add rxvt-unicode curl
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
+
+ENV PATH=/root/.cargo/bin:$PATH
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
