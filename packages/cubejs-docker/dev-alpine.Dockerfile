@@ -6,7 +6,13 @@ ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 ENV CI=0
 
-RUN apk add rxvt-unicode
+RUN apk add rxvt-unicode curl
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+RUN source $HOME/.cargo/env && \
+    rustup update && \
+    rustup default nightly-2021-07-04 && \
+    rustup component add --toolchain nightly-2021-07-04 rustfmt
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode

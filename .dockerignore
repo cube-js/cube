@@ -19,3 +19,5 @@ packages/cubejs-jdbc-driver
 packages/cubejs-serverless
 packages/cubejs-serverless-aws
 packages/cubejs-serverless-google
+# will be enabled in feature
+packages/cubejs-backend-native
