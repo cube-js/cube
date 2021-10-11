@@ -34,13 +34,14 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let config = NodeConfig::new();
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
+        // @todo await real?
+        channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
+
         runtime.block_on(async move {
             let services = config.configure(Arc::new(transport)).await;
             track_event("Cube SQL Start".to_string(), HashMap::new()).await;
             services.wait_processing_loops().await.unwrap();
         });
-
-        channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
     });
 
     Ok(promise)
