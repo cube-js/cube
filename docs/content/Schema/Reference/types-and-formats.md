@@ -33,7 +33,7 @@ cube('Orders', {
 });
 ```
 
-You can put any sql into `number` measure as soon as it's an aggregate
+You can put any sql into `number` measure as long as it's an aggregate
 expression:
 
 ```javascript
