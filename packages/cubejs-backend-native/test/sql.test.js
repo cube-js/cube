@@ -1,44 +1,35 @@
 const mysql = require('mysql');
 const util = require('util');
 
-const native = require('..');
+const native = require('../dist/lib/index');
 const meta_fixture = require('./meta');
 
 describe('SQLInteface', () => {
   jest.setTimeout(10 * 1000);
 
   it('can start', async () => {
-    const load = async (extra, channel) => {
+    const load = async (extra) => {
       console.log('[js] load',  {
         extra,
-        channel
       });
 
-      native.channel_reject(channel);
+      throw new Error('Unsupported');
     };
 
-    const meta = async (extra, channel) => {
+    const meta = async (extra) => {
         console.log('[js] meta',  {
           extra,
-          channel
         });
 
-        try {
-          native.channel_resolve(channel, JSON.stringify(meta_fixture));
-        } catch (e) {
-          console.log(e);
-
-          native.channel_reject(channel);
-        }
+        return meta_fixture;
     };
 
-    const checkAuth = jest.fn(async (extra, channel) => {
+    const checkAuth = jest.fn(async (extra) => {
       console.log('[js] checkAuth',  {
         extra,
-        channel
       });
 
-      native.channel_resolve(channel, "true");
+      return true;
     });
 
     await native.registerInterface({
@@ -68,7 +59,7 @@ describe('SQLInteface', () => {
     ]);
 
     expect(checkAuth.mock.calls.length).toEqual(1);
-    expect(checkAuth.mock.calls[0][0]).toEqual('"eyJhbGciOiJIUzI1NiJ9.e30.pLPm89qEsoPg-66NIfEJjRQFiW5PYyjfferd4sBx5IU"');
+    expect(checkAuth.mock.calls[0][0]).toEqual('eyJhbGciOiJIUzI1NiJ9.e30.pLPm89qEsoPg-66NIfEJjRQFiW5PYyjfferd4sBx5IU');
 
     connection.destroy();
   })

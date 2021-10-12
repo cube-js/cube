@@ -3,16 +3,17 @@
   "version": "0.28.41",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
-  "main": "index.node",
-  "typings": "lib/index.d.ts",
+  "main": "dist/lib/index.js",
+  "typings": "dist/lib/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cube-js/cube.js.git"
   },
   "scripts": {
+    "tsc": "tsc",
     "build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
-    "build-debug": "npm run build --",
-    "build-release": "npm run build -- --release",
+    "build-debug": "npm run tsc && npm run build --",
+    "build-release": "npm run tsc && npm run build -- --release",
     "install": "echo 'Skipping installation'",
     "upload-binary": "npm run build-release && mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:unit": "jest --verbose --forceExit test",
@@ -22,7 +23,7 @@
     "node": ">=10.8.0"
   },
   "files": [
-    "lib"
+    "dist/lib"
   ],
   "devDependencies": {
     "@types/jest": "^26",
@@ -30,7 +31,8 @@
     "@types/node": "^10",
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
-    "mysql": "^2.18.1"
+    "mysql": "^2.18.1",
+    "typescript": "~4.1.5"
   },
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1",

@@ -31,8 +31,12 @@ impl SqlAuthService for NodeBridgeAuthService {
         trace!("[auth] Request ->");
 
         let request = serde_json::to_string(&user)?;
-        let response: serde_json::Value = call_js_with_channel_as_callback(self.channel.clone(), self.check_auth.clone(), Some(request))
-            .await?;
+        let response: serde_json::Value = call_js_with_channel_as_callback(
+            self.channel.clone(),
+            self.check_auth.clone(),
+            Some(request),
+        )
+        .await?;
         trace!("[auth] Request <- {:?}", response);
 
         Ok(AuthContext {

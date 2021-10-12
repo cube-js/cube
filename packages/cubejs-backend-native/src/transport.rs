@@ -9,7 +9,7 @@ use cubesql::{
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 
-use crate::channel::{JsAsyncChannel, call_js_with_channel_as_callback};
+use crate::channel::{call_js_with_channel_as_callback, JsAsyncChannel};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
@@ -33,7 +33,9 @@ impl SchemaService for NodeBridgeTransport {
     async fn get_ctx_for_tenant(&self, _ctx: &AuthContext) -> Result<TenantContext, CubeError> {
         trace!("[transport] Meta ->");
 
-        let response: V1MetaResponse = call_js_with_channel_as_callback(self.channel.clone(), self.on_meta.clone(), None).await?;
+        let response: V1MetaResponse =
+            call_js_with_channel_as_callback(self.channel.clone(), self.on_meta.clone(), None)
+                .await?;
         trace!("[transport] Meta <- {:?}", response);
 
         Ok(TenantContext {
@@ -49,8 +51,12 @@ impl SchemaService for NodeBridgeTransport {
         trace!("[transport] Request ->");
 
         let request = serde_json::to_string(&query)?;
-        let response: V1LoadResponse = call_js_with_channel_as_callback(self.channel.clone(), self.on_load.clone(), Some(request))
-            .await?;
+        let response: V1LoadResponse = call_js_with_channel_as_callback(
+            self.channel.clone(),
+            self.on_load.clone(),
+            Some(request),
+        )
+        .await?;
         trace!("[transport] Request <- {:?}", response);
 
         Ok(response)
