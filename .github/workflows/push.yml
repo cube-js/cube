@@ -9,6 +9,8 @@ on:
       - 'rust/js-wrapper/**'
       - 'rust/tsconfig.json'
       - 'rust/package.json'
+      - 'rust/cubesql'
+      - 'rust/cubeclient'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -25,6 +27,8 @@ on:
       - 'rust/js-wrapper/**'
       - 'rust/tsconfig.json'
       - 'rust/package.json'
+      - 'rust/cubesql'
+      - 'rust/cubeclient'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -94,6 +98,59 @@ jobs:
         with:
           files: ./packages/*/coverage/clover.xml
           verbose: true # optional (default = false)
+
+  native:
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    needs: [unit, lint, latest-tag-sha]
+    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
+    strategy:
+      matrix:
+        # Node.js - Module Ver
+        # 16 - 93
+        # 15 - 88
+        # 14 - 83
+        # 13 - 79
+        # 12 - 72
+        # 11 - 67
+        # 10 - 64
+        node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
+        os-version: [ubuntu-20.04, macos-11]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build native
+        run: cd packages/cubejs-backend-native && yarn run build && yarn run test:unit
 
   lint:
     runs-on: ubuntu-20.04

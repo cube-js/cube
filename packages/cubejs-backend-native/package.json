@@ -5,20 +5,24 @@
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "index.node",
   "typings": "lib/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cube-js/cube.js.git"
+  },
   "scripts": {
     "build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",
-    "unit": "jest --verbose --forceExit test",
-    "install": "npm run build-release",
-    "test": "cargo test"
+    "install": "echo 'Skipping installation'",
+    "upload-binary": "npm run build-release && mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
+    "test:unit": "jest --verbose --forceExit test",
+    "test:cargo": "cargo test"
   },
   "engines": {
     "node": ">=10.8.0"
   },
   "files": [
-    "lib",
-    "index.node"
+    "lib"
   ],
   "devDependencies": {
     "cargo-cp-artifact": "^0.1",
@@ -29,7 +33,16 @@
     "@types/node": "^10"
   },
   "dependencies": {
-    
+    "@mapbox/node-pre-gyp": "^1",
+    "@mathquis/node-pre-gyp-github": "^1"
+  },
+  "binary": {
+    "module_name": "index",
+    "host": "https://github.com/cube-js/cube.js/releases/download/",
+    "remote_path": "v{version}",
+    "package_name": "native-{node_abi}-{platform}-{arch}.tar.gz",
+    "module_path": "native",
+    "pkg_path": "."
   },
   "jest": {
     "testEnvironment": "node"
