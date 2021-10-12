@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Use ILIKE for contains filter ([#3502](https://github.com/cube-js/cube.js/issues/3502)) ([c1b2e10](https://github.com/cube-js/cube.js/commit/c1b2e10023b890276dc251db9c6d7b9bfa04e2d3))
+
+
+
+
+
 ## [0.28.40](https://github.com/cube-js/cube.js/compare/v0.28.39...v0.28.40) (2021-09-30)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
