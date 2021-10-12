@@ -103,7 +103,7 @@ jobs:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     needs: [unit, lint, latest-tag-sha]
-    name: Build native ${{ matrix.node-version }}x${{ matrix.os-version }}
+    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
     strategy:
       matrix:
         # Node.js - Module Ver
