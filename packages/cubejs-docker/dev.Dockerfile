@@ -8,8 +8,13 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
+    && rm -rf /var/lib/apt/lists/* \
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
+
+ENV PATH=/root/.cargo/bin:$PATH
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
