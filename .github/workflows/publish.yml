@@ -56,6 +56,8 @@ jobs:
   native:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
+    env:
+      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
     strategy:
       matrix:
