@@ -22,8 +22,12 @@ impl Finalize for SQLInterface {}
 impl SQLInterface {}
 
 fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transport_load = cx.argument::<JsFunction>(0)?.root(&mut cx);
-    let transport_meta = cx.argument::<JsFunction>(1)?.root(&mut cx);
+    let options = cx.argument::<JsObject>(0)?.root(&mut cx);
+    options.get("")
+
+    // let auth_check = cx.argument::<JsFunction>(0)?.root(&mut cx);
+    // let transport_load = cx.argument::<JsFunction>(0)?.root(&mut cx);
+    // let transport_meta = cx.argument::<JsFunction>(1)?.root(&mut cx);
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();

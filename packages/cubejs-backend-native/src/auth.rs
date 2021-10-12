@@ -7,11 +7,17 @@ use cubesql::{
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct NodeBridgeAuthService {}
+pub struct NodeBridgeAuthService {
+    channel: Arc<Channel>,
+    on_load: Arc<Root<JsFunction>>,
+}
 
 impl NodeBridgeAuthService {
-    pub fn new() -> NodeBridgeAuthService {
-        NodeBridgeAuthService {}
+    pub fn new(channel: Channel, on_auth: Root<JsFunction>) -> NodeBridgeAuthService {
+        NodeBridgeAuthService {
+            channel: Arc::new(channel),
+            on_auth: Arc::new(on_auth),
+        }
     }
 }
 
