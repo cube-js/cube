@@ -149,7 +149,7 @@ jobs:
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
-        run: cd packages/cubejs-backend-native && yarn run build
+        run: cd packages/cubejs-backend-native && yarn run build && yarn run test:unit
 
   lint:
     runs-on: ubuntu-20.04
