@@ -11,7 +11,7 @@
   },
   "scripts": {
     "tsc": "tsc",
-    "build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run tsc && npm run build --",
     "build-release": "npm run tsc && npm run build -- --release",
     "install": "echo 'Skipping installation'",
