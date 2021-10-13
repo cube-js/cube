@@ -28,19 +28,10 @@ impl NodeBridgeTransport {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct LoadRequest {
     authorization: String,
     query: V1LoadRequestQuery,
-}
-
-impl serde::Serialize for LoadRequest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        todo!()
-    }
 }
 
 #[derive(Debug, Serialize)]
