@@ -17,7 +17,11 @@ function loadNative() {
         return require('../../native/index.node')
     }
 
-    throw new Error('Unable to load @cubejs-backend/native');
+    throw new Error('Unable to load @cubejs-backend/native, probably your system is not supported.');
+}
+
+export function isSupported(): boolean {
+    return fs.existsSync(path.resolve('index.node')) || fs.existsSync(path.resolve('native/index.node'));
 }
 
 function wrapNativeFunctionWithChannelCallback(
