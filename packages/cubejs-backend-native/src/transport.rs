@@ -6,8 +6,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
 };
-use std::sync::{Arc, Mutex};
-use tokio::sync::oneshot;
+use serde_derive::Serialize;
+use std::sync::Arc;
 
 use crate::channel::{call_js_with_channel_as_callback, JsAsyncChannel};
 
@@ -28,14 +28,40 @@ impl NodeBridgeTransport {
     }
 }
 
+#[derive(Debug)]
+struct LoadRequest {
+    authorization: String,
+    query: V1LoadRequestQuery,
+}
+
+impl serde::Serialize for LoadRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct MetaRequest {
+    authorization: String,
+}
+
 #[async_trait]
 impl SchemaService for NodeBridgeTransport {
-    async fn get_ctx_for_tenant(&self, _ctx: &AuthContext) -> Result<TenantContext, CubeError> {
+    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
         trace!("[transport] Meta ->");
 
-        let response: V1MetaResponse =
-            call_js_with_channel_as_callback(self.channel.clone(), self.on_meta.clone(), None)
-                .await?;
+        let extra = serde_json::to_string(&MetaRequest {
+            authorization: ctx.access_token.clone(),
+        })?;
+        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+            self.channel.clone(),
+            self.on_meta.clone(),
+            Some(extra),
+        )
+        .await?;
         trace!("[transport] Meta <- {:?}", response);
 
         Ok(TenantContext {
@@ -46,15 +72,18 @@ impl SchemaService for NodeBridgeTransport {
     async fn request(
         &self,
         query: V1LoadRequestQuery,
-        _ctx: &AuthContext,
+        ctx: &AuthContext,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
-        let request = serde_json::to_string(&query)?;
-        let response: V1LoadResponse = call_js_with_channel_as_callback(
+        let extra = serde_json::to_string(&LoadRequest {
+            authorization: ctx.access_token.clone(),
+            query: query.clone(),
+        })?;
+        let response = call_js_with_channel_as_callback::<V1LoadResponse>(
             self.channel.clone(),
             self.on_load.clone(),
-            Some(request),
+            Some(extra),
         )
         .await?;
         trace!("[transport] Request <- {:?}", response);
