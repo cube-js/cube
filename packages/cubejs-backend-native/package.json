@@ -14,7 +14,7 @@
     "build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run tsc && npm run build --",
     "build-release": "npm run tsc && npm run build -- --release",
-    "install": "echo 'Skipping installation'",
+    "install": "node-pre-gyp install || true",
     "upload-binary": "npm run build-release && mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:unit": "jest --verbose --forceExit test",
     "test:cargo": "cargo test"
@@ -25,6 +25,7 @@
   "files": [
     "dist/lib"
   ],
+  "bundledDependencies":["node-pre-gyp"],
   "devDependencies": {
     "@types/jest": "^26",
     "@types/mysql": "^2.15.19",

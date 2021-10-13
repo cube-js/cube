@@ -1,13 +1,29 @@
+import fs from 'fs';
+import path from 'path';
+
 export type SQLInterfaceOptions = {
     checkAuth: (payload: string) => void | Promise<void>,
     load: (extra: any) => void | Promise<void>,
     meta: (extra: any) => void | Promise<void>,
 };
 
+function loadNative() {
+    // Development version
+    if (fs.existsSync(path.resolve('index.node'))) {
+        return require('../../index.node')
+    }
+
+    if (fs.existsSync(path.resolve('native/index.node'))) {
+        return require('../../native/index.node')
+    }
+
+    throw new Error('Unable to load @cubejs-backend/native');
+}
+
 function wrapNativeFunctionWithChannelCallback(
     fn: (extra: any) => void | Promise<void>
 ) {
-    const native = require('../../index.node');
+    const native = loadNative();
 
     return async (extra: any, channel: any) => {
         try {
@@ -38,7 +54,7 @@ export const registerInterface = async (options: SQLInterfaceOptions) => {
         throw new Error('options.meta must be a function');
     }
 
-    const native = require('../../index.node');
+    const native = loadNative();
     return native.registerInterface({
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
