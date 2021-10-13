@@ -5,7 +5,7 @@ import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
-import { Button } from '../../atoms';
+import { Button, CubeLoader } from '../../atoms';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
 // import { LightningIcon } from '../../shared/icons/LightningIcon';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
@@ -64,6 +64,10 @@ export function QueryBuilderContainer({
   }, [apiUrl, currentToken]);
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
+
+  if (!cubejsApi) {
+    return <CubeLoader />;
+  }
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
