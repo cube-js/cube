@@ -205,6 +205,7 @@ fn proc_handler() {
 }
 
 struct JobRunner {
+    config_obj: Arc<dyn ConfigObj>,
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
@@ -510,7 +511,7 @@ impl JobRunner {
                 return None;
             }
         }
-        Some(Duration::from_secs(600))
+        Some(Duration::from_secs(self.config_obj.import_job_timeout()))
     }
 
     async fn run_local(&self, job: IdRow<Job>) -> Result<(), CubeError> {
@@ -704,6 +705,7 @@ impl ClusterImpl {
         for _ in 0..self.config_obj.job_runners_count() {
             // TODO number of job event loops
             let job_runner = JobRunner {
+                config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
                 chunk_store: self.chunk_store.clone(),
                 compaction_service: self.compaction_service.clone(),

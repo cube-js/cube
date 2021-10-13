@@ -285,6 +285,8 @@ pub trait ConfigObj: DIService {
 
     fn not_used_timeout(&self) -> u64;
 
+    fn import_job_timeout(&self) -> u64;
+
     fn select_workers(&self) -> &Vec<String>;
 
     fn worker_bind_address(&self) -> &Option<String>;
@@ -332,6 +334,7 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub import_job_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -394,6 +397,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn not_used_timeout(&self) -> u64 {
         self.not_used_timeout
+    }
+
+    fn import_job_timeout(&self) -> u64 {
+        self.import_job_timeout
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -544,6 +551,7 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -596,6 +604,7 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: 600,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,

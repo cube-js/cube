@@ -59,7 +59,7 @@ use rocksdb::backup::BackupEngineOptions;
 use rocksdb::checkpoint::Checkpoint;
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -725,6 +725,12 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
     async fn mark_partition_warmed_up(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn delete_middle_man_partition(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError>;
+    async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError>;
+    async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -781,6 +787,8 @@ pub trait MetaStore: DIService + Send + Sync {
         uploaded_chunk_ids: Vec<u64>,
     ) -> Result<(), CubeError>;
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
+    async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -2726,6 +2734,164 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn delete_middle_man_partition(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let partition = partitions_table.get_row_or_not_found(partition_id)?;
+
+            if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
+                let parent_partition = partitions_table.get_row_or_not_found(*parent_partition_id)?;
+                // This sanity check isn't structurally used anywhere as of now however we might need
+                // to preserve such hierarchy in future for special type of indexes.
+                if parent_partition.get_row().get_max_val() != partition.get_row().get_max_val() ||
+                    parent_partition.get_row().get_min_val() != partition.get_row().get_min_val() {
+                    return Err(CubeError::internal(format!(
+                        "Middle man drop should preserve partition hierarchy but trying to drop partition {:?} with parent {:?}",
+                        partition,
+                        parent_partition
+                    )));
+                }
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Can't drop root partition as middle man: {:?}",
+                    partition
+                )));
+            }
+
+            if partition.get_row().is_active() {
+                return Err(CubeError::internal(format!(
+                    "Can't drop active partition: {:?}",
+                    partition
+                )));
+            }
+
+            let chunks = chunks_table
+                .get_rows_by_index(
+                    &ChunkIndexKey::ByPartitionId(partition_id),
+                    &ChunkRocksIndex::PartitionId,
+                )?;
+
+            if !chunks.is_empty() {
+                return Err(CubeError::internal(format!(
+                    "Can't drop partition {:?} with chunks: {:?}",
+                    partition,
+                    chunks
+                )));
+            }
+
+            let child = partitions_table
+                .get_rows_by_index(
+                    &PartitionIndexKey::ByIndexId(partition.get_row().get_index_id()),
+                    &PartitionRocksIndex::IndexId,
+                )?
+                .into_iter()
+                .find(|p| p.get_row().parent_partition_id() == &Some(partition.get_id()));
+
+            if let Some(child) = child {
+                partitions_table.update_with_fn(child.get_id(), |c| c.update_parent_partition_id(partition.get_row().parent_partition_id().clone()), batch_pipe)?;
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Can't drop partition {:?} without children",
+                    partition
+                )));
+            }
+
+            partitions_table.delete(partition_id, batch_pipe)
+        })
+        .await
+    }
+
+    async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError> {
+        self.read_operation(move |db_ref| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let partition = partitions_table.get_row_or_not_found(partition_id)?;
+
+            if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
+                let parent_partition =
+                    partitions_table.get_row_or_not_found(*parent_partition_id)?;
+                if parent_partition.get_row().get_max_val() != partition.get_row().get_max_val()
+                    || parent_partition.get_row().get_min_val() != partition.get_row().get_min_val()
+                {
+                    return Ok(false);
+                }
+            } else {
+                return Ok(false);
+            }
+
+            if partition.get_row().is_active() {
+                return Ok(false);
+            }
+
+            let chunks = chunks_table.get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(partition_id),
+                &ChunkRocksIndex::PartitionId,
+            )?;
+
+            if !chunks.is_empty() {
+                return Ok(false);
+            }
+
+            let child = partitions_table
+                .get_rows_by_index(
+                    &PartitionIndexKey::ByIndexId(partition.get_row().get_index_id()),
+                    &PartitionRocksIndex::IndexId,
+                )?
+                .into_iter()
+                .find(|p| p.get_row().parent_partition_id() == &Some(partition.get_id()));
+
+            if child.is_none() {
+                return Ok(false);
+            }
+
+            Ok(true)
+        })
+        .await
+    }
+
+    async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut partitions_with_chunks = HashSet::new();
+
+            let chunks = chunks_table.all_rows()?;
+
+            for chunk in chunks.iter() {
+                partitions_with_chunks.insert(chunk.get_row().get_partition_id());
+            }
+
+            let orphaned_partitions = partitions_table.all_rows()?.into_iter().filter(|p| {
+                !p.get_row().is_active() && !partitions_with_chunks.contains(&p.get_id())
+            });
+
+            let mut result = Vec::new();
+
+            for partition in orphaned_partitions {
+                if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
+                    let parent_partition =
+                        partitions_table.get_row_or_not_found(*parent_partition_id)?;
+                    if parent_partition.get_row().get_max_val() == partition.get_row().get_max_val()
+                        && parent_partition.get_row().get_min_val()
+                            == partition.get_row().get_min_val()
+                    {
+                        result.push(partition);
+                    }
+                }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
     fn index_table(&self) -> IndexMetaStoreTable {
         IndexMetaStoreTable {
             rocks_meta_store: self.clone(),
@@ -3063,6 +3229,30 @@ impl MetaStore for RocksMetaStore {
                 )));
             }
             Ok(chunks.delete(chunk_id, batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let table = ChunkRocksTable::new(db_ref);
+            Ok(table
+                .all_rows()?
+                .into_iter()
+                .filter(|c| !c.get_row().active() && c.get_row().uploaded())
+                .collect())
+        })
+        .await
+    }
+
+    async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let table = ChunkRocksTable::new(db_ref);
+            Ok(table
+                .all_rows()?
+                .into_iter()
+                .filter(|c| !c.get_row().active() && !c.get_row().uploaded())
+                .collect())
         })
         .await
     }

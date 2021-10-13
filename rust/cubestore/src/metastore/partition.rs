@@ -81,6 +81,12 @@ impl Partition {
         &self.parent_partition_id
     }
 
+    pub fn update_parent_partition_id(&self, parent_partition_id: Option<u64>) -> Partition {
+        let mut p = self.clone();
+        p.parent_partition_id = parent_partition_id;
+        p
+    }
+
     pub fn is_active(&self) -> bool {
         self.active
     }

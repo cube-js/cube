@@ -145,6 +145,35 @@ impl SchedulerImpl {
                 }
             }
         }
+
+        // TODO we can do this reconciliation more rarely
+        let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
+
+        for chunk in all_inactive_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+
+        let all_inactive_not_uploaded_chunks =
+            self.meta_store.all_inactive_not_uploaded_chunks().await?;
+
+        for chunk in all_inactive_not_uploaded_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+
+        let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
+
+        for partition in all_inactive_partitions.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender.send(GCTimedTask(
+                deadline,
+                GCTask::DeleteMiddleManPartition(partition.get_id()),
+            ))?;
+        }
+
         Ok(())
     }
 
@@ -368,6 +397,7 @@ struct GCTimedTask(/*deadline*/ Instant, GCTask);
 enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
     DeleteChunk(/*chunk_id*/ u64),
+    DeleteMiddleManPartition(/*partition_id*/ u64),
 }
 
 /// Cleans up deactivated partitions and chunks on remote fs.
@@ -441,9 +471,35 @@ impl DataGCLoop {
                     }
                 }
                 GCTask::DeleteChunk(chunk_id) => {
-                    log::trace!("Removing deactivated chunk {}", chunk_id);
-                    if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
-                        log::error!("Could not remove deactivated chunk ({}): {}", chunk_id, e);
+                    if self.metastore.get_chunk(chunk_id).await.is_ok() {
+                        log::trace!("Removing deactivated chunk {}", chunk_id);
+                        if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
+                            log::error!("Could not remove deactivated chunk ({}): {}", chunk_id, e);
+                        }
+                    } else {
+                        log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
+                    }
+                }
+                GCTask::DeleteMiddleManPartition(partition_id) => {
+                    if let Ok(true) = self
+                        .metastore
+                        .can_delete_middle_man_partition(partition_id)
+                        .await
+                    {
+                        log::trace!("Removing middle man partition {}", partition_id);
+                        if let Err(e) = self
+                            .metastore
+                            .delete_middle_man_partition(partition_id)
+                            .await
+                        {
+                            log::error!(
+                                "Could not remove middle man partition ({}): {}",
+                                partition_id,
+                                e
+                            );
+                        }
+                    } else {
+                        log::trace!("Skipping removing of middle man partition {}", partition_id);
                     }
                 }
             }
