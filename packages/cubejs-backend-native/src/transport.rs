@@ -9,7 +9,7 @@ use cubesql::{
 use serde_derive::Serialize;
 use std::sync::Arc;
 
-use crate::channel::{call_js_with_channel_as_callback, JsAsyncChannel};
+use crate::channel::{call_js_with_channel_as_callback};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
