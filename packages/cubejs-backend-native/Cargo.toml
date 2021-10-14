@@ -25,4 +25,4 @@ log = "=0.4.11"
 [dependencies.neon]
 version = "0.10.0-alpha.2"
 default-features = false
-features = ["napi-4", "channel-api", "promise-api", "task-api", "proc-macros"]
+features = ["napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]

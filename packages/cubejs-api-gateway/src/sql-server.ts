@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import {registerInterface} from '@cubejs-backend/native';
+import { registerInterface } from '@cubejs-backend/native';
 import type { ApiGateway } from './gateway';
 
 export interface SQLServerOptions {

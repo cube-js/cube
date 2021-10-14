@@ -74,6 +74,7 @@ export const registerInterface = async (options: SQLInterfaceOptions) => {
 
     const native = loadNative();
     return native.registerInterface({
+        ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
