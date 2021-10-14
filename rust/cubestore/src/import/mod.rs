@@ -544,8 +544,7 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        // TODO extract
-        if location.starts_with("stream:") {
+        if Table::is_stream_location(location) {
             self.streaming_service.stream_table(table, location).await?;
         } else {
             self.do_import(&table, *format, location).await?;

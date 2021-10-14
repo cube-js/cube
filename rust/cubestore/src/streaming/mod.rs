@@ -1,4 +1,5 @@
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
@@ -17,12 +18,12 @@ use futures::Stream;
 use itertools::{EitherOrBoth, Itertools};
 use json::JsonValue;
 use log::debug;
-use reqwest::Url;
+use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use warp::hyper::body::Bytes;
 
 #[async_trait]
@@ -31,6 +32,7 @@ pub trait StreamingService: DIService + Send + Sync {
 }
 
 pub struct StreamingServiceImpl {
+    config_obj: Arc<dyn ConfigObj>,
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
 }
@@ -38,8 +40,13 @@ pub struct StreamingServiceImpl {
 crate::di_service!(StreamingServiceImpl, [StreamingService]);
 
 impl StreamingServiceImpl {
-    pub fn new(meta_store: Arc<dyn MetaStore>, chunk_store: Arc<dyn ChunkDataStore>) -> Arc<Self> {
+    pub fn new(
+        config_obj: Arc<dyn ConfigObj>,
+        meta_store: Arc<dyn MetaStore>,
+        chunk_store: Arc<dyn ChunkDataStore>,
+    ) -> Arc<Self> {
         Arc::new(Self {
+            config_obj,
             meta_store,
             chunk_store,
         })
@@ -107,7 +114,12 @@ impl StreamingService for StreamingServiceImpl {
         };
 
         // TODO support sealing streaming tables through ALTER TABLE
-        while let Some(new_rows) = stream.next().await {
+        while let Some(new_rows) = tokio::time::timeout(
+            Duration::from_secs(self.config_obj.stale_stream_timeout()),
+            stream.next(),
+        )
+        .await?
+        {
             let rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
             let table_cols = table.get_row().get_columns().as_slice();
@@ -148,6 +160,7 @@ pub trait StreamingSource: Send + Sync {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError>;
 }
 
+#[derive(Clone)]
 pub struct KSqlStreamingSource {
     user: Option<String>,
     password: Option<String>,
@@ -163,6 +176,16 @@ pub struct KSqlError {
 #[derive(Serialize, Deserialize)]
 pub struct KSqlQuery {
     sql: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KSqlQuerySchema {
+    #[serde(rename = "queryId")]
+    query_id: String,
+    #[serde(rename = "columnNames")]
+    column_names: Vec<String>,
+    #[serde(rename = "columnTypes")]
+    column_types: Vec<String>,
 }
 
 impl KSqlStreamingSource {
@@ -191,8 +214,24 @@ impl KSqlStreamingSource {
 
         for line in lines_str.split("\n") {
             let res = json::parse(line)?;
-            // TODO schema checks
             if res.has_key("queryId") {
+                let schema: KSqlQuerySchema = serde_json::from_str(line)?;
+                let schema_column_names = columns
+                    .iter()
+                    .filter(|c| c.get_name() != seq_column.get_name())
+                    .map(|c| c.get_name().to_string())
+                    .collect::<Vec<_>>();
+                let ksql_column_names = schema
+                    .column_names
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>();
+                if ksql_column_names != schema_column_names {
+                    return Err(CubeError::user(format!(
+                        "Column names of ksql stream and table doesn't match: {:?} and {:?}",
+                        ksql_column_names, schema_column_names
+                    )));
+                }
                 continue;
             }
             let row_values = match res {
@@ -242,7 +281,6 @@ impl KSqlStreamingSource {
                                     }
                                     ColumnType::Timestamp => {
                                         match value {
-                                            // TODO schema conversions
                                             JsonValue::Short(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
                                             JsonValue::String(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
                                             JsonValue::Null => Ok(TableValue::Null),
@@ -316,6 +354,31 @@ impl KSqlStreamingSource {
 
         Ok(rows)
     }
+
+    async fn post_req<T: Serialize + ?Sized>(
+        &self,
+        url: &str,
+        json: &T,
+    ) -> Result<Response, CubeError> {
+        let client = reqwest::ClientBuilder::new()
+            .use_rustls_tls()
+            .user_agent("cubestore")
+            .build()
+            .unwrap();
+        let mut builder = client.post(format!("{}{}", self.endpoint_url, url));
+        if let Some(user) = &self.user {
+            builder = builder.basic_auth(user.to_string(), self.password.clone())
+        }
+        let res = builder.json(&json).send().await?;
+        if res.status() != 200 {
+            let error = res.json::<KSqlError>().await?;
+            return Err(CubeError::user(format!(
+                "ksql api error: {}",
+                error.message
+            )));
+        }
+        Ok(res)
+    }
 }
 
 #[async_trait]
@@ -326,31 +389,16 @@ impl StreamingSource for KSqlStreamingSource {
         seq_column: Column,
         initial_seq_value: u64,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError> {
-        let client = reqwest::ClientBuilder::new()
-            .use_rustls_tls()
-            .user_agent("cubestore")
-            .build()
-            .unwrap();
-        let mut builder = client.post(format!("{}/query-stream", self.endpoint_url));
-        if let Some(user) = &self.user {
-            builder = builder.basic_auth(user.to_string(), self.password.clone())
-        }
-        let res = builder
-            .json(&KSqlQuery {
-                sql: format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
-            })
-            .send()
+        let res = self
+            .post_req(
+                "/query-stream",
+                &KSqlQuery {
+                    sql: format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
+                },
+            )
             .await?;
-        if res.status() != 200 {
-            let error = res.json::<KSqlError>().await?;
-            return Err(CubeError::user(format!(
-                "ksql api error: {}",
-                error.message
-            )));
-        }
         let column_to_move = columns.clone();
         let seq_column_to_move = seq_column.clone();
-        // TODO close stream in ksql
         Ok(
             Box::pin(
                 res.bytes_stream()

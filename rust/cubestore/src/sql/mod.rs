@@ -235,7 +235,7 @@ impl SqlServiceImpl {
             .locations()
             .unwrap()
             .iter()
-            .filter(|&l| !l.starts_with("stream:")) // TODO centralize stream check
+            .filter(|&l| !Table::is_stream_location(l))
             .map(|&l| {
                 (
                     RowKey::Table(TableId::Tables, table.get_id()),
