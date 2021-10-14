@@ -42,9 +42,9 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let value = port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
         let port = value.value(&mut cx) as u16;
 
-        port
+        Some(port)
     } else {
-        33306
+        None
     };
 
     let (deferred, promise) = cx.promise();

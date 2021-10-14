@@ -17,10 +17,13 @@ impl NodeConfig {
         self.config.config_obj()
     }
 
-    pub fn new(port: u16) -> NodeConfig {
+    pub fn new(port: Option<u16>) -> NodeConfig {
         let config = Config::default();
         let config = config.update_config(|mut c| {
-            c.bind_address = Some(format!("0.0.0.0:{}", port));
+            if let Some(p) = port {
+                c.bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
             c
         });
 
