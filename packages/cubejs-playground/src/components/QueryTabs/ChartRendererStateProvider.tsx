@@ -23,6 +23,9 @@ type QueryStatusContextProps = {
 
   slowQueryFromCache: BooleanMap;
   setSlowQueryFromCache: (queryId: string, isSlow: boolean) => void;
+
+  queryRequestId: Record<string, string>;
+  setQueryRequestId: (queryId: string, requestId: string) => void;
 };
 
 const ChartRendererStateContext = createContext({} as QueryStatusContextProps);
@@ -48,6 +51,9 @@ export function ChartRendererStateProvider({
   const [isBuildInProgress, setBuildInProgress] = useState<BooleanMap>({});
   const [slowQuery, setSlowQuery] = useState<BooleanMap>({});
   const [slowQueryFromCache, setSlowQueryFromCache] = useState<BooleanMap>({});
+  const [queryRequestId, setQueryRequestId] = useState<Record<string, string>>(
+    {}
+  );
 
   return (
     <ChartRendererStateContext.Provider
@@ -110,6 +116,14 @@ export function ChartRendererStateProvider({
             [queryId]: isSlow,
           }));
         },
+
+        queryRequestId,
+        setQueryRequestId(queryId, requestId) {
+          setQueryRequestId((prev) => ({
+            ...prev,
+            [queryId]: requestId,
+          }));
+        },
       }}
     >
       {children}
@@ -127,6 +141,7 @@ export function useChartRendererState(queryId: string) {
     isBuildInProgress,
     slowQuery,
     slowQueryFromCache,
+    queryRequestId,
   } = useContext(ChartRendererStateContext);
 
   return {
@@ -138,6 +153,7 @@ export function useChartRendererState(queryId: string) {
     isBuildInProgress: Boolean(isBuildInProgress[queryId]),
     slowQuery: Boolean(slowQuery[queryId]),
     slowQueryFromCache: Boolean(slowQueryFromCache[queryId]),
+    queryRequestId: queryRequestId[queryId],
   };
 }
 
@@ -151,6 +167,7 @@ export function useChartRendererStateMethods() {
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   } = useContext(ChartRendererStateContext);
 
   return {
@@ -162,5 +179,6 @@ export function useChartRendererStateMethods() {
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   };
 }

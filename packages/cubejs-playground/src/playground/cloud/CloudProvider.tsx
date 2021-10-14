@@ -4,10 +4,19 @@ import { PreAggregationDefinition } from '../../components/RollupDesigner/utils'
 
 type AddPreAggregationToSchemaResult = {
   error?: string;
-}
+};
+
+export type FetchRequestFromApmResult = {
+  error?: string;
+  request?: { duration: string; onClick: Function };
+};
 
 type CloudProviderContext = {
   isCloud: boolean;
+  fetchRequestFromApm?: (
+    requestId: string,
+    prevRequestId?: string
+  ) => Promise<FetchRequestFromApmResult>;
   addPreAggregationToSchema?: (
     preAggregationDefinition: PreAggregationDefinition
   ) => Promise<AddPreAggregationToSchemaResult>;

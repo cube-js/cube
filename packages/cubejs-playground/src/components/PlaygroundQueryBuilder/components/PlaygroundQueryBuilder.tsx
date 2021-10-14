@@ -11,7 +11,7 @@ import {
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row } from 'antd';
+import { Col, Row, Space } from 'antd';
 import { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
@@ -38,6 +38,7 @@ import {
   useChartRendererStateMethods,
 } from '../../QueryTabs/ChartRendererStateProvider';
 import { PreAggregationStatus } from './PreAggregationStatus';
+import { RequestApmStatus } from './RequestApmStatus';
 
 const Section = styled.div`
   display: flex;
@@ -196,7 +197,7 @@ export function PlaygroundQueryBuilder({
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const { isChartRendererReady, queryStatus, queryError } =
+  const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
     setQueryStatus,
@@ -442,14 +443,19 @@ export function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  {queryStatus ? (
-                    <PreAggregationStatus
-                      apiUrl={apiUrl}
-                      availableMembers={availableMembers}
-                      query={query}
-                      {...(queryStatus as QueryStatus)}
-                    />
-                  ) : null}
+                  <Space style={{ marginLeft: 'auto' }}>
+                    {queryStatus ? (
+                      <RequestApmStatus requestId={queryRequestId} />
+                    ) : null}
+                    {queryStatus ? (
+                      <PreAggregationStatus
+                        apiUrl={apiUrl}
+                        availableMembers={availableMembers}
+                        query={query}
+                        {...(queryStatus as QueryStatus)}
+                      />
+                    ) : null}
+                  </Space>
                 </SectionRow>
               </Col>
             </Row>
