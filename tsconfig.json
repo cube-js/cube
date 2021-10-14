@@ -5,6 +5,9 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
+      "path": "packages/cubejs-backend-native"
+    },
+    {
       "path": "packages/cubejs-templates"
     },
     {

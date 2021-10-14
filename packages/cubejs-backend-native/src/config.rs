@@ -23,7 +23,11 @@ impl NodeConfig {
         Self { config }
     }
 
-    pub async fn configure(&self, transport: Arc<NodeBridgeTransport>) -> CubeServices {
+    pub async fn configure(
+        &self,
+        transport: Arc<NodeBridgeTransport>,
+        auth: Arc<NodeBridgeAuthService>,
+    ) -> CubeServices {
         let injector = self.config.injector();
         self.config.configure_injector().await;
 
@@ -32,9 +36,7 @@ impl NodeConfig {
             .await;
 
         injector
-            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
-                Arc::new(NodeBridgeAuthService::new())
-            })
+            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| auth)
             .await;
 
         self.config.cube_services().await
