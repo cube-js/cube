@@ -57,7 +57,6 @@ export class SQLServer {
               queryType: 'multi',
               context,
               res: (message) => {
-                console.log(message);
                 resolve(message);
               },
             });
