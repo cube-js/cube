@@ -245,6 +245,9 @@ const variables: Record<string, (...args: any) => any> = {
 
     return false;
   },
+  sqlPort: () => get('CUBEJS_SQL_PORT')
+    .default('false')
+    .asPortNumber(),
   dbSsl: () => get('CUBEJS_DB_SSL')
     .default('false')
     .asBoolStrict(),
