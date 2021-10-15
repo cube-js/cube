@@ -12,6 +12,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
 
 ENV PATH=/root/.cargo/bin:$PATH
+RUN ln -s /root/.cargo/bin/cargo /usr/local/bin/cargo
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode

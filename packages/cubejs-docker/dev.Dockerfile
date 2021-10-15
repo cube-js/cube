@@ -11,6 +11,11 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
     && rm -rf /var/lib/apt/lists/* \
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
+
+ENV PATH=/root/.cargo/bin:$PATH
+
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV development
@@ -75,9 +80,6 @@ RUN yarn install --prod
 
 FROM base as build
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
-
 ENV PATH=/root/.cargo/bin:$PATH
 RUN yarn install
 
@@ -121,6 +123,7 @@ COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 RUN yarn build
+RUN cd packages/cubejs-backend-native && cargo build
 RUN yarn lerna run build
 
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
