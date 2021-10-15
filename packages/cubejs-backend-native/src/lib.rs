@@ -37,6 +37,16 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .downcast_or_throw::<JsFunction, _>(&mut cx)?
         .root(&mut cx);
 
+    let port = options.get(&mut cx, "port")?;
+    let configuration_port = if port.is_a::<JsNumber, _>(&mut cx) {
+        let value = port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+        let port = value.value(&mut cx) as u16;
+
+        Some(port)
+    } else {
+        None
+    };
+
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
@@ -44,7 +54,8 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new();
+        let config = NodeConfig::new(configuration_port);
+
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
         // @todo await real?

@@ -558,6 +558,11 @@ export class CubejsServerCore {
     return apiGateway.initSubscriptionServer(sendMessage);
   }
 
+  public initSQLServer() {
+    const apiGateway = this.apiGateway();
+    return apiGateway.initSQLServer();
+  }
+
   protected apiGateway(): ApiGateway {
     if (this.apiGatewayInstance) {
       return this.apiGatewayInstance;

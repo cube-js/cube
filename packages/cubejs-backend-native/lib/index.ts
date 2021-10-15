@@ -1,31 +1,46 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface CheckAuthPayload {
+    authorization: string
+}
+
+export interface LoadPayload {
+    authorization: string,
+    request_id: string,
+    query: any
+}
+
+export interface MetaPayload {
+    authorization: string
+}
+
 export type SQLInterfaceOptions = {
-    checkAuth: (payload: string) => void | Promise<void>,
-    load: (extra: any) => void | Promise<void>,
-    meta: (extra: any) => void | Promise<void>,
+    port?: number,
+    checkAuth: (payload: CheckAuthPayload) => unknown | Promise<unknown>,
+    load: (payload: LoadPayload) => unknown | Promise<unknown>,
+    meta: (payload: MetaPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
     // Development version
-    if (fs.existsSync(path.resolve('index.node'))) {
-        return require('../../index.node')
+    if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
+        return require(path.join(__dirname, '/../../index.node'))
     }
 
-    if (fs.existsSync(path.resolve('native/index.node'))) {
-        return require('../../native/index.node')
+    if (fs.existsSync(path.join(__dirname, '/../../native/index.node'))) {
+        return require(path.join(__dirname, '/../../native/index.node'))
     }
 
     throw new Error('Unable to load @cubejs-backend/native, probably your system is not supported.');
 }
 
 export function isSupported(): boolean {
-    return fs.existsSync(path.resolve('index.node')) || fs.existsSync(path.resolve('native/index.node'));
+    return fs.existsSync(path.join(__dirname, '/../../index.node')) || fs.existsSync(path.join(__dirname, '/../../native/index.node'));
 }
 
 function wrapNativeFunctionWithChannelCallback(
-    fn: (extra: any) => void | Promise<void>
+    fn: (extra: any) => unknown | Promise<unknown>
 ) {
     const native = loadNative();
 
@@ -60,6 +75,7 @@ export const registerInterface = async (options: SQLInterfaceOptions) => {
 
     const native = loadNative();
     return native.registerInterface({
+        ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),

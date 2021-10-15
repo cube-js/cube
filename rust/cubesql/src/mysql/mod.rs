@@ -619,7 +619,7 @@ impl ProcessingLoop for MySqlServer {
     async fn processing_loop(&self) -> Result<(), CubeError> {
         let listener = TcpListener::bind(self.address.clone()).await?;
 
-        println!("MySQL port open on {}", self.address);
+        println!("🔗 Cube SQL is listening on {}", self.address);
 
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
