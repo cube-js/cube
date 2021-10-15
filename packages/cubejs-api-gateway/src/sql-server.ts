@@ -27,7 +27,7 @@ export class SQLServer {
       },
       meta: async (payload) => {
         const authContext = await this.apiGateway.checkAuthFn({}, payload.authorization);
-        const requestId = `${uuidv4()}-span-${uuidv4()}`;
+        const requestId = `${uuidv4()}-span-1`;
         const context = await this.apiGateway.contextByReq(<any> {}, authContext, requestId);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -46,7 +46,7 @@ export class SQLServer {
       },
       load: async (payload) => {
         const authContext = await this.apiGateway.checkAuthFn({}, payload.authorization);
-        const requestId = `${uuidv4()}-span-${uuidv4()}`;
+        const requestId = payload.request_id || `${uuidv4()}-span-1`;
         const context = await this.apiGateway.contextByReq(<any> {}, authContext, requestId);
 
         // eslint-disable-next-line no-async-promise-executor

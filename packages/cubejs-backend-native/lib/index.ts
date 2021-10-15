@@ -7,6 +7,7 @@ export interface CheckAuthPayload {
 
 export interface LoadPayload {
     authorization: string,
+    request_id: string,
     query: any
 }
 

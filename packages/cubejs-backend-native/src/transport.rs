@@ -1,13 +1,14 @@
-use log::trace;
+use log::{debug, error, trace};
 use neon::prelude::*;
 
 use async_trait::async_trait;
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
+use cubeclient::models::{V1LoadConinueWait, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
 };
 use serde_derive::Serialize;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::channel::call_js_with_channel_as_callback;
 
@@ -31,6 +32,7 @@ impl NodeBridgeTransport {
 #[derive(Debug, Serialize)]
 struct LoadRequest {
     authorization: String,
+    request_id: String,
     query: V1LoadRequestQuery,
 }
 
@@ -67,19 +69,52 @@ impl SchemaService for NodeBridgeTransport {
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
-        let extra = serde_json::to_string(&LoadRequest {
-            authorization: ctx.access_token.clone(),
-            query: query.clone(),
-        })?;
-        let response = call_js_with_channel_as_callback::<V1LoadResponse>(
-            self.channel.clone(),
-            self.on_load.clone(),
-            Some(extra),
-        )
-        .await?;
-        trace!("[transport] Request <- {:?}", response);
+        let request_id = Uuid::new_v4().to_string();
+        let mut span_counter: u32 = 1;
 
-        Ok(response)
+        loop {
+            let extra = serde_json::to_string(&LoadRequest {
+                authorization: ctx.access_token.clone(),
+                request_id: format!("{}-span-{}", request_id, span_counter),
+                query: query.clone(),
+            })?;
+            let response: serde_json::Value = call_js_with_channel_as_callback(
+                self.channel.clone(),
+                self.on_load.clone(),
+                Some(extra),
+            )
+            .await?;
+            trace!("[transport] Request <- {:?}", response);
+
+            let load_err = match serde_json::from_value::<V1LoadResponse>(response.clone()) {
+                Ok(r) => {
+                    return Ok(r);
+                }
+                Err(err) => err,
+            };
+
+            if let Ok(res) = serde_json::from_value::<V1LoadConinueWait>(response) {
+                if res.error.to_lowercase() == "continue wait".to_string() {
+                    debug!(
+                        "[transport] load - retrying request (continue wait) requestId: {}, span: {}",
+                        request_id, span_counter
+                    );
+
+                    span_counter = span_counter + 1;
+
+                    continue;
+                } else {
+                    error!(
+                        "[transport] load - strange response, success which contains error: {:?}",
+                        res
+                    );
+
+                    return Err(CubeError::internal(load_err.to_string()));
+                }
+            };
+
+            return Err(CubeError::user(load_err.to_string()));
+        }
     }
 }
 
