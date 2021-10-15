@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.28.41",
+  "version": "0.28.42",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/lib/index.js",
@@ -25,7 +25,9 @@
   "files": [
     "dist/lib"
   ],
-  "bundledDependencies":["node-pre-gyp"],
+  "bundledDependencies": [
+    "node-pre-gyp"
+  ],
   "devDependencies": {
     "@types/jest": "^26",
     "@types/mysql": "^2.15.19",
