@@ -45,7 +45,7 @@
     "module_name": "index",
     "host": "https://github.com/cube-js/cube.js/releases/download/",
     "remote_path": "v{version}",
-    "package_name": "native-{node_abi}-{platform}-{arch}.tar.gz",
+    "package_name": "native-{node_abi}-{platform}-{arch}-{libc}.tar.gz",
     "module_path": "native",
     "pkg_path": "."
   },
