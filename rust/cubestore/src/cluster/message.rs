@@ -1,4 +1,6 @@
-use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
+use crate::metastore::{
+    Chunk, IdRow, Index, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult, Partition,
+};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
@@ -27,6 +29,13 @@ pub enum NetworkMessage {
 
     WarmupDownload(/*remote_path*/ String),
     WarmupDownloadResult(Result<(), CubeError>),
+
+    AddChunk {
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        data: SerializedRecordBatchStream,
+    },
+    AddChunkResult(Result<IdRow<Chunk>, CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),

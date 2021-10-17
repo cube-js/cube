@@ -679,7 +679,8 @@ impl SqlService for SqlServiceImpl {
                                         // Pick one of the workers to run as main for the request.
                                         let i =
                                             thread_rng().sample(Uniform::new(0, partitions.len()));
-                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let node =
+                                            cluster.node_name_by_partitions(&partitions[i]).await?;
                                         let rs = cluster.route_select(&node, plan).await?.1;
                                         records = rs
                                             .into_iter()
@@ -1270,7 +1271,12 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -1315,8 +1321,12 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let chunk_store =
-                ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),

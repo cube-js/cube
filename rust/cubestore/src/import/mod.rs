@@ -589,7 +589,9 @@ impl Ingestion {
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
         self.partition_jobs.push(cube_ext::spawn(async move {
-            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
+            let new_chunks = chunk_store
+                .partition_data(table_id, rows, &columns, false)
+                .await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.

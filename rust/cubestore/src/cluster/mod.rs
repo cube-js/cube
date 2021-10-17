@@ -10,7 +10,7 @@ use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
-use crate::config::injection::DIService;
+use crate::config::injection::{DIService, Injector};
 use crate::config::is_router;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
@@ -19,7 +19,9 @@ use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
+use crate::metastore::{
+    Chunk, IdRow, Index, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
+};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -29,7 +31,9 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::table::parquet::arrow_schema;
 use crate::CubeError;
+use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
@@ -105,9 +109,19 @@ pub trait Cluster: DIService + Send + Sync {
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError>;
 
+    async fn add_chunk(
+        &self,
+        node_name: &str,
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        data: Vec<ArrayRef>,
+    ) -> Result<IdRow<Chunk>, CubeError>;
+
     fn job_result_listener(&self) -> JobResultListener;
 
-    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String;
+    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
+
+    fn node_name_by_partition_rows(&self, partitions: &Vec<IdRow<Partition>>) -> String;
 
     async fn node_name_for_import(
         &self,
@@ -131,11 +145,12 @@ pub enum JobEvent {
 
 pub struct ClusterImpl {
     this: Weak<ClusterImpl>,
+    // Used in order to avoid cycle dependencies.
+    // Convention is every service can reference cluster but cluster shouldn't reference services.
+    // Weak to avoid cycle reference counting and memory leaks
+    injector: Weak<Injector>,
     remote_fs: Arc<dyn RemoteFs>,
     meta_store: Arc<dyn MetaStore>,
-    chunk_store: Arc<dyn ChunkDataStore>,
-    compaction_service: Arc<dyn CompactionService>,
-    import_service: Arc<dyn ImportService>,
     cluster_transport: Arc<dyn ClusterTransport>,
     connect_timeout: Duration,
     server_name: String,
@@ -294,21 +309,60 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn add_chunk(
+        &self,
+        node_name: &str,
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        data: Vec<ArrayRef>,
+    ) -> Result<IdRow<Chunk>, CubeError> {
+        // We only wait for the result is to ensure our request is delivered.
+        let schema = Arc::new(arrow_schema(&index.get_row()));
+        let record_batch = SerializedRecordBatchStream::write(
+            &schema,
+            vec![RecordBatch::try_new(schema.clone(), data)?],
+        )?;
+        let response = self
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::AddChunk {
+                    index,
+                    partition,
+                    data: record_batch.into_iter().next().unwrap(),
+                },
+            )
+            .await?;
+        match response {
+            NetworkMessage::AddChunkResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
         }
     }
 
-    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String {
+    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError> {
+        let mut partitions = Vec::new();
+        for partition_id in partition_ids.iter() {
+            partitions.push(self.meta_store.get_partition(*partition_id).await?);
+        }
+        Ok(self.node_name_by_partition_rows(&mut partitions))
+    }
+
+    fn node_name_by_partition_rows(&self, partitions: &Vec<IdRow<Partition>>) -> String {
         let workers = self.config_obj.select_workers();
         if workers.is_empty() {
             return self.server_name.to_string();
         }
 
         let mut hasher = DefaultHasher::new();
-        for p in partition_ids.iter() {
-            p.hash(&mut hasher);
+        for partition in partitions.iter() {
+            partition.get_row().get_min_val().hash(&mut hasher);
+            partition.get_row().get_max_val().hash(&mut hasher);
+            partition.get_row().get_index_id().hash(&mut hasher);
         }
         workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
@@ -333,7 +387,7 @@ impl Cluster for ClusterImpl {
         partition: IdRow<Partition>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        let node_name = self.node_name_by_partitions(&[partition.get_id()]);
+        let node_name = self.node_name_by_partitions(&[partition.get_id()]).await?;
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
             futures.push(self.warmup_download(&node_name, name));
@@ -373,6 +427,37 @@ impl Cluster for ClusterImpl {
             }
             NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
                 panic!("result sent to worker");
+            }
+            NetworkMessage::AddChunk {
+                index,
+                partition,
+                data,
+            } => {
+                let res = match data.read() {
+                    Ok(batch) => {
+                        let chunk_store = self
+                            .injector
+                            .upgrade()
+                            .unwrap()
+                            .get_service_typed::<dyn ChunkDataStore>()
+                            .await;
+                        let res = chunk_store
+                            .add_chunk_columns(index, partition, batch.columns().to_vec())
+                            .await;
+                        match res {
+                            Ok(res) => {
+                                let res = res.await;
+                                res.map_err(|e| CubeError::from_error(e)).and_then(|r| r)
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+                    Err(e) => Err(e),
+                };
+                NetworkMessage::AddChunkResult(res)
+            }
+            NetworkMessage::AddChunkResult(_) => {
+                panic!("AddChunkResult sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
                 panic!("MetaStoreCall sent to worker");
@@ -635,12 +720,10 @@ impl ClusterImpl {
     pub fn new(
         server_name: String,
         server_addresses: Vec<String>,
+        injector: Weak<Injector>,
         remote_fs: Arc<dyn RemoteFs>,
         connect_timeout: Duration,
-        chunk_store: Arc<dyn ChunkDataStore>,
-        compaction_service: Arc<dyn CompactionService>,
         meta_store: Arc<dyn MetaStore>,
-        import_service: Arc<dyn ImportService>,
         config_obj: Arc<dyn ConfigObj>,
         query_executor: Arc<dyn QueryExecutor>,
         meta_store_sender: Sender<MetaStoreEvent>,
@@ -649,13 +732,11 @@ impl ClusterImpl {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new_cyclic(|this| ClusterImpl {
             this: this.clone(),
+            injector,
             server_name,
             server_addresses,
             remote_fs,
             connect_timeout,
-            chunk_store,
-            compaction_service,
-            import_service,
             meta_store,
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
@@ -707,9 +788,9 @@ impl ClusterImpl {
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
-                chunk_store: self.chunk_store.clone(),
-                compaction_service: self.compaction_service.clone(),
-                import_service: self.import_service.clone(),
+                chunk_store: self.injector.upgrade().unwrap().get_service_typed().await,
+                compaction_service: self.injector.upgrade().unwrap().get_service_typed().await,
+                import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
                 jobs_enabled: self.jobs_enabled.clone(),
@@ -1234,7 +1315,14 @@ impl ClusterImpl {
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
         for (p, chunks) in partitions {
-            if self.node_name_by_partitions(&[p.partition_id]) != self.server_name {
+            let node_name = match self.node_name_by_partitions(&[p.partition_id]).await {
+                Ok(p) => p,
+                Err(e) => {
+                    log::error!("Failed to get node by partition: {}", e);
+                    return;
+                }
+            };
+            if node_name != self.server_name {
                 continue;
             }
             if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {

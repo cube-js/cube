@@ -308,7 +308,10 @@ impl SchedulerImpl {
     }
 
     async fn schedule_repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -365,7 +368,10 @@ impl SchedulerImpl {
     }
 
     async fn schedule_partition_to_compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -386,7 +392,10 @@ impl SchedulerImpl {
         partition_id: u64,
         path: String,
     ) -> Result<(), CubeError> {
-        let node_name = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node_name = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         self.cluster.warmup_download(&node_name, path).await
     }
 }

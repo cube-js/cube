@@ -127,13 +127,13 @@ impl StreamingService for StreamingServiceImpl {
             for row in rows {
                 append_row(&mut builders, table_cols, &row);
             }
-            // TODO send to node which owns the partition
             let new_chunks = self
                 .chunk_store
                 .partition_data(
                     table.get_id(),
                     finish(builders),
                     table.get_row().get_columns().as_slice(),
+                    true,
                 )
                 .await?;
 

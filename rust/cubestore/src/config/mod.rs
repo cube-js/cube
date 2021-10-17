@@ -870,6 +870,7 @@ impl Config {
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -943,11 +944,9 @@ impl Config {
                         .server_name()
                         .to_string(),
                     vec!["localhost".to_string()],
+                    Arc::downgrade(&i),
                     i.get_service_typed().await,
                     Duration::from_secs(30),
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

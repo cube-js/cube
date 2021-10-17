@@ -675,7 +675,7 @@ impl ClusterSendExec {
         let mut m: HashMap<String, Vec<u64>> = HashMap::new();
         for ps in &logical {
             let ids = ps.iter().map(|p| p.get_id()).collect_vec();
-            m.entry(c.node_name_by_partitions(&ids))
+            m.entry(c.node_name_by_partition_rows(ps))
                 .or_default()
                 .extend(ids)
         }

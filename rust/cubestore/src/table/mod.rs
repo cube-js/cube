@@ -19,7 +19,7 @@ pub mod data;
 pub(crate) mod parquet;
 pub mod redistribute;
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Hash)]
 pub enum TableValue {
     Null,
     String(String),
@@ -166,7 +166,7 @@ impl ToString for TimestampValue {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Row {
     values: Vec<TableValue>,
 }
