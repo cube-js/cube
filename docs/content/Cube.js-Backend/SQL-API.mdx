@@ -1,0 +1,248 @@
+---
+title: SQL API
+permalink: /backend/sql
+category: Cube.js Backend
+menuOrder: 3
+---
+
+<WarningBox heading={`🐣  Preview`}>
+
+The Cube SQL connector is currently in Preview, and there may be changes in a
+future version. Full support of the ANSI SQL standard is not guaranteed.
+
+</WarningBox>
+
+Cube SQL is a SQL emulation layer for Cube.
+
+It is extremely useful for integrating with existing Business Intelligence (BI)
+tools such as Apache Superset, Microsoft PowerBI etc.
+
+## Enabling the connector
+
+To enable the Cube SQL connector, we first need to add a new environment
+variable:
+
+```dotenv
+CUBEJS_SQL_PORT=3306
+```
+
+Cube SQL uses the same JWTs as Cube, so we first need to create a JWT from the
+`CUBEJS_API_SECRET` or from our external identity provider if custom JWK
+authentication is configured. Assuming the JWT has been generated, we can
+connect using the `mysql` client:
+
+```bash
+# Format: mysql -h <CUBE_IP> --port <CUBE_SQL_PORT> -u <JWT_STRING>
+mysql -h 127.0.0.1 --port 3306 -u eyJhbGc...
+```
+
+Because MySQL does not support JWT authentication, Cube SQL retrieves the JWT
+from the `username` parameter.
+
+## Querying Dimensions
+
+Querying dimensions is straightforward, simply add any required fields to the
+`SELECT` clause. Let's use a sample orders table from an e-commerce database:
+
+```javascript
+cube('Orders', {
+  ...,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+    },
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+  },
+})
+```
+
+We can then execute the following queries through the Cube SQL connector:
+
+```sql
+SELECT id FROM Orders;
+SELECT status FROM Orders;
+```
+
+## Querying Measures
+
+Measures can similarly be queried through Cube SQL.
+
+<InfoBox>
+
+When applying aggregate functions to measures in a Cube SQL query, be sure to
+use the right aggregation function for the measure. If the measure is of [type
+`min`][ref-schema-ref-types-formats], then use the [`MIN()` SQL
+function][mysql-docs-min], for example.
+
+</InfoBox>
+
+Let's examine the schema again:
+
+```javascript
+cube('Orders', {
+  ...,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+    distinctCount: {
+      sql: `id`,
+      type: `countDistinct`,
+    },
+    approxDistinctCount: {
+      sql: `id`,
+      type: `countDistinctApprox`,
+    },
+    minValue: {
+      sql: `min_value`,
+      type: `min`
+    },
+    maxValue: {
+      sql: `max_value`,
+      type: `max`
+    },
+  },
+})
+```
+
+As we can see, we have a mix of measure types in the above schema. To query
+them, we could use the following SQL statements:
+
+```sql
+--- Both the following statements are equivalent
+SELECT count FROM Orders
+SELECT COUNT(*) FROM Orders
+
+--- Count distinct, and count distinct approx
+--- Both the following statements are equivalent
+SELECT distinctCount FROM Orders
+SELECT COUNT(DISTINCT distinctCount) FROM Orders
+
+--- Both the following statements are equivalent
+SELECT approxDistinctCount FROM Orders
+SELECT COUNT(DISTINCT approxDistinctCount) FROM Orders
+
+--- Both the following statements are equivalent
+SELECT minValue FROM Orders
+SELECT MIN(minValue) FROM Orders
+
+--- Both the following statements are equivalent
+SELECT maxValue FROM Orders
+SELECT MAX(maxValue) FROM Orders
+```
+
+## Querying Segments
+
+Any segments defined in a schema can also be used in Cube SQL queries. Looking
+at the schema below, we have one segment `isCompleted`:
+
+```javascript
+cube('Orders', {
+  ...,
+
+  segments: {
+    isCompleted: {
+      sql: `${CUBE}.status = 'completed'`,
+    },
+  },
+});
+```
+
+Segments must be used as `boolean` types in Cube SQL queries:
+
+```sql
+WHERE isCompleted = true
+```
+
+## Limitations
+
+### SELECT
+
+`SELECT` statements only support the following projections:
+
+**`*` for all dimensions:**
+
+```sql
+SELECT * FROM Orders;
+```
+
+**A valid expression for a dimension or measure:**
+
+```sql
+SELECT COUNT(*) FROM Orders;
+```
+
+**A valid expression as an alias:**
+
+```sql
+SELECT COUNT(*) AS order_count FROM Orders;
+```
+
+### WHERE
+
+Cube SQL supports most conditional checks for the `WHERE` clause.
+
+**Comparison operators:**
+
+```sql
+WHERE price > 50
+WHERE price >= 50 AND <= 100
+```
+
+**Boolean logic:**
+
+```sql
+WHERE isPaid = true
+  AND isCompleted = false
+  OR isReviewed = false
+```
+
+**`IN` operator:**:
+
+```sql
+WHERE status IN ('completed', 'shipped')
+WHERE status NOT IN ('processing')
+```
+
+**`IS NULL`:**
+
+```sql
+WHERE completedAt IS NULL
+WHERE completedAt IS NOT NULL
+```
+
+**`BETWEEN`:**
+
+```sql
+WHERE completedAt BETWEEN '2021-08-31' AND '2021-09-07'
+WHERE createdAt NOT BETWEEN '2021-08-31' AND '2021-09-07'
+```
+
+**`LIKE`:**
+
+```sql
+WHERE name LIKE 'joe'
+WHERE name NOT LIKE 'bloggs'
+```
+
+**Functions:**
+
+Currently Cube SQL only supports [`STR_TO_DATE()`][mysql-docs-str-to-date].
+
+### GROUP BY
+
+`GROUP BY` clauses in SQL queries sent to Cube SQL are ignored; Cube SQL follows
+the same rules as Cube. Any defined dimensions/measures will be grouped **by
+default**, and currently there is no way to retrieve ungrouped results.
+
+[mysql-docs-str-to-date]:
+  https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_str-to-date
+[mysql-docs-min]:
+  https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html#function_min
+[ref-schema-ref-types-formats]: /schema/reference/types-and-formats#min
