@@ -38,7 +38,6 @@ import {
   useChartRendererStateMethods,
 } from '../../QueryTabs/ChartRendererStateProvider';
 import { PreAggregationStatus } from './PreAggregationStatus';
-import { RequestApmStatus } from './RequestApmStatus';
 
 const Section = styled.div`
   display: flex;
@@ -171,6 +170,7 @@ export type PlaygroundQueryBuilderProps = {
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
+  extra?: Function;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
@@ -192,6 +192,7 @@ export function PlaygroundQueryBuilder({
   dashboardSource,
   schemaVersion = 0,
   initialVizState,
+  extra: Extra,
   onSchemaChange,
   onVizStateChanged,
 }: PlaygroundQueryBuilderProps) {
@@ -444,8 +445,11 @@ export function PlaygroundQueryBuilder({
                   />
 
                   <Space style={{ marginLeft: 'auto' }}>
-                    {queryStatus ? (
-                      <RequestApmStatus requestId={queryRequestId} />
+                    {Extra ? (
+                      <Extra
+                        queryRequestId={queryRequestId}
+                        queryStatus={queryStatus}
+                      />
                     ) : null}
                     {queryStatus ? (
                       <PreAggregationStatus

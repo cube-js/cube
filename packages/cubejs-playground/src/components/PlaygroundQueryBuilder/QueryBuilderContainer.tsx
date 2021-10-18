@@ -41,6 +41,7 @@ type QueryBuilderContainerProps = {
   | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -76,6 +77,7 @@ export function QueryBuilderContainer({
               dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
               onTabChange={props.onTabChange}
+              extra={props.extra}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
@@ -92,7 +94,11 @@ type QueryTabsRendererProps = {
   onSecurityContextModalOpen: () => void;
 } & Pick<
   PlaygroundQueryBuilderProps,
-  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+  | 'schemaVersion'
+  | 'dashboardSource'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -152,6 +158,7 @@ function QueryTabsRenderer({
           }}
           dashboardSource={dashboardSource}
           schemaVersion={schemaVersion}
+          extra={props.extra}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},
