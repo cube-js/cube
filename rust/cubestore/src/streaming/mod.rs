@@ -207,10 +207,17 @@ impl KSqlStreamingSource {
             *tail_bytes = Bytes::from(concat.into_inner());
             return Ok(rows);
         }
-        concat.write_all(&b[0..last_separator.unwrap()])?;
+        let last_separator_index = last_separator.unwrap();
+        concat.write_all(&b[0..last_separator_index])?;
 
         let buf = concat.into_inner();
         let lines_str = String::from_utf8_lossy(buf.as_slice());
+
+        *tail_bytes = if last_separator_index == b.len() || last_separator_index == b.len() - 1 {
+            Bytes::from(Vec::new())
+        } else {
+            Bytes::from(b[(last_separator_index + 1)..].to_vec())
+        };
 
         for line in lines_str.split("\n") {
             let res = json::parse(line)?;
@@ -415,7 +422,13 @@ impl StreamingSource for KSqlStreamingSource {
                                 bytes,
                                 column_to_move.clone(),
                                 seq_column_to_move.clone(),
-                            );
+                            )
+                            .map_err(|e| {
+                                CubeError::internal(format!(
+                                    "Error during parsing ksql response: {}",
+                                    e
+                                ))
+                            });
                             futures_util::future::ready(Some(rows))
                         },
                     )
