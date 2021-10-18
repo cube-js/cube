@@ -70,7 +70,7 @@ jobs:
         # 11 - 67
         # 10 - 64
         node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
-        os-version: [ubuntu-20.04, macos-11]
+        os-version: [windows-2019,ubuntu-20.04, macos-11]
       fail-fast: false
 
     steps:
@@ -103,7 +103,9 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        run: yarn install --frozen-lockfile
       - name: Build native
         run: cd packages/cubejs-backend-native && yarn run upload-binary
 

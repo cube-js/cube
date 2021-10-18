@@ -11,10 +11,12 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
     && rm -rf /var/lib/apt/lists/* \
 
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
-
-ENV PATH=/root/.cargo/bin:$PATH
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
@@ -33,6 +35,7 @@ COPY packages/cubejs-linter packages/cubejs-linter
 COPY rust/package.json rust/package.json
 COPY rust/bin rust/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
 COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
@@ -84,6 +87,7 @@ RUN yarn install
 # Backend
 COPY rust/ rust/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing/ packages/cubejs-testing/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/

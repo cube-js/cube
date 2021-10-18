@@ -21,8 +21,9 @@ serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_json = "1.0.56"
 log = "=0.4.11"
+uuid = { version = "0.8", features = ["v4"] }
 
 [dependencies.neon]
 version = "0.10.0-alpha.2"
 default-features = false
-features = ["napi-4", "channel-api", "promise-api", "task-api", "proc-macros"]
+features = ["napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]

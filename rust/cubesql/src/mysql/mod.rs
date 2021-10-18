@@ -51,6 +51,7 @@ impl Backend {
         let query_lower = query_lower.replace("`", "");
 
         let ignore = match query_lower.as_str() {
+            "set names utf8mb4" => true,
             "set names latin1" => true,
             "rollback" => true,
             "commit" => true,
@@ -618,7 +619,7 @@ impl ProcessingLoop for MySqlServer {
     async fn processing_loop(&self) -> Result<(), CubeError> {
         let listener = TcpListener::bind(self.address.clone()).await?;
 
-        println!("MySQL port open on {}", self.address);
+        println!("🔗 Cube SQL is listening on {}", self.address);
 
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;

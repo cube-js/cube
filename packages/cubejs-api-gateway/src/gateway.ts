@@ -40,6 +40,7 @@ import {
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
+import { SQLServer } from './sql-server';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -429,6 +430,10 @@ export class ApiGateway {
     });
 
     app.use(this.handleErrorMiddleware);
+  }
+
+  public initSQLServer() {
+    return new SQLServer(this);
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
