@@ -33,6 +33,7 @@
     "body-parser": "^1.19.0",
     "chrono-node": "^2.2.6",
     "express-graphql": "^0.12.0",
+    "graphql": "^15.3.0",
     "graphql-scalars": "^1.10.0",
     "jsonwebtoken": "^8.3.0",
     "jwk-to-pem": "^2.0.4",
@@ -60,9 +61,6 @@
     "should": "^13.2.3",
     "supertest": "^4.0.2",
     "typescript": "~4.1.5"
-  },
-  "peerDependencies": {
-    "graphql": "^14.7.0 || ^15.3.0"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
