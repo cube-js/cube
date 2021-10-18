@@ -94,13 +94,13 @@ impl SchemaService for NodeBridgeTransport {
             };
 
             if let Ok(res) = serde_json::from_value::<V1LoadConinueWait>(response) {
-                if res.error.to_lowercase() == "continue wait".to_string() {
+                if res.error.to_lowercase() == *"continue wait" {
                     debug!(
                         "[transport] load - retrying request (continue wait) requestId: {}, span: {}",
                         request_id, span_counter
                     );
 
-                    span_counter = span_counter + 1;
+                    span_counter += 1;
 
                     continue;
                 } else {

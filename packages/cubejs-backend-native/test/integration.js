@@ -1,40 +1,42 @@
-const native = require('..');
-const meta = require('./meta');
+const native = require('../dist/lib/index');
+const meta_fixture = require('./meta');
 
 (async () => {
-    let transport_load = async (extra, channel) => {
-      console.log('[js] transport_load',  {
+    const load = async (extra) => {
+      console.log('[js] load',  {
         extra,
-        channel
       });
 
-      native.channel_reject(channel);
+      throw new Error('Unsupported');
     };
 
-    let transport_meta = async (extra, channel) => {
-        console.log('[js] transport_meta',  {
-          extra,
-          channel
+    const meta = async (extra) => {
+        console.log('[js] meta',  {
+          extra
         });
 
-        try {
-          native.channel_resolve(channel, JSON.stringify(meta));
-        } catch (e) {
-          console.log(e);
-
-          native.channel_reject(channel);
-        }
+        return meta_fixture;
     };
 
-    let promise = native.registerInterface(
-      transport_load,
-      transport_meta,
-    );
+    const checkAuth = async (extra) => {
+      console.log('[js] checkAuth',  {
+        extra,
+      });
 
-    try {
-        console.log(await promise);
-        console.log('await');
-    } catch (e) {
-        console.log("Error", e);
-    }
+      return true;
+    };
+
+    native.setLogLevel('trace');
+
+    const interface = await native.registerInterface({
+      checkAuth,
+      load,
+      meta,
+    });
+    console.log({
+      interface
+    });
+
+    // block
+    await new Promise(() => {});
 })();

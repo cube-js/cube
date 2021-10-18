@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { registerInterface } from '@cubejs-backend/native';
+import { setLogLevel, registerInterface } from '@cubejs-backend/native';
 import type { ApiGateway } from './gateway';
 
 export interface SQLServerOptions {
@@ -11,6 +11,9 @@ export class SQLServer {
   public constructor(
     protected readonly apiGateway: ApiGateway,
   ) {
+    setLogLevel(
+      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
+    );
   }
 
   public async init(options: SQLServerOptions): Promise<void> {
