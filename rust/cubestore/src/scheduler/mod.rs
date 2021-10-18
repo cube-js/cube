@@ -219,13 +219,24 @@ impl SchedulerImpl {
                             .meta_store
                             .get_partition_chunk_sizes(chunk.get_row().get_partition_id())
                             .await?;
-                        let chunks = self
+                        let all_chunks = self
                             .meta_store
                             .get_chunks_by_partition(chunk.get_row().get_partition_id(), false)
                             .await?;
+                        let chunks = all_chunks
+                            .iter()
+                            .filter(|c| !c.get_row().in_memory())
+                            .collect::<Vec<_>>();
+
+                        let in_memory_chunks = all_chunks
+                            .iter()
+                            .filter(|c| c.get_row().in_memory())
+                            .collect::<Vec<_>>();
                         if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
                             || chunks.len()
                                 > self.config.compaction_chunks_count_threshold() as usize
+                            // TODO config
+                            || in_memory_chunks.len() > 100
                         {
                             self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
                                 .await?;
@@ -255,10 +266,20 @@ impl SchedulerImpl {
                 .await?;
             tokio::fs::remove_file(file).await?;
         }
-        if let MetaStoreEvent::Delete(TableId::Chunks, row_id) = event {
-            self.remote_fs
-                .delete_file(ChunkStore::chunk_remote_path(row_id).as_str())
-                .await?
+        if let MetaStoreEvent::DeleteChunk(chunk) = &event {
+            if chunk.get_row().in_memory() {
+                let node_name = self
+                    .cluster
+                    .node_name_by_partitions(&[chunk.get_row().get_partition_id()])
+                    .await?;
+                self.cluster
+                    .free_memory_chunk(&node_name, chunk.get_id())
+                    .await?;
+            } else {
+                self.remote_fs
+                    .delete_file(ChunkStore::chunk_remote_path(chunk.get_id()).as_str())
+                    .await?
+            }
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
             // remove file only if partition is active otherwise it should be removed when it's deactivated

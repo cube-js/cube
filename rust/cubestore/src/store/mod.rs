@@ -24,7 +24,7 @@ use std::{
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::ParquetTableStore;
+use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
@@ -34,6 +34,8 @@ use itertools::Itertools;
 use log::trace;
 use mockall::automock;
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
@@ -154,6 +156,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
+    memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
 
@@ -192,17 +195,13 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         table_id: u64,
         rows: Vec<ArrayRef>,
         columns: &[Column],
-        send_to_owner_worker: bool,
+        in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
     async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError>;
-    async fn add_chunk_columns(
-        &self,
-        index: IdRow<Index>,
-        partition: IdRow<Partition>,
-        data: Vec<ArrayRef>,
-    ) -> Result<ChunkUploadJob, CubeError>;
+    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
+    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockChunkDataStore, [ChunkDataStore]);
@@ -285,6 +284,7 @@ impl ChunkStore {
             remote_fs,
             cluster,
             chunk_size,
+            memory_chunks: RwLock::new(HashMap::new()),
         };
 
         Arc::new(store)
@@ -310,10 +310,10 @@ impl ChunkDataStore for ChunkStore {
         table_id: u64,
         rows: Vec<ArrayRef>,
         columns: &[Column],
-        send_to_owner_worker: bool,
+        in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let indexes = self.meta_store.get_table_indexes(table_id).await?;
-        self.build_index_chunks(&indexes, rows.into(), columns, send_to_owner_worker)
+        self.build_index_chunks(&indexes, rows.into(), columns, in_memory)
             .await
     }
 
@@ -366,48 +366,56 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError> {
-        let (local_file, index) = self.download_chunk(chunk).await?;
-        Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-            let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
-            Ok(parquet.read_columns(&local_file)?)
-        })
-        .await??)
+        if chunk.get_row().in_memory() {
+            let node_name = self
+                .cluster
+                .node_name_by_partitions(&[chunk.get_row().get_partition_id()])
+                .await?;
+            let server_name = self.cluster.server_name();
+            if node_name != server_name {
+                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
+            }
+            let partition = self
+                .meta_store
+                .get_partition(chunk.get_row().get_partition_id())
+                .await?;
+            let index = self
+                .meta_store
+                .get_index(partition.get_row().get_index_id())
+                .await?;
+            let memory_chunks = self.memory_chunks.read().await;
+            Ok(vec![memory_chunks
+                .get(&chunk.get_id())
+                .map(|b| b.clone())
+                .unwrap_or(RecordBatch::new_empty(Arc::new(
+                    arrow_schema(&index.get_row()),
+                )))])
+        } else {
+            let (local_file, index) = self.download_chunk(chunk).await?;
+            Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                Ok(parquet.read_columns(&local_file)?)
+            })
+            .await??)
+        }
+    }
+
+    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError> {
+        let mut memory_chunks = self.memory_chunks.write().await;
+        memory_chunks.insert(chunk_id, batch);
+        Ok(())
+    }
+
+    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+        let mut memory_chunks = self.memory_chunks.write().await;
+        memory_chunks.remove(&chunk_id);
+        Ok(())
     }
 
     async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError> {
         let remote_path = ChunkStore::chunk_file_name(chunk);
         self.remote_fs.delete_file(&remote_path).await?;
         Ok(())
-    }
-
-    /// Processes data into parquet files in the current task and schedules an async file upload.
-    /// Join the returned handle to wait for the upload to finish.
-    async fn add_chunk_columns(
-        &self,
-        index: IdRow<Index>,
-        partition: IdRow<Partition>,
-        data: Vec<ArrayRef>,
-    ) -> Result<ChunkUploadJob, CubeError> {
-        let chunk = self
-            .meta_store
-            .create_chunk(partition.get_id(), data[0].len())
-            .await?;
-        trace!("New chunk allocated during partitioning: {:?}", chunk);
-        let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
-        let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
-        let local_file_copy = local_file.clone();
-        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-            let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
-            parquet.write_data(&local_file_copy, data)?;
-            Ok(())
-        })
-        .await??;
-
-        let fs = self.remote_fs.clone();
-        Ok(cube_ext::spawn(async move {
-            fs.upload_file(&local_file, &remote_path).await?;
-            Ok(chunk)
-        }))
     }
 }
 
@@ -598,7 +606,7 @@ mod tests {
 
             let data = rows_to_columns(&col, data_frame.get_rows().as_slice());
             let chunk = chunk_store
-                .add_chunk_columns(index, partition, data.clone())
+                .add_chunk_columns(index, partition, data.clone(), false)
                 .await
                 .unwrap()
                 .await
@@ -628,7 +636,7 @@ impl ChunkStore {
         &self,
         index_id: u64,
         mut columns: Vec<ArrayRef>,
-        send_to_owner_worker: bool,
+        in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<IdRow<Chunk>, CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
         let partitions = self
@@ -680,14 +688,10 @@ impl ChunkStore {
                     .iter()
                     .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
-                let chunk = if send_to_owner_worker {
-                    self.add_chunk_columns_on_partition_owner(index.clone(), partition, columns)
-                        .await?
-                } else {
-                    self.add_chunk_columns(index.clone(), partition, columns)
-                        .await?
-                };
-                new_chunks.push(chunk);
+                new_chunks.push(
+                    self.add_chunk_columns(index.clone(), partition, columns, in_memory)
+                        .await?,
+                );
             }
             remaining_rows = next;
         }
@@ -697,20 +701,54 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
-    async fn add_chunk_columns_on_partition_owner(
-        &'a self,
+    /// Processes data into parquet files in the current task and schedules an async file upload.
+    /// Join the returned handle to wait for the upload to finish.
+    async fn add_chunk_columns(
+        &self,
         index: IdRow<Index>,
         partition: IdRow<Partition>,
         data: Vec<ArrayRef>,
+        in_memory: bool,
     ) -> Result<ChunkUploadJob, CubeError> {
-        let node_name = self
-            .cluster
-            .node_name_by_partition_rows(&vec![partition.clone()]);
-        let cluster = self.cluster.clone();
-        trace!("Sending chunk to partition owner: {}", node_name);
-        Ok(cube_ext::spawn(async move {
-            cluster.add_chunk(&node_name, index, partition, data).await
-        }))
+        let chunk = self
+            .meta_store
+            .create_chunk(partition.get_id(), data[0].len(), in_memory)
+            .await?;
+        if in_memory {
+            trace!(
+                "New in memory chunk allocated during partitioning: {:?}",
+                chunk
+            );
+            let batch = RecordBatch::try_new(Arc::new(arrow_schema(&index.get_row())), data)?;
+            let node_name = self
+                .cluster
+                .node_name_by_partitions(&[partition.get_id()])
+                .await?;
+            let cluster = self.cluster.clone();
+            Ok(cube_ext::spawn(async move {
+                cluster
+                    .add_memory_chunk(&node_name, chunk.get_id(), batch)
+                    .await?;
+                Ok(chunk)
+            }))
+        } else {
+            trace!("New chunk allocated during partitioning: {:?}", chunk);
+            let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
+            let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
+            let local_file_copy = local_file.clone();
+            cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+                parquet.write_data(&local_file_copy, data)?;
+                Ok(())
+            })
+            .await??;
+
+            let fs = self.remote_fs.clone();
+            Ok(cube_ext::spawn(async move {
+                fs.upload_file(&local_file, &remote_path).await?;
+                Ok(chunk)
+            }))
+        }
     }
 
     /// Returns a list of newly added chunks.
@@ -719,7 +757,7 @@ impl ChunkStore {
         indexes: &[IdRow<Index>],
         rows: VecArrayRef,
         columns: &[Column],
-        send_to_owner_worker: bool,
+        in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
         let mut new_chunks = Vec::new();
@@ -736,7 +774,7 @@ impl ChunkStore {
             rows = rows_again;
             new_chunks.append(
                 &mut self
-                    .partition_rows(index.get_id(), remapped, send_to_owner_worker)
+                    .partition_rows(index.get_id(), remapped, in_memory)
                     .await?,
             );
         }

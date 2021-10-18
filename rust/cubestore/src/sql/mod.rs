@@ -734,6 +734,11 @@ impl SqlService for SqlServiceImpl {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
+                        let chunk_ids_to_batches = worker_plan
+                            .in_memory_chunks_to_load()
+                            .into_iter()
+                            .map(|c| (c.get_id(), Vec::new()))
+                            .collect();
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
@@ -742,7 +747,7 @@ impl SqlService for SqlServiceImpl {
                                 .0,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names)
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
                                 .await?
                                 .0,
                         });

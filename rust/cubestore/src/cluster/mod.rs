@@ -19,9 +19,7 @@ use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
-use crate::metastore::{
-    Chunk, IdRow, Index, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
-};
+use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -31,9 +29,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::table::parquet::arrow_schema;
 use crate::CubeError;
-use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
@@ -109,13 +105,14 @@ pub trait Cluster: DIService + Send + Sync {
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError>;
 
-    async fn add_chunk(
+    async fn add_memory_chunk(
         &self,
         node_name: &str,
-        index: IdRow<Index>,
-        partition: IdRow<Partition>,
-        data: Vec<ArrayRef>,
-    ) -> Result<IdRow<Chunk>, CubeError>;
+        chunk_id: u64,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError>;
+
+    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -181,7 +178,11 @@ crate::di_service!(ClusterImpl, [Cluster]);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
-    Select(SerializedPlan, HashMap<String, String>),
+    Select(
+        SerializedPlan,
+        HashMap<String, String>,
+        HashMap<u64, Vec<SerializedRecordBatchStream>>,
+    ),
 }
 #[cfg(not(target_os = "windows"))]
 pub struct WorkerProcessor;
@@ -195,12 +196,24 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
-            WorkerMessage::Select(plan_node, remote_to_local_names) => {
+            WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
                 debug!("Running select in worker started: {:?}", plan_node);
                 let plan_node_to_send = plan_node.clone();
+                let result = chunk_id_to_record_batches
+                    .into_iter()
+                    .map(|(id, batches)| -> Result<_, CubeError> {
+                        Ok((
+                            id,
+                            batches
+                                .into_iter()
+                                .map(|b| b.read())
+                                .collect::<Result<Vec<_>, _>>()?,
+                        ))
+                    })
+                    .collect::<Result<HashMap<_, _>, _>>()?;
                 let res = Config::current_worker_services()
                     .query_executor
-                    .execute_worker_plan(plan_node_to_send, remote_to_local_names)
+                    .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
                 let (schema, records) = res?;
@@ -309,31 +322,34 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn add_chunk(
+    async fn add_memory_chunk(
         &self,
         node_name: &str,
-        index: IdRow<Index>,
-        partition: IdRow<Partition>,
-        data: Vec<ArrayRef>,
-    ) -> Result<IdRow<Chunk>, CubeError> {
-        // We only wait for the result is to ensure our request is delivered.
-        let schema = Arc::new(arrow_schema(&index.get_row()));
-        let record_batch = SerializedRecordBatchStream::write(
-            &schema,
-            vec![RecordBatch::try_new(schema.clone(), data)?],
-        )?;
+        chunk_id: u64,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError> {
+        let record_batch = SerializedRecordBatchStream::write(&batch.schema(), vec![batch])?;
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::AddChunk {
-                    index,
-                    partition,
+                NetworkMessage::AddMemoryChunk {
+                    chunk_id,
                     data: record_batch.into_iter().next().unwrap(),
                 },
             )
             .await?;
         match response {
-            NetworkMessage::AddChunkResult(r) => r,
+            NetworkMessage::AddMemoryChunkResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
+    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_id })
+            .await?;
+        match response {
+            NetworkMessage::FreeMemoryChunkResult(r) => r,
             x => panic!("Unexpected result for add chunk: {:?}", x),
         }
     }
@@ -428,11 +444,7 @@ impl Cluster for ClusterImpl {
             NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
                 panic!("result sent to worker");
             }
-            NetworkMessage::AddChunk {
-                index,
-                partition,
-                data,
-            } => {
+            NetworkMessage::AddMemoryChunk { chunk_id, data } => {
                 let res = match data.read() {
                     Ok(batch) => {
                         let chunk_store = self
@@ -441,22 +453,26 @@ impl Cluster for ClusterImpl {
                             .unwrap()
                             .get_service_typed::<dyn ChunkDataStore>()
                             .await;
-                        let res = chunk_store
-                            .add_chunk_columns(index, partition, batch.columns().to_vec())
-                            .await;
-                        match res {
-                            Ok(res) => {
-                                let res = res.await;
-                                res.map_err(|e| CubeError::from_error(e)).and_then(|r| r)
-                            }
-                            Err(e) => Err(e),
-                        }
+                        chunk_store.add_memory_chunk(chunk_id, batch).await
                     }
                     Err(e) => Err(e),
                 };
-                NetworkMessage::AddChunkResult(res)
+                NetworkMessage::AddMemoryChunkResult(res)
             }
-            NetworkMessage::AddChunkResult(_) => {
+            NetworkMessage::AddMemoryChunkResult(_) => {
+                panic!("AddChunkResult sent to worker");
+            }
+            NetworkMessage::FreeMemoryChunk { chunk_id } => {
+                let chunk_store = self
+                    .injector
+                    .upgrade()
+                    .unwrap()
+                    .get_service_typed::<dyn ChunkDataStore>()
+                    .await;
+                let res = chunk_store.free_memory_chunk(chunk_id).await;
+                NetworkMessage::FreeMemoryChunkResult(res)
+            }
+            NetworkMessage::FreeMemoryChunkResult(_) => {
                 panic!("AddChunkResult sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
@@ -1015,14 +1031,55 @@ impl ClusterImpl {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
+        let chunk_store = self
+            .injector
+            .upgrade()
+            .unwrap()
+            .get_service_typed::<dyn ChunkDataStore>()
+            .await;
+
+        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
+        let in_memory_chunks_futures = in_memory_chunks_to_load
+            .iter()
+            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+            .collect::<Vec<_>>();
+
+        let chunk_id_to_record_batches = in_memory_chunks_to_load
+            .clone()
+            .into_iter()
+            .map(|c| c.get_id())
+            .zip(
+                join_all(in_memory_chunks_futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter(),
+            )
+            .collect::<HashMap<_, _>>();
+
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
         {
             if let Some(pool) = self.select_process_pool.read().await.clone() {
+                let chunk_id_to_record_batches = chunk_id_to_record_batches
+                    .iter()
+                    .map(
+                        |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
+                            Ok((
+                                *id,
+                                SerializedRecordBatchStream::write(
+                                    &b.iter().next().unwrap().schema(),
+                                    b.to_vec(),
+                                )?,
+                            ))
+                        },
+                    )
+                    .collect::<Result<HashMap<_, _>, _>>()?;
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
                         remote_to_local_names.clone(),
+                        chunk_id_to_record_batches,
                     ))
                     .instrument(tracing::span!(
                         tracing::Level::TRACE,
@@ -1037,7 +1094,11 @@ impl ClusterImpl {
             // TODO optimize for no double conversion
             let (schema, records) = self
                 .query_executor
-                .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                .execute_worker_plan(
+                    plan_node.clone(),
+                    remote_to_local_names,
+                    chunk_id_to_record_batches,
+                )
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
             res = Some(Ok((schema, records?)))

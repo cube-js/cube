@@ -524,7 +524,9 @@ pub struct Chunk {
     active: bool,
     /// Not used or updated anymore.
     #[serde(default)]
-    last_used: Option<DateTime<Utc>>
+    last_used: Option<DateTime<Utc>>,
+    #[serde(default)]
+    in_memory: bool
 }
 }
 
@@ -761,6 +763,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         partition_id: u64,
         row_count: usize,
+        in_memory: bool,
     ) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunks_by_partition(
@@ -3060,11 +3063,12 @@ impl MetaStore for RocksMetaStore {
         &self,
         partition_id: u64,
         row_count: usize,
+        in_memory: bool,
     ) -> Result<IdRow<Chunk>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
 
-            let chunk = Chunk::new(partition_id, row_count);
+            let chunk = Chunk::new(partition_id, row_count, in_memory);
             let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
 
             Ok(id_row)

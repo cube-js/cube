@@ -482,17 +482,17 @@ mod tests {
         metastore.get_default_index(1).await.unwrap();
         let partition = metastore.get_partition(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 10)
+            .create_chunk(partition.get_id(), 10, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 16)
+            .create_chunk(partition.get_id(), 16, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 20)
+            .create_chunk(partition.get_id(), 20, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(3).await.unwrap();
@@ -567,7 +567,10 @@ mod tests {
             .find(|p| p.get_row().main_table_row_count() == 14)
             .unwrap()
             .get_id();
-        metastore.create_chunk(next_partition_id, 2).await.unwrap();
+        metastore
+            .create_chunk(next_partition_id, 2, false)
+            .await
+            .unwrap();
         metastore.chunk_uploaded(4).await.unwrap();
 
         compaction_service.compact(next_partition_id).await.unwrap();

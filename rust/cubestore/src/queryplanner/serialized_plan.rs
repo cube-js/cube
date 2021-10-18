@@ -10,6 +10,7 @@ use crate::queryplanner::udfs::{
 };
 use crate::CubeError;
 use arrow::datatypes::DataType;
+use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::cube_ext::join::SkewedLeftCrossJoin;
 use datafusion::cube_ext::joinagg::CrossJoinAgg;
@@ -198,12 +199,14 @@ pub enum SerializePartitioning {
     Hash(Vec<SerializedExpr>, usize),
 }
 
+pub struct WorkerContext {
+    remote_to_local_names: HashMap<String, String>,
+    worker_partition_ids: HashSet<u64>,
+    chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+}
+
 impl SerializedLogicalPlan {
-    fn logical_plan(
-        &self,
-        remote_to_local_names: &HashMap<String, String>,
-        worker_partition_ids: &HashSet<u64>,
-    ) -> Result<LogicalPlan, CubeError> {
+    fn logical_plan(&self, worker_context: &WorkerContext) -> Result<LogicalPlan, CubeError> {
         Ok(match self {
             SerializedLogicalPlan::Projection {
                 expr,
@@ -211,12 +214,12 @@ impl SerializedLogicalPlan {
                 schema,
             } => LogicalPlan::Projection {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
                 predicate: predicate.expr(),
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
             },
             SerializedLogicalPlan::Aggregate {
                 input,
@@ -226,12 +229,12 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Aggregate {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
                 expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
             },
             SerializedLogicalPlan::Union {
                 inputs,
@@ -241,7 +244,7 @@ impl SerializedLogicalPlan {
                 inputs: inputs
                     .iter()
                     .map(|p| -> Result<LogicalPlan, CubeError> {
-                        Ok(p.logical_plan(remote_to_local_names, worker_partition_ids)?)
+                        Ok(p.logical_plan(worker_context)?)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
                 schema: schema.clone(),
@@ -259,8 +262,9 @@ impl SerializedLogicalPlan {
                 table_name: table_name.clone(),
                 source: match source {
                     SerializedTableSource::CubeTable(v) => Arc::new(v.to_worker_table(
-                        remote_to_local_names.clone(),
-                        worker_partition_ids.clone(),
+                        worker_context.remote_to_local_names.clone(),
+                        worker_context.worker_partition_ids.clone(),
+                        worker_context.chunk_id_to_record_batches.clone(),
                     )),
                 },
                 projection: projection.clone(),
@@ -277,11 +281,11 @@ impl SerializedLogicalPlan {
             },
             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
                 n: *n,
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
             },
             SerializedLogicalPlan::Skip { n, input } => LogicalPlan::Skip {
                 n: *n,
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
             },
             SerializedLogicalPlan::Join {
                 left,
@@ -291,8 +295,8 @@ impl SerializedLogicalPlan {
                 join_constraint,
                 schema,
             } => LogicalPlan::Join {
-                left: Arc::new(left.logical_plan(remote_to_local_names, worker_partition_ids)?),
-                right: Arc::new(right.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                left: Arc::new(left.logical_plan(worker_context)?),
+                right: Arc::new(right.logical_plan(worker_context)?),
                 on: on.clone(),
                 join_type: join_type.clone(),
                 join_constraint: *join_constraint,
@@ -302,7 +306,7 @@ impl SerializedLogicalPlan {
                 input,
                 partitioning_scheme,
             } => LogicalPlan::Repartition {
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
                 partitioning_scheme: match partitioning_scheme {
                     SerializePartitioning::RoundRobinBatch(s) => Partitioning::RoundRobinBatch(*s),
                     SerializePartitioning::Hash(e, s) => {
@@ -316,13 +320,13 @@ impl SerializedLogicalPlan {
                 schema,
             } => LogicalPlan::Extension {
                 node: Arc::new(LogicalAlias {
-                    input: input.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    input: input.logical_plan(worker_context)?,
                     alias: alias.clone(),
                     schema: schema.clone(),
                 }),
             },
             SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
                 snapshots: snapshots.clone(),
             }
             .into_plan(),
@@ -336,7 +340,7 @@ impl SerializedLogicalPlan {
                 snapshots,
             } => ClusterAggregateTopK {
                 limit: *limit,
-                input: Arc::new(input.logical_plan(remote_to_local_names, worker_partition_ids)?),
+                input: Arc::new(input.logical_plan(worker_context)?),
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
                 order_by: sort_columns.clone(),
@@ -351,8 +355,8 @@ impl SerializedLogicalPlan {
                 join_schema,
             } => LogicalPlan::Extension {
                 node: Arc::new(SkewedLeftCrossJoin {
-                    left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
-                    right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    left: left.logical_plan(worker_context)?,
+                    right: right.logical_plan(worker_context)?,
                     on: on.expr(),
                     schema: join_schema.clone(),
                 }),
@@ -368,8 +372,8 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Extension {
                 node: Arc::new(CrossJoinAgg {
                     join: SkewedLeftCrossJoin {
-                        left: left.logical_plan(remote_to_local_names, worker_partition_ids)?,
-                        right: right.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                        left: left.logical_plan(worker_context)?,
+                        right: right.logical_plan(worker_context)?,
                         on: on.expr(),
                         schema: join_schema.clone(),
                     },
@@ -392,7 +396,7 @@ impl SerializedLogicalPlan {
             } => LogicalPlan::Extension {
                 node: Arc::new(RollingWindowAggregate {
                     schema: schema.clone(),
-                    input: input.logical_plan(remote_to_local_names, worker_partition_ids)?,
+                    input: input.logical_plan(worker_context)?,
                     dimension: dimension.clone(),
                     from: from.expr(),
                     to: to.expr(),
@@ -620,10 +624,14 @@ impl SerializedPlan {
 
     pub fn logical_plan(
         &self,
-        remote_to_local_names: &HashMap<String, String>,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<LogicalPlan, CubeError> {
-        self.logical_plan
-            .logical_plan(remote_to_local_names, &self.partition_ids_to_execute())
+        self.logical_plan.logical_plan(&WorkerContext {
+            remote_to_local_names,
+            worker_partition_ids: self.partition_ids_to_execute(),
+            chunk_id_to_record_batches,
+        })
     }
 
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
@@ -658,12 +666,43 @@ impl SerializedPlan {
                 }
 
                 for chunk in partition.chunks() {
-                    files.push(chunk.get_row().get_full_name(chunk.get_id()))
+                    if !chunk.get_row().in_memory() {
+                        files.push(chunk.get_row().get_full_name(chunk.get_id()))
+                    }
                 }
             }
         }
 
         files
+    }
+
+    pub fn in_memory_chunks_to_load(&self) -> Vec<IdRow<Chunk>> {
+        self.list_in_memory_chunks_to_load(|id| self.partition_ids_to_execute.contains(&id))
+    }
+
+    fn list_in_memory_chunks_to_load(
+        &self,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<IdRow<Chunk>> {
+        let indexes = self.index_snapshots();
+
+        let mut chunk_ids = Vec::new();
+
+        for index in indexes.iter() {
+            for partition in index.partitions() {
+                if !include_partition(partition.partition.get_id()) {
+                    continue;
+                }
+
+                for chunk in partition.chunks() {
+                    if chunk.get_row().in_memory() {
+                        chunk_ids.push(chunk.clone());
+                    }
+                }
+            }
+        }
+
+        chunk_ids
     }
 
     pub fn is_data_select_query(plan: &LogicalPlan) -> bool {

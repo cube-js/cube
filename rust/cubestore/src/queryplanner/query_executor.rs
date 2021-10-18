@@ -63,6 +63,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     async fn router_plan(
@@ -74,6 +75,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 }
 
@@ -125,8 +127,11 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
-        let (physical_plan, logical_plan) = self.worker_plan(plan, remote_to_local_names).await?;
+        let (physical_plan, logical_plan) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
 
         let worker_plan;
         let max_batch_rows;
@@ -187,7 +192,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&HashMap::new())?;
+        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new())?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -200,8 +205,9 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
+        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches)?;
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -242,12 +248,24 @@ impl QueryExecutorImpl {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: HashSet<u64>,
+    #[serde(skip, default)]
+    chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     schema: SchemaRef,
+}
+
+impl Debug for CubeTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CubeTable")
+            .field("index", self.index_snapshot.index())
+            .field("schema", &self.schema)
+            .field("worker_partition_ids", &self.worker_partition_ids)
+            .finish()
+    }
 }
 
 impl CubeTable {
@@ -271,6 +289,7 @@ impl CubeTable {
             schema,
             remote_to_local_names,
             worker_partition_ids,
+            chunk_id_to_record_batches: HashMap::new(),
         })
     }
 
@@ -279,10 +298,12 @@ impl CubeTable {
         &self,
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: HashSet<u64>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> CubeTable {
         let mut t = self.clone();
         t.remote_to_local_names = remote_to_local_names;
         t.worker_partition_ids = worker_partition_ids;
+        t.chunk_id_to_record_batches = chunk_id_to_record_batches;
         t
     }
 
@@ -363,19 +384,42 @@ impl CubeTable {
 
             let chunks = partition_snapshot.chunks();
             for chunk in chunks {
-                let remote_path = chunk.get_row().get_full_name(chunk.get_id());
-                let local_path = self
-                    .remote_to_local_names
-                    .get(&remote_path)
-                    .expect(format!("Missing remote path {}", remote_path).as_str());
-                let node = Arc::new(ParquetExec::try_from_path(
-                    local_path,
-                    partition_projection.clone(),
-                    predicate.clone(),
-                    batch_size,
-                    1,
-                    None, // TODO: propagate limit
-                )?);
+                let node: Arc<dyn ExecutionPlan> = if chunk.get_row().in_memory() {
+                    let record_batches = self
+                        .chunk_id_to_record_batches
+                        .get(&chunk.get_id())
+                        .ok_or(CubeError::internal(format!(
+                            "Record batch for in memory chunk {:?} is not provided",
+                            chunk
+                        )))?;
+                    Arc::new(MemoryExec::try_new(
+                        &[record_batches.clone()],
+                        record_batches
+                            .iter()
+                            .next()
+                            .ok_or(CubeError::internal(format!(
+                                "Empty Record batch for in memory chunk {:?} is not provided",
+                                chunk
+                            )))?
+                            .schema(),
+                        partition_projection.clone(),
+                    )?)
+                } else {
+                    let remote_path = chunk.get_row().get_full_name(chunk.get_id());
+                    let local_path = self
+                        .remote_to_local_names
+                        .get(&remote_path)
+                        .expect(format!("Missing remote path {}", remote_path).as_str());
+                    Arc::new(ParquetExec::try_from_path(
+                        local_path,
+                        partition_projection.clone(),
+                        predicate.clone(),
+                        batch_size,
+                        1,
+                        None, // TODO: propagate limit
+                    )?)
+                };
+
                 partition_execs.push(node);
             }
         }
