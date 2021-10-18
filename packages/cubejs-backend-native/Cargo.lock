@@ -303,6 +303,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "simple_logger",
  "tokio",
  "uuid",
 ]

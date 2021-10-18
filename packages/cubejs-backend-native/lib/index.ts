@@ -56,6 +56,13 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
+type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+
+export const setLogLevel = (level: LogLevel): void => {
+    const native = loadNative();
+    native.setLogLevel(level);
+};
+
 export const registerInterface = async (options: SQLInterfaceOptions) => {
     if (typeof options !== 'object' && options == null) {
         throw new Error('Argument options must be an object');

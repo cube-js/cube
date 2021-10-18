@@ -11,8 +11,10 @@ use std::{collections::HashMap, sync::Arc};
 use auth::NodeBridgeAuthService;
 use channel::{channel_reject, channel_resolve};
 use config::NodeConfig;
-use cubesql::telemetry::track_event;
+use cubesql::telemetry::{track_event, ReportingLogger};
+use log::Level;
 use neon::prelude::*;
+use simple_logger::SimpleLogger;
 use tokio::runtime::Builder;
 use transport::NodeBridgeTransport;
 
@@ -21,6 +23,36 @@ struct SQLInterface {}
 impl Finalize for SQLInterface {}
 
 impl SQLInterface {}
+
+fn init_logger(log_level: Level) {
+    let logger = SimpleLogger::new()
+        .with_level(Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        // cubejs-native is a real name
+        .with_module_level("native", log_level.to_level_filter());
+
+    ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
+}
+
+fn set_log_level(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let log_level = match cx
+        .argument::<JsString>(0)?
+        .value(&mut cx)
+        .to_lowercase()
+        .as_str()
+    {
+        "error" => Level::Error,
+        "warn" => Level::Warn,
+        "info" => Level::Info,
+        "debug" => Level::Debug,
+        "trace" => Level::Trace,
+        x => cx.throw_error(format!("Unrecognized log level: {}", x))?,
+    };
+
+    init_logger(log_level);
+
+    Ok(cx.undefined())
+}
 
 fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
@@ -75,6 +107,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
+    cx.export_function("setLogLevel", set_log_level)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("channel_resolve", channel_resolve)?;
     cx.export_function("channel_reject", channel_reject)?;

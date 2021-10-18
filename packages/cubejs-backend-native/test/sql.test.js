@@ -7,6 +7,10 @@ const meta_fixture = require('./meta');
 describe('SQLInteface', () => {
   jest.setTimeout(10 * 1000);
 
+  beforeAll(() => {
+    native.setLogLevel('trace');
+  });
+
   // it('Failed auth', async () => {
   //   const load = async (extra) => {
   //     console.log('[js] load',  {
