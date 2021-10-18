@@ -80,6 +80,7 @@ const CubeGranularity = enumType({
   members: [
     'second',
     'minute',
+    'hour',
     'day',
     'week',
     'month',
