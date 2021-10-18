@@ -146,7 +146,7 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run upload-binary
 
   docker-default:
-    needs: [npm, cubestore]
+    needs: [npm, cubestore, native_linux]
     name: Debian docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30
@@ -212,7 +212,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
-    needs: [npm, cubestore]
+    needs: [npm, cubestore, native_linux]
     name: Alpine docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30
