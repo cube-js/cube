@@ -1,5 +1,5 @@
 ---
-title: Getting Started with Cube Cloud - Upload with CLI
+title: "Getting Started with Cube Cloud: Create new project"
 permalink: /cloud/getting-started/create
 ---
 
