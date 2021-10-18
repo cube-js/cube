@@ -14,7 +14,14 @@ future version. Full support of the ANSI SQL standard is not guaranteed.
 
 Cube SQL is a SQL emulation layer for Cube. It is extremely useful for
 integrating with existing Business Intelligence (BI) tools such as [Apache
-Superset][apache-superset], [Microsoft PowerBI][ms-powerbi] etc.
+Superset][superset].
+
+<InfoBox>
+
+To see an example of Cube connecting to Apache Superset, check out [this
+recipe][ref-recipe-cube-sql-superset].
+
+</InfoBox>
 
 ## Enabling the connector
 
@@ -40,13 +47,14 @@ services:
 
 </InfoBox>
 
-Cube SQL uses the same JWTs as Cube, so we first need to create a JWT.
-If the project uses `CUBEJS_API_SECRET`, then we can generate a JWT
-token by running the following inside the project directory:
+Cube SQL uses the same JWTs as Cube, so we first need to create a JWT. If the
+project uses `CUBEJS_API_SECRET`, then we can generate a JWT token by running
+the following inside the project directory:
 
 <InfoBox>
 
-If custom JWK authentication is configured, then a JWT must be retrieved from the external identity provider.
+If custom JWK authentication is configured, then a JWT must be retrieved from
+the external identity provider.
 
 </InfoBox>
 
@@ -64,7 +72,7 @@ Expires in: 30 days
 Payload: {}
 
 Token: eyJhbGc***
-````
+```
 
 Once the JWT has been generated, we can connect using the `mysql` client:
 
@@ -278,10 +286,11 @@ Currently Cube SQL only supports [`STR_TO_DATE()`][mysql-docs-str-to-date].
 the same rules as Cube. Any defined dimensions/measures will be grouped **by
 default**, and currently there is no way to retrieve ungrouped results.
 
-[apache-superset]: https://superset.apache.org/
+[superset]: https://superset.apache.org/
 [ms-powerbi]: https://powerbi.microsoft.com/en-gb/
 [mysql-docs-str-to-date]:
   https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_str-to-date
 [mysql-docs-min]:
   https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html#function_min
 [ref-schema-ref-types-formats]: /schema/reference/types-and-formats#min
+[ref-recipe-cube-sql-superset]: /recipes/using-apache-superset-with-cube-sql

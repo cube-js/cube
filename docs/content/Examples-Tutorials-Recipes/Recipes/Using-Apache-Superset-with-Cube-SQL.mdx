@@ -1,0 +1,138 @@
+---
+title: Using Apache Superset with Cube SQL
+permalink: /recipes/using-apache-superset-with-cube-sql
+category: Examples & Tutorials
+subCategory: Queries
+tags: cube-sql,apache-superset
+menuOrder: 4
+---
+
+## Use case
+
+We want to connect a Cube project to [Apache Superset][superset] using the Cube
+SQL API. [Apache Superset][superset] is an open-source data exploration and
+visualization platform, commonly used to visualize business metrics and
+performance.
+
+## Prerequisites
+
+This recipe assumes you already have set up:
+
+- A Cube project
+- An Apache Superset installation
+
+If you haven't already set up a Cube project, [read
+this][ref-cube-getting-started-docker]. To learn about how to set up Apache
+Superset, follow [this guide][superset-docs-installation-docker].
+
+## Enable Cube SQL connector
+
+We'll assume an existing Cube project is set up with an e-commerce database.
+First, let's enable the SQL connector in Cube by adding the following
+environment variable:
+
+```dotenv
+CUBEJS_SQL_PORT=3306
+```
+
+<InfoBox>
+
+If you're using Docker Compose, remember to also expose the port from
+`docker-compose.yml`:
+
+```yaml
+services:
+  cube_api:
+    ...
+    ports:
+      - 3306:3306 # Cube SQL API
+```
+
+</InfoBox>
+
+Once restarted, the Cube project should now have the SQL connector enabled. If
+the Cube project is using Docker Compose, we can run the following command to
+confirm that the port is indeed open:
+
+```bash
+$ docker-compose ps
+NAME                    COMMAND                  SERVICE             STATUS              PORTS
+hello-cube-sql_cube_1   "docker-entrypoint.s…"   cube                running             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp, 0.0.0.0:3306->3306/tcp, :::3306->3306/tcp, 0.0.0.0:4000->4000/tcp, :::4000->4000/tcp
+```
+
+## Generate a JWT
+
+Before moving onto Apache Superset, we need to generate a JWT first. From the
+terminal inside the Cube project, run the following:
+
+```bash
+$ npx cubejs-cli token
+Warning. Option --user-context was deprecated and payload will be stored inside root instead of u
+Generating Cube.js JWT token
+
+-----------------------------------------------------------------------------------------
+  Use these manually generated tokens in production with caution.
+  Please refer to https://cube.dev/docs/security for production security best practices.
+-----------------------------------------------------------------------------------------
+
+Expires in: 30 days
+Payload: {}
+
+Token: eyJhbGc***
+```
+
+## Configure Apache Superset
+
+Moving on to Apache Superset, go to Data > Databases, then click '+ Database' to
+add a new database:
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: databases page"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-1.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Pick MySQL from the modal:
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: add new database modal"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-2.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Now set up the database credentials. Remember to use the right host
+(`host.docker.internal` if you're running Cube inside Docker Compose) and port
+as configured earlier (`CUBEJS_SQL_PORT`). For the username field, use the JWT
+generated earlier, and leave the password field blank.
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: add database credentials"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-3.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Click 'Connect', then 'Finish' and head to SQL Lab > SQL Editor to run a test
+query:
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: SQL Editor page with successful query"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-4.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+[superset]: https://superset.apache.org/
+[ref-cube-getting-started-docker]: https://cube.dev/docs/getting-started/docker
+[superset-docs-installation-docker]:
+  https://superset.apache.org/docs/installation/installing-superset-using-docker-compose
