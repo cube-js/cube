@@ -308,7 +308,6 @@ impl SchedulerImpl {
                 if let RowKey::Table(TableId::Partitions, partition_id) =
                     job.get_row().row_reference()
                 {
-                    // TODO remove partition itself after chunks are repartitioned
                     if self
                         .meta_store
                         .get_partition_chunk_sizes(*partition_id)
