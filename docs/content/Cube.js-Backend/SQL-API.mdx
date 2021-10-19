@@ -12,10 +12,9 @@ future version. Full support of the ANSI SQL standard is not guaranteed.
 
 </WarningBox>
 
-Cube SQL is a SQL emulation layer for Cube.
-
-It is extremely useful for integrating with existing Business Intelligence (BI)
-tools such as Apache Superset, Microsoft PowerBI etc.
+Cube SQL is a SQL emulation layer for Cube. It is extremely useful for
+integrating with existing Business Intelligence (BI) tools such as [Apache
+Superset][apache-superset], [Microsoft PowerBI][ms-powerbi] etc.
 
 ## Enabling the connector
 
@@ -26,10 +25,48 @@ variable:
 CUBEJS_SQL_PORT=3306
 ```
 
-Cube SQL uses the same JWTs as Cube, so we first need to create a JWT from the
-`CUBEJS_API_SECRET` or from our external identity provider if custom JWK
-authentication is configured. Assuming the JWT has been generated, we can
-connect using the `mysql` client:
+<InfoBox>
+
+If you're running Cube with Docker Compose, remember to add a port mapping to
+the Cube service for `CUBEJS_SQL_PORT`, for example:
+
+```yaml
+services:
+  cube_api:
+    ...
+    ports:
+      - 3306:3306 # Cube SQL API
+```
+
+</InfoBox>
+
+Cube SQL uses the same JWTs as Cube, so we first need to create a JWT.
+If the project uses `CUBEJS_API_SECRET`, then we can generate a JWT
+token by running the following inside the project directory:
+
+<InfoBox>
+
+If custom JWK authentication is configured, then a JWT must be retrieved from the external identity provider.
+
+</InfoBox>
+
+```bash
+$ npx cubejs-cli token
+Warning. Option --user-context was deprecated and payload will be stored inside root instead of u
+Generating Cube.js JWT token
+
+-----------------------------------------------------------------------------------------
+  Use these manually generated tokens in production with caution.
+  Please refer to https://cube.dev/docs/security for production security best practices.
+-----------------------------------------------------------------------------------------
+
+Expires in: 30 days
+Payload: {}
+
+Token: eyJhbGc***
+````
+
+Once the JWT has been generated, we can connect using the `mysql` client:
 
 ```bash
 # Format: mysql -h <CUBE_IP> --port <CUBE_SQL_PORT> -u <JWT_STRING>
@@ -37,7 +74,7 @@ mysql -h 127.0.0.1 --port 3306 -u eyJhbGc...
 ```
 
 Because MySQL does not support JWT authentication, Cube SQL retrieves the JWT
-from the `username` parameter.
+from the `username` parameter. Leave the `password` field empty.
 
 ## Querying Dimensions
 
@@ -241,6 +278,8 @@ Currently Cube SQL only supports [`STR_TO_DATE()`][mysql-docs-str-to-date].
 the same rules as Cube. Any defined dimensions/measures will be grouped **by
 default**, and currently there is no way to retrieve ungrouped results.
 
+[apache-superset]: https://superset.apache.org/
+[ms-powerbi]: https://powerbi.microsoft.com/en-gb/
 [mysql-docs-str-to-date]:
   https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_str-to-date
 [mysql-docs-min]:
