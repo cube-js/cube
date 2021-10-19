@@ -60,6 +60,7 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
+            isVisible: this.isVisible(nameToSegment[1], true)
           })),
           R.toPairs
         )(cube.segments || {})
