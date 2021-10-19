@@ -12,6 +12,7 @@ type KsqlDriverOptions = {
   url: string,
   username: string,
   password: string,
+  streamingSourceName?: string,
 };
 
 type KsqlTable = {
@@ -157,7 +158,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return {
       streamingTable: this.tableDashName(table),
       streamingSource: {
-        name: 'default', // TODO fill based on data source name with tenant id
+        name: this.config.streamingSourceName || 'default',
         type: 'ksql',
         credentials: {
           user: this.config.username,
