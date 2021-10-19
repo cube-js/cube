@@ -12,7 +12,7 @@ import {
   VizState,
 } from '@cubejs-client/react';
 import { Col, Row, Space } from 'antd';
-import { RefObject, useEffect, useRef, useState } from 'react';
+import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
 import { Card, FatalError } from '../../../atoms';
@@ -170,7 +170,7 @@ export type PlaygroundQueryBuilderProps = {
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
-  extra?: Function;
+  extra?: React.FC<any>;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
@@ -448,7 +448,7 @@ export function PlaygroundQueryBuilder({
                     {Extra ? (
                       <Extra
                         queryRequestId={queryRequestId}
-                        queryStatus={queryStatus}
+                        queryStatus={queryStatus as QueryStatus}
                       />
                     ) : null}
                     {queryStatus ? (
