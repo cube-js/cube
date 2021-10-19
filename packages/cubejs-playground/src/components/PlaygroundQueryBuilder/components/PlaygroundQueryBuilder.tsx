@@ -11,8 +11,8 @@ import {
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row } from 'antd';
-import { RefObject, useEffect, useRef, useState } from 'react';
+import { Col, Row, Space } from 'antd';
+import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
 import { Card, FatalError } from '../../../atoms';
@@ -170,6 +170,7 @@ export type PlaygroundQueryBuilderProps = {
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
+  extra?: React.FC<any>;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
@@ -191,12 +192,13 @@ export function PlaygroundQueryBuilder({
   dashboardSource,
   schemaVersion = 0,
   initialVizState,
+  extra: Extra,
   onSchemaChange,
   onVizStateChanged,
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const { isChartRendererReady, queryStatus, queryError } =
+  const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
     setQueryStatus,
@@ -442,14 +444,22 @@ export function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  {queryStatus ? (
-                    <PreAggregationStatus
-                      apiUrl={apiUrl}
-                      availableMembers={availableMembers}
-                      query={query}
-                      {...(queryStatus as QueryStatus)}
-                    />
-                  ) : null}
+                  <Space style={{ marginLeft: 'auto' }}>
+                    {Extra ? (
+                      <Extra
+                        queryRequestId={queryRequestId}
+                        queryStatus={queryStatus as QueryStatus}
+                      />
+                    ) : null}
+                    {queryStatus ? (
+                      <PreAggregationStatus
+                        apiUrl={apiUrl}
+                        availableMembers={availableMembers}
+                        query={query}
+                        {...(queryStatus as QueryStatus)}
+                      />
+                    ) : null}
+                  </Space>
                 </SectionRow>
               </Col>
             </Row>

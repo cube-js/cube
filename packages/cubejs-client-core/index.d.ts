@@ -158,6 +158,7 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
+    requestId?: string,
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };

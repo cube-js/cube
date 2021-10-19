@@ -868,6 +868,7 @@ export class ApiGateway {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
           } : null),
           annotation,
           dataSource: response.dataSource,

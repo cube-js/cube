@@ -60,6 +60,7 @@ export function QueryTabs({
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   } = useChartRendererStateMethods();
 
   const [ready, setReady] = useState<boolean>(false);
@@ -95,11 +96,16 @@ export function QueryTabs({
             if (resultSet) {
               const { loadResponse } = resultSet.serialize();
               const {
+                requestId,
                 external,
                 dbType,
                 extDbType,
                 usedPreAggregations = {},
               } = loadResponse.results[0] || {};
+
+              if (requestId) {
+                setQueryRequestId(queryId, requestId);
+              }
 
               setSlowQueryFromCache(queryId, Boolean(loadResponse.slowQuery));
               Boolean(loadResponse.slowQuery) && setSlowQuery(queryId, false);
