@@ -2,7 +2,7 @@
 title: Query Format
 permalink: /query-format
 category: Cube.js Backend
-menuOrder: 5
+menuOrder: 2
 ---
 
 Cube Queries are plain JavaScript objects, describing an analytics query. The
