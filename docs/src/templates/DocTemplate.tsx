@@ -123,10 +123,14 @@ class DocTemplate extends Component<Props, State> {
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
+
+    const hackFixFileAbsPath = this.props.pageContext.fileAbsolutePath
+      .replace('/opt/build/repo/', '')
+
     this.createAnchors(
       <MDXForSideMenu {...this.props} />,
       frontmatter.title,
-      getGithubUrl(this.props.pageContext.fileAbsolutePath)
+      getGithubUrl(hackFixFileAbsPath)
     );
   }
 
