@@ -307,6 +307,7 @@ pub(crate) async fn write_to_files(
 ) -> Result<Vec<(usize, Vec<TableValue>)>, CubeError> {
     let schema = Arc::new(store.arrow_schema());
     let key_size = store.key_size() as usize;
+    let partition_split_key_size = store.partition_split_key_size() as usize;
     let rows_per_file = (num_rows as usize).div_ceil(&files.len());
     let mut writers = files.into_iter().map(move |f| -> Result<_, CubeError> {
         Ok(ArrowWriter::try_new(
@@ -371,7 +372,8 @@ pub(crate) async fn write_to_files(
         }
         // Keep writing into the same file until we see a different key.
         while i < b.num_rows()
-            && cmp_partition_key(key_size, &last_row, b.columns(), i) == Ordering::Equal
+            && cmp_partition_key(partition_split_key_size, &last_row, b.columns(), i)
+                == Ordering::Equal
         {
             i += 1;
         }

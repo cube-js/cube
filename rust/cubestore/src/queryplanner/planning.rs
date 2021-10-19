@@ -992,6 +992,7 @@ pub mod tests {
                 customers,
                 put_first("customer_city", &customers_cols),
                 1,
+                None,
             )
             .unwrap(),
         );
@@ -1019,6 +1020,7 @@ pub mod tests {
                 orders,
                 put_first("order_customer", &orders_cols),
                 2,
+                None,
             )
             .unwrap(),
         );
@@ -1028,6 +1030,7 @@ pub mod tests {
                 customers,
                 put_first("order_city", &orders_cols),
                 2,
+                None,
             )
             .unwrap(),
         );
@@ -1092,6 +1095,7 @@ pub mod tests {
                     table_id,
                     t.get_columns().clone(),
                     t.get_columns().len() as u64,
+                    None,
                 )
                 .unwrap(),
             );

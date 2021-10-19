@@ -506,7 +506,6 @@ impl CubeTable {
                 .collect::<Result<Vec<_>, _>>()?;
             let mut exec: Arc<dyn ExecutionPlan> =
                 Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
-            // TODO we need ensure seq column is never used in partition key otherwise we can't do shared nothing execution across partitions
             exec = Arc::new(LastRowByUniqueKeyExec::try_new(
                 exec,
                 key_columns

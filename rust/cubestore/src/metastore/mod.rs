@@ -488,7 +488,9 @@ pub struct Index {
     name: String,
     table_id: u64,
     columns: Vec<Column>,
-    sort_key_size: u64
+    sort_key_size: u64,
+    #[serde(default)]
+    partition_split_key_size: Option<u64>
 }
 }
 
@@ -1767,13 +1769,13 @@ impl RocksMetaStore {
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
         let time = SystemTime::now();
-        info!("Persisting meta store snapshot");
+        trace!("Persisting meta store snapshot");
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = acquire_lock("meta store upload", self.db.read())
             .await?
             .latest_sequence_number();
         if last_check_seq == last_db_seq {
-            info!("Persisting meta store snapshot: nothing to update");
+            trace!("Persisting meta store snapshot: nothing to update");
             return Ok(());
         }
         let last_upload_seq = self.last_upload_seq().await;
@@ -2143,6 +2145,8 @@ impl RocksMetaStore {
             table_id.get_id(),
             index_columns,
             sorted_key_size,
+            // Seq column shouldn't participate in partition split. Otherwise we can't do shared nothing calculations across partitions.
+            table_id.get_row().seq_column().map(|_| sorted_key_size - 1),
         )?;
         let index_id = rocks_index.insert(index, batch_pipe)?;
         let partition = Partition::new(index_id.id, None, None);
@@ -3880,6 +3884,7 @@ mod tests {
                 table1_id,
                 columns.clone(),
                 columns.len() as u64 - 1,
+                None,
             )
             .unwrap();
             let expected_res = vec![IdRow::new(1, expected_index)];
