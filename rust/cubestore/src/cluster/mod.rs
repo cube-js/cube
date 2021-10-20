@@ -686,6 +686,11 @@ impl JobRunner {
                 .update_status(job_id, JobStatus::Error(cube_err.to_string()))
                 .await?;
             error!(
+                "Error while running job {}: {}",
+                job_id,
+                cube_err.display_with_backtrace()
+            );
+            error!(
                 "Running job error ({:?}): {:?}",
                 start.elapsed()?,
                 self.meta_store.get_job(job_id).await?
