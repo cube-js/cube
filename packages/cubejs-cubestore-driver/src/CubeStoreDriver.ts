@@ -214,7 +214,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     const createTableSql = this.createTableSql(table, columns);
     // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} UNIQUE KEY (${uniqueKeyColumns.join(',')}) LOCATION ?`; // TODO event
+    const createTableSqlWithLocation = `${createTableSql} ${indexes} UNIQUE KEY (${uniqueKeyColumns.join(',')}) LOCATION ?`;
 
     await this.query(createTableSqlWithLocation, [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`]).catch(e => {
       e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;

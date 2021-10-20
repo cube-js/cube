@@ -1121,6 +1121,7 @@ dependencies = [
  "parquet",
  "parquet-format",
  "paste",
+ "pin-project",
  "pin-project-lite 0.2.7",
  "pretty_assertions",
  "rand 0.8.4",

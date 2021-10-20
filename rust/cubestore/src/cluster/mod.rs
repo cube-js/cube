@@ -29,6 +29,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
@@ -62,6 +63,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
+use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
@@ -154,7 +156,6 @@ pub struct ClusterImpl {
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
-    jobs_enabled: Arc<RwLock<bool>>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
         Option<
@@ -240,7 +241,7 @@ struct JobRunner {
     import_service: Arc<dyn ImportService>,
     server_name: String,
     notify: Arc<Notify>,
-    jobs_enabled: Arc<RwLock<bool>>,
+    stop_token: CancellationToken,
 }
 
 lazy_static! {
@@ -578,10 +579,10 @@ impl JobResultListener {
 impl JobRunner {
     async fn processing_loop(&self) {
         loop {
-            if !*self.jobs_enabled.read().await {
-                return;
-            }
             let res = tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    return;
+                }
                 _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
@@ -633,25 +634,53 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
-        // TODO cancellation of orphaned jobs through JoinHandle
+        let handle = AbortingJoinHandle::new(self.route_job(job.get_row())?);
+        // TODO cancel job if this worker isn't job owner anymore
         let res = if let Some(duration) = self.job_timeout(&job) {
-            timeout(duration, self.route_job(job.get_row())).await
+            let future = timeout(duration, handle);
+            // TODO duplicate
+            tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    Err(CubeError::user("shutting down".to_string()))
+                }
+                res = future => {
+                    res.map_err(|_| CubeError::user("timed out".to_string()))
+                }
+            }
         } else {
-            Ok(self.route_job(job.get_row()).await)
+            // TODO duplicate
+            tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    Err(CubeError::user("shutting down".to_string()))
+                }
+                res = handle => {
+                    Ok(res)
+                }
+            }
         };
 
         mem::drop(rx);
         heart_beat_timer.await?;
-        if let Err(_) = res {
+        if let Err(e) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Timeout)
                 .await?;
             error!(
-                "Running job timed out ({:?}): {:?}",
+                "Running job {} ({:?}): {:?}",
+                e.message,
                 start.elapsed()?,
                 self.meta_store.get_job(job_id).await?
             );
         } else if let Ok(Err(cube_err)) = res {
+            self.meta_store
+                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+                .await?;
+            error!(
+                "Running job join error ({:?}): {:?}",
+                start.elapsed()?,
+                self.meta_store.get_job(job_id).await?
+            );
+        } else if let Ok(Ok(Err(cube_err))) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Error(cube_err.to_string()))
                 .await?;
@@ -672,63 +701,77 @@ impl JobRunner {
         Ok(())
     }
 
-    async fn route_job(&self, job: &Job) -> Result<(), CubeError> {
+    fn route_job(&self, job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
+        // spawn here is required in case there's a panic in a job. If job panics worker process loop will survive it.
         match job.job_type() {
             JobType::WalPartitioning => {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let wal_id = *wal_id;
-                    cube_ext::spawn(async move { chunk_store.partition(wal_id).await }).await??
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.partition(wal_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::Repartition => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    cube_ext::spawn(async move { chunk_store.repartition(partition_id).await })
-                        .await??
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.repartition(partition_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::PartitionCompaction => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
-                    cube_ext::spawn(async move { compaction_service.compact(partition_id).await })
-                        .await??;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service.compact(partition_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::TableImport => {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
                     let import_service = self.import_service.clone();
                     let table_id = *table_id;
-                    cube_ext::spawn(async move { import_service.import_table(table_id).await })
-                        .await??
+                    Ok(cube_ext::spawn(async move {
+                        import_service.import_table(table_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::TableImportCSV(location) => {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
-                    self.import_service
-                        .clone()
-                        .import_table_part(*table_id, location)
-                        .await?
+                    let table_id = *table_id;
+                    let import_service = self.import_service.clone();
+                    let location = location.to_string();
+                    Ok(cube_ext::spawn(async move {
+                        import_service
+                            .clone()
+                            .import_table_part(table_id, &location)
+                            .await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
         }
-        Ok(())
     }
 
-    fn fail_job_row_key(job: &Job) {
-        panic!("Incorrect row key for {:?}: {:?}", job, job.row_reference());
+    fn fail_job_row_key(job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
+        Err(CubeError::internal(format!(
+            "Incorrect row key for {:?}: {:?}",
+            job,
+            job.row_reference()
+        )))
     }
 }
 
@@ -757,7 +800,6 @@ impl ClusterImpl {
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
             meta_store_sender,
-            jobs_enabled: Arc::new(RwLock::new(true)),
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
             config_obj,
@@ -809,7 +851,7 @@ impl ClusterImpl {
                 import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
-                jobs_enabled: self.jobs_enabled.clone(),
+                stop_token: self.stop_token.clone(),
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
@@ -823,12 +865,7 @@ impl ClusterImpl {
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        let mut jobs_enabled = self.jobs_enabled.write().await;
-        *jobs_enabled = false;
-        for _ in 0..4 {
-            // TODO number of job event loops
-            self.job_notify.notify_waiters();
-        }
+        self.stop_token.cancel();
 
         #[cfg(not(target_os = "windows"))]
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
@@ -836,7 +873,6 @@ impl ClusterImpl {
         }
 
         self.close_worker_socket_tx.send(true)?;
-        self.stop_token.cancel();
         Ok(())
     }
 
