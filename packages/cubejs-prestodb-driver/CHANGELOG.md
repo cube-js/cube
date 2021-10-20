@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
+
+
+### Features
+
+* **prestodb-driver:** Bump prestodb-client ([08e32eb](https://github.com/cube-js/cube.js/commit/08e32eb87545bc3578ac0aec9f8902a077458d4c))
+* **prestodb-driver:** Support SSL ([b243e9f](https://github.com/cube-js/cube.js/commit/b243e9f3406a04e956a32bcd55a437749c69f632))
+
+
+
+
+
 ## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver
