@@ -47,17 +47,18 @@ impl SqlAuthService for NodeBridgeAuthService {
         .await?;
         trace!("[auth] Request <- {:?}", response);
 
-        let is_auth = response.as_bool().unwrap_or(false);
-
-        Ok(AuthContext {
-            password: if !is_auth {
-                Some("wrong password to user".to_string())
-            } else {
-                None
-            },
-            access_token: user.unwrap_or("fake".to_string()),
-            base_path: "fake".to_string(),
-        })
+        let auth_success = response.as_bool().unwrap_or(false);
+        if auth_success {
+            Ok(AuthContext {
+                password: None,
+                access_token: user.unwrap_or("fake".to_string()),
+                base_path: "fake".to_string(),
+            })
+        } else {
+            Err(CubeError::user(
+                "Incorrect user name or password".to_string(),
+            ))
+        }
     }
 }
 
