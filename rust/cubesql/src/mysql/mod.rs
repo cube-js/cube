@@ -22,8 +22,8 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::DataFrame;
 use crate::mysql::dataframe::Row;
 use crate::mysql::dataframe::TableValue;
+use crate::schema::SchemaService;
 use crate::schema::V1CubeMetaExt;
-use crate::schema::{SchemaService};
 use crate::CubeError;
 use sqlparser::ast::{ShowCreateObject, Statement};
 
@@ -591,11 +591,14 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             None
         };
 
-        let ctx = self
-            .auth
-            .authenticate(user.clone())
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        let ctx = self.auth.authenticate(user.clone()).await.map_err(|e| {
+            if e.message != *"Incorrect user name or password" {
+                error!("Error during authentication MySQL connection: {}", e);
+            };
+
+            io::Error::new(io::ErrorKind::Other, e.to_string())
+        })?;
+
         let passwd = ctx.password.clone().map(|p| p.as_bytes().to_vec());
 
         self.context = Some(ctx);
