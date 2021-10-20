@@ -26,6 +26,7 @@ table code {
 
 :not(thead) > tr:nth-child(odd):last-child > td:last-child {
   border-radius: 0 0 4px 0;
+  overflow-wrap: break-word;
 }
 
 th, td {
