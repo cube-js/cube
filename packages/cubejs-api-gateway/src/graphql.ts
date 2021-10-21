@@ -1,7 +1,5 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
-import fetch from 'node-fetch';
-import { encode } from 'querystring';
 
 import {
   GraphQLResolveInfo,
@@ -32,6 +30,8 @@ import {
   DateTimeResolver,
   SafeIntResolver
 } from 'graphql-scalars';
+
+import { QUERY_TYPE } from './query';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 const SafeIntScalar = asNexusMethod(SafeIntResolver, 'safeInt');
@@ -187,44 +187,6 @@ function getFieldsWithArg(argument: string, infos: GraphQLResolveInfo) {
   ];
 }
 
-export async function proxifyQuery(
-  query: any,
-  endpoint: string,
-  originalReq: any,
-  delay = 500
-): Promise<any> {
-  const url = `${endpoint}?${encode({
-    query: JSON.stringify(query)
-  })}`;
-
-  const headers = { ...originalReq.headers } as Record<string, string>;
-  ['host', 'connexion', 'content-length'].forEach(key => delete headers[key]);
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers
-  });
-
-  if (!response.ok) {
-    if (response.headers.get('content-type')?.includes('application/json')) {
-      const json = await response.json();
-      if (json.error) {
-        throw Error(`Error querying load api: ${json.error}`);
-      }
-    }
-    throw Error(`Error querying load api: status ${response.status}`);
-  }
-
-  const json = await response.json();
-
-  if (json.error === 'Continue wait') {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    return proxifyQuery(query, endpoint, originalReq, delay * 1.2);
-  }
-
-  return json;
-}
-
 function parseDates(result: any) {
   const { timezone } = result.query;
 
@@ -335,7 +297,7 @@ export function makeSchema(metaConfig: any) {
               }),
               ...(dimensions.length && {
                 dimensions: dimensions
-                  .filter(dimension => timeDimensions[0][0] !== dimension)
+                  .filter(dimension => timeDimensions.length === 0 || timeDimensions[0][0] !== dimension)
                   .map(dimension => `${cube.config.name}.${dimension}`)
               }),
               ...(timeDimensions.length && {
@@ -356,7 +318,25 @@ export function makeSchema(metaConfig: any) {
               ...(renewQuery && { renewQuery }),
             };
 
-            const results = await proxifyQuery(query, context.endpoint, context.req);
+            // eslint-disable-next-line no-async-promise-executor
+            const results = await (new Promise<any>(async (resolve, reject) => {
+              try {
+                await context.apiGateway.load({
+                  query,
+                  queryType: QUERY_TYPE.REGULAR_QUERY,
+                  context: context.req.context,
+                  res: (message) => {
+                    if (message.error) {
+                      reject(new Error(message.error));
+                    }
+                    resolve(message);
+                  },
+                });
+              } catch (e) {
+                reject(e);
+              }
+            }));
+
             parseDates(results);
 
             return results.data.map(entry => R.fromPairs(R.toPairs(entry).map(pair => [pair[0].split('.').slice(1).join('.'), pair[1]])));

@@ -296,7 +296,7 @@ export class ApiGateway {
           schema,
           context: {
             req,
-            endpoint: `http://localhost:${getEnv('port')}${this.basePath}/v1/load`
+            apiGateway: this
           },
           graphiql: getEnv('nodeEnv') !== 'production'
         })(req, res);
