@@ -167,56 +167,78 @@ special property `rollups` which is an array containing references to both
 "source" rollups.
 
 ```javascript
-// `schema/Users.js` - a schema representing all users, retrieved from MySQL
 cube(`Users`, {
-  dataSource: 'mysql',
-  sql: `SELECT * from users`,
-
-  measures: {
-    count: {
-      type: `count`,
-    },
-  },
-
-  dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true,
-    },
-    name: {
-      sql: `CONCAT(first_name, ' ', last_name)`,
-      type: `string`,
-    },
-  },
+  sql: `SELECT * FROM public.users`,
 
   preAggregations: {
     usersRollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
   },
-});
 
-// `schema/Orders.js` - a schema representing all orders, retrieved from Postgres
-cube('Orders', {
-  dataSource: 'postgres',
-  sql: `SELECT * FROM orders`,
-  joins: {
-    Users: {
-      relationship: `belongsTo`,
-      sql: `${CUBE}.user_id = ${Users}.id`,
-    },
-  },
   measures: {
     count: {
       type: `count`,
     },
   },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      // We need to set this field as the primary key for joins to work
+      primaryKey: true,
+    },
+    name: {
+      sql: `first_name || last_name`,
+      type: `string`,
+    },
+  },
+});
+
+cube('Orders', {
+  sql: `SELECT * FROM orders`,
+
+  preAggregations: {
+    ordersRollup: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.userId, CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+    },
+    // Here we add a new pre-aggregation of type `rollupJoin`
+    ordersWithUsersRollup: {
+      type: `rollupJoin`,
+      measures: [CUBE.count],
+      dimensions: [Users.name],
+      rollups: [Users.usersRollup, CUBE.ordersRollup],
+    },
+  },
+
+  joins: {
+    Users: {
+      relationship: `belongsTo`,
+      // Make sure the join uses dimensions on the cube, rather than
+      // the column names from the underlying SQL
+      sql: `${CUBE.userId} = ${Users.id}`,
+    },
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primaryKey: true,
+    },
+    userId: {
+      sql: `user_id`,
+      type: `number`,
     },
     status: {
       sql: `status`,
@@ -225,24 +247,6 @@ cube('Orders', {
     createdAt: {
       sql: `created_at`,
       type: `time`,
-    },
-    completedAt: {
-      sql: `completed_at`,
-      type: `time`,
-    },
-  },
-  preAggregations: {
-    ordersRollup: {
-      measures: [CUBE.count],
-      dimensions: [CUBE.status],
-      timeDimension: CUBE.createdAt,
-    },
-    // Here we add a new pre-aggregation of type `rollupJoin`
-    ordersWithUsersRollup: {
-      type: `rollupJoin`,
-      measures: [CUBE.count],
-      dimensions: [Users.name],
-      rollups: [Users.usersRollup, CUBE.ordersRollup],
     },
   },
 });
