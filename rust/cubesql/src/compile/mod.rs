@@ -653,6 +653,19 @@ fn optimize_where_filters(
 
 fn convert_where_filters(
     node: CompiledFilterTree,
+) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
+    match node {
+        // It's a special case for the root of CompiledFilterTree to simplify and operator without using logical and
+        CompiledFilterTree::And(left, right) => Ok(vec![
+            convert_where_filters_children(*left)?,
+            convert_where_filters_children(*right)?,
+        ]),
+        _ => Ok(vec![convert_where_filters_children(node)?])
+    }
+}
+
+fn convert_where_filters_children(
+    node: CompiledFilterTree,
 ) -> CompilationResult<V1LoadRequestQueryFilterItem> {
     match node {
         CompiledFilterTree::Filter(filter) => match filter {
@@ -677,8 +690,8 @@ fn convert_where_filters(
             values: None,
             or: None,
             and: Some(vec![
-                json!(convert_where_filters(*left)?),
-                json!(convert_where_filters(*right)?),
+                json!(convert_where_filters_children(*left)?),
+                json!(convert_where_filters_children(*right)?),
             ]),
         }),
         CompiledFilterTree::Or(left, right) => Ok(V1LoadRequestQueryFilterItem {
@@ -686,8 +699,8 @@ fn convert_where_filters(
             operator: None,
             values: None,
             or: Some(vec![
-                json!(convert_where_filters(*left)?),
-                json!(convert_where_filters(*right)?),
+                json!(convert_where_filters_children(*left)?),
+                json!(convert_where_filters_children(*right)?),
             ]),
             and: None,
         }),
@@ -792,7 +805,7 @@ fn compile_where(
     trace!("Filters (after optimization): {:?}", filters);
 
     if let Some(optimized_filter) = filters {
-        builder.with_filter(convert_where_filters(optimized_filter)?);
+        builder.with_filters(convert_where_filters(optimized_filter)?);
     }
 
     Ok(())
@@ -1892,8 +1905,27 @@ mod tests {
     fn test_where_filter_complex() {
         let to_check = vec![
             (
+                "customer_gender = 'FEMALE' AND customer_gender = 'MALE'".to_string(),
+                vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["FEMALE".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["MALE".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ],
+            ),
+            (
                 "customer_gender = 'FEMALE' OR customer_gender = 'MALE'".to_string(),
-                V1LoadRequestQueryFilterItem {
+                vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
                     values: None,
@@ -1914,11 +1946,11 @@ mod tests {
                         })
                     ]),
                     and: None,
-                },
+                }],
             ),
             (
                 "customer_gender = 'FEMALE' OR (customer_gender = 'MALE' AND taxful_total_price > 5)".to_string(),
-                V1LoadRequestQueryFilterItem {
+                vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
                     values: None,
@@ -1954,7 +1986,7 @@ mod tests {
                         })
                     ]),
                     and: None,
-                },
+                }],
             ),
         ];
 
@@ -1973,7 +2005,7 @@ mod tests {
 
             assert_eq!(
                 query.unwrap().request.filters,
-                Some(vec![expected_fitler.clone()])
+                Some(expected_fitler.clone())
             )
         }
     }
