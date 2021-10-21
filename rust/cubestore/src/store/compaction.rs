@@ -1,6 +1,7 @@
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::MetaStore;
+use crate::metastore::partition::partition_file_name;
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkDataStore, ROW_GROUP_SIZE};
 use crate::table::data::cmp_partition_key;
@@ -122,7 +123,7 @@ impl CompactionService for CompactionServiceImpl {
 
         let mut new_partition_local_files = Vec::new();
         for p in new_partitions.iter() {
-            let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
+            let new_remote_path = partition_file_name(p.get_id());
             new_partition_local_files.push(self.remote_fs.temp_upload_path(&new_remote_path).await?)
         }
 
@@ -200,7 +201,7 @@ impl CompactionService for CompactionServiceImpl {
         {
             match p {
                 EitherOrBoth::Both(p, _) => {
-                    let new_remote_path = p.get_row().get_full_name(p.get_id()).unwrap();
+                    let new_remote_path = partition_file_name(p.get_id());
                     self.remote_fs
                         .upload_file(&new_partition_local_files[i], new_remote_path.as_str())
                         .await?;

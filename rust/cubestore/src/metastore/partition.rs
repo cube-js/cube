@@ -45,7 +45,14 @@ impl Partition {
     }
 
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
-        partition_file_name(self.parent_partition_id, partition_id)
+        match self.has_main_table_file() {
+            false => None,
+            true => Some(partition_file_name(partition_id)),
+        }
+    }
+
+    pub fn has_main_table_file(&self) -> bool {
+        self.main_table_row_count != 0
     }
 
     pub fn to_active(&self, active: bool) -> Partition {
@@ -100,8 +107,8 @@ impl Partition {
     }
 }
 
-pub fn partition_file_name(parent_partition_id: Option<u64>, partition_id: u64) -> Option<String> {
-    parent_partition_id.and(Some(format!("{}.parquet", partition_id)))
+pub fn partition_file_name(partition_id: u64) -> String {
+    format!("{}.parquet", partition_id)
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -1428,7 +1428,8 @@ impl ClusterImpl {
             if node_name != self.server_name {
                 continue;
             }
-            if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {
+            if p.has_main_table {
+                let file = partition_file_name(p.partition_id);
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
                     return;
