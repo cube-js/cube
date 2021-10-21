@@ -528,7 +528,9 @@ pub struct Chunk {
     #[serde(default)]
     last_used: Option<DateTime<Utc>>,
     #[serde(default)]
-    in_memory: bool
+    in_memory: bool,
+    #[serde(default)]
+    created_at: Option<DateTime<Utc>>
 }
 }
 
@@ -735,6 +737,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Partition>, CubeError>;
     async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError>;
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_partition_ids_with_chunks_created_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<u64>, CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -2895,6 +2901,37 @@ impl MetaStore for RocksMetaStore {
             }
 
             Ok(result)
+        })
+        .await
+    }
+
+    async fn get_partition_ids_with_chunks_created_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<u64>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let now = Utc::now();
+            let partition_ids = chunks_table
+                .all_rows()?
+                .into_iter()
+                .filter(|c| {
+                    c.get_row().active()
+                        && c.get_row()
+                            .created_at()
+                            .as_ref()
+                            .map(|created_at| {
+                                now.signed_duration_since(created_at.clone()).num_seconds()
+                                    > seconds_ago
+                            })
+                            .unwrap_or(false)
+                })
+                .map(|c| c.get_row().get_partition_id())
+                .unique()
+                .collect::<Vec<_>>();
+
+            Ok(partition_ids)
         })
         .await
     }

@@ -3,6 +3,7 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::{DateTime, Utc};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
@@ -16,6 +17,7 @@ impl Chunk {
             active: false,
             last_used: None,
             in_memory,
+            created_at: Some(Utc::now()),
         }
     }
 
@@ -54,6 +56,10 @@ impl Chunk {
 
     pub fn in_memory(&self) -> bool {
         self.in_memory
+    }
+
+    pub fn created_at(&self) -> &Option<DateTime<Utc>> {
+        &self.created_at
     }
 }
 

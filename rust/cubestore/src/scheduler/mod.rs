@@ -7,6 +7,7 @@ use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
 use crate::util::WorkerLoop;
 use crate::CubeError;
+use chrono::Utc;
 use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::time::Duration;
 use futures_timer::Delay;
@@ -174,6 +175,16 @@ impl SchedulerImpl {
             ))?;
         }
 
+        let partition_compaction_candidates_id = self
+            .meta_store
+            // TODO config
+            .get_partition_ids_with_chunks_created_seconds_ago(60)
+            .await?;
+
+        for partition_id in partition_compaction_candidates_id.into_iter() {
+            self.schedule_compaction_if_needed(partition_id).await?;
+        }
+
         Ok(())
     }
 
@@ -215,32 +226,8 @@ impl SchedulerImpl {
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
                         // TODO config
-                        let chunk_sizes = self
-                            .meta_store
-                            .get_partition_chunk_sizes(chunk.get_row().get_partition_id())
-                            .await?;
-                        let all_chunks = self
-                            .meta_store
-                            .get_chunks_by_partition(chunk.get_row().get_partition_id(), false)
-                            .await?;
-                        let chunks = all_chunks
-                            .iter()
-                            .filter(|c| !c.get_row().in_memory())
-                            .collect::<Vec<_>>();
-
-                        let in_memory_chunks = all_chunks
-                            .iter()
-                            .filter(|c| c.get_row().in_memory())
-                            .collect::<Vec<_>>();
-                        if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-                            || chunks.len()
-                                > self.config.compaction_chunks_count_threshold() as usize
-                            // TODO config
-                            || in_memory_chunks.len() > 100
-                        {
-                            self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
-                                .await?;
-                        }
+                        let partition_id = chunk.get_row().get_partition_id();
+                        self.schedule_compaction_if_needed(partition_id).await?;
                     } else {
                         self.schedule_repartition(chunk.get_row().get_partition_id())
                             .await?;
@@ -323,6 +310,45 @@ impl SchedulerImpl {
                     );
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn schedule_compaction_if_needed(&self, partition_id: u64) -> Result<(), CubeError> {
+        let chunk_sizes = self
+            .meta_store
+            .get_partition_chunk_sizes(partition_id)
+            .await?;
+        let all_chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?;
+        let chunks = all_chunks
+            .iter()
+            .filter(|c| !c.get_row().in_memory())
+            .collect::<Vec<_>>();
+
+        let in_memory_chunks = all_chunks
+            .iter()
+            .filter(|c| c.get_row().in_memory())
+            .collect::<Vec<_>>();
+        let min_in_memory_created_at = in_memory_chunks
+            .iter()
+            .filter_map(|c| c.get_row().created_at().clone())
+            .min();
+        let max_created_at = chunks
+            .iter()
+            .filter_map(|c| c.get_row().created_at().clone())
+            .max();
+        if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
+            || chunks.len()
+            > self.config.compaction_chunks_count_threshold() as usize
+            // TODO config
+            || in_memory_chunks.len() > 100
+            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
+            || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)
+        {
+            self.schedule_partition_to_compact(partition_id).await?;
         }
         Ok(())
     }
