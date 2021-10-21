@@ -1,4 +1,4 @@
-import { Component, useEffect } from 'react';
+import { Component, useEffect, FunctionComponent } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -45,37 +45,82 @@ const StyledCard: any = styled(Card)`
   }
 `;
 
+type UnsupportedPlaceholder = FunctionComponent<{ framework: string }>;
 type FrameworkDescriptor = {
   id: string;
   title: string;
   docsLink?: string;
-  supported?: boolean;
+  placeholder?: UnsupportedPlaceholder;
   scaffoldingSupported?: boolean;
 };
+
+const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({ framework }) => (
+  <h2 style={{ padding: 24, textAlign: 'center' }}>
+    We do not support&nbsp;
+    Vanilla JavaScript
+    &nbsp;code generation here yet.
+    <br />
+    Please refer to&nbsp;
+    <a
+      href="https://cube.dev/docs/@cubejs-client-core"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() =>
+        playgroundAction('Unsupported Framework Docs', { framework })
+      }
+    >
+      Vanilla JavaScript
+      &nbsp;docs
+    </a>
+    &nbsp;to see on how to use it with Cube.js.
+  </h2>
+);
+
+const BIPlaceholder: UnsupportedPlaceholder = () => (
+  <h2 style={{ padding: 24, textAlign: 'center' }}>
+    You can connect Cube to any Business Intelligence tool through the Cube SQL API.
+    <br />
+    Please refer to&nbsp;
+    <a
+      href="https://cube.dev/docs/backend/sql"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() =>
+        playgroundAction('BI Docs' )
+      }
+    >
+      Cube SQL
+      &nbsp;docs
+    </a>
+    &nbsp;to learn more.
+  </h2>
+);
 
 export const frameworks: FrameworkDescriptor[] = [
   {
     id: 'react',
     title: 'React',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'angular',
     title: 'Angular',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'vue',
     title: 'Vue',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'vanilla',
     title: 'Vanilla JavaScript',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
+    placeholder: UnsupportedFrameworkPlaceholder,
+  },
+  {
+    id: 'bi',
+    title: 'BI',
+    placeholder: BIPlaceholder,
   },
 ];
 
@@ -275,7 +320,7 @@ class ChartContainer extends Component<
             {chartLibrariesMenu ? (
               <Dropdown
                 overlay={chartLibrariesMenu}
-                disabled={!frameworkItem?.supported || isFetchingMeta}
+                disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               >
                 <Button data-testid="charting-library-btn" size="small">
                   {currentLibraryItem?.title}
@@ -290,7 +335,7 @@ class ChartContainer extends Component<
               data-testid="chart-btn"
               size="small"
               type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
                 this.setState({
@@ -305,7 +350,7 @@ class ChartContainer extends Component<
               data-testid="json-query-btn"
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
@@ -321,7 +366,7 @@ class ChartContainer extends Component<
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Code');
                 this.setState({ showCode: 'code' });
@@ -335,7 +380,7 @@ class ChartContainer extends Component<
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show SQL');
                 this.setState({ showCode: 'sql' });
@@ -349,7 +394,7 @@ class ChartContainer extends Component<
               icon={<SyncOutlined />}
               size="small"
               type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
@@ -366,7 +411,7 @@ class ChartContainer extends Component<
             icon={<CodeSandboxOutlined />}
             size="small"
             htmlType="submit"
-            disabled={!frameworkItem?.supported || isFetchingMeta}
+            disabled={!!frameworkItem?.placeholder || isFetchingMeta}
             onClick={() => playgroundAction('Open Code Sandbox')}
           >
             Edit
@@ -409,7 +454,7 @@ class ChartContainer extends Component<
               icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               type="primary"
             >
               {addingToDashboard
@@ -424,28 +469,9 @@ class ChartContainer extends Component<
     const queryText = JSON.stringify(query, null, 2);
 
     const renderChart = () => {
-      if (!frameworkItem?.supported) {
-        return (
-          <h2 style={{ padding: 24, textAlign: 'center' }}>
-            We do not support&nbsp;
-            {frameworkItem?.title}
-            &nbsp;code generation here yet.
-            <br />
-            Please refer to&nbsp;
-            <a
-              href={frameworkItem?.docsLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                playgroundAction('Unsupported Framework Docs', { framework })
-              }
-            >
-              {frameworkItem?.title}
-              &nbsp;docs
-            </a>
-            &nbsp;to see on how to use it with Cube.js.
-          </h2>
-        );
+      if (frameworkItem?.placeholder) {
+        const Placeholder = frameworkItem.placeholder;
+        return <Placeholder framework={framework} />;
       } else if (showCode === 'code') {
         if (error) {
           return <FatalError error={error} />;
