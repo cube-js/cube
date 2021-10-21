@@ -846,7 +846,7 @@ pub trait MetaStore: DIService + Send + Sync {
 /// Information required to produce partition name on remote fs.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PartitionName {
-    pub parent_partition_id: Option<u64>,
+    pub has_main_table: bool,
     pub partition_id: u64,
 }
 
@@ -3085,10 +3085,9 @@ impl MetaStore for RocksMetaStore {
                                 .cloned(),
                         );
                     }
-
                     partitions.push((
                         PartitionName {
-                            parent_partition_id: p.row.parent_partition_id,
+                            has_main_table: p.row.has_main_table_file(),
                             partition_id: p.id,
                         },
                         chunks,
