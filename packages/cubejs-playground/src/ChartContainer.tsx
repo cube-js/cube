@@ -92,7 +92,7 @@ const BIPlaceholder: UnsupportedPlaceholder = () => (
       Cube SQL
       &nbsp;docs
     </a>
-    &nbsp;to see on how to use it.
+    &nbsp;to learn more.
   </h2>
 );
 
@@ -470,7 +470,8 @@ class ChartContainer extends Component<
 
     const renderChart = () => {
       if (frameworkItem?.placeholder) {
-        return <frameworkItem.placeholder framework={framework} />;
+        const Placeholder = frameworkItem.placeholder;
+        return <Placeholder framework={framework} />;
       } else if (showCode === 'code') {
         if (error) {
           return <FatalError error={error} />;
