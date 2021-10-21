@@ -202,7 +202,7 @@ impl Backend {
                     )
                 ),
             )
-        } else if query_lower.eq("show schemas") {
+        } else if query_lower.eq("show schemas") || query_lower.eq("show databases") {
             return Ok(
                 Arc::new(
                     DataFrame::new(
