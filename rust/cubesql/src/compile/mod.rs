@@ -1,8 +1,8 @@
-use std::{backtrace::Backtrace, convert::TryFrom, fmt};
+use std::{backtrace::Backtrace, borrow::BorrowMut, convert::TryFrom, fmt, ops::Sub};
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use log::{debug, trace};
-use serde::{Serialize};
+use serde::Serialize;
 use serde_json::json;
 use sqlparser::ast;
 use sqlparser::dialect::MySqlDialect;
@@ -152,24 +152,22 @@ enum CompiledExpression {
     BooleanLiteral(bool),
 }
 
-impl TryFrom<CompiledExpression> for String {
-    type Error = CompilationError;
-
-    fn try_from(value: CompiledExpression) -> CompilationResult<Self> {
-        match value {
-            CompiledExpression::BooleanLiteral(v) => Ok(if v {
+impl CompiledExpression {
+    pub fn to_value_as_str(&self) -> CompilationResult<String> {
+        match &self {
+            CompiledExpression::BooleanLiteral(v) => Ok(if *v {
                 "true".to_string()
             } else {
                 "false".to_string()
             }),
-            CompiledExpression::StringLiteral(v) => Ok(v),
+            CompiledExpression::StringLiteral(v) => Ok(v.clone()),
             CompiledExpression::DateLiteral(date) => Ok(date.to_rfc3339()),
             CompiledExpression::NumberLiteral(n, is_negative) => {
-                Ok(format!("{}{}", if is_negative { "-" } else { "" }, n))
+                Ok(format!("{}{}", if *is_negative { "-" } else { "" }, n))
             }
             _ => Err(CompilationError::Internal(format!(
                 "Unable to convert CompiledExpression to String: {:?}",
-                value
+                self
             ))),
         }
     }
@@ -307,13 +305,15 @@ fn compiled_binary_op_expr(
     let left = compile_expression(left, ctx)?;
     let right = compile_expression(right, ctx)?;
 
-    let (selection_to_filter, filter) = match (&left, &right) {
+    // Group selection to left, expr for filtering to right
+    let (selection_to_filter, filter_expr) = match (left, right) {
         (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
         (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
-        _ => {
+        // CubeSQL doesnt support BinaryExpression with literals in both sides
+        (l, r) => {
             return Err(CompilationError::Unsupported(format!(
                 "Unable to compile binary expression (unbound expr): ({:?}, {:?})",
-                left, right
+                l, r
             )))
         }
     };
@@ -325,32 +325,35 @@ fn compiled_binary_op_expr(
         Selection::Segment(m) => m.name,
     };
 
-    let filter = match selection_to_filter {
+    let compiled_filter = match selection_to_filter {
         // Compile to CompiledFilter::Filter
-        Selection::Dimension(_) => CompiledFilter::Filter {
-            member,
-            operator: match op {
-                ast::BinaryOperator::NotLike => "notContains".to_string(),
-                ast::BinaryOperator::Like => "contains".to_string(),
-                ast::BinaryOperator::Eq => "equals".to_string(),
-                ast::BinaryOperator::NotEq => "notEquals".to_string(),
-                ast::BinaryOperator::Gt => match filter {
-                    // @todo -1 day
-                    CompiledExpression::DateLiteral(_) => "afterDate".to_string(),
-                    _ => "gt".to_string(),
+        Selection::Dimension(_) => {
+            let (value, operator) = match op {
+                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
+                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
+                ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
+                ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
+                ast::BinaryOperator::Gt => match filter_expr {
+                    CompiledExpression::DateLiteral(dt) => (
+                        CompiledExpression::DateLiteral(dt + Duration::milliseconds(1)),
+                        "afterDate".to_string(),
+                    ),
+                    _ => (filter_expr, "gt".to_string()),
                 },
-                ast::BinaryOperator::GtEq => match filter {
-                    CompiledExpression::DateLiteral(_) => "afterDate".to_string(),
-                    _ => "gte".to_string(),
+                ast::BinaryOperator::GtEq => match filter_expr {
+                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
+                    _ => (filter_expr, "gte".to_string()),
                 },
-                ast::BinaryOperator::Lt => match filter {
-                    // @todo -1 day
-                    CompiledExpression::DateLiteral(_) => "beforeDate".to_string(),
-                    _ => "lte".to_string(),
+                ast::BinaryOperator::Lt => match filter_expr {
+                    CompiledExpression::DateLiteral(dt) => (
+                        CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
+                        "beforeDate".to_string(),
+                    ),
+                    _ => (filter_expr, "lt".to_string()),
                 },
-                ast::BinaryOperator::LtEq => match filter {
-                    CompiledExpression::DateLiteral(_) => "beforeDate".to_string(),
-                    _ => "lte".to_string(),
+                ast::BinaryOperator::LtEq => match filter_expr {
+                    CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
+                    _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
@@ -358,14 +361,19 @@ fn compiled_binary_op_expr(
                         op
                     )))
                 }
-            },
-            values: Some(vec![String::try_from(filter.clone())?]),
-        },
+            };
+
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values: Some(vec![value.to_value_as_str()?]),
+            }
+        }
         // Compile to CompiledFilter::SegmentFilter (it will be pushed to segments via optimization)
         Selection::Segment(_) => match op {
-            ast::BinaryOperator::Eq => match filter {
+            ast::BinaryOperator::Eq => match filter_expr {
                 CompiledExpression::BooleanLiteral(v) => {
-                    if *v {
+                    if v {
                         CompiledFilter::SegmentFilter { member }
                     } else {
                         return Err(CompilationError::Unsupported(
@@ -376,7 +384,7 @@ fn compiled_binary_op_expr(
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
                         "Unable to use value {:?} as value for filtering segment",
-                        filter
+                        filter_expr
                     )));
                 }
             },
@@ -395,7 +403,7 @@ fn compiled_binary_op_expr(
         }
     };
 
-    Ok(CompiledFilterTree::Filter(filter))
+    Ok(CompiledFilterTree::Filter(compiled_filter))
 }
 
 fn binary_op_create_node_and(
@@ -531,8 +539,8 @@ fn compile_where_expression(
                     "inDateRange".to_string()
                 },
                 values: Some(vec![
-                    String::try_from(low_compiled)?,
-                    String::try_from(high_compiled)?,
+                    low_compiled.to_value_as_str()?,
+                    high_compiled.to_value_as_str()?,
                 ]),
             }))
         }
@@ -585,7 +593,7 @@ fn compile_where_expression(
             }?;
 
             fn compile_value(value: &ast::Expr, ctx: &QueryContext) -> CompilationResult<String> {
-                String::try_from(compile_expression(value, ctx)?)
+                compile_expression(value, ctx)?.to_value_as_str()
             }
 
             let values = list
@@ -1711,7 +1719,7 @@ mod tests {
                 granularity: "day".to_string(),
                 date_range: Some(json!(vec![
                     "2021-08-31T00:00:00+00:00".to_string(),
-                    "2021-09-07T00:00:00+00:00".to_string()
+                    "2021-09-06T23:59:59.999+00:00".to_string()
                 ])),
             }])
         );
@@ -1748,7 +1756,7 @@ mod tests {
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-07T00:00:00+00:00".to_string()]),
+                        values: Some(vec!["2021-09-06T23:59:59.999+00:00".to_string()]),
                         or: None,
                         and: None,
                     })
