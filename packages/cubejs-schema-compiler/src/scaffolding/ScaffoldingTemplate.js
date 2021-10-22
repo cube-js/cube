@@ -70,7 +70,7 @@ export class ScaffoldingTemplate {
   schemaDescriptorForTable(tableSchema, schemaContext = {}) {
     return {
       cube: tableSchema.cube,
-      sql: `SELECT * FROM ${this.escapeName(tableSchema.schema)}.${this.escapeName(tableSchema.table)}`, // TODO escape
+      sql: `SELECT * FROM ${tableSchema.schema ? `${this.escapeName(tableSchema.schema)}.` : ''}${this.escapeName(tableSchema.table)}`, // TODO escape
       preAggregations: new ValueWithComments({}, [
         'Pre-Aggregations definitions go here',
         'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started'

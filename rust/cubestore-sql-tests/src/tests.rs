@@ -16,6 +16,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 pub type TestFn = Box<
@@ -119,6 +120,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
         t("unsorted_data_timestamps", unsorted_data_timestamps),
+        t("ksql_simple", ksql_simple),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -3851,6 +3853,38 @@ async fn dump(service: Box<dyn SqlClient>) {
             .unwrap()
             .is_dir()
     );
+}
+
+async fn ksql_simple(service: Box<dyn SqlClient>) {
+    let vars = env::var("TEST_KSQL_USER").and_then(|user| {
+        env::var("TEST_KSQL_PASS")
+            .and_then(|pass| env::var("TEST_KSQL_URL").and_then(|url| Ok((user, pass, url))))
+    });
+    if let Ok((user, pass, url)) = vars {
+        service
+            .exec_query(&format!("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = '{}', password = '{}', url = '{}')", user, pass, url))
+            .await
+            .unwrap();
+
+        service.exec_query("CREATE SCHEMA test").await.unwrap();
+        service.exec_query("CREATE TABLE test.events_by_type (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'").await.unwrap();
+        for _ in 0..100 {
+            let res = service
+                .exec_query(
+                    "SELECT * FROM test.events_by_type WHERE `EVENT` = 'load_request_success'",
+                )
+                .await
+                .unwrap();
+            if res.len() == 0 {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+                continue;
+            }
+            if res.len() == 1 {
+                return;
+            }
+        }
+        panic!("Can't load data from ksql");
+    }
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

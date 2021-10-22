@@ -9,6 +9,7 @@ import {
   DownloadTableCSVData,
   DownloadTableMemoryData, DriverInterface, IndexesSQL,
   StreamTableData,
+  StreamingSourceTableData,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
@@ -97,7 +98,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[]) {
     const indexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
 
@@ -105,6 +106,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       await this.importStream(columns, tableData, table, indexes);
     } else if (tableData.csvFile) {
       await this.importCsvFile(tableData, table, columns, indexes);
+    } else if (tableData.streamingSource) {
+      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns);
     } else if (tableData.rows) {
       await this.importRows(table, columns, indexesSql, tableData);
     } else {
@@ -195,6 +198,28 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     } finally {
       await unlink(tempFile);
     }
+  }
+
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[]) {
+    if (!uniqueKeyColumns) {
+      throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
+    }
+    await this.query(
+      `CREATE SOURCE OR UPDATE ${this.quoteIdentifier(tableData.streamingSource.name)} as ? VALUES (${Object.keys(tableData.streamingSource.credentials).map(k => `${k} = ?`)})`,
+      [tableData.streamingSource.type]
+        .concat(
+          Object.keys(tableData.streamingSource.credentials).map(k => tableData.streamingSource.credentials[k])
+        )
+    );
+
+    const createTableSql = this.createTableSql(table, columns);
+    // eslint-disable-next-line no-unused-vars
+    const createTableSqlWithLocation = `${createTableSql} ${indexes} UNIQUE KEY (${uniqueKeyColumns.join(',')}) LOCATION ?`;
+
+    await this.query(createTableSqlWithLocation, [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`]).catch(e => {
+      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+      throw e;
+    });
   }
 
   public static dialectClass() {

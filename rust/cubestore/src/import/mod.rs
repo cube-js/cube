@@ -34,6 +34,7 @@ use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
+use crate::streaming::StreamingService;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::decimal::Decimal;
@@ -360,6 +361,7 @@ crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
+    streaming_service: Arc<dyn StreamingService>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
@@ -371,6 +373,7 @@ crate::di_service!(ImportServiceImpl, [ImportService]);
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
+        streaming_service: Arc<dyn StreamingService>,
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
@@ -378,6 +381,7 @@ impl ImportServiceImpl {
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
+            streaming_service,
             chunk_store,
             remote_fs,
             config_obj,
@@ -540,9 +544,12 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await?;
-
-        self.drop_temp_uploads(&location).await?;
+        if Table::is_stream_location(location) {
+            self.streaming_service.stream_table(table, location).await?;
+        } else {
+            self.do_import(&table, *format, location).await?;
+            self.drop_temp_uploads(&location).await?;
+        }
 
         Ok(())
     }
@@ -582,7 +589,9 @@ impl Ingestion {
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
         self.partition_jobs.push(cube_ext::spawn(async move {
-            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
+            let new_chunks = chunk_store
+                .partition_data(table_id, rows, &columns, false)
+                .await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.

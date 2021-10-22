@@ -38,6 +38,12 @@ impl ParquetTableStore {
         self.table.sort_key_size()
     }
 
+    pub fn partition_split_key_size(&self) -> u64 {
+        self.table
+            .partition_split_key_size()
+            .unwrap_or(self.key_size())
+    }
+
     pub fn arrow_schema(&self) -> Schema {
         arrow_schema(&self.table)
     }
@@ -112,6 +118,7 @@ mod tests {
                 Column::new("bool".to_string(), ColumnType::Boolean, 5),
             ],
             6,
+            None,
         )
         .unwrap();
 
@@ -199,6 +206,7 @@ mod tests {
                     ),
                 ],
                 3,
+                None,
             )
             .unwrap(),
             row_group_size: 10,
@@ -307,6 +315,7 @@ mod tests {
                 0,
                 vec![Column::new("b".to_string(), ColumnType::Boolean, 0)],
                 1,
+                None,
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
@@ -352,6 +361,7 @@ mod tests {
                 Column::new("bytes".into(), ColumnType::Bytes, 1),
             ],
             1,
+            None,
         )
         .unwrap();
 

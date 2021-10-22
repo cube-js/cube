@@ -1,4 +1,6 @@
-use sqlparser::ast::{HiveDistributionStyle, ObjectName, Query, Statement as SQLStatement};
+use sqlparser::ast::{
+    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement,
+};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
@@ -32,10 +34,17 @@ pub enum Statement {
         create_table: SQLStatement,
         indexes: Vec<SQLStatement>,
         locations: Option<Vec<String>>,
+        unique_key: Option<Vec<Ident>>,
     },
     CreateSchema {
         schema_name: ObjectName,
         if_not_exists: bool,
+    },
+    CreateSource {
+        name: Ident,
+        source_type: String,
+        credentials: Vec<SqlOption>,
+        or_update: bool,
     },
     Dump(Box<Query>),
 }
@@ -85,6 +94,10 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_create_schema()
         } else if self.parser.parse_keyword(Keyword::TABLE) {
             self.parse_create_table()
+        } else if self.parser.consume_token(&Token::make_keyword("SOURCE"))
+            || self.parser.consume_token(&Token::make_keyword("source"))
+        {
+            self.parse_create_source()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
         }
@@ -108,6 +121,18 @@ impl<'a> CubeStoreParser<'a> {
             ..
         } = statement
         {
+            let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
+                self.parser.expect_token(&Token::LParen)?;
+                let res = Some(
+                    self.parser
+                        .parse_comma_separated(|p| p.parse_identifier())?,
+                );
+                self.parser.expect_token(&Token::RParen)?;
+                res
+            } else {
+                None
+            };
+
             let mut indexes = Vec::new();
 
             while self.parser.parse_keyword(Keyword::INDEX) {
@@ -144,6 +169,7 @@ impl<'a> CubeStoreParser<'a> {
                 },
                 indexes,
                 locations,
+                unique_key,
             })
         } else {
             Ok(Statement::Statement(statement))
@@ -177,6 +203,20 @@ impl<'a> CubeStoreParser<'a> {
         Ok(Statement::CreateSchema {
             schema_name,
             if_not_exists,
+        })
+    }
+
+    fn parse_create_source(&mut self) -> Result<Statement, ParserError> {
+        let or_update = self.parser.parse_keywords(&[Keyword::OR, Keyword::UPDATE]);
+        let name = self.parser.parse_identifier()?;
+        self.parser.expect_keyword(Keyword::AS)?;
+        let source_type = self.parser.parse_literal_string()?;
+        let credentials = self.parser.parse_options(Keyword::VALUES)?;
+        Ok(Statement::CreateSource {
+            name,
+            or_update,
+            credentials,
+            source_type,
         })
     }
 }

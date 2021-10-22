@@ -40,6 +40,7 @@ use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
+use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
@@ -155,6 +156,7 @@ impl SqlServiceImpl {
         external: bool,
         locations: Option<Vec<String>>,
         indexes: Vec<Statement>,
+        unique_key: Option<Vec<Ident>>,
     ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
@@ -190,6 +192,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
+                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 )
                 .await;
         }
@@ -205,6 +208,7 @@ impl SqlServiceImpl {
                 Some(ImportFormat::CSV),
                 indexes_to_create,
                 false,
+                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
             )
             .await?;
 
@@ -231,6 +235,7 @@ impl SqlServiceImpl {
             .locations()
             .unwrap()
             .iter()
+            .filter(|&l| !Table::is_stream_location(l))
             .map(|&l| {
                 (
                     RowKey::Table(TableId::Tables, table.get_id()),
@@ -420,7 +425,8 @@ impl SqlService for SqlServiceImpl {
         _context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        if !query.to_lowercase().starts_with("insert") {
+        if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
+        {
             trace!("Query: '{}'", query);
         }
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
@@ -480,6 +486,7 @@ impl SqlService for SqlServiceImpl {
                     },
                 indexes,
                 locations,
+                unique_key,
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
@@ -499,6 +506,7 @@ impl SqlService for SqlServiceImpl {
                         external,
                         locations,
                         indexes,
+                        unique_key,
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
@@ -538,6 +546,67 @@ impl SqlService for SqlServiceImpl {
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
+            }
+            CubeStoreStatement::CreateSource {
+                name,
+                source_type,
+                credentials,
+                or_update,
+            } => {
+                if or_update {
+                    let creds = match source_type.as_str() {
+                        "ksql" => {
+                            let user = credentials
+                                .iter()
+                                .find(|o| o.name.value == "user")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let password = credentials
+                                .iter()
+                                .find(|o| o.name.value == "password")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let url =
+                                credentials
+                                    .iter()
+                                    .find(|o| o.name.value == "url")
+                                    .and_then(|x| {
+                                        if let Value::SingleQuotedString(v) = &x.value {
+                                            Some(v.to_string())
+                                        } else {
+                                            None
+                                        }
+                                    });
+                            Ok(SourceCredentials::KSql {
+                                user,
+                                password,
+                                url: url.ok_or(CubeError::user(
+                                    "url is required as credential for ksql source".to_string(),
+                                ))?,
+                            })
+                        }
+                        x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
+                    };
+                    let source = self
+                        .db
+                        .create_or_update_source(name.value.to_string(), creds?)
+                        .await?;
+                    Ok(Arc::new(DataFrame::from(vec![source])))
+                } else {
+                    Err(CubeError::user(
+                        "CREATE SOURCE OR UPDATE should be used instead".to_string(),
+                    ))
+                }
             }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
@@ -610,7 +679,8 @@ impl SqlService for SqlServiceImpl {
                                         // Pick one of the workers to run as main for the request.
                                         let i =
                                             thread_rng().sample(Uniform::new(0, partitions.len()));
-                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let node =
+                                            cluster.node_name_by_partitions(&partitions[i]).await?;
                                         let rs = cluster.route_select(&node, plan).await?.1;
                                         records = rs
                                             .into_iter()
@@ -664,6 +734,11 @@ impl SqlService for SqlServiceImpl {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
+                        let chunk_ids_to_batches = worker_plan
+                            .in_memory_chunks_to_load()
+                            .into_iter()
+                            .map(|c| (c.get_id(), Vec::new()))
+                            .collect();
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
@@ -672,7 +747,7 @@ impl SqlService for SqlServiceImpl {
                                 .0,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names)
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
                                 .await?
                                 .0,
                         });
@@ -1201,7 +1276,12 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -1246,8 +1326,12 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let chunk_store =
-                ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
@@ -1287,6 +1371,8 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);

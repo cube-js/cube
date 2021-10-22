@@ -43,3 +43,4 @@ scopeguard = "1.1.0"
 serde = "1.0.115"
 serde_derive = "1.0.115"
 tokio = { version = "1.0", features = ["full", "rt"] }
+futures-timer = "3.0.2"

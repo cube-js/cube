@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
 use std::cmp::Ordering;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[repr(transparent)]
@@ -35,5 +36,11 @@ impl fmt::Display for OrdF64 {
 impl From<f64> for OrdF64 {
     fn from(v: f64) -> Self {
         return Self(v);
+    }
+}
+
+impl Hash for OrdF64 {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        format!("{}", self.0).hash(state);
     }
 }

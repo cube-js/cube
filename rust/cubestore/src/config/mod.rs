@@ -23,6 +23,7 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
+use crate::streaming::{StreamingService, StreamingServiceImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -284,6 +285,10 @@ pub trait ConfigObj: DIService {
 
     fn not_used_timeout(&self) -> u64;
 
+    fn import_job_timeout(&self) -> u64;
+
+    fn stale_stream_timeout(&self) -> u64;
+
     fn select_workers(&self) -> &Vec<String>;
 
     fn worker_bind_address(&self) -> &Option<String>;
@@ -331,6 +336,8 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub import_job_timeout: u64,
+    pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -393,6 +400,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn not_used_timeout(&self) -> u64 {
         self.not_used_timeout
+    }
+
+    fn import_job_timeout(&self) -> u64 {
+        self.import_job_timeout
+    }
+
+    fn stale_stream_timeout(&self) -> u64 {
+        self.stale_stream_timeout
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -543,6 +558,8 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -595,6 +612,8 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: 600,
+                stale_stream_timeout: 60,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
@@ -851,6 +870,7 @@ impl Config {
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -887,6 +907,17 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
+                StreamingServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -913,11 +944,9 @@ impl Config {
                         .server_name()
                         .to_string(),
                     vec!["localhost".to_string()],
+                    Arc::downgrade(&i),
                     i.get_service_typed().await,
                     Duration::from_secs(30),
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

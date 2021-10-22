@@ -79,6 +79,10 @@ tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
 lru = "0.6.5"
 ctor = "0.1.20"
+json = "0.12.4"
+futures-util = "0.3.17"
+url = "2.2.2"
+pin-project = "1.0.8"
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

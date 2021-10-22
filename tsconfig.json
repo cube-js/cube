@@ -53,6 +53,9 @@
       "path": "packages/cubejs-snowflake-driver"
     },
     {
+      "path": "packages/cubejs-ksql-driver"
+    },
+    {
       "path": "packages/cubejs-jdbc-driver"
     },
     {
@@ -75,6 +78,6 @@
     },
     {
       "path": "rust"
-    },
+    }
   ]
 }
