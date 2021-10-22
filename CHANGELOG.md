@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.48](https://github.com/cube-js/cube.js/compare/v0.28.47...v0.28.48) (2021-10-22)
+
+
+### Bug Fixes
+
+* Use BaseQuery#evaluateSql() for evaluate refresh range references, pre-aggregations debug API ([#3352](https://github.com/cube-js/cube.js/issues/3352)) ([ea81650](https://github.com/cube-js/cube.js/commit/ea816509ee9c07707bb46fc8fac83e55c52aaf00))
+* **@cubejs-backend/ksql-driver:** Missing in docker ([4af6c8a](https://github.com/cube-js/cube.js/commit/4af6c8af71034272bae721e7f28c038776286f31))
+* **@cubejs-backend/ksql-driver:** Scaffolding for empty schema generates empty prefix ([091e45c](https://github.com/cube-js/cube.js/commit/091e45c66b712491699856d0a203e442bdfbd888))
+* **@cubejs-backend/ksql-driver:** Unquoted describe ([61dba66](https://github.com/cube-js/cube.js/commit/61dba66ef3f38e21d2b4f6f0d602009b66175e0a))
+
+
+### Features
+
+* **cubesql:** EXPLAIN <stmt> (debug info) ([7f0b57f](https://github.com/cube-js/cube.js/commit/7f0b57f1ed593ad51df7647aeeb9ee25055edfa6))
+
+
+
+
+
 ## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
 
 
