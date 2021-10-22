@@ -212,20 +212,22 @@ export class RefreshScheduler {
     compilerApi: CompilerApi,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const preAggregationsQueringOptions = queryingOptions.preAggregations.reduce((obj, p) => {
+    const preAggregationsQueryingOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
     }, {});
 
     const preAggregations = await compilerApi.preAggregations({
-      preAggregationIds: Object.keys(preAggregationsQueringOptions)
+      preAggregationIds: Object.keys(preAggregationsQueryingOptions)
     });
 
     return Promise.all(preAggregations.map(async preAggregation => {
       const { timezones } = queryingOptions;
-      const { partitions: partitionsFilter } = preAggregationsQueringOptions[preAggregation.id] || {};
+      const { partitions: partitionsFilter } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
-      const partitions = (await Promise.all(
+      const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
+
+      const partitions = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => {
           const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
             context,
@@ -250,8 +252,15 @@ export class RefreshScheduler {
         .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p.sql?.tableName));
       
       const [partition] = partitions || [];
-      const { refreshRangeStart, refreshRangeEnd, refreshKey } = partition?.sql || {};
+      const { invalidateKeyQueries, preAggregationStartEndQueries } = partition?.sql || {};
       
+      const [refreshRangeStartQuery, refreshRangeEndQuery] = preAggregationStartEndQueries || [];
+      const [refreshRangeStart] = refreshRangeStartQuery || [];
+      const [refreshRangeEnd] = refreshRangeEndQuery || [];
+      
+      const [refreshKeyQuery] = invalidateKeyQueries || [];
+      const [refreshKey] = refreshKeyQuery || [];
+
       return {
         timezones,
         preAggregation: {
@@ -262,7 +271,7 @@ export class RefreshScheduler {
               sql: refreshKey
             }
           },
-          refreshRangeReferences: (refreshRangeStart || refreshRangeEnd) && {
+          refreshRangeReferences: preAggregationStartEndQueries && {
             refreshRangeStart: refreshRangeStart && { sql: refreshRangeStart },
             refreshRangeEnd: refreshRangeEnd && { sql: refreshRangeEnd }
           },

@@ -1987,16 +1987,6 @@ export class BaseQuery {
     );
   }
 
-  preAggregationRefreshSql(cube, preAggregation) {
-    const { refreshRangeStart, refreshRangeEnd, refreshKey } = preAggregation;
-
-    return {
-      refreshRangeStart: refreshRangeStart && this.evaluateSql(cube, refreshRangeStart.sql),
-      refreshRangeEnd: refreshRangeEnd && this.evaluateSql(cube, refreshRangeEnd.sql),
-      refreshKey: refreshKey && refreshKey.sql && this.evaluateSql(cube, refreshKey.sql),
-    };
-  }
-
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {

@@ -139,19 +139,11 @@ export class PreAggregations {
     const uniqueKeyColumns = preAggregation.type === 'rollup' ?
       this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dimensionColumns() : null;
 
-    const {
-      refreshRangeStart,
-      refreshRangeEnd,
-      refreshKey
-    } = this.query.preAggregationRefreshSql(cube, preAggregation);
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
-      refreshRangeStart,
-      refreshRangeEnd,
-      refreshKey,
       invalidateKeyQueries,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),
