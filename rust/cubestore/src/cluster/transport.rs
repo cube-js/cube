@@ -128,7 +128,7 @@ impl MetaStoreTransport for MetaStoreTransportImpl {
             .to_string();
         let mut stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
-            TcpStream::connect(meta_remote_addr.to_string()),
+            TcpStream::connect(&meta_remote_addr),
         )
         .await?
         .map_err(|e| {

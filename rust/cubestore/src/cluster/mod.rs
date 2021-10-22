@@ -146,6 +146,7 @@ pub struct ClusterImpl {
     this: Weak<ClusterImpl>,
     // Used in order to avoid cycle dependencies.
     // Convention is every service can reference cluster but cluster shouldn't reference services.
+    // TODO revisit cycle dependencies: try to extract cluster transport separately?
     // Weak to avoid cycle reference counting and memory leaks
     injector: Weak<Injector>,
     remote_fs: Arc<dyn RemoteFs>,
