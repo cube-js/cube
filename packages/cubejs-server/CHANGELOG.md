@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+
+### Bug Fixes
+
+* diagnostics - cannot convert undefined or null to object ([#3564](https://github.com/cube-js/cube.js/issues/3564)) ([643c9f8](https://github.com/cube-js/cube.js/commit/643c9f8b744ce115e70dd1d42800bc01be17e675))
+
+
+
+
+
 ## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
 
 **Note:** Version bump only for package @cubejs-backend/server

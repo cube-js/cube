@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+
+### Features
+
+* ksql support ([#3507](https://github.com/cube-js/cube.js/issues/3507)) ([b7128d4](https://github.com/cube-js/cube.js/commit/b7128d43d2aaffdd7273555779176b3efe4e2aa6))
+* **cubesql:** Simplify root AND in where ([a417d4b](https://github.com/cube-js/cube.js/commit/a417d4b9166d1ac00346ea41323d6bd6e0e4e222))
+* **cubesql:** Support SHOW DATABASES (alias) ([f1c4d3f](https://github.com/cube-js/cube.js/commit/f1c4d3f922fd36cb3b0af25b44301a26b801602f))
+
+
+
+
+
 ## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
 
 
