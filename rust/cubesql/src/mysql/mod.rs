@@ -18,6 +18,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
+use crate::compile::convert_statement_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::DataFrame;
 use crate::mysql::dataframe::Row;
@@ -327,7 +328,33 @@ impl Backend {
                     } else {
                         return Err(CubeError::internal("Unknown table".to_string()))
                     }
-                }
+                },
+                Statement::Explain { statement, .. } => {
+                    let auth_ctx = if self.context.is_some() {
+                        self.context.as_ref().unwrap()
+                    } else {
+                        return Err(CubeError::user("must be auth".to_string()))
+                    };
+
+                    let ctx = self.schema
+                        .get_ctx_for_tenant(auth_ctx)
+                    .await?;
+
+                    let compiled_query = convert_statement_to_cube_query(statement, &ctx)?;
+                    let plan = serde_json::to_string_pretty(&compiled_query)?;
+
+                    return Ok(Arc::new(DataFrame::new(
+                        vec![
+                            dataframe::Column::new(
+                                "Execution Plan".to_string(),
+                                ColumnType::MYSQL_TYPE_STRING
+                            ),
+                        ],
+                        vec![dataframe::Row::new(vec![
+                            dataframe::TableValue::String(plan)
+                        ])]
+                    )))
+                },
                 _ => {
                     return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
                 }

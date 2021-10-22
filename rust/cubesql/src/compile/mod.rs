@@ -2,6 +2,7 @@ use std::{backtrace::Backtrace, convert::TryFrom, fmt};
 
 use chrono::{DateTime, TimeZone, Utc};
 use log::{debug, trace};
+use serde::{Serialize};
 use serde_json::json;
 use sqlparser::ast;
 use sqlparser::dialect::MySqlDialect;
@@ -660,7 +661,7 @@ fn convert_where_filters(
             convert_where_filters_children(*left)?,
             convert_where_filters_children(*right)?,
         ]),
-        _ => Ok(vec![convert_where_filters_children(node)?])
+        _ => Ok(vec![convert_where_filters_children(node)?]),
     }
 }
 
@@ -935,7 +936,7 @@ fn compile_table_factor(expr: &ast::TableFactor) -> CompilationResult<String> {
     }
 }
 
-fn compile_statement(
+pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     tenant: &ctx::TenantContext,
 ) -> CompilationResult<CompiledQuery> {
@@ -1031,7 +1032,7 @@ fn compile_statement(
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct CompiledQuery {
     pub request: V1LoadRequestQuery,
     pub meta: Vec<CompiledQueryFieldMeta>,
@@ -1052,7 +1053,7 @@ pub fn convert_sql_to_cube_query(
         Ok(stmts) => {
             let stmt = &stmts[0];
 
-            compile_statement(stmt, tenant)
+            convert_statement_to_cube_query(stmt, tenant)
         }
     }
 }
