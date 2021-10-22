@@ -64,13 +64,6 @@ export class RefreshScheduler {
     });
 
     return Promise.all(partitions.preAggregations.map(async partition => ({
-      query: {
-        ...baseQuery,
-        timeDimensions: baseQuery.timeDimensions && baseQuery.timeDimensions[0] && [{
-          ...baseQuery.timeDimensions[0],
-          dateRange: partition.loadSql[1]
-        }]
-      },
       sql: partition
     })));
   }
@@ -426,7 +419,7 @@ export class RefreshScheduler {
 
     Promise.all(preAggregations.map(async (p: any) => {
       const { partitions } = p;
-      return Promise.all(partitions.map(async ({ query, sql }) => {
+      return Promise.all(partitions.map(async ({ sql }) => {
         await orchestratorApi.executeQuery({
           preAggregations: [sql],
           continueWait: true,
@@ -434,7 +427,7 @@ export class RefreshScheduler {
           forceBuildPreAggregations: true,
           orphanedTimeout: 60 * 60,
           requestId: context.requestId,
-          timezone: query.timezone,
+          timezone: sql.timezone,
           scheduledRefresh: false,
           preAggregationsLoadCacheByDataSource,
           metadata: queryingOptions.metadata
