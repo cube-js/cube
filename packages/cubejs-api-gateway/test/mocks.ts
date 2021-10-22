@@ -1,5 +1,6 @@
 export const preAggregationsResultFactory = () => ([
   {
+    id: 'Usage.usages',
     preAggregationName: 'usages',
     preAggregation: {
       type: 'rollup',
