@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 export const STEP = 8;
 
@@ -15,12 +15,42 @@ type FlexProps = {
 export const Flex = styled.div<FlexProps>`
   display: flex;
   flex-direction: ${(props) => props.direction || 'row'};
-  flex-wrap: ${(props) => props.wrap ? 'wrap' : null};
+  flex-wrap: ${(props) => (props.wrap ? 'wrap' : null)};
   justify-content: ${(props) => props.justifyContent};
   align-items: ${(props) => props.alignItems};
-  gap: ${(props) => (props.gap ? `${props.gap * STEP}px` : null)};
+
+  ${gap};
+
   margin: ${margin};
 `;
+
+function gap({ gap, direction }: FlexProps) {
+  if (gap) {
+    if (direction === 'column') {
+      return css`
+        & > div {
+          margin-bottom: ${gap * STEP}px};
+        }
+
+        & > div:last-child {
+          margin-bottom: 0;
+        }
+      `;
+    }
+
+    return css`
+      & > div {
+        margin-right: ${gap * STEP}px};
+      }
+
+      & > div:last-child {
+        margin-right: 0;
+      }
+    `;
+  }
+
+  return '';
+}
 
 function margin(props: FlexProps) {
   const value = props.margin;

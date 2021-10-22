@@ -39,6 +39,20 @@ export interface StreamTableData extends DownloadTableBase {
    */
   types?: TableStructure;
 }
+
+export interface StreamingSourceTableData extends DownloadTableBase {
+  streamingTable: string;
+  streamingSource: {
+    name: string;
+    type: string;
+    credentials: any;
+  };
+  /**
+   * Some drivers know types of response
+   */
+  types?: TableStructure;
+}
+
 export type StreamTableDataWithTypes = StreamTableData & {
   /**
    * Some drivers know types of response
@@ -75,7 +89,9 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
-  uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL): Promise<void>;
+  uploadTableWithIndexes(
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[]
+  ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;

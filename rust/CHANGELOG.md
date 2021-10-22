@@ -3,6 +3,118 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
+
+
+### Bug Fixes
+
+* **native:** Catch errors in authentication handshake (msql_srv) ([#3560](https://github.com/cube-js/cube.js/issues/3560)) ([9012399](https://github.com/cube-js/cube.js/commit/90123990fa5713fc1351ba0540776a9f7cd78dce))
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+
+### Bug Fixes
+
+* **cubesql:** SET NAMES utf8mb4 ([9229123](https://github.com/cube-js/cube.js/commit/9229123b8160eefe47f071063a455eb854199ebf))
+
+
+### Features
+
+* Integrate SQL Connector to Cube.js ([#3544](https://github.com/cube-js/cube.js/issues/3544)) ([f90de4c](https://github.com/cube-js/cube.js/commit/f90de4c9283178962f501826a8a64abb674c37d1))
+
+
+
+
+
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+
+### Bug Fixes
+
+* **cubestore:** fix parquet statistics for string columns ([565465a](https://github.com/cube-js/cube.js/commit/565465a02328875340d63046245637a3544ce2f1))
+
+
+### Features
+
+* Introduce cubeclient (rust client) ([ff44347](https://github.com/cube-js/cube.js/commit/ff443477925e9948b9b6e190370696e1d8375ee0))
+* Introduce SQL Connector for Cube.js 🚀  ([#3527](https://github.com/cube-js/cube.js/issues/3527)) ([7d97398](https://github.com/cube-js/cube.js/commit/7d97398bc11b64c1c77463030263316fad1da27a))
+
+
+
+
+
+## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
+
+
+### Bug Fixes
+
+* **cubestore:** fix string-to-timestamp conversion ([654e81d](https://github.com/cube-js/cube.js/commit/654e81d42ef90bdcfffbe5c9760aa231facf8a43))
+* **cubestore:** invalid data after compaction of binary columns ([064a9f4](https://github.com/cube-js/cube.js/commit/064a9f46995ddbf35fefa3c25f5c3a6e47d96c1a))
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+
+### Bug Fixes
+
+* **cubestore:** improve diagnostics on invalid configurations ([95f3810](https://github.com/cube-js/cube.js/commit/95f3810c28d777455c7c180b91f13c4fadc623de))
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+
+### Features
+
+* **cubestore:** ILIKE operator ([6a3fe64](https://github.com/cube-js/cube.js/commit/6a3fe647fb5f93932521591b6a7c572b88758bfe))
+
+
+
+
+
+## [0.28.36](https://github.com/cube-js/cube.js/compare/v0.28.35...v0.28.36) (2021-09-14)
+
+
+### Features
+
+* **cubestore:** support reading of postgres-hll sketches ([72c38ba](https://github.com/cube-js/cube.js/commit/72c38badec1ee2ffc64218299653af1897042671))
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+
+### Bug Fixes
+
+* **cubestore:** 'unsorted data in merge' ([f4fad69](https://github.com/cube-js/cube.js/commit/f4fad697332de369292c30087e74c2a5af2723b7))
+* **cubestore:** do not log AWS credentials, close [#3366](https://github.com/cube-js/cube.js/issues/3366) ([9aae6e5](https://github.com/cube-js/cube.js/commit/9aae6e585e87b39714d2273e9406913d1f3a8566))
+
+
+
+
+
+## [0.28.31](https://github.com/cube-js/cube.js/compare/v0.28.30...v0.28.31) (2021-09-02)
+
+
+### Bug Fixes
+
+* **cubestore:** fix crash on 'unexpected accumulator state List([NULL])' ([cbc0d52](https://github.com/cube-js/cube.js/commit/cbc0d5255d89481a1e88dacbf3b0dd03dc189839))
+
+
+
+
+
 ## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
 
 

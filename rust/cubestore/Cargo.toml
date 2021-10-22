@@ -18,14 +18,14 @@ base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
 warp = { git = 'https://github.com/seanmonstar/warp', version = "0.3.0" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "b1d144a2cb5cc47ac950fd1d518bc28b4dc33ab9" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "c3c77dd2aa408a7cb0c9f27e5e9fc1b101351dcd" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_bytes = "0.11.5"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
 cuberpc = { path = "../cuberpc" }
-parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
+parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube", features = ["arrow"] }
 arrow = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 arrow-flight = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube" }
@@ -79,6 +79,10 @@ tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
 lru = "0.6.5"
 ctor = "0.1.20"
+json = "0.12.4"
+futures-util = "0.3.17"
+url = "2.2.2"
+pin-project = "1.0.8"
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

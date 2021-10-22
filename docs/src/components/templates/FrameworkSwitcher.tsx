@@ -1,9 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Radio } from 'antd';
-import { RadioChangeEvent } from 'antd/lib/radio/interface';
-import { navigate } from '@reach/router';
+import Link from 'gatsby-link';
 import {
-  useFrameworkOfChoice,
   FRAMEWORKS,
 } from '../../stores/frameworkOfChoice';
 
@@ -13,30 +11,35 @@ type Props = {
   value: string;
 };
 
+// Check if window is defined (so if in the browser or in node.js).
+const isBrowser = typeof window !== "undefined"
+
 const FrameworkSwitcher: React.FC<Props> = () => {
-  const [frameworkOfChoice, setFrameworkOfChoice] = useFrameworkOfChoice();
 
-  function onChange(event: RadioChangeEvent) {
-    const framework = event.target.value;
+  const [framework, setFramework] = useState('vanilla');
 
-    setFrameworkOfChoice(framework);
-    navigate(
-      `${process.env.PATH_PREFIX}/frontend-introduction${
-        framework !== FRAMEWORKS[0].slug ? `/${framework}` : ''
-      }`
-    );
+  if (isBrowser) {
+    useEffect(() => {
+      const arrayOfPath = window.location.pathname.split('/');
+      const framework = arrayOfPath[arrayOfPath.length - 1];
+      const allFrameworks = ['vue', 'react', 'angular']
+
+      setFramework(allFrameworks.includes(framework) ? framework : 'vanilla');
+    }, [window.location.pathname]);
   }
 
   return (
-    <Radio.Group
-      className={styles.frameworkSwitcher}
-      value={frameworkOfChoice}
-      onChange={onChange}
-    >
+    <Radio.Group className={styles.frameworkSwitcher} value={framework}>
       {FRAMEWORKS.map((framework) => (
-        <Radio.Button key={framework.slug} value={framework.slug}>
-          {framework.name}
-        </Radio.Button>
+        <Link
+          to={`/frontend-introduction/${
+            framework.slug === 'vanilla' ? '' : framework.slug
+          }`}
+        >
+          <Radio.Button key={framework.slug} value={framework.slug}>
+            {framework.name}
+          </Radio.Button>
+        </Link>
       ))}
     </Radio.Group>
   );

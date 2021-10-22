@@ -1,21 +1,12 @@
-import {
-  GRANULARITIES,
-  TCubeMember,
-  TimeDimensionGranularity,
-} from '@cubejs-client/core';
-import { Typography, Menu } from 'antd';
-import styled from 'styled-components';
-import ButtonDropdown from '../../../QueryBuilder/ButtonDropdown';
-import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
-import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
+import { BaseCubeMember, TimeDimensionGranularity } from '@cubejs-client/core';
+import { Space } from 'antd';
 
-const Flex = styled.div`
-  display: flex;
-  gap: 16px;
-`;
+import { MemberType } from './Members';
+import { MemberTag } from './MemberTag';
+import { GranularitySelect } from './Settings';
 
 type TimeDimensionProps = {
-  member: TCubeMember;
+  member: BaseCubeMember | undefined;
   granularity?: TimeDimensionGranularity;
   onGranularityChange: (
     granularity: TimeDimensionGranularity | undefined
@@ -25,49 +16,30 @@ type TimeDimensionProps = {
 
 export function TimeDimension({
   member,
-  granularity,
+  granularity = 'day',
   onGranularityChange,
   onRemove,
 }: TimeDimensionProps) {
+  if (!member) {
+    console.warn(
+      'Rollup Designer received `undefined` member as TimeDimension'
+    );
+    return null;
+  }
+
   return (
     <>
-      <Typography.Paragraph>
-        <Typography.Text>Time dimension</Typography.Text>
-      </Typography.Paragraph>
+      <MemberType>Time dimension</MemberType>
 
-      <Flex>
-        <RemoveButtonGroup
-          key={member.name}
-          onRemoveClick={() => onRemove(member.name)}
-        >
-          <MemberDropdown
-            showNoMembersPlaceholder={false}
-            availableMembers={[]}
-            onClick={() => undefined}
-          >
-            {member.title}
-          </MemberDropdown>
-        </RemoveButtonGroup>
+      <Space>
+        <MemberTag
+          name={member.shortTitle}
+          cubeName={member.title.replace(member.shortTitle, '')}
+          onClose={() => onRemove(member.name)}
+        />
 
-        {granularity ? (
-          <ButtonDropdown
-            overlay={
-              <Menu>
-                {GRANULARITIES.map(({ name, title }) => (
-                  <Menu.Item
-                    key={title}
-                    onClick={() => onGranularityChange(name)}
-                  >
-                    {title}
-                  </Menu.Item>
-                ))}
-              </Menu>
-            }
-          >
-            {granularity}
-          </ButtonDropdown>
-        ) : null}
-      </Flex>
+        <GranularitySelect value={granularity} onChange={onGranularityChange} />
+      </Space>
     </>
   );
 }

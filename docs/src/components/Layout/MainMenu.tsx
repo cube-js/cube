@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { Col, Menu } from 'antd';
+import cx from 'classnames';
 import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
@@ -88,7 +89,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
       {...layout.leftSidebar.width}
       xs={props.mobileMode === 'menu' ? 24 : 0}
     >
-      <div className={styles.menuWrapper}>
+      <div className={cx(styles.menuWrapper, styles.menuWrapperHack)}>
         <Menu {...menuProps} className={styles.antMenu}>
           <MenuItem to={isCloudDocs ? '/cloud' : '/'} title="Home" />
           {menuOrderResolved.map((item) => {

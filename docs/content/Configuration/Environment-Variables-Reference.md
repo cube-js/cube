@@ -54,9 +54,9 @@ options][link-config].
 | `CUBEJS_TOPIC_NAME`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                             | A valid topic name                                          |
 
 [ref-config-sched-refresh-timer]:
-  /config#options-reference-scheduled-refresh-timer
+  /config#scheduled-refresh-timer
 [ref-config-preagg-schema-name]:
-  /config#options-reference-pre-aggregations-schema
+  /config#pre-aggregations-schema
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -89,7 +89,6 @@ databases [in this guide][link-connecting-to-db].
 | `CUBEJS_DB_BQ_CREDENTIALS`                      | BigQuery             | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                            | A valid Google BigQuery JSON key file encoded as a Base64 string |
 | `CUBEJS_DB_BQ_KEY_FILE`                         | BigQuery             | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                               | A valid Google BigQuery JSON key file                            |
 | `CUBEJS_DB_BQ_PROJECT_ID`                       | BigQuery             | The Google BigQuery project ID to connect to                                                                                                                                                                | A valid Google BigQuery Project ID                               |
-| `CUBEJS_DB_BQ_EXPORT_BUCKET`                    | BigQuery             | GCS bucket to use for export pre-aggregation tables to Cube Store. Use it to achieve best Cube Store ingestion performance possible.                                                                        | A valid Google Cloud Storage Bucket ID                           |
 | `CUBEJS_DB_BQ_LOCATION`                         | BigQuery             | The Google BigQuery dataset location to connect to                                                                                                                                                          | A valid Google BigQuery regional location                        |
 | `CUBEJS_DB_URL`                                 | Druid, Elasticsearch | The URL for a database                                                                                                                                                                                      | A valid database URL for Druid/Elasticsearch                     |
 | `CUBEJS_DB_ELASTIC_OPENDISTRO`                  | Elasticsearch        | If `true`, then use the Open Distro for Elasticsearch                                                                                                                                                       | `true`, `false`                                                  |
@@ -165,7 +164,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_WORKER_PORT`         | The port for Cube Store workers to listen to connections on. When set, the node will start as a **worker** in the cluster                                                 | A valid port number                                         |
 | `CUBESTORE_WORKERS`             | A comma-separated list of address/port pairs; for example `worker-1:3123,localhost:3124,123.124.125.128:3123`                                                             | A comma-separated list of address/port pairs                |
 
-### Cloud Storage
+### <--{"id" : "Cube Store"}--> Cloud Storage
 
 | Environment variable              | Description                                                                                             | Possible Values                                                                         |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |

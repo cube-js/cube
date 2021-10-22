@@ -14,6 +14,7 @@ impl Index {
         table_id: u64,
         columns: Vec<Column>,
         sort_key_size: u64,
+        partition_split_key_size: Option<u64>,
     ) -> Result<Index, CubeError> {
         if sort_key_size == 0 {
             return Err(CubeError::user(format!(
@@ -26,6 +27,7 @@ impl Index {
             table_id,
             columns,
             sort_key_size,
+            partition_split_key_size,
         })
     }
 
@@ -48,6 +50,10 @@ impl Index {
 
     pub fn sort_key_size(&self) -> u64 {
         self.sort_key_size
+    }
+
+    pub fn partition_split_key_size(&self) -> &Option<u64> {
+        &self.partition_split_key_size
     }
 }
 

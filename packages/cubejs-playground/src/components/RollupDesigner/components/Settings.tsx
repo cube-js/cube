@@ -6,27 +6,29 @@ import {
   Col,
   DatePicker,
   Form,
-  FormItemProps,
   Input,
   Radio,
   Row,
   Select,
+  SelectProps,
   Space,
   Tooltip,
   Typography,
 } from 'antd';
 import { isValidCron } from 'cron-validator';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
 import { Flex } from '../../../grid';
 import { ucfirst } from '../../../shared/helpers';
+import { timeZones } from '../../../shared/time-zones';
 import { flatten } from '../utils';
 
 const Wrapper = styled.div`
   display: flex;
   gap: 32px;
   flex-direction: column;
+  padding: 24px;
 `;
 
 const partionGranularities = GRANULARITIES.filter(
@@ -55,6 +57,7 @@ type RefreshKey = {
   incremental?: boolean;
   updateWindow?: string;
   sql?: string;
+  timezone?: string;
 };
 
 export type RollupSettings = {
@@ -69,7 +72,7 @@ type SettingsProps = {
   hasTimeDimension: boolean;
   members: string[];
   onCronExpressionValidityChange: (valid: boolean) => void;
-  onChange: (values: Record<string, string>) => void;
+  onChange: (values: Record<string, string | boolean>) => void;
 };
 
 export function Settings({
@@ -85,10 +88,12 @@ export function Settings({
         every: true,
         sql: false,
       },
+      isCron: false,
       sql: '',
       value: 1,
-      granularity: 'day',
+      granularity: 'hour',
       cron: '',
+      timeZone: undefined,
     },
     partitionGranularity: '',
     updateWindow: {
@@ -124,6 +129,21 @@ export function Settings({
   }, []);
 
   const [values, setValues] = useState<Record<string, string>>(flattenedValues);
+  const [isCron, toggleCron] = useState(false);
+
+  useEffect(() => {
+    onChange({ ...values, 'refreshKey.isCron': isCron });
+
+    if (!isCron && !isValidCron(values['refreshKey.cron'])) {
+      form.setFields([
+        {
+          name: 'refreshKey.cron',
+          value: '',
+          errors: [],
+        },
+      ]);
+    }
+  }, [isCron]);
 
   return (
     <Form
@@ -132,7 +152,7 @@ export function Settings({
       initialValues={flatten(initialValues)}
       onValuesChange={(values) => {
         setValues((prevValues) => {
-          onChange({ ...prevValues, ...values });
+          onChange({ ...prevValues, ...values, 'refreshKey.isCron': isCron });
 
           Object.keys(values).forEach((field) => {
             const error = form.getFieldError(field);
@@ -159,7 +179,12 @@ export function Settings({
             Specify how often to refresh your pre-aggregated data
           </TitleWithTooltip>
 
-          <Row gutter={8} wrap={false} align="middle">
+          <Typography.Paragraph>
+            If you do not specify any Refresh Key, refreshes will still default
+            to every 1 hour.
+          </Typography.Paragraph>
+
+          <Row gutter={8} wrap={false} align="top">
             <Col flex="85px">
               <Form.Item
                 name="refreshKey.checked.every"
@@ -170,48 +195,101 @@ export function Settings({
             </Col>
 
             <Col flex="auto">
-              <Space align="center">
-                <Form.Item name="refreshKey.value">
-                  <Input
+              <Flex direction="column" gap={2}>
+                <Space>
+                  <Radio
+                    checked={!isCron}
                     disabled={!values['refreshKey.checked.every']}
-                    type="number"
-                    min={0}
-                    style={{ maxWidth: 80 }}
+                    onClick={() => toggleCron(false)}
                   />
-                </Form.Item>
 
-                <GranularitySelect
-                  disabled={!values['refreshKey.checked.every']}
-                  name="refreshKey.granularity"
-                />
+                  <Form.Item name="refreshKey.value" noStyle>
+                    <Input
+                      data-testid="rd-input-every"
+                      disabled={!values['refreshKey.checked.every'] || isCron}
+                      type="number"
+                      min={0}
+                      style={{ maxWidth: 80 }}
+                    />
+                  </Form.Item>
 
-                <div style={{ marginBottom: 24 }}>
-                  <Typography.Text>or</Typography.Text>
-                </div>
+                  <Form.Item name="refreshKey.granularity" noStyle>
+                    <GranularitySelect
+                      data-testid="rd-select-every-granularity"
+                      disabled={!values['refreshKey.checked.every'] || isCron}
+                    />
+                  </Form.Item>
+                </Space>
 
-                <Form.Item
-                  name="refreshKey.cron"
-                  rules={[
-                    {
-                      validator: (_, value, callback) => {
-                        if (value && !isValidCron(value, { seconds: true })) {
-                          onCronExpressionValidityChange(false);
-                          callback('Cron expression is invalid');
-                        } else {
-                          onCronExpressionValidityChange(true);
+                <Space align="start" style={{ marginBottom: 32 }}>
+                  <Radio
+                    disabled={!values['refreshKey.checked.every']}
+                    checked={isCron}
+                    style={{ paddingTop: 5 }}
+                    onClick={() => toggleCron(true)}
+                  />
+
+                  <Flex direction="column" gap={1}>
+                    <Form.Item
+                      name="refreshKey.cron"
+                      rules={[
+                        {
+                          validator: (_, value, callback) => {
+                            if (
+                              value &&
+                              !isValidCron(value, { seconds: true })
+                            ) {
+                              onCronExpressionValidityChange(false);
+                              callback('Cron expression is invalid');
+                            } else {
+                              onCronExpressionValidityChange(true);
+                            }
+                          },
+                        },
+                      ]}
+                    >
+                      <Input
+                        allowClear
+                        placeholder="Cron expression e.g. 30 5 * * 5"
+                        disabled={
+                          !values['refreshKey.checked.every'] || !isCron
                         }
-                      },
-                    },
-                  ]}
-                >
-                  <Input
-                    allowClear
-                    placeholder="Cron Expression"
-                    disabled={!values['refreshKey.checked.every']}
-                    style={{ maxWidth: 200 }}
-                  />
-                </Form.Item>
-              </Space>
+                      />
+                    </Form.Item>
+
+                    {isCron && values['refreshKey.checked.every'] ? (
+                      <>
+                        <Typography.Paragraph>
+                          <Typography.Link
+                            target="_blank"
+                            href="https://cube.dev/docs/schema/reference/cube#supported-cron-formats"
+                          >
+                            See how to format your cron expression
+                          </Typography.Link>
+                        </Typography.Paragraph>
+
+                        <Typography.Paragraph strong>
+                          Time Zone
+                        </Typography.Paragraph>
+
+                        <Form.Item name="refreshKey.timeZone" noStyle>
+                          <Select
+                            showSearch
+                            style={{ maxWidth: 200 }}
+                            placeholder="Select Time Zone"
+                          >
+                            {timeZones.map((name) => (
+                              <Select.Option key={name} value={name || ''}>
+                                {name}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      </>
+                    ) : null}
+                  </Flex>
+                </Space>
+              </Flex>
             </Col>
           </Row>
 
@@ -269,23 +347,33 @@ export function Settings({
                     <Checkbox>Incremental Refresh</Checkbox>
                   </Form.Item>
 
-                  <TitleWithTooltip title="Update Window">
-                    Any partition which includes this span of time into the past
-                    from now will be refreshed according to the Refresh Key set
-                    above. Otherwise, if left unset, only the most recent
-                    partition will be refreshed regularly.
-                  </TitleWithTooltip>
+                  {values['incrementalRefresh'] && (
+                    <>
+                      <TitleWithTooltip title="Update Window">
+                        Any partition which includes this span of time into the
+                        past from now will be refreshed according to the Refresh
+                        Key set above. Otherwise, if left unset, only the most
+                        recent partition will be refreshed regularly.
+                      </TitleWithTooltip>
 
-                  <Space align="start">
-                    <Form.Item name="updateWindow.value">
-                      <Input type="number" min={0} style={{ maxWidth: 80 }} />
-                    </Form.Item>
+                      <Space align="start">
+                        <Form.Item name="updateWindow.value">
+                          <Input
+                            type="number"
+                            min={0}
+                            style={{ maxWidth: 80 }}
+                          />
+                        </Form.Item>
 
-                    <GranularitySelect
-                      name="updateWindow.granularity"
-                      excludedGranularities={['second']}
-                    />
-                  </Space>
+                        <Form.Item name="updateWindow.granularity">
+                          <GranularitySelect
+                            excludedGranularities={['second']}
+                          />
+                        </Form.Item>
+                      </Space>
+                    </>
+                  )}
+
                   {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
                   {/* <Flex direction="column" gap={4}>
   <BuildRange time="since" />
@@ -305,7 +393,9 @@ export function Settings({
               placeholder="(list column names)"
             >
               {members.map((name) => (
-                <Select.Option value={name}>{name}</Select.Option>
+                <Select.Option key={name} value={name}>
+                  {name}
+                </Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -337,7 +427,9 @@ function BuildRange({ time }: BuildRangeProps) {
                   <Input type="number" min={0} style={{ maxWidth: 80 }} />
                 </Form.Item>
 
-                <GranularitySelect name={name('granularity')} noStyle />
+                <Form.Item name={name('granularity')} noStyle>
+                  <GranularitySelect />
+                </Form.Item>
               </Space>
 
               <Space>
@@ -362,26 +454,22 @@ function BuildRange({ time }: BuildRangeProps) {
 
 type GranularitySelectProps = {
   excludedGranularities?: TimeDimensionGranularity[];
-  disabled?: boolean;
-};
+} & SelectProps<any>;
 
-function GranularitySelect({
-  disabled,
+export function GranularitySelect({
   excludedGranularities = [],
   ...props
-}: FormItemProps & GranularitySelectProps) {
+}: GranularitySelectProps) {
   return (
-    <Form.Item {...props}>
-      <Select disabled={disabled} showSearch style={{ minWidth: 100 }}>
-        {GRANULARITIES.filter(
-          ({ name }) => name != null && !excludedGranularities.includes(name)
-        ).map(({ name, title }) => (
-          <Select.Option key={name} value={name as string}>
-            {title}
-          </Select.Option>
-        ))}
-      </Select>
-    </Form.Item>
+    <Select style={{ minWidth: 100 }} showSearch {...props}>
+      {GRANULARITIES.filter(
+        ({ name }) => name != null && !excludedGranularities.includes(name)
+      ).map(({ name, title }) => (
+        <Select.Option key={name} value={name as string}>
+          {title}
+        </Select.Option>
+      ))}
+    </Select>
   );
 }
 

@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** catch `dryRun` errors on `query-builder` mount ([#3450](https://github.com/cube-js/cube.js/issues/3450)) ([189491c](https://github.com/cube-js/cube.js/commit/189491c87ac2d3f5e1ddac516d7ab236d6a7c09b))
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
 ## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
 
 **Note:** Version bump only for package @cubejs-client/vue

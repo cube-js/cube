@@ -53,6 +53,14 @@ function asPortOrSocket(input: string, envName: string): number | string {
   return input;
 }
 
+function asFalseOrPort(input: string, envName: string): number | false {
+  if (input.toLowerCase() === 'false' || input === '0' || input === undefined) {
+    return false;
+  }
+
+  return asPortNumber(parseInt(input, 10), envName);
+}
+
 function asBoolOrTime(input: string, envName: string): number | boolean {
   if (input.toLowerCase() === 'true') {
     return true;
@@ -245,6 +253,7 @@ const variables: Record<string, (...args: any) => any> = {
 
     return false;
   },
+  sqlPort: () => asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT'),
   dbSsl: () => get('CUBEJS_DB_SSL')
     .default('false')
     .asBoolStrict(),

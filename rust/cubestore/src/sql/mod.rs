@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use arrow::array::*;
+use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -11,6 +13,7 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, Utc};
+use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
@@ -22,6 +25,9 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::*;
 use sqlparser::dialect::Dialect;
+use tempfile::TempDir;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::time::timeout;
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
@@ -34,8 +40,9 @@ use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
+use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
-    is_valid_binary_hll_input, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
@@ -44,8 +51,7 @@ use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::CubeStoreParser;
 use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows, TableValueR};
-use crate::table::{Row, TableValue, TimestampValue};
+use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -54,11 +60,7 @@ use crate::{
     metastore::{Column, ColumnType, MetaStore},
     store::DataFrame,
 };
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
-use datafusion::cube_ext;
-use tempfile::TempDir;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use data::create_array_builder;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -154,6 +156,7 @@ impl SqlServiceImpl {
         external: bool,
         locations: Option<Vec<String>>,
         indexes: Vec<Statement>,
+        unique_key: Option<Vec<Ident>>,
     ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
@@ -189,6 +192,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
+                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 )
                 .await;
         }
@@ -204,6 +208,7 @@ impl SqlServiceImpl {
                 Some(ImportFormat::CSV),
                 indexes_to_create,
                 false,
+                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
             )
             .await?;
 
@@ -230,6 +235,7 @@ impl SqlServiceImpl {
             .locations()
             .unwrap()
             .iter()
+            .filter(|&l| !Table::is_stream_location(l))
             .map(|&l| {
                 (
                     RowKey::Table(TableId::Tables, table.get_id()),
@@ -306,7 +312,7 @@ impl SqlServiceImpl {
                 item
             } else {
                 return Err(CubeError::user(format!(
-                    "Column {} does noot present in table {}.{}.",
+                    "Column {} is not present in table {}.{}.",
                     column.value, schema_name, table_name
                 )));
             };
@@ -419,7 +425,8 @@ impl SqlService for SqlServiceImpl {
         _context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        if !query.to_lowercase().starts_with("insert") {
+        if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
+        {
             trace!("Query: '{}'", query);
         }
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
@@ -479,6 +486,7 @@ impl SqlService for SqlServiceImpl {
                     },
                 indexes,
                 locations,
+                unique_key,
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
@@ -498,6 +506,7 @@ impl SqlService for SqlServiceImpl {
                         external,
                         locations,
                         indexes,
+                        unique_key,
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
@@ -537,6 +546,67 @@ impl SqlService for SqlServiceImpl {
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
+            }
+            CubeStoreStatement::CreateSource {
+                name,
+                source_type,
+                credentials,
+                or_update,
+            } => {
+                if or_update {
+                    let creds = match source_type.as_str() {
+                        "ksql" => {
+                            let user = credentials
+                                .iter()
+                                .find(|o| o.name.value == "user")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let password = credentials
+                                .iter()
+                                .find(|o| o.name.value == "password")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let url =
+                                credentials
+                                    .iter()
+                                    .find(|o| o.name.value == "url")
+                                    .and_then(|x| {
+                                        if let Value::SingleQuotedString(v) = &x.value {
+                                            Some(v.to_string())
+                                        } else {
+                                            None
+                                        }
+                                    });
+                            Ok(SourceCredentials::KSql {
+                                user,
+                                password,
+                                url: url.ok_or(CubeError::user(
+                                    "url is required as credential for ksql source".to_string(),
+                                ))?,
+                            })
+                        }
+                        x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
+                    };
+                    let source = self
+                        .db
+                        .create_or_update_source(name.value.to_string(), creds?)
+                        .await?;
+                    Ok(Arc::new(DataFrame::from(vec![source])))
+                } else {
+                    Err(CubeError::user(
+                        "CREATE SOURCE OR UPDATE should be used instead".to_string(),
+                    ))
+                }
             }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
@@ -609,7 +679,8 @@ impl SqlService for SqlServiceImpl {
                                         // Pick one of the workers to run as main for the request.
                                         let i =
                                             thread_rng().sample(Uniform::new(0, partitions.len()));
-                                        let node = cluster.node_name_by_partitions(&partitions[i]);
+                                        let node =
+                                            cluster.node_name_by_partitions(&partitions[i]).await?;
                                         let rs = cluster.route_select(&node, plan).await?.1;
                                         records = rs
                                             .into_iter()
@@ -663,6 +734,11 @@ impl SqlService for SqlServiceImpl {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
+                        let chunk_ids_to_batches = worker_plan
+                            .in_memory_chunks_to_load()
+                            .into_iter()
+                            .map(|c| (c.get_id(), Vec::new()))
+                            .collect();
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
@@ -671,7 +747,7 @@ impl SqlService for SqlServiceImpl {
                                 .0,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names)
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
                                 .await?
                                 .0,
                         });
@@ -763,6 +839,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
+                        "hll_postgres" => ColumnType::HyperLogLog(HllFlavour::Postgres),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
@@ -784,19 +861,35 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
     Ok(rolupdb_columns)
 }
 
-fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Rows, CubeError> {
+fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRef>, CubeError> {
     let mut buffer = Vec::new();
-    let mut res = MutRows::new(column.len());
+    let mut builders = column
+        .iter()
+        .map(|c| create_array_builder(c.get_column_type()))
+        .collect_vec();
     for r in chunk {
-        let mut row = res.add_row();
         for i in 0..r.len() {
-            row.set_interned(
-                column[i].get_index(),
-                extract_data(&r[i], column, i, &mut buffer)?,
-            );
+            extract_data(&r[i], &column[i], &mut buffer, builders[i].as_mut())?;
         }
     }
-    Ok(res.freeze())
+    let mut order = (0..column.len()).collect_vec();
+    order.sort_unstable_by_key(|i| column[*i].get_index());
+
+    let mut arrays = Vec::with_capacity(builders.len());
+    for i in order {
+        let b = &mut builders[i];
+        let a = b.finish();
+        assert_eq!(
+            a.len(),
+            chunk.len(),
+            "invalid number of rows: {} in array vs {} in input data. array: {:?}",
+            a.len(),
+            chunk.len(),
+            a
+        );
+        arrays.push(a);
+    }
+    Ok(arrays)
 }
 
 fn decode_byte(s: &str) -> Option<u8> {
@@ -834,10 +927,15 @@ fn parse_hyper_log_log<'a>(
             *buffer = hll.write();
             Ok(buffer)
         }
-        f => {
-            assert!(f.imports_from_binary());
+        HllFlavour::Postgres => {
             let bytes = parse_binary_string(buffer, v)?;
-            is_valid_binary_hll_input(bytes, f)?;
+            let hll = HllSketch::read_hll_storage_spec(bytes)?;
+            *buffer = hll.write();
+            Ok(buffer)
+        }
+        HllFlavour::Airlift | HllFlavour::ZetaSketch => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
         }
     }
@@ -875,78 +973,160 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
 
 fn extract_data<'a>(
     cell: &'a Expr,
-    column: &Vec<&Column>,
-    i: usize,
+    column: &Column,
     buffer: &'a mut Vec<u8>,
-) -> Result<TableValueR<'a>, CubeError> {
-    if let Expr::Value(Value::Null) = cell {
-        return Ok(TableValueR::Null);
-    }
-    let res = {
-        match column[i].get_column_type() {
-            ColumnType::String => {
-                let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
-                    v
-                } else {
-                    return Err(CubeError::user(format!(
-                        "Single quoted string is expected but {:?} found",
-                        cell
-                    )));
-                };
-                TableValueR::String(&val)
+    builder: &mut dyn ArrayBuilder,
+) -> Result<(), CubeError> {
+    let is_null = match cell {
+        Expr::Value(Value::Null) => true,
+        _ => false,
+    };
+    match column.get_column_type() {
+        ColumnType::String => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<StringBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            ColumnType::Int => {
-                let val_int = match cell {
-                    Expr::Value(Value::Number(v, _))
-                    | Expr::Value(Value::SingleQuotedString(v)) => v.parse::<i64>(),
-                    Expr::UnaryOp {
-                        op: UnaryOperator::Minus,
-                        expr,
-                    } => {
-                        if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
-                            v.parse::<i64>().map(|v| v * -1)
-                        } else {
-                            return Err(CubeError::user(format!(
-                                "Can't parse int from, {:?}",
-                                cell
-                            )));
-                        }
-                    }
-                    _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell))),
-                };
-                if let Err(e) = val_int {
-                    return Err(CubeError::user(format!(
-                        "Can't parse int from, {:?}: {}",
-                        cell, e
-                    )));
+            let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
+                v
+            } else {
+                return Err(CubeError::user(format!(
+                    "Single quoted string is expected but {:?} found",
+                    cell
+                )));
+            };
+            builder.append_value(val)?;
+        }
+        ColumnType::Int => {
+            let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let val_int = match cell {
+                Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
+                    v.parse::<i64>()
                 }
-                TableValueR::Int(val_int.unwrap())
+                Expr::UnaryOp {
+                    op: UnaryOperator::Minus,
+                    expr,
+                } => {
+                    if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
+                        v.parse::<i64>().map(|v| v * -1)
+                    } else {
+                        return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)));
+                    }
+                }
+                _ => return Err(CubeError::user(format!("Can't parse int from, {:?}", cell))),
+            };
+            if let Err(e) = val_int {
+                return Err(CubeError::user(format!(
+                    "Can't parse int from, {:?}: {}",
+                    cell, e
+                )));
             }
-            t @ ColumnType::Decimal { .. } => {
-                let d = parse_decimal(cell, u8::try_from(t.target_scale()).unwrap())?;
-                TableValueR::Decimal(d)
+            builder.append_value(val_int.unwrap())?;
+        }
+        t @ ColumnType::Decimal { .. } => {
+            let scale = u8::try_from(t.target_scale()).unwrap();
+            let d = match is_null {
+                false => Some(parse_decimal(cell, scale)?),
+                true => None,
+            };
+            let d = d.map(|d| d.raw_value());
+            match scale {
+                0 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal0Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                1 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal1Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                2 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal2Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                3 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal3Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                4 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal4Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                5 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal5Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                10 => builder
+                    .as_any_mut()
+                    .downcast_mut::<Int64Decimal10Builder>()
+                    .unwrap()
+                    .append_option(d)?,
+                n => panic!("unhandled target scale: {}", n),
             }
-            ColumnType::Bytes => {
-                let val;
-                if let Expr::Value(v) = cell {
-                    val = parse_binary_string(buffer, v)
-                } else {
-                    return Err(CubeError::user("Corrupted data in query.".to_string()));
-                };
-                return Ok(TableValueR::Bytes(val?));
+        }
+        ColumnType::Bytes => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            &ColumnType::HyperLogLog(f) => {
-                let val;
-                if let Expr::Value(v) = cell {
-                    val = parse_hyper_log_log(buffer, v, f)
-                } else {
-                    return Err(CubeError::user("Corrupted data in query.".to_string()));
-                };
-                return Ok(TableValueR::Bytes(val?));
+            let val;
+            if let Expr::Value(v) = cell {
+                val = parse_binary_string(buffer, v)?
+            } else {
+                return Err(CubeError::user("Corrupted data in query.".to_string()));
+            };
+            builder.append_value(val)?;
+        }
+        &ColumnType::HyperLogLog(f) => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
             }
-            ColumnType::Timestamp => match cell {
+            let val;
+            if let Expr::Value(v) = cell {
+                val = parse_hyper_log_log(buffer, v, f)?
+            } else {
+                return Err(CubeError::user("Corrupted data in query.".to_string()));
+            };
+            builder
+                .as_any_mut()
+                .downcast_mut::<BinaryBuilder>()
+                .unwrap()
+                .append_value(val)?;
+        }
+        ColumnType::Timestamp => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<TimestampMicrosecondBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValueR::Timestamp(timestamp_from_string(v)?)
+                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000)?;
                 }
                 x => {
                     return Err(CubeError::user(format!(
@@ -954,23 +1134,43 @@ fn extract_data<'a>(
                         x
                     )))
                 }
-            },
-            ColumnType::Boolean => match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => {
-                    TableValueR::Boolean(v.to_lowercase() == "true")
-                }
-                Expr::Value(Value::Boolean(b)) => TableValueR::Boolean(*b),
+            }
+        }
+        ColumnType::Boolean => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<BooleanBuilder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let v = match cell {
+                Expr::Value(Value::SingleQuotedString(v)) => v.eq_ignore_ascii_case("true"),
+                Expr::Value(Value::Boolean(b)) => *b,
                 x => {
                     return Err(CubeError::user(format!(
                         "Can't parse boolean from, {:?}",
                         x
                     )))
                 }
-            },
-            ColumnType::Float => TableValueR::Float(parse_float(cell)?.into()),
+            };
+            builder.append_value(v)?;
         }
-    };
-    Ok(res)
+        ColumnType::Float => {
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<Float64Builder>()
+                .unwrap();
+            if is_null {
+                builder.append_null()?;
+                return Ok(());
+            }
+            let v = parse_float(cell)?;
+            builder.append_value(v)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn timestamp_from_string(v: &str) -> Result<TimestampValue, CubeError> {
@@ -1053,9 +1253,10 @@ mod tests {
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-    use crate::store::{ChunkStore, WALStore};
+    use crate::store::ChunkStore;
 
     use super::*;
+    use crate::table::data::{cmp_row_key_heap, cmp_row_markers};
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1075,11 +1276,10 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let wal_store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
-                wal_store,
+                Arc::new(MockCluster::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1126,11 +1326,10 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let store = WALStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
-                store.clone(),
+                Arc::new(MockCluster::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1172,6 +1371,8 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);
@@ -1339,7 +1540,7 @@ mod tests {
                 ).await.unwrap();
             }
 
-            join_results.sort_by(|a, b| a.sort_key(1).cmp(&b.sort_key(1)));
+            join_results.sort_by(|a, b| cmp_row_key_heap(1, &a.values(), &b.values()));
 
             let result = service.exec_query("SELECT o.email, c.uuid, sum(o.amount) from foo.orders o LEFT JOIN foo.customers c ON o.email = c.email GROUP BY 1, 2 ORDER BY 1 ASC").await.unwrap();
 
@@ -1831,14 +2032,14 @@ mod tests {
             let mut intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
                 .collect::<Vec<_>>();
-            intervals_set.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
             let mut expected = vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
             ].into_iter().collect::<Vec<_>>();
-            expected.sort_by(|(min_a, _), (min_b, _)| min_a.as_ref().map(|a| a.sort_key(1)).cmp(&min_b.as_ref().map(|a| a.sort_key(1))));
+            expected.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
             assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();

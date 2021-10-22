@@ -30,7 +30,7 @@ use datafusion::logical_plan::{Expr, LogicalPlan};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
+use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
@@ -63,6 +63,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     async fn router_plan(
@@ -74,6 +75,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 }
 
@@ -125,8 +127,11 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
-        let (physical_plan, logical_plan) = self.worker_plan(plan, remote_to_local_names).await?;
+        let (physical_plan, logical_plan) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
 
         let worker_plan;
         let max_batch_rows;
@@ -187,7 +192,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&HashMap::new())?;
+        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new())?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -200,8 +205,9 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
+        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches)?;
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -242,12 +248,24 @@ impl QueryExecutorImpl {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: HashSet<u64>,
+    #[serde(skip, default)]
+    chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     schema: SchemaRef,
+}
+
+impl Debug for CubeTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CubeTable")
+            .field("index", self.index_snapshot.index())
+            .field("schema", &self.schema)
+            .field("worker_partition_ids", &self.worker_partition_ids)
+            .finish()
+    }
 }
 
 impl CubeTable {
@@ -271,6 +289,7 @@ impl CubeTable {
             schema,
             remote_to_local_names,
             worker_partition_ids,
+            chunk_id_to_record_batches: HashMap::new(),
         })
     }
 
@@ -279,10 +298,12 @@ impl CubeTable {
         &self,
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: HashSet<u64>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> CubeTable {
         let mut t = self.clone();
         t.remote_to_local_names = remote_to_local_names;
         t.worker_partition_ids = worker_partition_ids;
+        t.chunk_id_to_record_batches = chunk_id_to_record_batches;
         t
     }
 
@@ -301,7 +322,25 @@ impl CubeTable {
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
-        let partition_projection = projection.as_ref().map(|p| {
+        let projection_with_seq_column = projection.as_ref().map(|p| {
+            let table = self.index_snapshot.table_path.table.get_row();
+            if let Some(mut key_columns) = table.unique_key_columns() {
+                key_columns.push(table.seq_column().expect(&format!(
+                    "Seq column is undefined for table: {}",
+                    table.get_table_name()
+                )));
+                let mut with_seq = p.clone();
+                for column in key_columns {
+                    if !with_seq.iter().any(|s| *s == column.get_index()) {
+                        with_seq.push(column.get_index());
+                    }
+                }
+                with_seq
+            } else {
+                p.clone()
+            }
+        });
+        let partition_projection = projection_with_seq_column.as_ref().map(|p| {
             let mut partition_projection = Vec::with_capacity(p.len());
             for table_col_i in p {
                 let name = table_cols[*table_col_i].get_name();
@@ -345,25 +384,48 @@ impl CubeTable {
 
             let chunks = partition_snapshot.chunks();
             for chunk in chunks {
-                let remote_path = chunk.get_row().get_full_name(chunk.get_id());
-                let local_path = self
-                    .remote_to_local_names
-                    .get(&remote_path)
-                    .expect(format!("Missing remote path {}", remote_path).as_str());
-                let node = Arc::new(ParquetExec::try_from_path(
-                    local_path,
-                    partition_projection.clone(),
-                    predicate.clone(),
-                    batch_size,
-                    1,
-                    None, // TODO: propagate limit
-                )?);
+                let node: Arc<dyn ExecutionPlan> = if chunk.get_row().in_memory() {
+                    let record_batches = self
+                        .chunk_id_to_record_batches
+                        .get(&chunk.get_id())
+                        .ok_or(CubeError::internal(format!(
+                            "Record batch for in memory chunk {:?} is not provided",
+                            chunk
+                        )))?;
+                    Arc::new(MemoryExec::try_new(
+                        &[record_batches.clone()],
+                        record_batches
+                            .iter()
+                            .next()
+                            .ok_or(CubeError::internal(format!(
+                                "Empty Record batch for in memory chunk {:?} is not provided",
+                                chunk
+                            )))?
+                            .schema(),
+                        partition_projection.clone(),
+                    )?)
+                } else {
+                    let remote_path = chunk.get_row().get_full_name(chunk.get_id());
+                    let local_path = self
+                        .remote_to_local_names
+                        .get(&remote_path)
+                        .expect(format!("Missing remote path {}", remote_path).as_str());
+                    Arc::new(ParquetExec::try_from_path(
+                        local_path,
+                        partition_projection.clone(),
+                        predicate.clone(),
+                        batch_size,
+                        1,
+                        None, // TODO: propagate limit
+                    )?)
+                };
+
                 partition_execs.push(node);
             }
         }
 
         // We might need extra projection to re-order data.
-        if let Some(projection) = projection {
+        if let Some(projection) = projection_with_seq_column.as_ref() {
             let partition_projection = partition_projection.unwrap();
             let mut final_reorder = Vec::with_capacity(projection.len());
             for table_col_i in projection {
@@ -397,7 +459,7 @@ impl CubeTable {
             }
         }
 
-        let projected_schema = if let Some(p) = projection {
+        let projected_schema = if let Some(p) = projection_with_seq_column.as_ref() {
             Arc::new(Schema::new(
                 p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
@@ -420,9 +482,60 @@ impl CubeTable {
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
         });
+        let unique_key_columns = self
+            .index_snapshot()
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
 
-        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
-        {
+        let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
+            let sort_columns = self
+                .index_snapshot()
+                .index
+                .get_row()
+                .columns()
+                .iter()
+                .take(self.index_snapshot.index.get_row().sort_key_size() as usize)
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(
+                        c.get_name(),
+                        &schema,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut exec: Arc<dyn ExecutionPlan> =
+                Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
+            exec = Arc::new(LastRowByUniqueKeyExec::try_new(
+                exec,
+                key_columns
+                    .iter()
+                    .map(|c| {
+                        datafusion::physical_plan::expressions::Column::new_with_schema(
+                            c.get_name().as_str(),
+                            &schema,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?);
+            if let Some(projection) = projection.as_ref() {
+                let s = exec.schema();
+                let proj_exprs = projection
+                    .iter()
+                    .map(|c| {
+                        let name = table_cols[*c].get_name();
+                        let col = datafusion::physical_plan::expressions::Column::new(
+                            name,
+                            s.index_of(name)?,
+                        );
+                        let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                        Ok((col, name.clone()))
+                    })
+                    .collect::<Result<Vec<_>, CubeError>>()?;
+                exec = Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
+            }
+            exec
+        } else if let Some(join_columns) = self.index_snapshot.sort_on() {
             let join_columns = join_columns
                 .iter()
                 .map(|c| {
@@ -605,7 +718,7 @@ impl ClusterSendExec {
         let mut m: HashMap<String, Vec<u64>> = HashMap::new();
         for ps in &logical {
             let ids = ps.iter().map(|p| p.get_id()).collect_vec();
-            m.entry(c.node_name_by_partitions(&ids))
+            m.entry(c.node_name_by_partition_rows(ps))
                 .or_default()
                 .extend(ids)
         }

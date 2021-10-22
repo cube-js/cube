@@ -3,6 +3,76 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Reduce memory usage during batching downloads ([8748344](https://github.com/cube-js/cube.js/commit/8748344dd2ea3245532c85cb7a9cea6300d72acd))
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** ReferenceError host is not defined ([#3417](https://github.com/cube-js/cube.js/issues/3417)) ([bf61aa3](https://github.com/cube-js/cube.js/commit/bf61aa3241d55511ca321a1f119bf560d6dc74d7)), closes [#2923](https://github.com/cube-js/cube.js/issues/2923)
+
+
+
+
+
+## [0.28.34](https://github.com/cube-js/cube.js/compare/v0.28.33...v0.28.34) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+
+
+
+
 ## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

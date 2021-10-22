@@ -24,7 +24,7 @@
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "CUBESTORE_SKIP_POST_INSTALL=true lerna link && patch-package"
+    "postinstall": "lerna link && patch-package"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {

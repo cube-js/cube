@@ -1,23 +1,23 @@
 {{- define "cubestore.common-env" -}}
-{{- if .Values.global.logLevel }}
+{{- if .Values.config.logLevel }}
 - name: CUBESTORE_LOG_LEVEL
-  value: {{ .Values.global.logLevel | quote }}
+  value: {{ .Values.config.logLevel | quote }}
 {{- end}}
-{{- if .Values.global.noUpload }}
+{{- if .Values.config.noUpload }}
 - name: CUBESTORE_NO_UPLOAD
-  value: {{ .Values.global.noUpload | quote }}
+  value: {{ .Values.config.noUpload | quote }}
 {{- end}}
-{{- if .Values.global.jobRunners }}
+{{- if .Values.config.jobRunners }}
 - name: CUBESTORE_JOB_RUNNERS
-  value: {{ .Values.global.jobRunners | quote }}
+  value: {{ .Values.config.jobRunners | quote }}
 {{- end}}
-{{- if .Values.global.queryTimeout }}
+{{- if .Values.config.queryTimeout }}
 - name: CUBESTORE_QUERY_TIMEOUT
-  value: {{ .Values.global.queryTimeout | quote }}
+  value: {{ .Values.config.queryTimeout | quote }}
 {{- end}}
-{{- if .Values.global.walSplitThreshold }}
+{{- if .Values.config.walSplitThreshold }}
 - name: CUBESTORE_WAL_SPLIT_THRESHOLD
-  value: {{ .Values.global.walSplitThreshold | quote }}
+  value: {{ .Values.config.walSplitThreshold | quote }}
 {{- end}}
 {{- if .Values.cloudStorage.gcp.bucket }}
 - name: CUBESTORE_GCS_BUCKET

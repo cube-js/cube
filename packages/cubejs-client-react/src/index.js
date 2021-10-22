@@ -8,6 +8,7 @@ export * from './hooks/cube-sql';
 export * from './hooks/dry-run';
 export * from './hooks/lazy-dry-run';
 export * from './hooks/cube-query';
+export * from './hooks/cube-meta';
 export {
   QueryRenderer,
   QueryRendererWithTotals,

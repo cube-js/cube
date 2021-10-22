@@ -983,6 +983,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -990,6 +992,7 @@ pub mod tests {
                 customers,
                 put_first("customer_city", &customers_cols),
                 1,
+                None,
             )
             .unwrap(),
         );
@@ -1008,6 +1011,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -1015,6 +1020,7 @@ pub mod tests {
                 orders,
                 put_first("order_customer", &orders_cols),
                 2,
+                None,
             )
             .unwrap(),
         );
@@ -1024,6 +1030,7 @@ pub mod tests {
                 customers,
                 put_first("order_city", &orders_cols),
                 2,
+                None,
             )
             .unwrap(),
         );
@@ -1035,6 +1042,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
         ));
 
         i
@@ -1086,6 +1095,7 @@ pub mod tests {
                     table_id,
                     t.get_columns().clone(),
                     t.get_columns().len() as u64,
+                    None,
                 )
                 .unwrap(),
             );

@@ -1,43 +1,46 @@
 use core::mem;
 use core::slice::memchr;
+use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
+use num::ToPrimitive;
 use pin_project_lite::pin_project;
+use tempfile::TempPath;
 use tokio::fs::File;
 use tokio::io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::task::JoinHandle;
+
+use cubehll::HllSketch;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
-use crate::metastore::{is_valid_binary_hll_input, HllFlavour, IdRow};
+use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows};
+use crate::streaming::StreamingService;
+use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
-use cubehll::HllSketch;
-use datafusion::cube_ext;
-use num::ToPrimitive;
-use std::convert::TryFrom;
-use tempfile::TempPath;
 
 pub mod limits;
 
@@ -129,10 +132,16 @@ impl ImportFormat {
                                         let hll = HllSketch::read_snowflake(value)?;
                                         TableValue::Bytes(hll.write())
                                     }
-                                    ColumnType::HyperLogLog(f) => {
-                                        assert!(f.imports_from_binary());
+                                    ColumnType::HyperLogLog(HllFlavour::Postgres) => {
                                         let data = base64::decode(value)?;
-                                        is_valid_binary_hll_input(&data, *f)?;
+                                        let hll = HllSketch::read_hll_storage_spec(&data)?;
+                                        TableValue::Bytes(hll.write())
+                                    }
+                                    ColumnType::HyperLogLog(
+                                        f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
+                                    ) => {
+                                        let data = base64::decode(value)?;
+                                        is_valid_plain_binary_hll(&data, *f)?;
                                         TableValue::Bytes(data)
                                     }
                                     ColumnType::Timestamp => {
@@ -352,6 +361,7 @@ crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
+    streaming_service: Arc<dyn StreamingService>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
@@ -363,6 +373,7 @@ crate::di_service!(ImportServiceImpl, [ImportService]);
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
+        streaming_service: Arc<dyn StreamingService>,
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
@@ -370,6 +381,7 @@ impl ImportServiceImpl {
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
+            streaming_service,
             chunk_store,
             remote_fs,
             config_obj,
@@ -448,21 +460,32 @@ impl ImportServiceImpl {
             self.limits.clone(),
             table.clone(),
         );
-        let mut rows = MutRows::new(table.get_row().get_columns().len());
+
+        let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
+            builders.into_iter().map(|mut b| b.finish()).collect_vec()
+        };
+
+        let table_cols = table.get_row().get_columns().as_slice();
+        let mut builders = create_array_builders(table_cols);
+        let mut num_rows = 0;
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
-                rows.add_row_heap_allocated(&row);
-                if rows.num_rows() >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = MutRows::new(table.get_row().get_columns().len());
-                    mem::swap(&mut rows, &mut to_add);
-                    ingestion.queue_data_frame(to_add.freeze()).await?;
+                append_row(&mut builders, table_cols, &row);
+                num_rows += 1;
+
+                if num_rows >= self.config_obj.wal_split_threshold() as usize {
+                    let mut to_add = create_array_builders(table_cols);
+                    mem::swap(&mut builders, &mut to_add);
+                    num_rows = 0;
+
+                    ingestion.queue_data_frame(finish(to_add)).await?;
                 }
             }
         }
 
         mem::drop(tmp_path);
 
-        ingestion.queue_data_frame(rows.freeze()).await?;
+        ingestion.queue_data_frame(finish(builders)).await?;
         ingestion.wait_completion().await
     }
 }
@@ -521,9 +544,12 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await?;
-
-        self.drop_temp_uploads(&location).await?;
+        if Table::is_stream_location(location) {
+            self.streaming_service.stream_table(table, location).await?;
+        } else {
+            self.do_import(&table, *format, location).await?;
+            self.drop_temp_uploads(&location).await?;
+        }
 
         Ok(())
     }
@@ -555,7 +581,7 @@ impl Ingestion {
         }
     }
 
-    pub async fn queue_data_frame(&mut self, rows: Rows) -> Result<(), CubeError> {
+    pub async fn queue_data_frame(&mut self, rows: Vec<ArrayRef>) -> Result<(), CubeError> {
         let active_data_frame = self.limits.acquire_data_frame().await?;
 
         let meta_store = self.meta_store.clone();
@@ -563,7 +589,9 @@ impl Ingestion {
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
         self.partition_jobs.push(cube_ext::spawn(async move {
-            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
+            let new_chunks = chunk_store
+                .partition_data(table_id, rows, &columns, false)
+                .await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.

@@ -14,7 +14,7 @@ statuses from an external API. To calculate the orders percentage distribution,
 we need to create several [measures](/schema/fundamentals/concepts#measures)
 that refer to each other. But we don't want to manually change the schema for
 each new status. To solve this, we will create a
-[schema dynamically](/schema/advanced/dynamic-schema-creation)
+[schema dynamically](/schema/advanced/dynamic-schema-creation).
 
 ## Data schema
 
@@ -38,7 +38,7 @@ const createTotalByStatusMeasure = (status) => ({
   },
 });
 
-const createPercentangeMeasure = (status) => ({
+const createPercentageMeasure = (status) => ({
   [`Percentage_of_${status}`]: {
     type: `number`,
     format: `percent`,
@@ -62,7 +62,7 @@ cube(`Orders`, {
       (all, status) => ({
         ...all,
         ...createTotalByStatusMeasure(status),
-        ...createPercentangeMeasure(status),
+        ...createPercentageMeasure(status),
       }),
       {}
     )

@@ -1,0 +1,12 @@
+dependencies:
+- name: cubejs
+  repository: file://../cubejs
+  version: 0.1.0
+- name: cubestore
+  repository: file://../cubestore
+  version: 0.1.0
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 11.2.3
+digest: sha256:74177b6eac090639acbfe7fe13b95f80ac5c1d1e7e2239dedfed66169f0ad816
+generated: "2021-09-02T18:07:09.484591113+02:00"

@@ -27,9 +27,9 @@ https://cube.dev/docs/reference/environment-variables
 
 ### Injecting schema
 
-To inject your schema files in the deployment you have to use `global.volumes` and `global.volumeMounts` values.
+To inject your schema files in the deployment you have to use `config.volumes` and `config.volumeMounts` values.
 
-Mount path is `/cube/conf/schema` by default and can be customized with the `global.schemaPath` value.
+Mount path is `/cube/conf/schema` by default and can be customized with the `config.schemaPath` value.
 
 A good practice is to use a ConfigMap to store your all the cube definition files:
 
@@ -63,7 +63,7 @@ data:
 
 ### Injecting javascript config
 
-To inject a javascript config in the deployment you can use `global.volumes` and `global.volumeMounts` values.
+To inject a javascript config in the deployment you can use `config.volumes` and `config.volumeMounts` values.
 
 Mount path is `/cube/conf/`
 
@@ -82,11 +82,11 @@ $ helm install my-release \
 # Set two workers (default 1)
 --set workers.workerCount=2 \
 # Mount schema volume from ConfigMap
---set global.volumes[0].name=schema \
---set global.volumes[0].configMap.name=cube-schema \
---set global.volumeMounts[0].name=schema \
---set global.volumeMounts[0].readOnly=true \
---set global.volumeMounts[0].mountPath=/cube/conf/schema \
+--set config.volumes[0].name=schema \
+--set config.volumes[0].configMap.name=cube-schema \
+--set config.volumeMounts[0].name=schema \
+--set config.volumeMounts[0].readOnly=true \
+--set config.volumeMounts[0].mountPath=/cube/conf/schema \
 # Database configuration using secret
 --set database.type=bigquery \
 --set database.bigquery.projectId=<project-id> \
@@ -114,7 +114,7 @@ $ helm install my-release -f path/to/values.yaml ./cubejs
 
 ```yaml
 # path/to/values.yaml
-global:
+config:
   volumes:
     - name: schema
       configMap:
@@ -171,26 +171,29 @@ cubestore:
 | `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
 | `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
 
-### Global parameters
+### Config parameters
 
 | Name                               | Description                                                                                                                     | Value   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `global.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
-| `global.devMode`                   | If true, enables development mode                                                                                               | `false` |
-| `global.debug`                     | If true, enables debug logging                                                                                                  | `false` |
-| `global.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
-| `global.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
-| `global.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
-| `global.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
-| `global.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
-| `global.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
-| `global.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
-| `global.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
-| `global.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
-| `global.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
-| `global.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
-| `global.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
-| `global.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
+| `config.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `config.devMode`                   | If true, enables development mode                                                                                               | `false` |
+| `config.debug`                     | If true, enables debug logging                                                                                                  | `false` |
+| `config.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
+| `config.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                   | `true`  |
+| `config.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
+| `config.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
+| `config.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.apiSecretFromSecret.key`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
+| `config.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
+| `config.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
+| `config.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
+| `config.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
+| `config.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
+| `config.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
+| `config.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
+| `config.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
+| `config.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
 
 ### Redis parameters
 
@@ -200,8 +203,8 @@ cubestore:
 | `redis.password`                | The password used to connect to the Redis server                                                                                                         |       |
 | `redis.passwordFromSecret.name` | The password used to connect to the Redis server (using secret)                                                                                          |       |
 | `redis.passwordFromSecret.key`  | The password used to connect to the Redis server (using secret)                                                                                          |       |
-| `redis.tls`                     | If true, then the connection to the Redis server is protected by TLS authentication. Defaults to false                                                   |
-| `redis.poolMin`                 | The minimum number of connections to keep active in the Redis connection pool for a single appId (tenant). Must be lower than poolMax. Defaults to 2     |
+| `redis.tls`                     | If true, then the connection to the Redis server is protected by TLS authentication. Defaults to false                                                   |       |
+| `redis.poolMin`                 | The minimum number of connections to keep active in the Redis connection pool for a single appId (tenant). Must be lower than poolMax. Defaults to 2     |       |
 | `redis.poolMax`                 | The maximum number of connections to keep active in the Redis connection pool for a single appId (tenant). Must be higher than poolMin. Defaults to 1000 |       |
 | `redis.useIoRedis`              | Use ioredis instead of redis. Defaults to false                                                                                                          |       |
 
@@ -307,20 +310,48 @@ cubestore:
 
 ### Master parameters
 
-| Name                       | Description                                          | Value |
-| -------------------------- | ---------------------------------------------------- | ----- |
-| `master.affinity`          | Affinity for pod assignment                          | `{}`  |
-| `master.spreadConstraints` | Topology spread constraint for pod assignment        | `[]`  |
-| `master.resources`         | Define resources requests and limits for single Pods | `{}`  |
+| Name                                        | Description                                          | Value  |
+| ------------------------------------------- | ---------------------------------------------------- | ------ |
+| `master.affinity`                           | Affinity for pod assignment                          | `{}`   |
+| `master.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
+| `master.resources`                          | Define resources requests and limits for single Pods | `{}`   |
+| `master.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
+| `master.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
+| `master.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
+| `master.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
+| `master.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
+| `master.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
+| `master.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
+| `master.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
+| `master.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
+| `master.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
+| `master.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
+| `master.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
+| `master.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
+| `master.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
 
 ### Workers parameters
 
-| Name                        | Description                                          | Value |
-| --------------------------- | ---------------------------------------------------- | ----- |
-| `workers.workersCount`      | Number of workers to deploy                          | `1`   |
-| `workers.affinity`          | Affinity for pod assignment                          | `{}`  |
-| `workers.spreadConstraints` | Topology spread constraint for pod assignment        | `[]`  |
-| `workers.resources`         | Define resources requests and limits for single Pods | `{}`  |
+| Name                                         | Description                                          | Value  |
+| -------------------------------------------- | ---------------------------------------------------- | ------ |
+| `workers.workersCount`                       | Number of workers to deploy                          | `1`    |
+| `workers.affinity`                           | Affinity for pod assignment                          | `{}`   |
+| `workers.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
+| `workers.resources`                          | Define resources requests and limits for single Pods | `{}`   |
+| `workers.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
+| `workers.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
+| `workers.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
+| `workers.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
+| `workers.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
+| `workers.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
+| `workers.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
+| `workers.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
+| `workers.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
+| `workers.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
+| `workers.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
+| `workers.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
+| `workers.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
+| `workers.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
 
 ## Service parameters
 
@@ -338,11 +369,12 @@ cubestore:
 
 ## Ingress parameters
 
-| Name                  | Description                                                                     | Value                    |
-| --------------------- | ------------------------------------------------------------------------------- | ------------------------ |
-| `ingress.enabled`     | Set to true to enable ingress record generation                                 | `false`                  |
-| `ingress.hostname`    | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local`           |
-| `ingress.path`        | The Path to Cubejs                                                              | `/`                      |
-| `ingress.pathPrefix`  | The PathPrefix                                                                  | `ImplementationSpecific` |
-| `ingress.annotations` | Ingress annotations                                                             | `{}`                     |
-| `ingress.tls`         | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`                  |
+| Name                       | Description                                                                     | Value                    |
+| -------------------------- | ------------------------------------------------------------------------------- | ------------------------ |
+| `ingress.enabled`          | Set to true to enable ingress record generation                                 | `false`                  |
+| `ingress.hostname`         | When the ingress is enabled, a host pointing to this will be created            | `cubejs.local`           |
+| `ingress.path`             | The Path to Cubejs                                                              | `/`                      |
+| `ingress.pathPrefix`       | The PathPrefix                                                                  | `ImplementationSpecific` |
+| `ingress.ingressClassName` | The Ingress class name                                                          |                          |
+| `ingress.annotations`      | Ingress annotations                                                             | `{}`                     |
+| `ingress.tls`              | Enable TLS configuration for the hostname defined at ingress.hostname parameter | `false`                  |

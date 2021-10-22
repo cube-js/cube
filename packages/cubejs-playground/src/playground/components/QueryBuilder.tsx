@@ -23,6 +23,7 @@ type QueryBuilderProps = {
   | 'schemaVersion'
   | 'onVizStateChanged'
   | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<SecurityContextProps, 'onTokenPayloadChange'> &
   Pick<SecurityContextProviderProps, 'tokenUpdater'> &

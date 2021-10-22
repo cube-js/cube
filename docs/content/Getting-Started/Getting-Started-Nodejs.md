@@ -49,7 +49,7 @@ $ npm run dev
 Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
 
-### Manually creating Data Schema files
+### <--{"id" : "2. Define Your Data Schema"}-->  Manually creating Data Schema files
 
 You can also add schema files to the `schema` folder manually:
 
@@ -58,7 +58,9 @@ You can also add schema files to the `schema` folder manually:
 
 cube(`Users`, {
   measures: {
-    type: `count`,
+    count: {
+      type: `count`,
+    },
   },
 
   dimensions: {
@@ -101,7 +103,7 @@ chart types, generate sample code and more!
 Cube.js also provides a [REST API](/rest-api) for accessing your data
 programmatically.
 
-### Cube.js Client Installation
+### <--{"id" : "3. Visualize Results"}-->  Cube.js Client Installation
 
 Vanilla JS:
 
@@ -130,7 +132,7 @@ $ npm i --save @cubejs-client/core
 $ npm i --save @cubejs-client/ngx
 ```
 
-### Example Usage
+### <--{"id" : "3. Visualize Results"}-->  Example Usage
 
 #### Vanilla Javascript
 
@@ -326,7 +328,7 @@ export class AppComponent {
 Cube.js has first-class deployment support for [Docker][link-docker] and the
 [Serverless Framework][link-serverless-framework].
 
-### Docker
+### <--{"id" : "4. Deploy to Production"}-->  Docker
 
 For more information on deploying our official Docker image, please consult the
 [Deployment Guide][ref-docker-deployment-guide].
@@ -344,7 +346,7 @@ $ docker run --rm \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 
-### Serverless
+### <--{"id" : "4. Deploy to Production"}-->  Serverless
 
 For more information on deploying with the Serverless Framework, consult the
 [Deployment Guide][ref-sls-aws-deployment-guide].
@@ -355,6 +357,6 @@ For more information on deploying with the Serverless Framework, consult the
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-frontend-intro]: /frontend-introduction
 [ref-docker-deployment-guide]: /deployment/platforms/docker
-[ref-sls-aws-deployment-guide]: /deployment/serverless/aws
+[ref-sls-aws-deployment-guide]: /deployment/platforms/serverless/aws
 [ref-connecting-to-the-database]: /connecting-to-the-database
 [ref-cubejs-schema]: /schema/getting-started

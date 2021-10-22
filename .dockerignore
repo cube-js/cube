@@ -10,6 +10,8 @@
 !rust/package.json
 !rust/yarn.lock
 !rust/bin
+!rust/cubeclient
+!rust/cubesql
 
 packages/*/node_modules/
 packages/*/dist/

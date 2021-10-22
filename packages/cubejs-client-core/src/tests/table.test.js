@@ -693,4 +693,99 @@ describe('resultSet tablePivot and tableColumns', () => {
       ]);
     });
   });
+
+  test('order of values is preserved', () => {
+    const resultSet = new ResultSet({
+      query: {
+        measures:  [
+          'Branch.count'
+        ],
+        dimensions: [
+          'Tenant.number'
+        ],
+        'order': [
+          {
+            'id': 'Tenant.number',
+            'desc': true
+          }
+        ],
+        filters: [],
+        timezone: 'UTC'
+      },
+      data: [
+        {
+          'Tenant.number': '6',
+          'Branch.count': '2'
+        },
+        {
+          'Tenant.number': '1',
+          'Branch.count': '2'
+        },
+      ],
+      annotation: {
+        measures: {
+          'Branch.count': {
+            type: 'number'
+          }
+        },
+        dimensions: {
+          'Tenant.number': {
+            title: 'Tenant Number',
+            shortTitle: 'Number',
+            type: 'string'
+          }
+        },
+        segments: {},
+        timeDimensions: {}
+      }
+    });
+
+    expect(resultSet.tableColumns({
+      'x': [],
+      'y': [
+        'Tenant.number'
+      ]
+    })).toEqual(
+        [
+          {
+            'key': '6',
+            'type': 'string',
+            'title': 'Tenant Number 6',
+            'shortTitle': '6',
+            'format': undefined,
+            'meta': undefined,
+            'children': [
+              {
+                'key': 'Branch.count',
+                'type': 'number',
+                'dataIndex': '6,Branch.count',
+                'title': 'Branch.count',
+                'shortTitle': 'Branch.count',
+                'format': undefined,
+                'meta': undefined,
+              }
+            ]
+          },
+          {
+            'key': '1',
+            'type': 'string',
+            'title': 'Tenant Number 1',
+            'shortTitle': '1',
+            'format': undefined,
+            'meta': undefined,
+            'children': [
+              {
+                'key': 'Branch.count',
+                'type': 'number',
+                'dataIndex': '1,Branch.count',
+                'title': 'Branch.count',
+                'shortTitle': 'Branch.count',
+                'format': undefined,
+                "meta": undefined,
+              }
+            ]
+          }
+        ]
+    );
+  });
 });

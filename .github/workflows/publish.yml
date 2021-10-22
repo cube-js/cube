@@ -14,7 +14,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -47,8 +53,100 @@ jobs:
       - name: NPM publish
         run: ./node_modules/.bin/lerna publish from-package --yes
 
+  native_linux:
+    runs-on: ubuntu-20.04
+    env:
+      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 60
+    name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
+    strategy:
+      matrix:
+        node-version: [10, 12, 14, 15, 16]
+        image: ["stretch"]
+      fail-fast: false
+    container:
+      image: node:${{ matrix.node-version }}-${{ matrix.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build native
+        run: cd packages/cubejs-backend-native && yarn run upload-binary
+
+  native:
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    env:
+      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
+        os-version: [windows-2019, macos-11]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        run: yarn install --frozen-lockfile
+      - name: Build native
+        run: cd packages/cubejs-backend-native && yarn run upload-binary
+
   docker-default:
-    needs: [npm, cubestore]
+    needs: [npm, cubestore, native_linux]
     name: Debian docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30
@@ -114,7 +212,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
-    needs: [npm, cubestore]
+    needs: [npm, cubestore, native_linux]
     name: Alpine docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30
@@ -185,7 +283,6 @@ jobs:
     name: Cube Store Docker
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -262,6 +359,83 @@ jobs:
           repository: cubejs/cubestore
           readme-filepath: ./rust/README.md
 
+  docker-cubestore-non-avx:
+    name: Cube Store Docker (Non AVX)
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
+      - name: Prepare
+        id: prep
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          DOCKER_IMAGE=cubejs/cubestore
+          VERSION=noop
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx"
+          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR=${VERSION%.*}
+            MAJOR=${MINOR%.*}
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-non-avx,${DOCKER_IMAGE}:${MAJOR}-non-avx,${DOCKER_IMAGE}:non-avx"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-non-avx"
+          fi
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-non-avx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-non-avx-
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v2
+        with:
+          context: ./rust/
+          file: ./rust/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          build-args: |
+            WITH_AVX2=0
+          labels: |
+            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+
   cubestore:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -333,7 +507,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y llvm --version 9.0.1
+        run: choco install -y --force llvm --version 9.0.1
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v2.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}

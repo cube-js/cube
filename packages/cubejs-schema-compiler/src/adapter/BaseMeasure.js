@@ -93,7 +93,7 @@ export class BaseMeasure {
 
   rollingWindowDefinition() {
     if (this.measureDefinition().type === 'runningTotal') {
-      throw new UserError(`runningTotal rollups aren't supported. Please consider replacing runningTotal measure with rollingWindow.`);
+      throw new UserError('runningTotal rollups aren\'t supported. Please consider replacing runningTotal measure with rollingWindow.');
     }
     return this.measureDefinition().rollingWindow;
   }

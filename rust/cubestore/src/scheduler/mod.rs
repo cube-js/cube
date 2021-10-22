@@ -1,12 +1,16 @@
 use crate::cluster::Cluster;
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
+use crate::metastore::table::Table;
 use crate::metastore::{MetaStore, MetaStoreEvent, RowKey, TableId};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
+use crate::util::WorkerLoop;
 use crate::CubeError;
+use chrono::Utc;
 use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::time::Duration;
+use futures_timer::Delay;
 use log::error;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
@@ -25,6 +29,7 @@ pub struct SchedulerImpl {
     gc_loop: Mutex<DataGCLoop>,
     gc_sender: UnboundedSender<GCTimedTask>,
     config: Arc<dyn ConfigObj>,
+    reconcile_loop: WorkerLoop,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -50,6 +55,7 @@ impl SchedulerImpl {
             gc_loop: Mutex::new(gc_loop),
             gc_sender,
             config,
+            reconcile_loop: WorkerLoop::new("Reconcile"),
         }
     }
 
@@ -57,6 +63,7 @@ impl SchedulerImpl {
         scheduler: Arc<SchedulerImpl>,
     ) -> Vec<JoinHandle<Result<(), CubeError>>> {
         let scheduler2 = scheduler.clone();
+        let scheduler3 = scheduler.clone();
         vec![
             cube_ext::spawn(async move {
                 let mut gc_loop = scheduler
@@ -67,6 +74,17 @@ impl SchedulerImpl {
                 Ok(())
             }),
             cube_ext::spawn(async move { Self::run_scheduler(scheduler2).await }),
+            cube_ext::spawn(async move {
+                scheduler3
+                    .reconcile_loop
+                    .process(
+                        scheduler3.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(30)).await),
+                        async move |s, _| s.reconcile().await,
+                    )
+                    .await;
+                Ok(())
+            }),
         ]
     }
 
@@ -96,8 +114,84 @@ impl SchedulerImpl {
         }
     }
 
+    pub async fn reconcile(&self) -> Result<(), CubeError> {
+        let orphaned_jobs = self
+            .meta_store
+            .get_orphaned_jobs(Duration::from_secs(120))
+            .await?;
+        for job in orphaned_jobs {
+            log::info!("Removing orphaned job: {:?}", job);
+            self.meta_store.delete_job(job.get_id()).await?;
+        }
+        // Using get_tables_with_path due to it's cached
+        let tables = self.meta_store.get_tables_with_path().await?;
+        for table in tables.iter() {
+            if table.table.get_row().is_ready() {
+                if let Some(locations) = table.table.get_row().locations() {
+                    for location in locations.iter() {
+                        if Table::is_stream_location(location) {
+                            let job = self
+                                .meta_store
+                                .get_job_by_ref(
+                                    RowKey::Table(TableId::Tables, table.table.get_id()),
+                                    JobType::TableImportCSV(location.to_string()),
+                                )
+                                .await?;
+                            if job.is_none() {
+                                self.schedule_table_import(table.table.get_id(), &[location])
+                                    .await?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO we can do this reconciliation more rarely
+        let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
+
+        for chunk in all_inactive_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+
+        let all_inactive_not_uploaded_chunks =
+            self.meta_store.all_inactive_not_uploaded_chunks().await?;
+
+        for chunk in all_inactive_not_uploaded_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+
+        let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
+
+        for partition in all_inactive_partitions.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender.send(GCTimedTask(
+                deadline,
+                GCTask::DeleteMiddleManPartition(partition.get_id()),
+            ))?;
+        }
+
+        let partition_compaction_candidates_id = self
+            .meta_store
+            // TODO config
+            .get_partition_ids_with_chunks_created_seconds_ago(60)
+            .await?;
+
+        for partition_id in partition_compaction_candidates_id.into_iter() {
+            self.schedule_compaction_if_needed(partition_id).await?;
+        }
+
+        Ok(())
+    }
+
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        Ok(self.stop_sender.send(true)?)
+        self.stop_sender.send(true)?;
+        self.reconcile_loop.stop();
+        Ok(())
     }
 
     async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
@@ -132,21 +226,8 @@ impl SchedulerImpl {
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
                         // TODO config
-                        let chunk_sizes = self
-                            .meta_store
-                            .get_partition_chunk_sizes(chunk.get_row().get_partition_id())
-                            .await?;
-                        let chunks = self
-                            .meta_store
-                            .get_chunks_by_partition(chunk.get_row().get_partition_id(), false)
-                            .await?;
-                        if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-                            || chunks.len()
-                                > self.config.compaction_chunks_count_threshold() as usize
-                        {
-                            self.schedule_partition_to_compact(chunk.get_row().get_partition_id())
-                                .await?;
-                        }
+                        let partition_id = chunk.get_row().get_partition_id();
+                        self.schedule_compaction_if_needed(partition_id).await?;
                     } else {
                         self.schedule_repartition(chunk.get_row().get_partition_id())
                             .await?;
@@ -172,10 +253,20 @@ impl SchedulerImpl {
                 .await?;
             tokio::fs::remove_file(file).await?;
         }
-        if let MetaStoreEvent::Delete(TableId::Chunks, row_id) = event {
-            self.remote_fs
-                .delete_file(ChunkStore::chunk_remote_path(row_id).as_str())
-                .await?
+        if let MetaStoreEvent::DeleteChunk(chunk) = &event {
+            if chunk.get_row().in_memory() {
+                let node_name = self
+                    .cluster
+                    .node_name_by_partitions(&[chunk.get_row().get_partition_id()])
+                    .await?;
+                self.cluster
+                    .free_memory_chunk(&node_name, chunk.get_id())
+                    .await?;
+            } else {
+                self.remote_fs
+                    .delete_file(ChunkStore::chunk_remote_path(chunk.get_id()).as_str())
+                    .await?
+            }
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
             // remove file only if partition is active otherwise it should be removed when it's deactivated
@@ -223,8 +314,50 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    async fn schedule_compaction_if_needed(&self, partition_id: u64) -> Result<(), CubeError> {
+        let chunk_sizes = self
+            .meta_store
+            .get_partition_chunk_sizes(partition_id)
+            .await?;
+        let all_chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?;
+        let chunks = all_chunks
+            .iter()
+            .filter(|c| !c.get_row().in_memory())
+            .collect::<Vec<_>>();
+
+        let in_memory_chunks = all_chunks
+            .iter()
+            .filter(|c| c.get_row().in_memory())
+            .collect::<Vec<_>>();
+        let min_in_memory_created_at = in_memory_chunks
+            .iter()
+            .filter_map(|c| c.get_row().created_at().clone())
+            .min();
+        let max_created_at = chunks
+            .iter()
+            .filter_map(|c| c.get_row().created_at().clone())
+            .max();
+        if chunk_sizes > self.config.compaction_chunks_total_size_threshold()
+            || chunks.len()
+            > self.config.compaction_chunks_count_threshold() as usize
+            // TODO config
+            || in_memory_chunks.len() > 100
+            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
+            || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)
+        {
+            self.schedule_partition_to_compact(partition_id).await?;
+        }
+        Ok(())
+    }
+
     async fn schedule_repartition(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -281,7 +414,10 @@ impl SchedulerImpl {
     }
 
     async fn schedule_partition_to_compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         let job = self
             .meta_store
             .add_job(Job::new(
@@ -302,7 +438,10 @@ impl SchedulerImpl {
         partition_id: u64,
         path: String,
     ) -> Result<(), CubeError> {
-        let node_name = self.cluster.node_name_by_partitions(&[partition_id]);
+        let node_name = self
+            .cluster
+            .node_name_by_partitions(&[partition_id])
+            .await?;
         self.cluster.warmup_download(&node_name, path).await
     }
 }
@@ -313,6 +452,7 @@ struct GCTimedTask(/*deadline*/ Instant, GCTask);
 enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
     DeleteChunk(/*chunk_id*/ u64),
+    DeleteMiddleManPartition(/*partition_id*/ u64),
 }
 
 /// Cleans up deactivated partitions and chunks on remote fs.
@@ -386,9 +526,35 @@ impl DataGCLoop {
                     }
                 }
                 GCTask::DeleteChunk(chunk_id) => {
-                    log::trace!("Removing deactivated chunk {}", chunk_id);
-                    if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
-                        log::error!("Could not remove deactivated chunk ({}): {}", chunk_id, e);
+                    if self.metastore.get_chunk(chunk_id).await.is_ok() {
+                        log::trace!("Removing deactivated chunk {}", chunk_id);
+                        if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
+                            log::error!("Could not remove deactivated chunk ({}): {}", chunk_id, e);
+                        }
+                    } else {
+                        log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
+                    }
+                }
+                GCTask::DeleteMiddleManPartition(partition_id) => {
+                    if let Ok(true) = self
+                        .metastore
+                        .can_delete_middle_man_partition(partition_id)
+                        .await
+                    {
+                        log::trace!("Removing middle man partition {}", partition_id);
+                        if let Err(e) = self
+                            .metastore
+                            .delete_middle_man_partition(partition_id)
+                            .await
+                        {
+                            log::error!(
+                                "Could not remove middle man partition ({}): {}",
+                                partition_id,
+                                e
+                            );
+                        }
+                    } else {
+                        log::trace!("Skipping removing of middle man partition {}", partition_id);
                     }
                 }
             }

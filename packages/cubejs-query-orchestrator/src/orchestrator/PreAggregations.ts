@@ -95,9 +95,11 @@ type IndexDescription = {
   indexName: string;
 };
 
-type PreAggregationDescription = {
+export type PreAggregationDescription = {
   preAggregationId: string;
   priority: number;
+  dataSource: string;
+  external: boolean;
   previewSql: QueryWithParams;
   timezone: string;
   indexesSql: IndexDescription[];
@@ -106,9 +108,11 @@ type PreAggregationDescription = {
   loadSql: QueryWithParams;
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;
+  granularity: string;
   partitionGranularity: string;
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
+  expandedPartition: boolean;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -448,7 +452,7 @@ export class PreAggregationLoader {
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
         if (!versionEntryByStructureVersion) {
-          throw new Error('One or more pre-aggregation tables could not be found to satisfy that query');
+          throw new Error('Your configuration restricts query requests to only be served from pre-aggregations, and no pre-aggregation was found matching this query. Either update your pre-aggregations or disable rollup only mode in your Cube.js configuration.');
         }
 
         // the rollups are being maintained independently of this instance of cube.js,
@@ -894,7 +898,7 @@ export class PreAggregationLoader {
 
     await saveCancelFn(
       externalDriver.uploadTableWithIndexes(
-        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry)
+        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
       )
     );
 
@@ -1017,7 +1021,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.dataSource = options.dataSource;
+    this.dataSource = preAggregation.dataSource;
   }
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
@@ -1134,7 +1138,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public async loadPreAggregations(): Promise<LoadPreAggregationResult> {
-    if (this.preAggregation.preAggregationStartEndQueries) {
+    if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const partitionRanges = await this.partitionRanges();
       const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
         this.redisPrefix,
@@ -1175,7 +1179,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
-    if (this.preAggregation.preAggregationStartEndQueries) {
+    if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const partitionRanges = await this.partitionRanges();
       return partitionRanges.map(range => this.partitionPreAggregationDescription(range));
     } else {
@@ -1207,6 +1211,9 @@ export class PreAggregationPartitionRangeLoader {
         async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
       ),
     );
+    if (!this.preAggregation.partitionGranularity) {
+      return [startDate, endDate];
+    }
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       [startDate, endDate],
@@ -1456,7 +1463,7 @@ export class PreAggregations {
       preAggregations: expandedPreAggregations
         .reduce((a, b) => a.concat(b), [])
         .map(p => {
-          p.preAggregationStartEndQueries = undefined;
+          p.expandedPartition = true;
           return p;
         })
     };

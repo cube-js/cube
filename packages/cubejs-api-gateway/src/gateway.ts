@@ -40,6 +40,7 @@ import {
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
+import { SQLServer } from './sql-server';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -120,7 +121,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
       const annotationForMember = annotation[memberName];
 
       if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
+        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
       }
 
       const transformResult = [
@@ -431,6 +432,10 @@ export class ApiGateway {
     app.use(this.handleErrorMiddleware);
   }
 
+  public initSQLServer() {
+    return new SQLServer(this);
+  }
+
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
@@ -460,13 +465,29 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
+    
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
     try {
-      const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
-      const cubes = metaConfig.map(c => c.config);
+      const metaConfig = await this.getCompilerApi(context).metaConfig({
+        requestId: context.requestId,
+      });
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...cube,
+          measures: cube.measures.filter(visibilityFilter),
+          dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
       res({ cubes });
     } catch (e) {
       this.handleError({
-        e, context, res, requestStarted
+        e,
+        context,
+        res,
+        requestStarted,
       });
     }
   }
@@ -517,7 +538,7 @@ export class ApiGateway {
           compilerApi,
           query
         );
-        
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
@@ -571,8 +592,7 @@ export class ApiGateway {
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition,
-          query.versionEntry
+          preAggregationPartition.sql
         )
       });
     } catch (e) {
@@ -863,6 +883,7 @@ export class ApiGateway {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
           } : null),
           annotation,
           dataSource: response.dataSource,
@@ -873,13 +894,18 @@ export class ApiGateway {
         };
       }));
 
-      this.log({
-        type: 'Load Request Success',
-        query,
-        duration: this.duration(requestStarted),
-        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
-        queriesWithData: results.filter((r: any) => r.data?.length).length
-      }, context);
+      this.log(
+        {
+          type: 'Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
+          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
+            .length,
+          queriesWithData: results.filter((r: any) => r.data?.length).length,
+        },
+        context
+      );
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);

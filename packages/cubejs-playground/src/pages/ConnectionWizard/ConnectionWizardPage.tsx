@@ -261,7 +261,7 @@ export function ConnectionWizardPage({ history }) {
                     Docker.
                     <br />
                     <Typography.Link
-                      href="https://cube.dev/docs/connecting-to-the-database"
+                      href="https://cube.dev/docs/config/databases"
                       target="_blank"
                     >
                       Learn more about connecting to databases in the

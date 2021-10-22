@@ -11,7 +11,7 @@ permalink: /config/databases/mysql
 
 ## Setup
 
-### Manual
+### <--{"id" : "Setup"}-->  Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -43,7 +43,7 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-### Local/Docker
+### <--{"id" : "Additional Configuration"}-->  Local/Docker
 
 To connect to a local MySQL database using a Unix socket, use
 `CUBEJS_DB_SOCKET_PATH`. When doing so, `CUBEJS_DB_HOST` will be ignored.

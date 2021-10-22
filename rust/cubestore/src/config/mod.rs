@@ -23,6 +23,7 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
+use crate::streaming::{StreamingService, StreamingServiceImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -168,6 +169,75 @@ impl CubeServices {
     }
 }
 
+pub struct ValidationMessages {
+    /// Hard errors, config cannot be used. Application must report these and exit.
+    pub errors: Vec<String>,
+    /// Must be reported to the user, but does not stop application from working.
+    pub warnings: Vec<String>,
+}
+
+impl ValidationMessages {
+    pub fn report_and_abort_on_errors(&self) {
+        for w in &self.warnings {
+            log::warn!("{}", w);
+        }
+        for e in &self.errors {
+            log::error!("{}", e);
+        }
+        if !self.errors.is_empty() {
+            log::error!("Cannot proceed with invalid configuration, exiting");
+            std::process::exit(1)
+        }
+    }
+}
+
+/// This method also looks at environment variables and assumes [c] was obtained by calling
+/// `Config::default()`.
+pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    if is_router(c) && c.metastore_remote_address().is_some() {
+        errors.push(
+            "Router node cannot use remote metastore. Try removing CUBESTORE_META_ADDR".to_string(),
+        );
+    }
+    if !is_router(c) && !c.select_workers().contains(c.server_name()) {
+        warnings.push(format!("Current worker '{}' is missing in CUBESTORE_WORKERS. Please check CUBESTORE_SERVER_NAME and CUBESTORE_WORKERS variables", c.server_name()));
+    }
+
+    let mut router_vars = vec![
+        "CUBESTORE_HTTP_BIND_ADDR",
+        "CUBESTORE_HTTP_PORT",
+        "CUBESTORE_BIND_ADDR",
+        "CUBESTORE_PORT",
+        "CUBESTORE_META_PORT",
+    ];
+    router_vars.retain(|v| env::var(v).is_ok());
+    if !is_router(c) && !router_vars.is_empty() {
+        warnings.push(format!(
+            "The following router variable{} ignored on worker node: {}",
+            if 1 < router_vars.len() { "s" } else { "" },
+            router_vars.join(", ")
+        ));
+    }
+
+    let mut remote_vars = vec![
+        "CUBESTORE_S3_BUCKET",
+        "CUBESTORE_GCS_BUCKET",
+        "CUBESTORE_REMOTE_DIR",
+    ];
+    remote_vars.retain(|v| env::var(v).is_ok());
+    if 1 < remote_vars.len() {
+        warnings.push(format!(
+            "{} variables specified together. Using {}",
+            remote_vars.join(" and "),
+            remote_vars[0],
+        ));
+    }
+
+    ValidationMessages { errors, warnings }
+}
+
 #[derive(Debug, Clone)]
 pub enum FileStoreProvider {
     Local,
@@ -214,6 +284,10 @@ pub trait ConfigObj: DIService {
     fn query_timeout(&self) -> u64;
 
     fn not_used_timeout(&self) -> u64;
+
+    fn import_job_timeout(&self) -> u64;
+
+    fn stale_stream_timeout(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
 
@@ -262,6 +336,8 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub import_job_timeout: u64,
+    pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -324,6 +400,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn not_used_timeout(&self) -> u64 {
         self.not_used_timeout
+    }
+
+    fn import_job_timeout(&self) -> u64 {
+        self.import_job_timeout
+    }
+
+    fn stale_stream_timeout(&self) -> u64 {
+        self.stale_stream_timeout
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -427,10 +511,7 @@ where
 
 impl Config {
     pub fn default() -> Config {
-        let query_timeout = env::var("CUBESTORE_QUERY_TIMEOUT")
-            .ok()
-            .map(|v| v.parse::<u64>().unwrap())
-            .unwrap_or(120);
+        let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -445,7 +526,9 @@ impl Config {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
                             bucket_name,
-                            region: env::var("CUBESTORE_S3_REGION").unwrap(),
+                            region: env::var("CUBESTORE_S3_REGION").expect(
+                                "CUBESTORE_S3_REGION required when CUBESTORE_S3_BUCKET is set",
+                            ),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
@@ -475,6 +558,8 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -527,6 +612,8 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                import_job_timeout: 600,
+                stale_stream_timeout: 60,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
@@ -820,6 +907,17 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
+                StreamingServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -846,11 +944,9 @@ impl Config {
                         .server_name()
                         .to_string(),
                     vec!["localhost".to_string()],
+                    Arc::downgrade(&i),
                     i.get_service_typed().await,
                     Duration::from_secs(30),
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

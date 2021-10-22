@@ -12,7 +12,7 @@ permalink: /config/databases/aws-athena
 
 ## Setup
 
-### Manual
+### <--{"id" : "Setup"}-->  Manual
 
 Add the following to a `.env` file in your Cube.js project:
 

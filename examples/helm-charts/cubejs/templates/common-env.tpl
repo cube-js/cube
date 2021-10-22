@@ -1,56 +1,101 @@
 {{- define "cubejs.common-env" -}}
 - name: PORT
-  value: {{ .Values.global.apiPort | quote }}
-{{- if .Values.global.debug }}
+  value: {{ .Values.config.apiPort | quote }}
+{{- if .Values.config.debug }}
 - name: DEBUG_LOG
-  value: {{ .Values.global.debug | quote }}
+  value: {{ .Values.config.debug | quote }}
 {{- end }}
-{{- if .Values.global.devMode }}
+{{- if .Values.config.devMode }}
 - name: CUBEJS_DEV_MODE
-  value: {{ .Values.global.devMode | quote }}
+  value: {{ .Values.config.devMode | quote }}
 {{- end }}
-{{- if .Values.global.logLevel }}
+{{- if .Values.config.logLevel }}
 - name: CUBEJS_LOG_LEVEL
-  value: {{ .Values.global.logLevel | quote }}
+  value: {{ .Values.config.logLevel | quote }}
 {{- end }}
-{{- if .Values.global.app }}
+{{- if .Values.config.externalDefault }}
+- name: CUBEJS_EXTERNAL_DEFAULT
+  value: {{ .Values.config.externalDefault | quote }}
+{{- end }}
+{{- if .Values.config.app }}
 - name: CUBEJS_APP
-  value: {{ .Values.global.app | quote }}
+  value: {{ .Values.config.app | quote }}
 {{- end }}
-{{- if .Values.global.cacheAndQueueDriver }}
+{{- if .Values.config.cacheAndQueueDriver }}
 - name: CUBEJS_CACHE_AND_QUEUE_DRIVER
-  value: {{ .Values.global.cacheAndQueueDriver | quote }}
+  value: {{ .Values.config.cacheAndQueueDriver | quote }}
 {{- end }}
-{{- if .Values.global.rollupOnly }}
+{{- if .Values.config.rollupOnly }}
 - name: CUBEJS_ROLLUP_ONLY
-  value: {{ .Values.global.rollupOnly | quote }}
+  value: {{ .Values.config.rollupOnly | quote }}
 {{- end }}
-{{- if .Values.global.scheduledRefreshTimezones }}
+{{- if .Values.config.scheduledRefreshTimezones }}
 - name: CUBEJS_SCHEDULED_REFRESH_TIMEZONES
-  value: {{ .Values.global.scheduledRefreshTimezones | quote }}
+  value: {{ .Values.config.scheduledRefreshTimezones | quote }}
 {{- end }}
-{{- if .Values.global.preAggregationsSchema }}
+{{- if .Values.config.preAggregationsSchema }}
 - name: CUBEJS_PRE_AGGREGATIONS_SCHEMA
-  value: {{ .Values.global.preAggregationsSchema | quote }}
+  value: {{ .Values.config.preAggregationsSchema | quote }}
 {{- end }}
-{{- if .Values.global.webSockets }}
+{{- if .Values.config.webSockets }}
 - name: CUBEJS_WEB_SOCKETS
-  value: {{ .Values.global.webSockets | quote }}
+  value: {{ .Values.config.webSockets | quote }}
 {{- end }}
 - name: CUBEJS_TELEMETRY
-  value: {{ .Values.global.telemetry | quote }}
-{{- if .Values.global.apiSecret }}
+  value: {{ .Values.config.telemetry | quote }}
+{{- if .Values.config.apiSecret }}
 - name: CUBEJS_API_SECRET
-  value: {{ .Values.global.apiSecret | quote }}
+  value: {{ .Values.config.apiSecret | quote }}
+{{- else if .Values.config.apiSecretFromSecret }}
+- name: CUBEJS_API_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.config.apiSecretFromSecret.name | required "config.apiSecretFromSecret.name is required" }}
+      key: {{ .Values.config.apiSecretFromSecret.key | required "config.apiSecretFromSecret.key is required" }}
 {{- end }}
-{{- if .Values.global.schemaPath }}
+{{- if .Values.config.schemaPath }}
 - name: CUBEJS_SCHEMA_PATH
-  value: {{ .Values.global.schemaPath | quote }}
+  value: {{ .Values.config.schemaPath | quote }}
 {{- end }}
-{{- if .Values.global.topicName }}
+{{- if .Values.config.topicName }}
 - name: CUBEJS_TOPIC_NAME
-  value: {{ .Values.global.topicName | quote }}
+  value: {{ .Values.config.topicName | quote }}
 {{- end }}
+{{- /*
+If global.redis.enabled = true,
+we set the default value for CUBEJS_REDIS_URL
+and CUBEJS_REDIS_PASSWORD to the default value
+provided by bitnami/redis if these values
+are not set explicitly.
+Otherwise, when global.redis.enabled = false,
+we require you to set the CUBEJS_REDIS_URL and
+CUBEJS_REDIS_PASSWORD.
+*/ -}}
+{{- if ((.Values.global).redis).enabled }}
+{{- if .Values.redis.url }}
+- name: CUBEJS_REDIS_URL
+  value: {{ .Values.redis.url | quote }}
+{{- else }}
+- name: CUBEJS_REDIS_URL
+  value: {{ printf "redis://%s-redis-master:6379" .Release.Name | quote }}
+{{- end }}
+{{- if .Values.redis.password }}
+- name: CUBEJS_REDIS_PASSWORD
+  value: {{ .Values.redis.password | quote }}
+{{- else if .Values.redis.passwordFromSecret }}
+- name: CUBEJS_REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.redis.passwordFromSecret.name | required "redis.passwordFromSecret.name is required" }}
+      key: {{ .Values.redis.passwordFromSecret.key | required "redis.passwordFromSecret.key is required" }}
+{{- else }}
+- name: CUBEJS_REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ printf "%s-redis" .Release.Name }}
+      key: "redis-password"
+{{- end }}
+{{- else }}
 {{- if .Values.redis.url }}
 - name: CUBEJS_REDIS_URL
   value: {{ .Values.redis.url | quote }}
@@ -65,6 +110,8 @@
       name: {{ .Values.redis.passwordFromSecret.name | required "redis.passwordFromSecret.name is required" }}
       key: {{ .Values.redis.passwordFromSecret.key | required "redis.passwordFromSecret.key is required" }}
 {{- end }}
+{{- end }}
+
 {{- if .Values.redis.tls }}
 - name: CUBEJS_REDIS_TLS
   value: {{ .Values.redis.tls | quote }}
@@ -327,14 +374,42 @@
   value: {{ .Value.database.ssl.passPhrase | quote }}
 {{- end }}
 {{- end }}
+{{- /*
+If global.cubestore.enabled = true,
+we set the default value for cubestore.host
+and cubestore.port to the default value
+defined in the Cube Store Chart if these values
+are not set explicitly.
+Otherwise, when global.cubestore.enabled = false,
+we require you to set the cubestore.host and
+cubestore.port.
+*/ -}}
+{{- if ((.Values.global).cubestore).enabled }}
 {{- if .Values.cubestore.host }}
 - name: CUBEJS_CUBESTORE_HOST
-  value: {{ .Values.cubestore.host | quote }}
+  value: {{ .Values.cubestore.host | quote | required "cubestore.host is required" }}
+{{- else }}
+- name: CUBEJS_CUBESTORE_HOST
+  value: {{ printf "%s-cubestore-router" .Release.Name | quote }}
 {{- end }}
 {{- if .Values.cubestore.port }}
 - name: CUBEJS_CUBESTORE_PORT
-  value: {{ .Values.cubestore.port | quote }}
+  value: {{ .Values.cubestore.port | quote | required "cubestore.port is required, this port is the HTTP PORT" }}
+{{- else }}
+- name: CUBEJS_CUBESTORE_PORT
+  value: {{ printf "3030" | quote }}
 {{- end }}
+{{- else }}
+{{- if .Values.cubestore.host }}
+- name: CUBEJS_CUBESTORE_HOST
+  value: {{ .Values.cubestore.host | quote | required "cubestore.host is required" }}
+{{- end }}
+{{- if .Values.cubestore.port }}
+- name: CUBEJS_CUBESTORE_PORT
+  value: {{ .Values.cubestore.port | quote | required "cubestore.port is required" }}
+{{- end }}
+{{- end }}
+
 {{- if .Values.externalDatabase.type }}
 - name: CUBEJS_EXT_DB_TYPE
   value: {{ .Values.externalDatabase.type | quote }}

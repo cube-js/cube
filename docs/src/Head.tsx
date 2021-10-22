@@ -1,4 +1,5 @@
 import React from 'react';
+import { DEPLOY_PREVIEW_NETLIFY } from 'gatsby-env-variables';
 
 type Props = {
   css?: any;
@@ -53,11 +54,13 @@ const Prod: React.FC<Props> = (props) => (
   </head>
 );
 
-const Head: React.FC<Props> = (props) =>
-  process.env.NODE_ENV === 'production' ? (
+const Head: React.FC<Props> = (props) => {
+  return process.env.NODE_ENV === 'production' &&
+    !DEPLOY_PREVIEW_NETLIFY ? (
     <Prod {...props} />
   ) : (
     <Dev {...props} />
   );
+}
 
 export default Head;

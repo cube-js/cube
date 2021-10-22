@@ -1,14 +1,10 @@
 use super::{
     BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex, RocksTable, TableId,
 };
-use super::{DataFrameValue, TableValue};
 use crate::base_rocks_secondary_index;
 use crate::data_frame_from;
-use crate::format_table_value;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
 use crate::rocks_table_impl;
-use crate::store::DataFrame;
-use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
@@ -31,7 +27,11 @@ pub struct Table {
     #[serde(default="Table::is_ready_default")]
     is_ready: bool,
     #[serde(default)]
-    created_at: Option<DateTime<Utc>>
+    created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    unique_key_column_indices: Option<Vec<u64>>,
+    #[serde(default)]
+    seq_column_index: Option<u64>
 }
 }
 
@@ -57,6 +57,8 @@ impl Table {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         is_ready: bool,
+        unique_key_column_indices: Option<Vec<u64>>,
+        seq_column_index: Option<u64>,
     ) -> Table {
         Table {
             table_name,
@@ -67,6 +69,8 @@ impl Table {
             has_data: false,
             is_ready,
             created_at: Some(Utc::now()),
+            unique_key_column_indices,
+            seq_column_index,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -115,6 +119,22 @@ impl Table {
 
     pub fn created_at(&self) -> &Option<DateTime<Utc>> {
         &self.created_at
+    }
+
+    pub fn unique_key_columns(&self) -> Option<Vec<&Column>> {
+        self.unique_key_column_indices
+            .as_ref()
+            .map(|indices| indices.iter().map(|i| &self.columns[*i as usize]).collect())
+    }
+
+    pub fn seq_column(&self) -> Option<&Column> {
+        self.seq_column_index
+            .as_ref()
+            .map(|c| &self.columns[*c as usize])
+    }
+
+    pub fn is_stream_location(location: &str) -> bool {
+        location.starts_with("stream:")
     }
 }
 

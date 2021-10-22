@@ -20,13 +20,14 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: 'month',
-  quarter: 'month',
-  month: 'day',
-  week: 'day',
-  day: 'hour',
-  hour: 'minute',
-  minute: 'second'
+  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+  month: ['month', 'day', 'hour', 'minute', 'second'],
+  week: ['week', 'day', 'hour', 'minute', 'second'],
+  day: ['day', 'hour', 'minute', 'second'],
+  hour: ['hour', 'minute', 'second'],
+  minute: ['minute', 'second'],
+  second: ['second']
 };
 
 const SecondsDurations = {
@@ -48,8 +49,6 @@ export class BaseQuery {
     this.defaultOrder = this.defaultOrder.bind(this);
 
     this.initFromOptions();
-
-    this.granularityParentHierarchyCache = {};
   }
 
   extractDimensionsAndMeasures(filters = []) {
@@ -256,7 +255,7 @@ export class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`To join across data sources use rollupJoin with external pre-aggregations. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with Cube Store. Note: this is an experimental feature for different data source types. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -706,17 +705,8 @@ export class BaseQuery {
     return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
   }
 
-  granularityParent(granularity) {
-    return standardGranularitiesParents[granularity];
-  }
-
   granularityParentHierarchy(granularity) {
-    if (!this.granularityParentHierarchyCache[granularity]) {
-      this.granularityParentHierarchyCache[granularity] = [granularity].concat(
-        this.granularityParent(granularity) ? this.granularityParentHierarchy(this.granularityParent(granularity)) : []
-      );
-    }
-    return this.granularityParentHierarchyCache[granularity];
+    return standardGranularitiesParents[granularity];
   }
 
   minGranularity(granularityA, granularityB) {
@@ -831,7 +821,7 @@ export class BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
     );
-    return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
+    return `SELECT ${this.dateTimeCast('date_from')} as ${this.escapeColumnName('date_from')}, ${this.dateTimeCast('date_to')} as ${this.escapeColumnName('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
   /**
@@ -1627,7 +1617,10 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true, measurePath);
+      const { topLevelMerge } = this.safeEvaluateSymbolContext();
+      const onGroupedColumn = this.aggregateOnGroupedColumn(
+        symbol, evaluateSql, topLevelMerge != null ? topLevelMerge : true, measurePath
+      );
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1670,11 +1663,22 @@ export class BaseQuery {
     return undefined;
   }
 
+  topAggregateWrap(symbol, evaluateSql) {
+    if (symbol.type === 'countDistinctApprox') {
+      return this.hllCardinality(evaluateSql);
+    }
+    return evaluateSql;
+  }
+
   hllInit(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
   hllMerge(sql) {
+    throw new UserError('Distributed approximate distinct count is not supported by this DB');
+  }
+
+  hllCardinality(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 

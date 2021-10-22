@@ -19,28 +19,26 @@ spec:
       containers:
         - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
             - name: CUBEJS_API_SECRET
-              value: secret
+              value: <API_SECRET>
             - name: CUBEJS_CUBESTORE_HOST
               value: "cubestore-router"
-            - name: CUBEJS_CUBESTORE_PORT
-              value: "3030"
             - name: CUBEJS_DB_HOST
-              value: demo-db.cube.dev
+              value: <DB_HOST>
             - name: CUBEJS_DB_NAME
-              value: ecom
+              value: <DB_NAME>
             - name: CUBEJS_DB_USER
-              value: cube
+              value: <DB_USER>
             - name: CUBEJS_DB_PASS
-              value: "12345"
+              value: <DB_PASSWORD>
             - name: CUBEJS_DB_TYPE
-              value: postgres
+              value: <DB_TYPE>
             - name: CUBEJS_DEV_MODE
               value: "false" # NEVER RUN DEV MODE IN K8S
             - name: CUBEJS_EXTERNAL_DEFAULT
               value: "true"
             - name: CUBEJS_REDIS_URL
               value: redis://redis:6379 # USING THIS REDIS URL BECAUSE THE REDIS SERVICE IS NAMED "REDIS"
-          image: cubejs/cube:latest
+          image: cubejs/cube:v0.28.14
           name: cube
           ports:
             - containerPort: 3000
