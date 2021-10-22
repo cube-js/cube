@@ -11,10 +11,11 @@
   },
   "scripts": {
     "tsc": "tsc",
-    "build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
-    "build-debug": "npm run tsc && npm run build --",
-    "build-release": "npm run tsc && npm run build -- --release",
-    "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be anavailable.'",
+    "build": "tsc",
+    "native:build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "native:build-debug": "npm run native:build --",
+    "native:build-release": "npm run native:build -- --release",
+    "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
     "upload-binary": "npm run build-release && mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:unit": "jest --verbose --forceExit test",
     "test:cargo": "cargo test"
