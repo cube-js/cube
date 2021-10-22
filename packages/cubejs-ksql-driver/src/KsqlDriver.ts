@@ -122,7 +122,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
     const tablesAndDescribes = await Promise.all(tables.map(async table => ({
       table,
-      describe: await this.query<KsqlDescribeResponse>(`DESCRIBE ${table.fullTableName}`),
+      describe: await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(table.fullTableName)}`),
     })));
 
     const schema: {
