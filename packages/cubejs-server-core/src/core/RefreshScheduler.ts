@@ -246,29 +246,25 @@ export class RefreshScheduler {
       
       const [partition] = partitions || [];
       const { invalidateKeyQueries, preAggregationStartEndQueries } = partition?.sql || {};
-      
-      const [refreshRangeStartQuery, refreshRangeEndQuery] = preAggregationStartEndQueries || [];
-      const [refreshRangeStart] = refreshRangeStartQuery || [];
-      const [refreshRangeEnd] = refreshRangeEndQuery || [];
-      
-      const [refreshKeyQuery] = invalidateKeyQueries || [];
-      const [refreshKey] = refreshKeyQuery || [];
+      const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
+      const [[refreshKey]] = invalidateKeyQueries || [[]];
+
+      const sqlMap = {
+        refreshKey,
+        refreshRangeStart,
+        refreshRangeEnd
+      };
+      Object.keys(sqlMap).forEach((field) => {
+        if (preAggregation?.preAggregation[field]?.sql) {
+          preAggregation.preAggregation[field].sql = sqlMap[field];
+        }
+      });
 
       return {
         timezones,
-        preAggregation: {
-          ...preAggregation,
-          refreshKeyReferences: {
-            refreshKey: preAggregation.refreshKey && {
-              ...preAggregation.refreshKey,
-              sql: refreshKey
-            }
-          },
-          refreshRangeReferences: preAggregationStartEndQueries && {
-            refreshRangeStart: refreshRangeStart && { sql: refreshRangeStart },
-            refreshRangeEnd: refreshRangeEnd && { sql: refreshRangeEnd }
-          },
-        },
+        invalidateKeyQueries,
+        preAggregationStartEndQueries,
+        preAggregation,
         partitions
       };
     }));
