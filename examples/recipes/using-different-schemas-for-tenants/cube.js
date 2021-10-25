@@ -6,4 +6,9 @@ module.exports = {
 
   repositoryFactory: ({ securityContext }) =>
     new FileRepository(`schema/${securityContext.tenant}`),
+
+  scheduledRefreshContexts: () => [
+    { securityContext: { tenant: 'avocado' } },
+    { securityContext: { tenant: 'mango' } },
+  ]
 };

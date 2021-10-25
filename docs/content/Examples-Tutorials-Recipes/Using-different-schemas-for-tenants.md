@@ -8,8 +8,8 @@ menuOrder: 2
 
 ## Use case
 
-We want to manage user access to different Cubes. In the recipe below, we'll
-learn how to use multiple data schemas for various tenants.
+We want to provide different data schemas to different tenants. In the recipe below, we'll
+learn how to switch between multiple data schemas based on the tenant.
 
 ## Configuration
 
@@ -23,13 +23,16 @@ schema
     └── Products.js
 ```
 
-Then we have to tell Cube which data schema path to use for each tenant. We'll
-use the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory)
-option to do it. We'll pass the tenant name into the `repositoryFactory` inside
-[`securityContext`](https://cube.dev/docs/security/context#top). We should also
-define the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
-property for caching schema compilation result. Our `cube.js` file will look
-like this:
+Let's configure Cube to use a specific data schema path for each tenant. We'll
+pass the tenant name as a part of [`securityContext`](https://cube.dev/docs/security/context#top)
+into the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
+
+We'll also need to override the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
+function to control how the schema compilation result is cached and provide the tenant names via the
+[`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts) function
+so a refresh worker can find all existing schemas and build pre-aggregations for them, if needed.
+
+Our `cube.js` file will look like this:
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -40,13 +43,18 @@ module.exports = {
 
   repositoryFactory: ({ securityContext }) =>
     new FileRepository(`schema/${securityContext.tenant}`),
+
+  scheduledRefreshContexts: () => [
+    { securityContext: { tenant: 'avocado' } },
+    { securityContext: { tenant: 'mango' } },
+  ]
 };
 ```
 
 ## Data schema
 
-In our case we'll get products with odd `id` values for the `Avocado` tenant and
-with even `id` values the `Mango` tenant:
+In this example, we'd like to get products with odd `id` values for the `avocado` tenant and
+with even `id` values the `mango` tenant:
 
 ```javascript
 // schema/avocado
@@ -66,7 +74,7 @@ cube(`Products`, {
 
 ## Query
 
-To get the products, we will send two identical queries with different JWTs:
+To fetch the products, we will send two identical queries with different JWTs:
 
 ```javascript
 {
@@ -88,8 +96,7 @@ To get the products, we will send two identical queries with different JWTs:
 
 ## Result
 
-We received different data from schemas corresponding to various tenants
-and located in different folders:
+We will receive different data for each tenant, as expected:
 
 ```javascript
 // Avocado products
