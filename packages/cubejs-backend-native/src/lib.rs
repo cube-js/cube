@@ -28,8 +28,7 @@ fn init_logger(log_level: Level) {
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
-        // cubejs-native is a real name
-        .with_module_level("native", log_level.to_level_filter());
+        .with_module_level("cubejs_native", log_level.to_level_filter());
 
     ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
 }
