@@ -211,6 +211,7 @@ pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
         "CUBESTORE_BIND_ADDR",
         "CUBESTORE_PORT",
         "CUBESTORE_META_PORT",
+        "CUBESTORE_META_BIND_ADDR",
     ];
     router_vars.retain(|v| env::var(v).is_ok());
     if !is_router(c) && !router_vars.is_empty() {
@@ -490,6 +491,24 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+fn env_parse_bind_addr(service: &str, default_port: u16) -> String {
+    if let Ok(a) = env::var(format!("{}_BIND_ADDR", service)) {
+        return a;
+    }
+    let p = env_parse::<u16>(&format!("{}_PORT", service), default_port);
+    format!("0.0.0.0:{}", p)
+}
+
+fn env_parse_opt_bind_addr(service: &str) -> Option<String> {
+    if let Ok(a) = env::var(format!("{}_BIND_ADDR", service)) {
+        return Some(a);
+    }
+    match env_optparse::<u16>(&format!("{}_PORT", service)) {
+        Some(p) => Some(format!("0.0.0.0:{}", p)),
+        None => None,
+    }
+}
+
 fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
@@ -550,12 +569,8 @@ impl Config {
                         .ok()
                         .unwrap_or(format!("0.0.0.0:{}", env_parse("CUBESTORE_PORT", 3306))),
                 ),
-                status_bind_address: Some(env::var("CUBESTORE_STATUS_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env_parse("CUBESTORE_STATUS_PORT", 3031)),
-                )),
-                http_bind_address: Some(env::var("CUBESTORE_HTTP_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
-                )),
+                status_bind_address: Some(env_parse_bind_addr("CUBESTORE_STATUS", 3031)),
+                http_bind_address: Some(env_parse_bind_addr("CUBESTORE_HTTP", 3030)),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
@@ -564,10 +579,8 @@ impl Config {
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
                     .unwrap_or(Vec::new()),
-                worker_bind_address: env_optparse::<u16>("CUBESTORE_WORKER_PORT")
-                    .map(|v| format!("0.0.0.0:{}", v)),
-                metastore_bind_address: env_optparse::<u16>("CUBESTORE_META_PORT")
-                    .map(|v| format!("0.0.0.0:{}", v)),
+                worker_bind_address: env_parse_opt_bind_addr("CUBESTORE_WORKER"),
+                metastore_bind_address: env_parse_opt_bind_addr("CUBESTORE_META"),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
