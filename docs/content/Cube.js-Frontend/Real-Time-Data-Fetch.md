@@ -6,14 +6,14 @@ menuOrder: 3
 ---
 
 Most of databases supported by Cube.js are retroactive. It means Cube.js should
-continuously poll for changes rather than receive updates as subscribed
-listener. Cube.js provides convenient way to create such polling database
+continuously poll for changes rather than receive updates as a subscribed
+listener. Cube.js provides a convenient way to create such polling database
 subscriptions on your behalf.
 
 ## Web Sockets
 
-To provide best real-time experience it's recommended to use Web Sockets
-transport instead of default http long polling. Web sockets on backend can be
+To provide the best real-time experience it's recommended to use Web Sockets
+transport instead of the default http long polling. Web sockets on backend can be
 enabled using `CUBEJS_WEB_SOCKETS` environment variable:
 
 **.env:**
@@ -103,8 +103,8 @@ const Chart = ({ query }) => {
 ## Refresh Rate
 
 As in the case of a regular data fetch, real-time data fetch obeys
-[refreshKey refresh rules](caching#refresh-keys). In order to provide desired
-refresh rate `refreshKey` should reflect changes of the underlying data set as
-well it's querying time should be much less than the desired refresh rate.
+[refreshKey refresh rules](caching#refresh-keys). In order to provide a desired
+refresh rate `refreshKey` should reflect the rate of change of the underlying data set; the 
+querying time should also be much less than the desired refresh rate.
 Please use the [refreshKey every](/schema/reference/cube#refresh-key)
-parameter to adjust refresh interval.
+parameter to adjust the refresh interval.
