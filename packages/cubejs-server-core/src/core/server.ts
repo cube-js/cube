@@ -464,7 +464,7 @@ export class CubejsServerCore {
         'dbType'
       ];
 
-      if (!options.jwt?.jwkUrl) {
+      if (!options.jwt?.jwkUrl && !getEnv('playgroundAuthSecret') && !options.checkAuth) {
         // apiSecret is required only for auth by JWT, for JWK it's not needed
         fieldsForValidation.push('apiSecret');
       }
