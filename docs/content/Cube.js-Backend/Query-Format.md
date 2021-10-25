@@ -16,7 +16,8 @@ In the case of dimension of type `time` granularity could be optionally added to
 the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`,
 ex: `Stories.time.month`.
 
-Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`.
+Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
+`quarter` and `year`.
 
 The Cube.js client also accepts an array of queries. By default it will be
 treated as a [Data Blending](/recipes/data-blending) query.
@@ -89,7 +90,7 @@ A Query has the following properties:
 }
 ```
 
-### <--{"id" : "Query Properties"}-->  Default order
+### <--{"id" : "Query Properties"}--> Default order
 
 If the `order` property is not specified in the query, Cube.js sorts results by
 default using the following rules:
@@ -99,7 +100,7 @@ default using the following rules:
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
-### <--{"id" : "Query Properties"}-->  Alternative order format
+### <--{"id" : "Query Properties"}--> Alternative order format
 
 Also you can control the ordering of the `order` specification, Cube.js support
 alternative order format - array of tuples:
@@ -144,7 +145,7 @@ Only some operators are available for measures. For dimensions, the available
 operators depend on the
 [type of the dimension](/schema/reference/types-and-formats#types).
 
-### <--{"id" : "Filters Operators"}-->  equals
+### <--{"id" : "Filters Operators"}--> equals
 
 Use it when you need an exact match. It supports multiple values.
 
@@ -159,7 +160,7 @@ Use it when you need an exact match. It supports multiple values.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  notEquals
+### <--{"id" : "Filters Operators"}--> notEquals
 
 The opposite operator of `equals`. It supports multiple values.
 
@@ -174,7 +175,7 @@ The opposite operator of `equals`. It supports multiple values.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  contains
+### <--{"id" : "Filters Operators"}--> contains
 
 The `contains` filter acts as a wildcard case insensitive `LIKE` operator. In
 the majority of SQL backends it uses `ILIKE` operator with values being
@@ -190,7 +191,7 @@ surrounded by `%`. It supports multiple values.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  notContains
+### <--{"id" : "Filters Operators"}--> notContains
 
 The opposite operator of `contains`. It supports multiple values.
 
@@ -204,7 +205,7 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  gt
+### <--{"id" : "Filters Operators"}--> gt
 
 The `gt` operator means **greater than** and is used with measures or dimensions
 of type `number`.
@@ -220,7 +221,7 @@ of type `number`.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  gte
+### <--{"id" : "Filters Operators"}--> gte
 
 The `gte` operator means **greater than or equal to** and is used with measures
 or dimensions of type `number`.
@@ -236,7 +237,7 @@ or dimensions of type `number`.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  lt
+### <--{"id" : "Filters Operators"}--> lt
 
 The `lt` operator means **less than** and is used with measures or dimensions of
 type `number`.
@@ -252,7 +253,7 @@ type `number`.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  lte
+### <--{"id" : "Filters Operators"}--> lte
 
 The `lte` operator means **less than or equal to** and is used with measures or
 dimensions of type `number`.
@@ -268,7 +269,7 @@ dimensions of type `number`.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  set
+### <--{"id" : "Filters Operators"}--> set
 
 Operator `set` checks whether the value of the member **is not** `NULL`. You
 don't need to pass `values` for this operator.
@@ -283,7 +284,7 @@ don't need to pass `values` for this operator.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  notSet
+### <--{"id" : "Filters Operators"}--> notSet
 
 An opposite to the `set` operator. It checks whether the value of the member
 **is** `NULL`. You don't need to pass `values` for this operator.
@@ -298,7 +299,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  inDateRange
+### <--{"id" : "Filters Operators"}--> inDateRange
 
 The operator `inDateRange` is used to filter a time dimension into a specific
 date range. The values must be an array of dates with the following format
@@ -318,7 +319,7 @@ There is a convient way to use date filters with grouping -
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  notInDateRange
+### <--{"id" : "Filters Operators"}--> notInDateRange
 
 An opposite operator to `inDateRange`, use it when you want to exclude specific
 dates. The values format is the same as for `inDateRange`.
@@ -333,7 +334,7 @@ dates. The values format is the same as for `inDateRange`.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  beforeDate
+### <--{"id" : "Filters Operators"}--> beforeDate
 
 Use it when you want to retreive all results before some specific date. The
 values should be an array of one element in `YYYY-MM-DD` format.
@@ -348,7 +349,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 }
 ```
 
-### <--{"id" : "Filters Operators"}-->  afterDate
+### <--{"id" : "Filters Operators"}--> afterDate
 
 The same as `beforeDate`, but is used to get all results after a specific date.
 
@@ -452,8 +453,8 @@ const resultSet = cubejsApi.load({
 // ...
 ```
 
-You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`, `last year`,
-`next month`, or `last 6 months`.
+You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`,
+`last year`, `next month`, or `last 6 months`.
 
 ```js
 {
@@ -467,7 +468,8 @@ You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`, 
 ```
 
 Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include the current
-date. If you need the current date also you can use `from N days ago to now` or `from now to N days from now`.
+date. If you need the current date also you can use `from N days ago to now` or
+`from now to N days from now`.
 
 ```js
 {
