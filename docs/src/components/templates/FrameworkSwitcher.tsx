@@ -32,6 +32,7 @@ const FrameworkSwitcher: React.FC<Props> = () => {
     <Radio.Group className={styles.frameworkSwitcher} value={framework}>
       {FRAMEWORKS.map((framework) => (
         <Link
+          key={framework.slug}
           to={`/frontend-introduction/${
             framework.slug === 'vanilla' ? '' : framework.slug
           }`}

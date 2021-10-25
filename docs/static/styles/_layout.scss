@@ -958,6 +958,11 @@ section[type=h2] h2 {
       z-index: initial;
     }
 
+    .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):first-child {
+      color: white;
+      border-color: $pink;
+    }
+
     .ant-radio-button-wrapper-checked:not(:first-child) {
       box-shadow: -1px 0 0 $pink;
       z-index: initial;
