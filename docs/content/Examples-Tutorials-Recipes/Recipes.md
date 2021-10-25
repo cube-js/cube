@@ -17,6 +17,7 @@ These recipes will show you the best practices of using Cube.js.
 
 - [Role-Based Access](/recipes/role-based-access)
 - [Column-Based Access](/recipes/column-based-access)
+- [Using Different Schemas for Tenants](/recipes/using-different-schemas-for-tenants)
 
 ### <--{"id" : "Recipes"}--> Data Sources
 
