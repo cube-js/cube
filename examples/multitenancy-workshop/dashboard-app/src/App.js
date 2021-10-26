@@ -1,74 +1,172 @@
-import {
-  BrowserRouter as Router,
-  Switch,
-  Route,
-  Link,
-  useParams
-} from "react-router-dom";
-import cubejs from "@cubejs-client/core";
+import cubejs from '@cubejs-client/core';
 import './App.css';
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import { Accordion, Alert, Col, Container, Form, Row } from 'react-bootstrap';
+import jwt from 'jsonwebtoken';
+import { LineChart } from './LineChart';
+import { TreeMapChart } from './TreeMapChart';
 
-const merchants = [
-  { id: 1, jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjUwMDAwMDAwMDAsIm1lcmNoYW50SWQiOjF9.X3MoDOpLChCZjdKv34EjlC3Y9jdSn2WsPSywj9A_6V8' },
-  { id: 2, jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjUwMDAwMDAwMDAsIm1lcmNoYW50SWQiOjJ9.V1X2A2jIpk7no-C0TmXC6j8VYz9o_C4_eGF0cYAiWZM' },
-  { id: 3, jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjUwMDAwMDAwMDAsIm1lcmNoYW50SWQiOjN9._t-xHNKtLBkogugdA0hTKBXla_1eIEcLGasJO3-gtDs' },
-];
+const defaultJwtSecret = 'SECRET';
+const defaultApiUrl = 'https://fashionable-pike.aws-us-east-2.cubecloudapp.dev/cubejs-api/v1';
+const defaultMerchantId = 5;
 
 function App() {
-  return (
-    <Router>
-      <Switch>
-          <Route exact path="/">
-            <div className="App">
-              <h1>Homepage</h1>
-              <ul>
-                {merchants.map((x, i) => (
-                  <li key={i}>
-                    <Link to={`/dashboard/${x.jwt}`}>{x.id}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Route>
-          <Route path="/dashboard/:jwt">
-            <MerchantDashboard />
-          </Route>
-        </Switch>
-    </Router>
-  );
-}
+  const [ status, setStatus ] = useState(undefined);
+  const [ jwtSecret, setJwtSecret ] = useState(defaultJwtSecret);
+  const [ apiUrl, setApiUrl ] = useState(defaultApiUrl);
 
-function MerchantDashboard() {
-  let { jwt } = useParams();
-  let [ data, setData ] = useState([]);
+  const merchants = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
+    .map(id => ({
+      id,
+      token: !jwtSecret ? 'foobar' : jwt.sign({
+        exp: 5000000000,
+        merchant_id: id,
+      }, jwtSecret),
+    }));
+
+  const [ merchantId, setMerchantId ] = useState(defaultMerchantId);
+  const merchant = merchants.find(x => x.id === merchantId);
 
   const cubejsApi = cubejs(
-    jwt,
-    { apiUrl: "https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1" }
+    merchant.token,
+    { apiUrl },
   );
-
-  const resultSet = cubejsApi.load({
-    measures: ["Orders.count"],
-    dimensions: ["ProductCategories.name"]
-  });
 
   useEffect(() => {
-    if (resultSet) {
-      resultSet.then(data => setData(data.tablePivot()));
-    }
-  }, [ resultSet ]);
+    cubejsApi
+      .meta()
+      .then(() => setStatus(true))
+      .catch(() => setStatus(false));
+  }, [
+    merchant.token,
+    apiUrl,
+  ]);
+
+  const [ ordersData, setOrdersData ] = useState([]);
+
+  useEffect(() => {
+    cubejsApi
+      .load({
+        measures: [ 'Orders.count' ],
+        dimensions: [ 'Orders.status' ],
+        timeDimensions: [ {
+          dimension: 'Orders.createdAt',
+          granularity: 'month',
+        } ],
+      })
+      .then(data => setOrdersData(data.tablePivot()))
+      .catch(() => {
+      });
+  }, [
+    merchant.token,
+    apiUrl,
+  ]);
+
+  const [ categoriesData, setCategoriesData ] = useState([]);
+
+  useEffect(() => {
+    cubejsApi
+      .load({
+        measures: [ 'Orders.count' ],
+        dimensions: [ 'ProductCategories.name' ],
+      })
+      .then(data => setCategoriesData(data.tablePivot()))
+      .catch(() => {
+      });
+  }, [
+    merchant.token,
+    apiUrl,
+  ]);
 
   return (
-    <div className="App">
-      <h1>Merchant Dashboard</h1>
-      <p><Link to="/">Back</Link></p>
-      <p>JWT: {jwt}</p>
-      <pre>Data: {JSON.stringify(data, null, 2)}</pre>
-    </div>
+    <Container>
+      <Row className='mb-3'>
+        <Accordion>
+          <Accordion.Item eventKey='0'>
+            <Accordion.Header>Cube
+              API {status === undefined ? '' : status ? 'is ready' : 'is not available'}</Accordion.Header>
+            <Accordion.Body>
+              <Form>
+                <Form.Group className='mb-3' as={Row}>
+                  <Form.Label column sm={2}>URL</Form.Label>
+                  <Col sm={10}>
+                    <Form.Control
+                      type='text'
+                      placeholder='URL'
+                      value={apiUrl}
+                      onChange={e => setApiUrl(e.target.value)}
+                    />
+                  </Col>
+                </Form.Group>
+                <Form.Group className='mb-3' as={Row}>
+                  <Form.Label column sm={2}>JWT secret</Form.Label>
+                  <Col sm={10}>
+                    <Form.Control
+                      type='text'
+                      placeholder=''
+                      value={jwtSecret}
+                      onChange={e => setJwtSecret(e.target.value)}
+                    />
+                  </Col>
+                </Form.Group>
+                <Form.Group className='mb-3' as={Row}>
+                  <Form.Label column sm={2}>JWT</Form.Label>
+                  <Col sm={10}>
+                    <Form.Control
+                      className='mb-2'
+                      as='textarea'
+                      value={merchant.token}
+                      readOnly={true}
+                    />
+                    <div>You can decode the token at <a href='https://jwt.io' target='_blank'
+                                                        rel='noreferrer'>jwt.io</a></div>
+                  </Col>
+                </Form.Group>
+              </Form>
+            </Accordion.Body>
+          </Accordion.Item>
+        </Accordion>
+      </Row>
+      <Row className='mb-3'>
+        <Form>
+          <Form.Group className='mb-3' as={Row}>
+            <Form.Label column sm={2}>Merchant</Form.Label>
+            <Col sm={10}>
+              <Form.Select
+                value={merchantId}
+                onChange={e => setMerchantId(parseInt(e.target.value))}
+              >
+                {merchants.map(merchant => (
+                  <option key={merchant.id} value={merchant.id}>
+                    {merchant.id}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+          </Form.Group>
+        </Form>
+      </Row>
+      <Row className='mb-3' style={{ height: 300 }}>
+        {ordersData.length > 0 && (
+          <LineChart
+            data={ordersData}
+            group={row => row['Orders.status']}
+            x={row => row['Orders.createdAt.month'].split('T')[0]}
+            y={row => parseInt(row['Orders.count'])}
+          />
+        )}
+      </Row>
+      <Row style={{ height: 200 }}>
+        {categoriesData.length > 0 && (
+          <TreeMapChart
+            data={categoriesData}
+            name={row => row['ProductCategories.name']}
+            value={row => parseInt(row['Orders.count'])}
+          />
+        )}
+      </Row>
+    </Container>
   );
 }
-
-
 
 export default App;
