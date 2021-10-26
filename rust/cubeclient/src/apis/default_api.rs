@@ -66,13 +66,13 @@ pub async fn load_v1(
             let response_err =
                 serde_json::from_str::<crate::models::V1LoadConinueWait>(&local_var_content);
             if let Ok(res) = response_err {
-                if res.error.to_lowercase() == "continue wait".to_string() {
+                if res.error.to_lowercase() == *"continue wait" {
                     debug!(
                         "[client] load - retrying request (continue wait) requestId: {}, span: {}",
                         request_id, span_counter
                     );
 
-                    span_counter = span_counter + 1;
+                    span_counter += 1;
 
                     continue;
                 } else {
