@@ -665,15 +665,51 @@ fn convert_where_filters(
 ) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
     match node {
         // It's a special case for the root of CompiledFilterTree to simplify and operator without using logical and
-        CompiledFilterTree::And(left, right) => Ok(vec![
-            convert_where_filters_children(*left)?,
-            convert_where_filters_children(*right)?,
-        ]),
-        _ => Ok(vec![convert_where_filters_children(node)?]),
+        CompiledFilterTree::And(left, right) => {
+            let mut l = convert_where_filters_unnest_and(*left)?;
+            let mut r = convert_where_filters_unnest_and(*right)?;
+
+            l.append(&mut r);
+
+            Ok(l)
+        }
+        _ => Ok(vec![convert_where_filters_base(node)?]),
     }
 }
 
-fn convert_where_filters_children(
+fn convert_where_filters_unnest_and(
+    node: CompiledFilterTree,
+) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
+    match node {
+        CompiledFilterTree::And(left, right) => {
+            let mut l = convert_where_filters_unnest_and(*left)?;
+            let mut r = convert_where_filters_unnest_and(*right)?;
+
+            l.append(&mut r);
+
+            Ok(l)
+        }
+        _ => Ok(vec![convert_where_filters_base(node)?]),
+    }
+}
+
+fn convert_where_filters_unnest_or(
+    node: CompiledFilterTree,
+) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
+    match node {
+        CompiledFilterTree::Or(left, right) => {
+            let mut l = convert_where_filters_unnest_or(*left)?;
+            let mut r = convert_where_filters_unnest_or(*right)?;
+
+            l.append(&mut r);
+
+            Ok(l)
+        }
+        _ => Ok(vec![convert_where_filters_base(node)?]),
+    }
+}
+
+fn convert_where_filters_base(
     node: CompiledFilterTree,
 ) -> CompilationResult<V1LoadRequestQueryFilterItem> {
     match node {
@@ -693,26 +729,34 @@ fn convert_where_filters_children(
                 "Unable to compile segments, it should be pushed down to segments".to_string(),
             )),
         },
-        CompiledFilterTree::And(left, right) => Ok(V1LoadRequestQueryFilterItem {
-            member: None,
-            operator: None,
-            values: None,
-            or: None,
-            and: Some(vec![
-                json!(convert_where_filters_children(*left)?),
-                json!(convert_where_filters_children(*right)?),
-            ]),
-        }),
-        CompiledFilterTree::Or(left, right) => Ok(V1LoadRequestQueryFilterItem {
-            member: None,
-            operator: None,
-            values: None,
-            or: Some(vec![
-                json!(convert_where_filters_children(*left)?),
-                json!(convert_where_filters_children(*right)?),
-            ]),
-            and: None,
-        }),
+        CompiledFilterTree::And(left, right) => {
+            let mut l = convert_where_filters_unnest_and(*left)?;
+            let mut r = convert_where_filters_unnest_and(*right)?;
+
+            l.append(&mut r);
+
+            Ok(V1LoadRequestQueryFilterItem {
+                member: None,
+                operator: None,
+                values: None,
+                or: None,
+                and: Some(l.iter().map(|filter| json!(filter)).collect::<_>()),
+            })
+        }
+        CompiledFilterTree::Or(left, right) => {
+            let mut l = convert_where_filters_unnest_or(*left)?;
+            let mut r = convert_where_filters_unnest_or(*right)?;
+
+            l.append(&mut r);
+
+            Ok(V1LoadRequestQueryFilterItem {
+                member: None,
+                operator: None,
+                values: None,
+                or: Some(l.iter().map(|filter| json!(filter)).collect::<_>()),
+                and: None,
+            })
+        }
     }
 }
 
@@ -1073,6 +1117,7 @@ mod tests {
     };
 
     use super::*;
+    use pretty_assertions::assert_eq;
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -1958,6 +2003,64 @@ mod tests {
                 }],
             ),
             (
+                "customer_gender = 'FEMALE' AND customer_gender = 'MALE' AND customer_gender = 'UNKNOWN'".to_string(),
+                vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["FEMALE".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["MALE".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["UNKNOWN".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ],
+            ),
+            (
+                "customer_gender = 'FEMALE' OR customer_gender = 'MALE' OR customer_gender = 'UNKNOWN'".to_string(),
+                vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["MALE".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["UNKNOWN".to_string()]),
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                }],
+            ),
+            (
                 "customer_gender = 'FEMALE' OR (customer_gender = 'MALE' AND taxful_total_price > 5)".to_string(),
                 vec![V1LoadRequestQueryFilterItem {
                     member: None,
@@ -1988,6 +2091,53 @@ mod tests {
                                     member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
                                     operator: Some("gt".to_string()),
                                     values: Some(vec!["5".to_string()]),
+                                    or: None,
+                                    and: None,
+                                })
+                            ]),
+                        })
+                    ]),
+                    and: None,
+                }],
+            ),
+            (
+                "customer_gender = 'FEMALE' OR (customer_gender = 'MALE' AND taxful_total_price > 5 AND taxful_total_price < 100)".to_string(),
+                vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                    operator: Some("equals".to_string()),
+                                    values: Some(vec!["MALE".to_string()]),
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                                    operator: Some("gt".to_string()),
+                                    values: Some(vec!["5".to_string()]),
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                                    operator: Some("lt".to_string()),
+                                    values: Some(vec!["100".to_string()]),
                                     or: None,
                                     and: None,
                                 })

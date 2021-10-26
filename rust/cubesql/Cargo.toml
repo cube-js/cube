@@ -36,3 +36,6 @@ reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-featu
 nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 mysql_common = "0.26.0"
+
+[dev-dependencies]
+pretty_assertions = "1.0.0"
