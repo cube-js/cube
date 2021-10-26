@@ -1,7 +1,7 @@
 import cubejs from '@cubejs-client/core';
 import './App.css';
 import { useEffect, useState } from 'react';
-import { Accordion, Alert, Col, Container, Form, Row } from 'react-bootstrap';
+import { Accordion, Col, Container, Form, Row } from 'react-bootstrap';
 import jwt from 'jsonwebtoken';
 import { LineChart } from './LineChart';
 import { TreeMapChart } from './TreeMapChart';
@@ -55,8 +55,7 @@ function App() {
         } ],
       })
       .then(data => setOrdersData(data.tablePivot()))
-      .catch(() => {
-      });
+      .catch(() => setStatus(false));
   }, [
     merchant.token,
     apiUrl,
