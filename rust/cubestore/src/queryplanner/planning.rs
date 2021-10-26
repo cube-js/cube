@@ -291,7 +291,7 @@ impl ChooseIndex<'_> {
                     .table;
                 assert_eq!(
                     table.table.get_id(),
-                    &self.chosen_indices[self.next_index]
+                    self.chosen_indices[self.next_index]
                         .table_path
                         .table
                         .get_id()
