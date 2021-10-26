@@ -289,7 +289,13 @@ impl ChooseIndex<'_> {
                     .downcast_ref::<CubeTableLogical>()
                     .unwrap()
                     .table;
-                assert_eq!(table, &self.chosen_indices[self.next_index].table_path);
+                assert_eq!(
+                    table.table.get_id(),
+                    &self.chosen_indices[self.next_index]
+                        .table_path
+                        .table
+                        .get_id()
+                );
 
                 let snapshot = self.chosen_indices[self.next_index].clone();
                 self.next_index += 1;
