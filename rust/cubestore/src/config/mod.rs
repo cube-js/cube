@@ -210,6 +210,7 @@ pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
         "CUBESTORE_HTTP_PORT",
         "CUBESTORE_BIND_ADDR",
         "CUBESTORE_PORT",
+        "CUBESTORE_META_BIND_ADDR",
         "CUBESTORE_META_PORT",
     ];
     router_vars.retain(|v| env::var(v).is_ok());
@@ -564,10 +565,12 @@ impl Config {
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
                     .unwrap_or(Vec::new()),
-                worker_bind_address: env_optparse::<u16>("CUBESTORE_WORKER_PORT")
-                    .map(|v| format!("0.0.0.0:{}", v)),
-                metastore_bind_address: env_optparse::<u16>("CUBESTORE_META_PORT")
-                    .map(|v| format!("0.0.0.0:{}", v)),
+                worker_bind_address: env::var("CUBESTORE_WORKER_BIND_ADDR").ok().or_else(|| {
+                    env_optparse::<u16>("CUBESTORE_WORKER_PORT").map(|v| format!("0.0.0.0:{}", v))
+                }),
+                metastore_bind_address: env::var("CUBESTORE_META_BIND_ADDR").ok().or_else(|| {
+                    env_optparse::<u16>("CUBESTORE_META_PORT").map(|v| format!("0.0.0.0:{}", v))
+                }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
