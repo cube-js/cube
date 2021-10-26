@@ -33,8 +33,10 @@ CUBEJS_DB_PASS=mongodb_server_password
 ```
 
 If you are connecting to a local `mongobi` connector, which is pointing to a local `mongodb` instance,
-the above will be enough. But to connect to a remote `mongodb` instance from local `mongobi` connector,
-please refer to this [config][mongobi-with-remote-db].
+If MongoBI Connector and MongoDB are both running locally, then the above should work.
+To connect to a remote MongoDB instance, first configure `mongosqld` appropriately. See
+[here for an example config file][mongobi-with-remote-db].
+
 
 
 ## Environment Variables
