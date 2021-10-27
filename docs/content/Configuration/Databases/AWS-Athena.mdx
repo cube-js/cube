@@ -35,7 +35,14 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 | `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
 | `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -74,4 +81,6 @@ Athena connections are made over HTTPS.
   https://docs.aws.amazon.com/athena/latest/ug/querying.html
 [aws-docs-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [self-preaggs-simple]: #simple

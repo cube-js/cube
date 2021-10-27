@@ -52,7 +52,14 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcs`                                                                   |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -110,5 +117,7 @@ BigQuery connections are made over HTTPS.
 [google-support-create-svc-account]:
   https://support.google.com/a/answer/7378726?hl=en
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-env-var]: /reference/environment-variables#database-connection
 [self-preaggs-batching]: #batching

@@ -42,7 +42,14 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                        |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key         |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -108,6 +115,8 @@ connections are made over HTTPS.
 [dbt-docs-snowflake-account]:
   https://docs.getdbt.com/reference/warehouse-profiles/snowflake-profile#account
 [ref-caching-large-preaggs]: /using-pre-aggregations#large-pre-aggregations
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-env-var]: /reference/environment-variables#database-connection
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/

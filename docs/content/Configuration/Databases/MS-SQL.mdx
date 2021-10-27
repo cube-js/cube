@@ -35,7 +35,14 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_DOMAIN`   | A domain name within the database to connect to                         | A valid domain name within a MSSQL database |    ❌    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`                             |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -83,5 +90,7 @@ module.exports = {
 ```
 
 [mssql]: https://www.microsoft.com/en-gb/sql-server/sql-server-2019
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [self-preaggs-simple]: #simple

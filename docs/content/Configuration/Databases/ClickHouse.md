@@ -34,7 +34,14 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`                | The password used to connect to the database            | A valid database password |    ✅    |
 | `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not | `true`, `false`           |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -70,5 +77,7 @@ You can connect to a ClickHouse database when your user's permissions are
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
 [clickhouse-readonly]:
   https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [self-preaggs-batching]: #batching
