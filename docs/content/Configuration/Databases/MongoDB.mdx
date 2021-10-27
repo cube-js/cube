@@ -25,11 +25,17 @@ Add the following to a `.env` file in your Cube.js project:
 
 ```bash
 CUBEJS_DB_TYPE=mongobi
-CUBEJS_DB_HOST=my.mongobi.host
+CUBEJS_DB_HOST=my.mongobi.host # mongo BI connector host, if using from local, should be either `localhost` or `127.0.0.1`
+CUBEJS_DB_PORT=3307 # default port of mongo BI connector service
 CUBEJS_DB_NAME=my_mongodb_database
-CUBEJS_DB_USER=mongobi_user
-CUBEJS_DB_PASS=**********
+CUBEJS_DB_USER=mongodb_server_user
+CUBEJS_DB_PASS=mongodb_server_password
 ```
+
+If you are connecting to a local `mongobi` connector, which is pointing to a local `mongodb` instance,
+If MongoBI Connector and MongoDB are both running locally, then the above should work.
+To connect to a remote MongoDB instance, first configure `mongosqld` appropriately. See
+[here for an example config file][mongobi-with-remote-db].
 
 ## Environment Variables
 
@@ -57,6 +63,7 @@ Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. All other
 SSL-related environment variables can be left unset.
 
 [mongodb]: https://www.mongodb.com/
+[mongobi-with-remote-db]: https://docs.mongodb.com/bi-connector/current/reference/mongosqld/#example-configuration-file
 [cube-blog-mongodb]:
   https://cube.dev/blog/building-mongodb-dashboard-using-node.js
 [mongobi-download]: https://www.mongodb.com/download-center/bi-connector
