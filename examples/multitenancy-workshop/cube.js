@@ -74,20 +74,20 @@ module.exports = {
 
   // `scheduledRefreshContexts` return an array of security contexts.
   // Cube's refresh worker uses them to build pre-aggregations
-
-  // scheduledRefreshContexts: async () => [
-  //   {
-  //     securityContext: {
-  //       merchant_id: 1,
-  //     },
-  //   },
-  //   {
-  //     securityContext: {
-  //       merchant_id: 2,
-  //     },
-  //   },
-  // ],
-
+/*  
+  scheduledRefreshContexts: async () => [
+    {
+      securityContext: {
+        merchant_id: 1,
+      },
+    },
+    {
+      securityContext: {
+        merchant_id: 2,
+      },
+    },
+  ],
+*/
   /* Part 3. Dynamic tenant-aware data schema */
   /* ---------------------------------------- */
 
