@@ -44,6 +44,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Accelerating Non-Additive Measures](/recipes/non-additivity)
 - [Joining Data from Multiple Data Sources](/recipes/joining-multiple-data-sources)
 - [Using originalSql and rollup pre-aggregations effectively](/recipes/using-originalsql-and-rollups-effectively)
+- [Incrementally building pre-aggregations for a date range](/recipes/incrementally-building-pre-aggregations-for-a-date-range)
 
 ### <--{"id" : "Recipes"}--> Code reusability
 
