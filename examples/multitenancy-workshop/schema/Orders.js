@@ -55,6 +55,7 @@ cube(`Orders`, {
     {
       count: {
         type: `count`,
+        drillMembers: (CUBE) => [`${CUBE}.id`, `${CUBE}.createdAt`]
       },
       number: {
         sql: (CUBE) => `number`,
