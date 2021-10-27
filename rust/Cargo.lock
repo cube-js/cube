@@ -147,10 +147,34 @@ dependencies = [
  "hex",
  "indexmap",
  "lazy_static",
- "lexical-core",
+ "lexical-core 0.7.6",
  "multiversion",
  "num 0.4.0",
  "prettytable-rs",
+ "rand 0.8.4",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "arrow"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "337e668497751234149fd607f5cb41a6ae7b286b6329589126fe67f0ac55d637"
+dependencies = [
+ "bitflags",
+ "chrono",
+ "comfy-table",
+ "csv",
+ "flatbuffers 2.0.0",
+ "hex",
+ "indexmap",
+ "lazy_static",
+ "lexical-core 0.8.2",
+ "multiversion",
+ "num 0.4.0",
  "rand 0.8.4",
  "regex",
  "serde",
@@ -163,7 +187,7 @@ name = "arrow-flight"
 version = "5.0.0"
 source = "git+https://github.com/cube-js/arrow-rs?branch=cube#f6a3075ab37239f655a982c2c15989d80d72a3db"
 dependencies = [
- "arrow",
+ "arrow 5.0.0",
  "base64 0.13.0",
  "bytes 1.0.1",
  "proc-macro2",
@@ -784,6 +808,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "comfy-table"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11e95a3e867422fd8d04049041f5671f94d53c32a9dcd82e2be268714942f3f3"
+dependencies = [
+ "strum",
+ "strum_macros",
+ "unicode-width",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1050,6 +1085,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "cubeclient",
+ "datafusion 5.1.0",
  "futures 0.3.16",
  "lazy_static",
  "log",
@@ -1065,7 +1101,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.6.1",
- "sqlparser 0.10.1-alpha.0",
+ "sqlparser 0.11.1-alpha.0",
  "thiserror",
  "tokio 1.9.0",
  "tokio-util 0.6.7",
@@ -1077,7 +1113,7 @@ name = "cubestore"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
- "arrow",
+ "arrow 5.0.0",
  "arrow-flight",
  "async-compression",
  "async-std 0.99.12",
@@ -1097,7 +1133,7 @@ dependencies = [
  "cubehll",
  "cuberpc",
  "cubezetasketch",
- "datafusion",
+ "datafusion 4.0.0-SNAPSHOT",
  "deadqueue",
  "enum_primitive",
  "flatbuffers 0.7.0",
@@ -1119,7 +1155,7 @@ dependencies = [
  "mysql_common 0.26.0",
  "nanoid",
  "num 0.3.1",
- "parquet",
+ "parquet 5.0.0",
  "parquet-format",
  "paste",
  "pin-project",
@@ -1184,7 +1220,7 @@ version = "4.0.0-SNAPSHOT"
 source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#65d3c5ba9be852ad3628af25df32fecde089e8a6"
 dependencies = [
  "ahash 0.7.4",
- "arrow",
+ "arrow 5.0.0",
  "async-trait",
  "chrono",
  "futures 0.3.16",
@@ -1195,7 +1231,7 @@ dependencies = [
  "md-5",
  "num_cpus",
  "ordered-float 2.7.0",
- "parquet",
+ "parquet 5.0.0",
  "paste",
  "pin-project-lite 0.2.7",
  "rand 0.8.4",
@@ -1210,6 +1246,30 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "datafusion"
+version = "5.1.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=2ff38903e3fe3d66b75ead15e5bbb40fa6d36899#2ff38903e3fe3d66b75ead15e5bbb40fa6d36899"
+dependencies = [
+ "ahash 0.7.4",
+ "arrow 6.0.0",
+ "async-trait",
+ "chrono",
+ "futures 0.3.16",
+ "hashbrown 0.11.2",
+ "log",
+ "num_cpus",
+ "ordered-float 2.7.0",
+ "parquet 6.0.0",
+ "paste",
+ "pin-project-lite 0.2.7",
+ "rand 0.8.4",
+ "smallvec 1.6.1",
+ "sqlparser 0.11.1-alpha.0",
+ "tokio 1.9.0",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -2212,7 +2272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f404a90a744e32e8be729034fc33b90cf2a56418fbf594d69aa3c0214ad414e5"
 dependencies = [
  "cfg-if 1.0.0",
- "lexical-core",
+ "lexical-core 0.7.6",
 ]
 
 [[package]]
@@ -2225,6 +2285,70 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "ryu",
+ "static_assertions",
+]
+
+[[package]]
+name = "lexical-core"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a3926d8f156019890be4abe5fd3785e0cff1001e06f59c597641fd513a5a284"
+dependencies = [
+ "lexical-parse-float",
+ "lexical-parse-integer",
+ "lexical-util",
+ "lexical-write-float",
+ "lexical-write-integer",
+]
+
+[[package]]
+name = "lexical-parse-float"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4d066d004fa762d9da995ed21aa8845bb9f6e4265f540d716fb4b315197bf0e"
+dependencies = [
+ "lexical-parse-integer",
+ "lexical-util",
+ "static_assertions",
+]
+
+[[package]]
+name = "lexical-parse-integer"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2c92badda8cc0fc4f3d3cc1c30aaefafb830510c8781ce4e8669881f3ed53ac"
+dependencies = [
+ "lexical-util",
+ "static_assertions",
+]
+
+[[package]]
+name = "lexical-util"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ff669ccaae16ee33af90dc51125755efed17f1309626ba5c12052512b11e291"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
+name = "lexical-write-float"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b5186948c7b297abaaa51560f2581dae625e5ce7dfc2d8fdc56345adb6dc576"
+dependencies = [
+ "lexical-util",
+ "lexical-write-integer",
+ "static_assertions",
+]
+
+[[package]]
+name = "lexical-write-integer"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ece956492e0e40fd95ef8658a34d53a3b8c2015762fdcaaff2167b28de1f56ef"
+dependencies = [
+ "lexical-util",
  "static_assertions",
 ]
 
@@ -2661,7 +2785,7 @@ version = "5.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
- "lexical-core",
+ "lexical-core 0.7.6",
  "memchr",
  "version_check",
 ]
@@ -3026,7 +3150,28 @@ name = "parquet"
 version = "5.0.0"
 source = "git+https://github.com/cube-js/arrow-rs?branch=cube#f6a3075ab37239f655a982c2c15989d80d72a3db"
 dependencies = [
- "arrow",
+ "arrow 5.0.0",
+ "base64 0.13.0",
+ "brotli",
+ "byteorder",
+ "chrono",
+ "flate2",
+ "lz4",
+ "num-bigint 0.4.0",
+ "parquet-format",
+ "rand 0.8.4",
+ "snap",
+ "thrift",
+ "zstd",
+]
+
+[[package]]
+name = "parquet"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d263b9b59ba260518de9e57bd65931c3f765fea0fabacfe84f40d6fde38e841a"
+dependencies = [
+ "arrow 6.0.0",
  "base64 0.13.0",
  "brotli",
  "byteorder",
@@ -4159,8 +4304,8 @@ dependencies = [
 
 [[package]]
 name = "sqlparser"
-version = "0.10.1-alpha.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff#c37e5cd5300ed3bf1487be7a017cd65b6ed1a5ff"
+version = "0.11.1-alpha.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=869902c88e242d6a759a04d03a753ba9728f4a0f#869902c88e242d6a759a04d03a753ba9728f4a0f"
 dependencies = [
  "log",
 ]
@@ -4179,6 +4324,24 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "strum"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+
+[[package]]
+name = "strum_macros"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "subtle"
