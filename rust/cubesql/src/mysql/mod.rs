@@ -5,6 +5,9 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
+use datafusion::execution::dataframe_impl::DataFrameImpl;
+use datafusion::prelude::DataFrame as DFDataFrame;
+
 use log::debug;
 use log::error;
 use log::trace;
@@ -12,17 +15,15 @@ use log::trace;
 use msql_srv::*;
 
 use serde_json::json;
-use sqlparser::dialect::MySqlDialect;
 use sqlparser::parser::Parser;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
 use crate::compile::convert_statement_to_cube_query;
+use crate::compile::parser::MySqlDialectWithBackTicks;
 use crate::config::processing_loop::ProcessingLoop;
-use crate::mysql::dataframe::DataFrame;
-use crate::mysql::dataframe::Row;
-use crate::mysql::dataframe::TableValue;
+use crate::mysql::dataframe::batch_to_dataframe;
 use crate::schema::SchemaService;
 use crate::schema::V1CubeMetaExt;
 use crate::CubeError;
@@ -42,6 +43,7 @@ impl Backend {
         query: &'a str,
     ) -> Result<Arc<dataframe::DataFrame>, CubeError> {
         let _start = SystemTime::now();
+
         trace!("RAW QUERY: {}", query);
         let query = str::replace(query, "\n", " ");
         let query = query.replace("SELECT FROM", "SELECT * FROM");
@@ -62,7 +64,7 @@ impl Backend {
         if query_lower.eq("show variables like 'sql_mode'") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -80,7 +82,7 @@ impl Backend {
         } else if query_lower.eq("show variables like 'lower_case_table_names'") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -98,7 +100,7 @@ impl Backend {
         } else if query_lower.eq("select database()") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "DATABASE()".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -112,7 +114,7 @@ impl Backend {
         } else if query_lower.eq("select version()") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "VERSION()".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -126,7 +128,7 @@ impl Backend {
         } else if query_lower.eq("show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin'") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Collation".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -164,7 +166,7 @@ impl Backend {
         }else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -178,7 +180,7 @@ impl Backend {
         } else if query_lower.eq("select cast('test unicode returns' as char(60)) as anon_1") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -192,7 +194,7 @@ impl Backend {
         } else if query_lower.eq("select cast('test collated returns' as char character set utf8mb4) collate utf8mb4_bin as anon_1") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -206,7 +208,7 @@ impl Backend {
         } else if query_lower.eq("show schemas") || query_lower.eq("show databases") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Database".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -234,7 +236,7 @@ impl Backend {
         } else if query_lower.eq("select connection_id()") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "connection_id".to_string(),
                             ColumnType::MYSQL_TYPE_LONGLONG,
@@ -248,7 +250,7 @@ impl Backend {
         } else if query_lower.eq("select @@transaction_isolation") {
             return Ok(
                 Arc::new(
-                    DataFrame::new(
+                    dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "@@transaction_isolation".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
@@ -260,7 +262,7 @@ impl Backend {
                 ),
             )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
-            let dialect = MySqlDialect {};
+            let dialect = MySqlDialectWithBackTicks {};
             let parse_result = Parser::parse_sql(&dialect, &query)?;
 
             let query = &parse_result[0];
@@ -284,19 +286,19 @@ impl Backend {
                         .await?;
 
                     if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
-                        let rows = cube.get_columns().iter().map(|column| Row::new(
+                        let rows = cube.get_columns().iter().map(|column| dataframe::Row::new(
                             vec![
-                                TableValue::String(column.get_name().clone()),
-                                TableValue::String(column.mysql_type_as_str().clone()),
-                                TableValue::String(if column.mysql_can_be_null() { "Yes".to_string() } else { "No".to_string() }),
-                                TableValue::String("".to_string()),
-                                TableValue::Null,
-                                TableValue::String("".to_string()),
+                                dataframe::TableValue::String(column.get_name().clone()),
+                                dataframe::TableValue::String(column.mysql_type_as_str().clone()),
+                                dataframe::TableValue::String(if column.mysql_can_be_null() { "Yes".to_string() } else { "No".to_string() }),
+                                dataframe::TableValue::String("".to_string()),
+                                dataframe::TableValue::Null,
+                                dataframe::TableValue::String("".to_string()),
                             ]
                         )).collect();
 
 
-                        return Ok(Arc::new(DataFrame::new(
+                        return Ok(Arc::new(dataframe::DataFrame::new(
                             vec![
                                 dataframe::Column::new(
                                     "Field".to_string(),
@@ -340,10 +342,9 @@ impl Backend {
                         .get_ctx_for_tenant(auth_ctx)
                     .await?;
 
-                    let compiled_query = convert_statement_to_cube_query(statement, &ctx)?;
-                    let plan = serde_json::to_string_pretty(&compiled_query)?;
+                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx))?;
 
-                    return Ok(Arc::new(DataFrame::new(
+                    return Ok(Arc::new(dataframe::DataFrame::new(
                         vec![
                             dataframe::Column::new(
                                 "Execution Plan".to_string(),
@@ -351,7 +352,9 @@ impl Backend {
                             ),
                         ],
                         vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String(plan)
+                            dataframe::TableValue::String(
+                                plan.print(true)?
+                            )
                         ])]
                     )))
                 },
@@ -360,7 +363,7 @@ impl Backend {
                 }
             }
         } else if query_lower.starts_with("show create table") {
-            let dialect = MySqlDialect {};
+            let dialect = MySqlDialectWithBackTicks {};
             let parse_result = Parser::parse_sql(&dialect, &query)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
@@ -398,7 +401,7 @@ impl Backend {
                                     ));
                                 }
 
-                                return Ok(Arc::new(DataFrame::new(
+                                return Ok(Arc::new(dataframe::DataFrame::new(
                                     vec![
                                         dataframe::Column::new(
                                             "Table".to_string(),
@@ -409,9 +412,9 @@ impl Backend {
                                             ColumnType::MYSQL_TYPE_STRING
                                         )
                                     ],
-                                    vec![Row::new(vec![
-                                        TableValue::String(cube.name.clone()),
-                                        TableValue::String(
+                                    vec![dataframe::Row::new(vec![
+                                        dataframe::TableValue::String(cube.name.clone()),
+                                        dataframe::TableValue::String(
                                             format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
                                         ),
                                     ])]
@@ -441,12 +444,12 @@ impl Backend {
                 .await?;
 
             let values = ctx.cubes.iter()
-                .map(|cube| Row::new(vec![
-                    TableValue::String(cube.name.clone()),
-                    TableValue::String("BASE TABLE".to_string()),
+                .map(|cube| dataframe::Row::new(vec![
+                    dataframe::TableValue::String(cube.name.clone()),
+                    dataframe::TableValue::String("BASE TABLE".to_string()),
                 ])).collect();
 
-            return Ok(Arc::new(DataFrame::new(
+            return Ok(Arc::new(dataframe::DataFrame::new(
                 vec![
                     dataframe::Column::new(
                         "Tables_in_db".to_string(),
@@ -472,62 +475,68 @@ impl Backend {
                 .get_ctx_for_tenant(auth_ctx)
                 .await?;
 
-            let compiled_query = convert_sql_to_cube_query(&query, &ctx)?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx))?;
+            match plan {
+                crate::compile::QueryPlan::DataFushionSelect(plan, ctx) => {
+                    let df = DataFrameImpl::new(
+                        ctx.state,
+                        &plan,
+                    );
+                    let batches = df.collect().await?;
+                    let response =  batch_to_dataframe(&batches)?;
 
-            debug!("Request {}", json!(compiled_query.request).to_string());
-            debug!("Meta {:?}", compiled_query.meta);
+                    return Ok(Arc::new(response));
+                },
+                crate::compile::QueryPlan::CubeSelect(compiled_query) => {
+                    debug!("Request {}", json!(compiled_query.request).to_string());
+                    debug!("Meta {:?}", compiled_query.meta);
 
-            let response = self.schema
-                .request(compiled_query.request, auth_ctx)
-                .await?;
+                    let response = self.schema
+                        .request(compiled_query.request, auth_ctx)
+                        .await?;
 
-            let mut columns: Vec<dataframe::Column> = vec![];
+                    let mut columns: Vec<dataframe::Column> = vec![];
 
-            for column_meta in &compiled_query.meta {
-                columns.push(dataframe::Column::new(
-                    column_meta.column_to.clone(),
-                    column_meta.column_type
-                ));
-            }
+                    for column_meta in &compiled_query.meta {
+                        columns.push(dataframe::Column::new(
+                            column_meta.column_to.clone(),
+                            column_meta.column_type
+                        ));
+                    }
 
-            let mut rows: Vec<dataframe::Row> = vec![];
+                    let mut rows: Vec<dataframe::Row> = vec![];
 
-            if let Some(result) = response.results.first() {
-                debug!("Columns {:?}", columns);
-                debug!("Hydration mapping {:?}", compiled_query.meta);
-                trace!("Response from Cube.js {:?}", result.data);
+                    if let Some(result) = response.results.first() {
+                        debug!("Columns {:?}", columns);
+                        debug!("Hydration mapping {:?}", compiled_query.meta);
+                        trace!("Response from Cube.js {:?}", result.data);
 
-                for row in result.data.iter() {
-                    if let Some(record) = row.as_object() {
-                        rows.push(
-                            Row::hydrate_from_response(&compiled_query.meta, record)
-                        );
+                        for row in result.data.iter() {
+                            if let Some(record) = row.as_object() {
+                                rows.push(
+                                    dataframe::Row::hydrate_from_response(&compiled_query.meta, record)
+                                );
+                            } else {
+                                error!(
+                                    "Unable to map row to DataFrame::Row: {:?}, skipping row",
+                                    row
+                                );
+                            }
+                        }
+
+                        return Ok(Arc::new(dataframe::DataFrame::new(
+                            columns,
+                            rows
+                        )));
                     } else {
-                        error!(
-                            "Unable to map row to DataFrame::Row: {:?}, skipping row",
-                            row
-                        );
+                        return Ok(Arc::new(dataframe::DataFrame::new(vec![], vec![])));
                     }
                 }
-
-                return Ok(Arc::new(DataFrame::new(
-                    columns,
-                    rows
-                )))
             }
-
         }
 
-        // if start.elapsed().unwrap().as_millis() > 200 && query_lower.starts_with("select") {
-        //     warn!(
-        //         "Slow Query SQL ({:?}):\n{}",
-        //         start.elapsed().unwrap(),
-        //         query
-        //     );
-        // }
-
         if ignore {
-            Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            Ok(Arc::new(dataframe::DataFrame::new(vec![], vec![])))
         } else {
             Err(CubeError::internal("Unsupported query".to_string()))
         }
@@ -591,6 +600,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     for (_i, value) in row.values().iter().enumerate() {
                         match value {
                             dataframe::TableValue::String(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
                             dataframe::TableValue::Boolean(s) => rw.write_col(s.to_string())?,
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,

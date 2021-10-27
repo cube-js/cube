@@ -139,6 +139,12 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
     }
 }
 
+impl From<datafusion::error::DataFusionError> for CubeError {
+    fn from(v: datafusion::error::DataFusionError) -> Self {
+        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+    }
+}
+
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
         CubeError::internal(v.to_string())

@@ -1,6 +1,22 @@
+use std::fmt::{self, Debug, Formatter};
+
+use chrono::{SecondsFormat, TimeZone, Utc};
+use datafusion::arrow::array::Array;
+use datafusion::arrow::array::BooleanArray;
+use datafusion::arrow::array::Float64Array;
+use datafusion::arrow::array::Int64Array;
+use datafusion::arrow::array::StringArray;
+use datafusion::arrow::array::TimestampMicrosecondArray;
+use datafusion::arrow::array::TimestampNanosecondArray;
+use datafusion::arrow::array::UInt64Array;
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::TimeUnit;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::prelude::ExecutionContext;
 use log::{error, warn};
 use msql_srv::ColumnType;
 
+use crate::CubeError;
 use crate::compile::builder::CompiledQueryFieldMeta;
 
 #[derive(Clone, Debug)]
@@ -39,6 +55,10 @@ impl Row {
 
     pub fn values(&self) -> &Vec<TableValue> {
         &self.values
+    }
+
+    pub fn push(&mut self, val: TableValue) {
+        self.values.push(val);
     }
 
     pub fn hydrate_from_response(
@@ -146,6 +166,7 @@ pub enum TableValue {
     Int64(i64),
     Boolean(bool),
     Float64(f64),
+    Timestamp(TimestampValue),
 }
 
 pub struct DataFrame {
@@ -177,6 +198,180 @@ impl DataFrame {
     pub fn into_rows(self) -> Vec<Row> {
         self.data
     }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct TimestampValue {
+    unix_nano: i64,
+}
+
+impl TimestampValue {
+    pub fn new(mut unix_nano: i64) -> TimestampValue {
+        // This is a hack to workaround a mismatch between on-disk and in-memory representations.
+        // We use millisecond precision on-disk.
+        unix_nano -= unix_nano % 1000;
+        TimestampValue { unix_nano }
+    }
+
+    pub fn get_time_stamp(&self) -> i64 {
+        self.unix_nano
+    }
+}
+
+impl Debug for TimestampValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimestampValue")
+            .field("unix_nano", &self.unix_nano)
+            .field("str", &self.to_string())
+            .finish()
+    }
+}
+
+impl ToString for TimestampValue {
+    fn to_string(&self) -> String {
+        Utc.timestamp_nanos(self.unix_nano)
+            .to_rfc3339_opts(SecondsFormat::Millis, true)
+    }
+}
+
+macro_rules! convert_array_cast_native {
+    ($V: expr, (Vec<u8>)) => {{
+        $V.to_vec()
+    }};
+    ($V: expr, $T: ty) => {{
+        $V as $T
+    }};
+}
+
+macro_rules! convert_array {
+    ($ARRAY:expr, $NUM_ROWS:expr, $ROWS:expr, $ARRAY_TYPE: ident, $TABLE_TYPE: ident, $NATIVE: tt) => {{
+        let a = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        for i in 0..$NUM_ROWS {
+            $ROWS[i].push(if a.is_null(i) {
+                TableValue::Null
+            } else {
+                TableValue::$TABLE_TYPE(convert_array_cast_native!(a.value(i), $NATIVE))
+            });
+        }
+    }};
+}
+
+pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeError> {
+    match arrow_type {
+        DataType::Binary => Ok(ColumnType::MYSQL_TYPE_BLOB),
+        DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::MYSQL_TYPE_STRING),
+        DataType::Timestamp(_, _) => Ok(ColumnType::MYSQL_TYPE_STRING),
+        DataType::Float16 | DataType::Float64 => Ok(ColumnType::MYSQL_TYPE_DOUBLE),
+        DataType::Boolean => Ok(ColumnType::MYSQL_TYPE_TINY),
+        DataType::Int8
+        | DataType::Int16
+        | DataType::Int32
+        | DataType::Int64
+        | DataType::UInt8
+        | DataType::UInt16
+        | DataType::UInt32
+        | DataType::UInt64 => Ok(ColumnType::MYSQL_TYPE_LONGLONG),
+        x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
+    }
+}
+
+pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
+    let mut cols = vec![];
+    let mut all_rows = vec![];
+
+    for batch in batches.iter() {
+        if cols.is_empty() {
+            let schema = batch.schema().clone();
+            for (_i, field) in schema.fields().iter().enumerate() {
+                cols.push(Column::new(
+                    field.name().clone(),
+                    arrow_to_column_type(field.data_type().clone())?,
+                ));
+            }
+        }
+        if batch.num_rows() == 0 {
+            continue;
+        }
+        let mut rows = vec![];
+
+        for _ in 0..batch.num_rows() {
+            rows.push(Row::new(Vec::with_capacity(batch.num_columns())));
+        }
+
+        for column_index in 0..batch.num_columns() {
+            let array = batch.column(column_index);
+            let num_rows = batch.num_rows();
+            match array.data_type() {
+                DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int64, i64),
+                DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int64, i64),
+                DataType::Float64 => {
+                    let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            let decimal = a.value(i) as f64;
+                            TableValue::Float64(decimal)
+                        });
+                    }
+                }
+                DataType::Utf8 => {
+                    let a = array.as_any().downcast_ref::<StringArray>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::String(a.value(i).to_string())
+                        });
+                    }
+                }
+                DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1000_i64,
+                            ))
+                        });
+                    }
+                }
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i),
+                            ))
+                        });
+                    }
+                }
+                DataType::Boolean => {
+                    let a = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Boolean(a.value(i))
+                        });
+                    }
+                }
+                x => panic!("Unsupported data type: {:?}", x),
+            }
+        }
+        all_rows.append(&mut rows);
+    }
+
+    Ok(DataFrame::new(cols, all_rows))
 }
 
 #[cfg(test)]
