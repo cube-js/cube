@@ -135,7 +135,8 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   trackEvents.push({
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
-    timestamp: new Date().toJSON()
+    timestamp: new Date().toJSON(),
+    applicationId: getEnv('applicationId'),
   });
   lastEvent = new Date();
 

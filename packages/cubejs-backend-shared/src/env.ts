@@ -288,6 +288,8 @@ const variables: Record<string, (...args: any) => any> = {
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
     .asInt(),
+  applicationId: () => get('CUBEJS_APPLICATION_ID')
+    .asString(),
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
