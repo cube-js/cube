@@ -285,7 +285,7 @@ describe('ClickHouse JoinGraph', () => {
     })
     `);
 
-  // FAILS - ClickHouse doesn't support OR in JOIN expressions
+  // FAILS - need to finish query to override ::timestamptz
   it.skip('simple join', () => {
     const result = compiler.compile().then(() => {
       debugLog(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
