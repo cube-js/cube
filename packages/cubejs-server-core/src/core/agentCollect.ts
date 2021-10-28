@@ -136,7 +136,7 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
     timestamp: new Date().toJSON(),
-    applicationId: getEnv('instanceId'),
+    instanceId: getEnv('instanceId'),
   });
   lastEvent = new Date();
 
