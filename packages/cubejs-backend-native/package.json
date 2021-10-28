@@ -27,7 +27,7 @@
     "dist/lib"
   ],
   "bundledDependencies": [
-    "node-pre-gyp"
+    "@mapbox/node-pre-gyp"
   ],
   "devDependencies": {
     "@types/jest": "^26",
