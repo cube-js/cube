@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mysql-driver:** Handle utf8mb4_bin as string ([a897392](https://github.com/cube-js/cube.js/commit/a8973924b3e940ea42880e456a603a3096994bef))
+
+
+
+
+
 ## [0.28.48](https://github.com/cube-js/cube.js/compare/v0.28.47...v0.28.48) (2021-10-22)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-driver

@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Added CUBESTORE_META_BIND_ADDR and CUBESTORE_WORKER_BIND_ADDR to allow for IPv6 binds ([435f8fc](https://github.com/cube-js/cube.js/commit/435f8fcf1d02bc6da5caaae223e9c64cd2e7e8be))
+* **cubestore:** assertion failed: `(left == right)` in case of trying to access table streaming table right after creation ([c900d51](https://github.com/cube-js/cube.js/commit/c900d517d4a2105a202faf79585c37ec6d56a298))
+* **native:** Correct logging level for native module ([c1a8439](https://github.com/cube-js/cube.js/commit/c1a843909d6681c718e3634f60684705cdc32f29))
+
+
+### Features
+
+* **native:** Simplify filters while converting to JSON RPC ([acab66a](https://github.com/cube-js/cube.js/commit/acab66a54e4cb7ca8a64717392f0dddc362f6057))
+* Validate return type for dbType/driverFactory/externalDriverFactory in runtime ([#2657](https://github.com/cube-js/cube.js/issues/2657)) ([10e269f](https://github.com/cube-js/cube.js/commit/10e269f9febe26902838a2d7fa611a0f1d375d3e))
+
+
+
+
+
 ## [0.28.49](https://github.com/cube-js/cube.js/compare/v0.28.48...v0.28.49) (2021-10-23)
 
 
