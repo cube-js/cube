@@ -12,6 +12,10 @@ impl SystemVar {
     pub fn new() -> Self {
         let mut variables = HashMap::new();
         variables.insert(
+            "@@version_comment".to_string(),
+            ScalarValue::Utf8(Some("mysql".to_string())),
+        );
+        variables.insert(
             "@@sessionauto_increment_increment".to_string(),
             ScalarValue::Int64(Some(1)),
         );
