@@ -58,6 +58,11 @@ impl Backend {
             "set names latin1" => true,
             "rollback" => true,
             "commit" => true,
+            // DataGrip workaround
+            "set character_set_results = utf8" => true,
+            "set character_set_results = latin1" => true,
+            "set autocommit=1" => true,
+            "set sql_mode='strict_trans_tables'" => true,
             _ => false,
         };
 
@@ -485,19 +490,19 @@ impl Backend {
                     let batches = df.collect().await?;
                     let response =  batch_to_dataframe(&batches)?;
 
-                    return Ok(Arc::new(response));
+                    return Ok(Arc::new(response))
                 },
-                crate::compile::QueryPlan::CubeSelect(compiled_query) => {
-                    debug!("Request {}", json!(compiled_query.request).to_string());
-                    debug!("Meta {:?}", compiled_query.meta);
+                crate::compile::QueryPlan::CubeSelect(plan) => {
+                    debug!("Request {}", json!(plan.request).to_string());
+                    debug!("Meta {:?}", plan.meta);
 
                     let response = self.schema
-                        .request(compiled_query.request, auth_ctx)
+                        .request(plan.request, auth_ctx)
                         .await?;
 
                     let mut columns: Vec<dataframe::Column> = vec![];
 
-                    for column_meta in &compiled_query.meta {
+                    for column_meta in &plan.meta {
                         columns.push(dataframe::Column::new(
                             column_meta.column_to.clone(),
                             column_meta.column_type
@@ -508,13 +513,13 @@ impl Backend {
 
                     if let Some(result) = response.results.first() {
                         debug!("Columns {:?}", columns);
-                        debug!("Hydration mapping {:?}", compiled_query.meta);
+                        debug!("Hydration mapping {:?}", plan.meta);
                         trace!("Response from Cube.js {:?}", result.data);
 
                         for row in result.data.iter() {
                             if let Some(record) = row.as_object() {
                                 rows.push(
-                                    dataframe::Row::hydrate_from_response(&compiled_query.meta, record)
+                                    dataframe::Row::hydrate_from_response(&plan.meta, record)
                                 );
                             } else {
                                 error!(

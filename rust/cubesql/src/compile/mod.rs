@@ -5,6 +5,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
+use datafusion::variable::VarType;
 use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace};
 use serde::Serialize;
@@ -27,9 +28,11 @@ use msql_srv::ColumnType;
 
 use self::builder::*;
 use self::context::*;
+use self::engine::context::SystemVar;
 
 pub mod builder;
 pub mod context;
+pub mod engine;
 pub mod parser;
 
 #[derive(Debug, PartialEq)]
@@ -1110,8 +1113,10 @@ impl QueryPlanner {
     }
 
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
-        let ctx = ExecutionContext::new();
-        let ctx = ExecutionContext::new();
+        let mut ctx = ExecutionContext::new();
+
+        let variable_provider = SystemVar::new();
+        ctx.register_variable(VarType::System, Arc::new(variable_provider));
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);
@@ -1126,7 +1131,7 @@ impl QueryPlanner {
             CompilationError::Internal(format!("Planning optimization error: {}", err))
         })?;
 
-        return Ok(QueryPlan::DataFushionSelect(optimized_plan, ctx));
+        Ok(QueryPlan::DataFushionSelect(optimized_plan, ctx))
     }
 }
 

@@ -12,12 +12,11 @@ use datafusion::arrow::array::UInt64Array;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::arrow::datatypes::TimeUnit;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::prelude::ExecutionContext;
 use log::{error, warn};
 use msql_srv::ColumnType;
 
-use crate::CubeError;
 use crate::compile::builder::CompiledQueryFieldMeta;
+use crate::CubeError;
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -334,9 +333,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(
-                                a.value(i) * 1000_i64,
-                            ))
+                            TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000_i64))
                         });
                     }
                 }
@@ -349,9 +346,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(
-                                a.value(i),
-                            ))
+                            TableValue::Timestamp(TimestampValue::new(a.value(i)))
                         });
                     }
                 }
