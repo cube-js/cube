@@ -29,6 +29,7 @@ use msql_srv::ColumnType;
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
+use self::engine::udf::{create_db_udf, create_version_udf};
 
 pub mod builder;
 pub mod context;
@@ -1117,6 +1118,9 @@ impl QueryPlanner {
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
+
+        ctx.register_udf(create_version_udf());
+        ctx.register_udf(create_db_udf());
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);

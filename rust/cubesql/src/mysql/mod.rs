@@ -63,6 +63,7 @@ impl Backend {
             "set character_set_results = latin1" => true,
             "set autocommit=1" => true,
             "set sql_mode='strict_trans_tables'" => true,
+            "set sql_select_limit=501" => true,
             _ => false,
         };
 
@@ -98,34 +99,6 @@ impl Backend {
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("lower_case_table_names".to_string()),
                             dataframe::TableValue::Int64(0)
-                        ])]
-                    )
-                ),
-            )
-        } else if query_lower.eq("select database()") {
-            return Ok(
-                Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "DATABASE()".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("db".to_string())
-                        ])]
-                    )
-                ),
-            )
-        } else if query_lower.eq("select version()") {
-            return Ok(
-                Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "VERSION()".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("8.0.25".to_string())
                         ])]
                     )
                 ),
