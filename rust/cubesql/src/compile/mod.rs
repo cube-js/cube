@@ -18,6 +18,7 @@ use cubeclient::models::{
 };
 
 use crate::compile::parser::MySqlDialectWithBackTicks;
+use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
 use crate::CubeError;
 use crate::{
@@ -1002,6 +1003,16 @@ impl QueryPlanner {
                     }
                 }
             }
+            ast::Statement::SetVariable { .. } => {
+                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                    vec![],
+                    vec![],
+                ))));
+            }
+            // Proxy some queries to DF
+            ast::Statement::ShowColumns { .. } | ast::Statement::ShowVariable { .. } => {
+                return self.create_df_logical_plan(stmt.clone());
+            }
             _ => {
                 return Err(CompilationError::Unsupported(
                     "Unsupported query type".to_string(),
@@ -1154,7 +1165,11 @@ pub struct CompiledQuery {
 }
 
 pub enum QueryPlan {
+    // Query will not be executed, we already knows how respond to it
+    Meta(Arc<dataframe::DataFrame>),
+    // Query will be executed via Data Fusion
     DataFushionSelect(LogicalPlan, ExecutionContext),
+    // Query will be executed by direct request in Cube.js
     CubeSelect(CompiledQuery),
 }
 
@@ -1175,6 +1190,10 @@ impl QueryPlan {
                     Ok(serde_json::to_string(&compiled_query)?)
                 }
             }
+            QueryPlan::Meta(_) => Ok(
+                "This query doesnt have a plan, because it already has values for response"
+                    .to_string(),
+            ),
         }
     }
 }

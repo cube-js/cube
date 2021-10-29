@@ -455,6 +455,9 @@ impl Backend {
 
             let plan = convert_sql_to_cube_query(&query, Arc::new(ctx))?;
             match plan {
+                crate::compile::QueryPlan::Meta(data_frame) => {
+                    return Ok(data_frame);
+                },
                 crate::compile::QueryPlan::DataFushionSelect(plan, ctx) => {
                     let df = DataFrameImpl::new(
                         ctx.state,
