@@ -1,22 +1,18 @@
 use std::fmt::{self, Debug, Formatter};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
-use datafusion::arrow::array::Array;
-use datafusion::arrow::array::BooleanArray;
-use datafusion::arrow::array::Float64Array;
-use datafusion::arrow::array::Int64Array;
-use datafusion::arrow::array::StringArray;
-use datafusion::arrow::array::TimestampMicrosecondArray;
-use datafusion::arrow::array::TimestampNanosecondArray;
-use datafusion::arrow::array::UInt64Array;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::arrow::datatypes::TimeUnit;
-use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::{
+    Array, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
+};
+use datafusion::arrow::{
+    array::{BooleanArray, TimestampNanosecondArray, UInt64Array},
+    datatypes::{DataType, TimeUnit},
+    record_batch::RecordBatch,
+};
 use log::{error, warn};
 use msql_srv::ColumnType;
 
-use crate::compile::builder::CompiledQueryFieldMeta;
-use crate::CubeError;
+use crate::{compile::builder::CompiledQueryFieldMeta, CubeError};
 
 #[derive(Clone, Debug)]
 pub struct Column {
