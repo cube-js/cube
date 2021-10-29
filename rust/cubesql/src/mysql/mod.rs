@@ -64,6 +64,9 @@ impl Backend {
             "set autocommit=1" => true,
             "set sql_mode='strict_trans_tables'" => true,
             "set sql_select_limit=501" => true,
+            // Metabase
+            // @todo We need to support multiple variables in parser for Set statement
+            "set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables')" => true,
             _ => false,
         };
 
@@ -82,6 +85,38 @@ impl Backend {
                             dataframe::TableValue::String("sql_mode".to_string()),
                             dataframe::TableValue::String("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string())
                         ])]
+                    )
+                ),
+            )
+        } else if query_lower.eq("show variables where variable_name in ('max_allowed_packet','system_time_zone','time_zone','auto_increment_increment')") {
+            return Ok(
+                Arc::new(
+                    dataframe::DataFrame::new(
+                        vec![dataframe::Column::new(
+                            "Variable_name".to_string(),
+                            ColumnType::MYSQL_TYPE_STRING,
+                        ), dataframe::Column::new(
+                            "Value".to_string(),
+                            ColumnType::MYSQL_TYPE_STRING,
+                        )],
+                        vec![
+                            dataframe::Row::new(vec![
+                                dataframe::TableValue::String("auto_increment_increment".to_string()),
+                                dataframe::TableValue::Int64(1)
+                            ]),
+                            dataframe::Row::new(vec![
+                                dataframe::TableValue::String("max_allowed_packet".to_string()),
+                                dataframe::TableValue::Int64(4194304)
+                            ]),
+                            dataframe::Row::new(vec![
+                                dataframe::TableValue::String("system_time_zone".to_string()),
+                                dataframe::TableValue::String("UTC".to_string())
+                            ]),
+                            dataframe::Row::new(vec![
+                                dataframe::TableValue::String("time_zone".to_string()),
+                                dataframe::TableValue::String("SYSTEM".to_string())
+                            ])
+                        ]
                     )
                 ),
             )
