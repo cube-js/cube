@@ -249,14 +249,18 @@ export class RefreshScheduler {
       const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
       const [[refreshKey]] = invalidateKeyQueries || [[]];
 
-      const sqlMap = {
+      const refreshesSqlMap = {
         refreshKey,
         refreshRangeStart,
         refreshRangeEnd
       };
-      Object.keys(sqlMap).forEach((field) => {
+      const preAggRefreshesWithSql = {};
+      Object.keys(refreshesSqlMap).forEach((field) => {
         if (preAggregation?.preAggregation[field]?.sql) {
-          preAggregation.preAggregation[field].sql = sqlMap[field];
+          preAggRefreshesWithSql[field] = {
+            ...preAggregation.preAggregation[field],
+            sql: refreshesSqlMap[field]
+          };
         }
       });
 
@@ -264,7 +268,13 @@ export class RefreshScheduler {
         timezones,
         invalidateKeyQueries,
         preAggregationStartEndQueries,
-        preAggregation,
+        preAggregation: {
+          ...preAggregation,
+          preAggregation: {
+            ...preAggregation?.preAggregation,
+            ...preAggRefreshesWithSql
+          }
+        },
         partitions
       };
     }));
