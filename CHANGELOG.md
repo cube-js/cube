@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.51](https://github.com/cube-js/cube.js/compare/v0.28.50...v0.28.51) (2021-10-30)
+
+
+### Bug Fixes
+
+* Prevent mutation pre-aggregation objects, debug API ([#3605](https://github.com/cube-js/cube.js/issues/3605)) ([0f982ce](https://github.com/cube-js/cube.js/commit/0f982ce7951a6bec059cd9710b26b2f9b3f8b78a))
+* **cubejs-client-ngx:** FilterMember.replace() will no longer update all filters with replacement ([#3597](https://github.com/cube-js/cube.js/issues/3597)) ([f972ad3](https://github.com/cube-js/cube.js/commit/f972ad375a7baccf3f67b58a8f2148ab8b278201))
+* **native:** warning - is missing a bundled dependency node-pre-gyp ([0bee2f7](https://github.com/cube-js/cube.js/commit/0bee2f7f1776eb8e11cfed003f2e4741c73b1f48))
+
+
+### Features
+
+* **cubesql:** Skip SET  = <expr> ([616023a](https://github.com/cube-js/cube.js/commit/616023a433cdf49fe76fc175b7c24abe267ea5f2))
+* **cubesql:** Support db(), version() via QE ([5a289e1](https://github.com/cube-js/cube.js/commit/5a289e15f0c689ac3277edbb9c50bb11f34abdcc))
+* **cubesql:** Support system variables ([#3592](https://github.com/cube-js/cube.js/issues/3592)) ([d2bd1fa](https://github.com/cube-js/cube.js/commit/d2bd1fab4674105e777b799db580d608b2c17caf))
+* **cubesql:** Use real Query Engine for simple queries ([cc907d3](https://github.com/cube-js/cube.js/commit/cc907d3e2b35462a789427e084989c2ee4a693db))
+
+
+
+
+
 ## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
 
 

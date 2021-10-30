@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.51](https://github.com/cube-js/cube.js/compare/v0.28.50...v0.28.51) (2021-10-30)
+
+
+### Bug Fixes
+
+* Prevent mutation pre-aggregation objects, debug API ([#3605](https://github.com/cube-js/cube.js/issues/3605)) ([0f982ce](https://github.com/cube-js/cube.js/commit/0f982ce7951a6bec059cd9710b26b2f9b3f8b78a))
+
+
+
+
+
 ## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
 
 

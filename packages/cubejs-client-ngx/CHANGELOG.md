@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.51](https://github.com/cube-js/cube.js/compare/v0.28.50...v0.28.51) (2021-10-30)
+
+
+### Bug Fixes
+
+* **cubejs-client-ngx:** FilterMember.replace() will no longer update all filters with replacement ([#3597](https://github.com/cube-js/cube.js/issues/3597)) ([f972ad3](https://github.com/cube-js/cube.js/commit/f972ad375a7baccf3f67b58a8f2148ab8b278201))
+
+
+
+
+
 ## [0.28.10](https://github.com/cube-js/cube.js/compare/v0.28.9...v0.28.10) (2021-07-30)
 
 **Note:** Version bump only for package @cubejs-client/ngx
