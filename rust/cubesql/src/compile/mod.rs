@@ -10,7 +10,7 @@ use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace};
 use serde::Serialize;
 use serde_json::json;
-use sqlparser::ast;
+use sqlparser::ast::{self, Ident, ObjectName};
 use sqlparser::parser::Parser;
 
 use cubeclient::models::{
@@ -1009,6 +1009,9 @@ impl QueryPlanner {
                     vec![],
                 ))));
             }
+            ast::Statement::ShowVariable { variable } => {
+                return self.show_variable_to_plan(&variable);
+            }
             // Proxy some queries to DF
             ast::Statement::ShowColumns { .. } | ast::Statement::ShowVariable { .. } => {
                 return self.create_df_logical_plan(stmt.clone());
@@ -1121,6 +1124,33 @@ impl QueryPlanner {
                 "Unknown cube: {}",
                 table_name
             )));
+        }
+    }
+
+    fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
+        let name = ObjectName(variable.to_vec()).to_string();
+        if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
+            return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                vec![dataframe::Column::new(
+                    "Database".to_string(),
+                    ColumnType::MYSQL_TYPE_STRING,
+                )],
+                vec![
+                    dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "information_schema".to_string(),
+                    )]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String("mysql".to_string())]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "performance_schema".to_string(),
+                    )]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
+                ],
+            ))));
+        } else {
+            return self.create_df_logical_plan(ast::Statement::ShowVariable {
+                variable: variable.clone(),
+            });
         }
     }
 
