@@ -183,34 +183,6 @@ impl Backend {
                     )
                 ),
             )
-        } else if query_lower.eq("show schemas") || query_lower.eq("show databases") {
-            return Ok(
-                Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "Database".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                        )],
-                        vec![
-                            dataframe::Row::new(vec![
-                                dataframe::TableValue::String("db".to_string())
-                            ]),
-                            dataframe::Row::new(vec![
-                                dataframe::TableValue::String("information_schema".to_string())
-                            ]),
-                            dataframe::Row::new(vec![
-                                dataframe::TableValue::String("mysql".to_string())
-                            ]),
-                            dataframe::Row::new(vec![
-                                dataframe::TableValue::String("performance_schema".to_string())
-                            ]),
-                            dataframe::Row::new(vec![
-                                dataframe::TableValue::String("sys".to_string())
-                            ])
-                        ]
-                    )
-                ),
-            )
         } else if query_lower.eq("select connection_id()") {
             return Ok(
                 Arc::new(
