@@ -1189,6 +1189,9 @@ export class PreAggregationPartitionRangeLoader {
 
   private async partitionRanges() {
     const buildRange = await this.loadBuildRange();
+    if (!buildRange[0] || !buildRange[1]) {
+      return [];
+    }
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
       buildRange,
       this.preAggregation.matchedTimeDimensionDateRange,
