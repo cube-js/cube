@@ -121,11 +121,22 @@ impl Row {
                     values.push(column_value);
                 }
                 ColumnType::MYSQL_TYPE_STRING => {
-                    if let Some(v) = value.as_str() {
-                        values.push(TableValue::String(v.to_string()))
-                    } else {
-                        values.push(TableValue::Null);
-                    }
+                    let column_value = match value {
+                        serde_json::Value::Null => TableValue::Null,
+                        serde_json::Value::String(v) => TableValue::String(v.clone()),
+                        serde_json::Value::Bool(v) => TableValue::Boolean(*v),
+                        serde_json::Value::Number(v) => TableValue::String(v.to_string()),
+                        v => {
+                            error!(
+                                "Unable to map value {:?} to MYSQL_TYPE_STRING (returning null)",
+                                v
+                            );
+
+                            TableValue::Null
+                        }
+                    };
+
+                    values.push(column_value);
                 }
                 ColumnType::MYSQL_TYPE_TINY => {
                     let column_value = match value {
