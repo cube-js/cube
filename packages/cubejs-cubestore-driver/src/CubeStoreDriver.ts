@@ -113,8 +113,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     } else {
       throw new Error(`Unsupported table data passed to ${this.constructor}`);
     }
+    this.logger('Insert into Cube Store completed', { table });
   }
 
+  // SIMPLE
   private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData) {
     await this.createTable(table, columns);
     try {
@@ -122,6 +124,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         const [query, params] = indexesSql[i].sql;
         await this.query(query, params);
       }
+      this.logger('Insert into Cube Store', { table });
       const batchSize = 2000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
@@ -139,16 +142,19 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
           params,
         );
       }
-    } catch (e) {
+    } catch (e: any) {
+      this.logger('Insert into Cube Store failed', { error: e.stack || e.message });
       await this.dropTable(table);
       throw e;
     }
   }
 
+  // EXPORT / UNLOAD
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
 
+    this.logger('Insert into Cube Store', { table });
     if (files.length > 0) {
       // eslint-disable-next-line no-unused-vars
       const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
@@ -160,17 +166,20 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;
     return this.query(createTableSqlWithoutLocation, []).catch(e => {
+      this.logger('Insert into Cube Store failed', { table, error: e.stack || e.message });
       e.message = `Error during create table: ${createTableSqlWithoutLocation}: ${e.message}`;
       throw e;
     });
   }
 
+  // BATCHING
   private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
     const tempFile = tempy.file();
 
     try {
+      this.logger('Upload to staging area', { table });
       const outputStream = createWriteStream(tempFile);
       await new Promise(
         (resolve, reject) => pipeline(
@@ -189,9 +198,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
       if (res.status !== 200) {
         const err = await res.json();
+        this.logger('Upload to staging area failed', { table, error: err.error });
         throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
       }
+      this.logger('Upload to staging area completed', { table });
+
+      this.logger('Insert into Cube Store', { table });
       await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
+        this.logger('Insert into Cube Store failed', { table, error: e.error });
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
       });
@@ -200,6 +214,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
+  // TODO: ???
   private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[]) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');

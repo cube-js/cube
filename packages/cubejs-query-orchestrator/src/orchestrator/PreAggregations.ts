@@ -749,6 +749,10 @@ export class PreAggregationLoader {
         targetTableName
       );
     this.logExecutingSql(invalidationKeys, query, params, targetTableName, newVersionEntry);
+    this.logger('Downloading external pre-aggregation via table', {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId
+    });
     await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
       query,
