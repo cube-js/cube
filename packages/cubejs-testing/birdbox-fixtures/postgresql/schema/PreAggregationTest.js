@@ -97,8 +97,6 @@ cube(`visitors`, {
           columns: ['source', 'created_at']
         }
       },
-      partitionGranularity: 'month',
-      timeDimensionReference: createdAt
     },
     googleRollup: {
       type: 'rollup',
@@ -318,13 +316,15 @@ cube('GoogleVisitors', {
     immutable: true,
   },
   extends: visitors,
-  sql: `select v.* from ${visitors.sql()} v where v.source = 'google'`
+  sql: `select v.* from ${visitors.sql()} v where v.source = 'google'`,
+  sqlAlias: `GV`
 });
 
 cube('EveryHourVisitors', {
   refreshKey: {
     immutable: true,
   },
+  sqlAlias: `EHV`,
   extends: visitors,
   sql: `select v.* from ${visitors.sql()} v where v.source = 'google'`,
 
@@ -353,11 +353,13 @@ cube('EveryHourVisitors', {
 
 cube('EmptyHourVisitors', {
   extends: EveryHourVisitors,
+  sqlAlias: `EMHV`,
   sql: `select v.* from ${visitors.sql()} v where created_at < '2000-01-01'`
 });
 
 cube('ReferenceOriginalSql', {
   extends: visitors,
+  sqlAlias: `ROS`,
   sql: `select v.* from ${visitors.sql()} v where v.source = 'google'`,
 
   preAggregations: {

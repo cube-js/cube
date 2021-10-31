@@ -14,6 +14,7 @@ services:
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
       CUBEJS_CUBESTORE_HOST: cubestore
+      CUBEJS_PLAYGROUND_AUTH_SECRET: mysupersecret
     depends_on:
       - db
       - cubestore

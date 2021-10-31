@@ -189,6 +189,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
         CUBEJS_DEV_MODE: 'true',
         CUBEJS_WEB_SOCKETS: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
+        CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
       },
     }
   );
