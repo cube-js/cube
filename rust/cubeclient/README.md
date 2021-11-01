@@ -2,7 +2,7 @@
 
 > API client for Cube.JS powered on Rust language
 
-Models are generated from Cube.js [Open API Specificiation](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-api-gateway/openspec.yml).
+Models are generated from [Cube.js Open API Specificiation](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-api-gateway/openspec.yml).
 
 # Protocols
 
