@@ -17,7 +17,6 @@ use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
@@ -73,6 +72,8 @@ use tracing::{instrument, Instrument};
 pub trait Cluster: DIService + Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
 
+    fn config(&self) -> Arc<dyn ConfigObj>;
+
     /// Send full select to a worker, which will act as the main node for the query.
     async fn route_select(
         &self,
@@ -118,9 +119,7 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn job_result_listener(&self) -> JobResultListener;
 
-    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError>;
-
-    fn node_name_by_partition_rows(&self, partitions: &Vec<IdRow<Partition>>) -> String;
+    fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String;
 
     async fn node_name_for_import(
         &self,
@@ -262,6 +261,10 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
+    fn config(&self) -> Arc<dyn ConfigObj> {
+        self.config_obj.clone()
+    }
+
     async fn route_select(
         &self,
         node_name: &str,
@@ -362,27 +365,12 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn node_name_by_partitions(&self, partition_ids: &[u64]) -> Result<String, CubeError> {
-        let mut partitions = Vec::new();
-        for partition_id in partition_ids.iter() {
-            partitions.push(self.meta_store.get_partition(*partition_id).await?);
+    fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String {
+        if let Some(id) = p.get_row().multi_partition_id() {
+            pick_worker_by_ids(self.config_obj.as_ref(), [id]).to_string()
+        } else {
+            pick_worker_by_partitions(self.config_obj.as_ref(), [p]).to_string()
         }
-        Ok(self.node_name_by_partition_rows(&mut partitions))
-    }
-
-    fn node_name_by_partition_rows(&self, partitions: &Vec<IdRow<Partition>>) -> String {
-        let workers = self.config_obj.select_workers();
-        if workers.is_empty() {
-            return self.server_name.to_string();
-        }
-
-        let mut hasher = DefaultHasher::new();
-        for partition in partitions.iter() {
-            partition.get_row().get_min_val().hash(&mut hasher);
-            partition.get_row().get_max_val().hash(&mut hasher);
-            partition.get_row().get_index_id().hash(&mut hasher);
-        }
-        workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
 
     async fn node_name_for_import(
@@ -405,7 +393,7 @@ impl Cluster for ClusterImpl {
         partition: IdRow<Partition>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        let node_name = self.node_name_by_partitions(&[partition.get_id()]).await?;
+        let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
             futures.push(self.warmup_download(&node_name, name));
@@ -738,6 +726,35 @@ impl JobRunner {
                     let partition_id = *partition_id;
                     Ok(cube_ext::spawn(async move {
                         compaction_service.compact(partition_id).await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::MultiPartitionSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let id = *id;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service.split_multi_partition(id).await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::FinishMultiSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, multi_part_id) = job.row_reference()
+                {
+                    let meta_store = self.meta_store.clone();
+                    let compaction_service = self.compaction_service.clone();
+                    let multi_part_id = *multi_part_id;
+                    Ok(cube_ext::spawn(async move {
+                        for p in meta_store.find_unsplit_partitions(multi_part_id).await? {
+                            compaction_service
+                                .finish_multi_split(multi_part_id, p)
+                                .await?
+                        }
+                        Ok(())
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -1418,18 +1435,10 @@ impl ClusterImpl {
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
         for (p, chunks) in partitions {
-            let node_name = match self.node_name_by_partitions(&[p.partition_id]).await {
-                Ok(p) => p,
-                Err(e) => {
-                    log::error!("Failed to get node by partition: {}", e);
-                    return;
-                }
-            };
-            if node_name != self.server_name {
+            if self.node_name_by_partition(&p) != self.server_name {
                 continue;
             }
-            if p.has_main_table {
-                let file = partition_file_name(p.partition_id);
+            if let Some(file) = p.get_row().get_full_name(p.get_id()) {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
                     return;
@@ -1531,4 +1540,43 @@ impl MessageStream for QueryStream {
 
 fn is_self_reference(name: &str) -> bool {
     name.starts_with("@loop:")
+}
+
+/// Picks a worker by opaque id for any distributing work in a cluster.
+/// Ids usually come from multi-partitions of the metastore.
+pub fn pick_worker_by_ids(
+    config: &'a dyn ConfigObj,
+    ids: impl IntoIterator<Item = u64>,
+) -> &'a str {
+    let workers = config.select_workers();
+    if workers.is_empty() {
+        return config.server_name().as_str();
+    }
+
+    let mut hasher = DefaultHasher::new();
+    for p in ids {
+        p.hash(&mut hasher);
+    }
+    workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
+}
+
+/// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack
+/// to keep the same node for partitions produced by compaction that merged
+/// chunks into the main table of a single partition.
+pub fn pick_worker_by_partitions(
+    config: &'a dyn ConfigObj,
+    partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
+) -> &'a str {
+    let workers = config.select_workers();
+    if workers.is_empty() {
+        return config.server_name().as_str();
+    }
+
+    let mut hasher = DefaultHasher::new();
+    for partition in partitions {
+        partition.get_row().get_min_val().hash(&mut hasher);
+        partition.get_row().get_max_val().hash(&mut hasher);
+        partition.get_row().get_index_id().hash(&mut hasher);
+    }
+    workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
 }

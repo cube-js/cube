@@ -367,18 +367,15 @@ impl ChunkDataStore for ChunkStore {
 
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError> {
         if chunk.get_row().in_memory() {
-            let node_name = self
-                .cluster
-                .node_name_by_partitions(&[chunk.get_row().get_partition_id()])
-                .await?;
-            let server_name = self.cluster.server_name();
-            if node_name != server_name {
-                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
-            }
             let partition = self
                 .meta_store
                 .get_partition(chunk.get_row().get_partition_id())
                 .await?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            let server_name = self.cluster.server_name();
+            if node_name != server_name {
+                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
+            }
             let index = self
                 .meta_store
                 .get_index(partition.get_row().get_index_id())
@@ -720,10 +717,7 @@ impl ChunkStore {
                 chunk
             );
             let batch = RecordBatch::try_new(Arc::new(arrow_schema(&index.get_row())), data)?;
-            let node_name = self
-                .cluster
-                .node_name_by_partitions(&[partition.get_id()])
-                .await?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
             Ok(cube_ext::spawn(async move {
                 cluster

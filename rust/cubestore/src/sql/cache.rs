@@ -111,6 +111,7 @@ impl SqlResultCache {
 #[cfg(test)]
 mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
+    use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
@@ -119,6 +120,7 @@ mod tests {
     use flatbuffers::bitflags::_core::sync::atomic::AtomicI64;
     use futures::future::join_all;
     use futures_timer::Delay;
+    use std::collections::HashMap;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::Duration;
@@ -132,7 +134,10 @@ mod tests {
                 produce_one_row: false,
                 schema,
             },
-            Vec::new(),
+            PlanningMeta {
+                indices: Vec::new(),
+                multi_part_subtree: HashMap::new(),
+            },
         )
         .await?;
         let counter = Arc::new(AtomicI64::new(1));

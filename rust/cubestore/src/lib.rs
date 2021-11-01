@@ -11,6 +11,7 @@
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
 #![feature(arc_new_cyclic)]
+#![feature(is_sorted)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

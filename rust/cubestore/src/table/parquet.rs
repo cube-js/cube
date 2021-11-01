@@ -119,6 +119,7 @@ mod tests {
             ],
             6,
             None,
+            None,
         )
         .unwrap();
 
@@ -206,6 +207,7 @@ mod tests {
                     ),
                 ],
                 3,
+                None,
                 None,
             )
             .unwrap(),
@@ -316,6 +318,7 @@ mod tests {
                 vec![Column::new("b".to_string(), ColumnType::Boolean, 0)],
                 1,
                 None,
+                None,
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
@@ -361,6 +364,7 @@ mod tests {
                 Column::new("bytes".into(), ColumnType::Bytes, 1),
             ],
             1,
+            None,
             None,
         )
         .unwrap();

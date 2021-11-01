@@ -77,8 +77,8 @@ pub fn cmp_partition_column_same_type(l: &TableValue, r: &dyn Array, ri: usize) 
     )
 }
 
-/// Use for comparing min/max rows insied partitions.
-pub fn cmp_row_markers(key_size: usize, l: &Option<Row>, r: &Option<Row>) -> Ordering {
+/// Use for comparing min row marker inside partitions.
+pub fn cmp_min_rows(key_size: usize, l: Option<&Row>, r: Option<&Row>) -> Ordering {
     match (l, r) {
         (None, None) => Ordering::Equal,
         (None, _) => Ordering::Less,

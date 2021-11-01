@@ -15,6 +15,7 @@ impl Index {
         columns: Vec<Column>,
         sort_key_size: u64,
         partition_split_key_size: Option<u64>,
+        multi_index_id: Option<u64>,
     ) -> Result<Index, CubeError> {
         if sort_key_size == 0 {
             return Err(CubeError::user(format!(
@@ -28,6 +29,7 @@ impl Index {
             columns,
             sort_key_size,
             partition_split_key_size,
+            multi_index_id,
         })
     }
 
@@ -54,6 +56,10 @@ impl Index {
 
     pub fn partition_split_key_size(&self) -> &Option<u64> {
         &self.partition_split_key_size
+    }
+
+    pub fn multi_index_id(&self) -> Option<u64> {
+        self.multi_index_id
     }
 }
 

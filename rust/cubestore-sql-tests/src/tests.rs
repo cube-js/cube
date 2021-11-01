@@ -86,6 +86,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
         t("topk_large_inputs", topk_large_inputs),
+        t("partitioned_index", partitioned_index),
+        t(
+            "partitioned_index_if_not_exists",
+            partitioned_index_if_not_exists,
+        ),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
@@ -2098,6 +2103,73 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
            \n                    Empty"
     );
+}
+
+async fn partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
+async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.ind(id int, url text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.other_ind(id int, url text)")
+        .await
+        .unwrap();
 }
 
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
