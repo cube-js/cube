@@ -35,6 +35,7 @@ use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::Itertools;
 
 use crate::cluster::Cluster;
+use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition, Schema};
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
@@ -44,20 +45,45 @@ use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, Ser
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
+use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
+use std::iter::FromIterator;
 
 #[cfg(test)]
 pub async fn choose_index(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
-) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
+) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     choose_index_ext(p, metastore, true).await
+}
+
+/// Information required to distribute the logical plan into multiple workers.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PlanningMeta {
+    pub indices: Vec<IndexSnapshot>,
+    /// Non-empty only if indices point to multi-partitions.
+    /// Custom serde handlers as flatbuffers can't handle hash maps with integer keys.
+    #[serde(deserialize_with = "de_vec_as_map")]
+    #[serde(serialize_with = "se_vec_as_map")]
+    pub multi_part_subtree: HashMap<u64, MultiPartition>,
+}
+
+fn se_vec_as_map<S: Serializer>(m: &HashMap<u64, MultiPartition>, s: S) -> Result<S::Ok, S::Error> {
+    m.iter().collect_vec().serialize(s)
+}
+
+fn de_vec_as_map<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<HashMap<u64, MultiPartition>, D::Error> {
+    Vec::<(u64, MultiPartition)>::deserialize(d).map(HashMap::from_iter)
 }
 
 pub async fn choose_index_ext(
     p: &LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
-) -> Result<(LogicalPlan, Vec<IndexSnapshot>), DataFusionError> {
+) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
     rewrite_plan(p, &None, &mut collector)?;
@@ -78,10 +104,19 @@ pub async fn choose_index_ext(
         )
         .await?;
     assert_eq!(tables.len(), collector.constraints.len());
-    let mut indices = Vec::new();
+    let mut candidates = Vec::new();
     for (c, inputs) in collector.constraints.iter().zip(tables) {
-        indices.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
+        candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
     }
+    // We pick partitioned index only when all tables request the same one.
+    let mut indices: Vec<_> = match all_have_same_partitioned_index(&candidates) {
+        true => candidates
+            .into_iter()
+            .map(|c| c.partitioned_index.unwrap())
+            .collect(),
+        false => candidates.into_iter().map(|c| c.ordinary_index).collect(),
+    };
+
     let partitions = metastore
         .get_active_partitions_and_chunks_by_index_id_for_select(
             indices.iter().map(|i| i.index.get_id()).collect_vec(),
@@ -105,7 +140,44 @@ pub async fn choose_index_ext(
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
 
-    Ok((plan, indices))
+    let mut multi_parts = Vec::new();
+    for i in &indices {
+        for p in &i.partitions {
+            if let Some(m) = p.partition.get_row().multi_partition_id() {
+                multi_parts.push(m);
+            }
+        }
+    }
+
+    let multi_part_subtree = metastore.get_multi_partition_subtree(multi_parts).await?;
+    Ok((
+        plan,
+        PlanningMeta {
+            indices,
+            multi_part_subtree,
+        },
+    ))
+}
+
+fn all_have_same_partitioned_index(cs: &[IndexCandidate]) -> bool {
+    if cs.is_empty() {
+        return true;
+    }
+    let multi_index_id = |c: &IndexCandidate| {
+        c.partitioned_index
+            .as_ref()
+            .and_then(|i| i.index.get_row().multi_index_id())
+    };
+    let id = match multi_index_id(&cs[0]) {
+        Some(id) => id,
+        None => return false,
+    };
+    for c in &cs[1..] {
+        if multi_index_id(c) != Some(id) {
+            return false;
+        }
+    }
+    return true;
 }
 
 #[async_trait]
@@ -118,6 +190,10 @@ pub trait PlanIndexStore: Send + Sync {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError>;
+    async fn get_multi_partition_subtree(
+        &self,
+        multi_part_ids: Vec<u64>,
+    ) -> Result<HashMap<u64, MultiPartition>, CubeError>;
 }
 
 #[async_trait]
@@ -134,6 +210,13 @@ impl<'a> PlanIndexStore for &'a dyn MetaStore {
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
         MetaStore::get_active_partitions_and_chunks_by_index_id_for_select(*self, index_id).await
+    }
+
+    async fn get_multi_partition_subtree(
+        &self,
+        multi_part_ids: Vec<u64>,
+    ) -> Result<HashMap<u64, MultiPartition>, CubeError> {
+        MetaStore::get_multi_partition_subtree(*self, multi_part_ids).await
     }
 }
 
@@ -305,7 +388,7 @@ impl ChooseIndex<'_> {
                     snapshot.clone(),
                     // Filled by workers
                     HashMap::new(),
-                    HashSet::new(),
+                    Vec::new(),
                 )?);
 
                 let index_schema = source.schema();
@@ -322,55 +405,76 @@ impl ChooseIndex<'_> {
     }
 }
 
+struct IndexCandidate {
+    pub ordinary_index: IndexSnapshot,
+    pub partitioned_index: Option<IndexSnapshot>,
+}
+
 // Picks the index, but not partitions snapshots.
 async fn pick_index(
     c: &IndexConstraints,
     schema: IdRow<Schema>,
     table: IdRow<Table>,
     indices: Vec<IdRow<Index>>,
-) -> Result<IndexSnapshot, DataFusionError> {
+) -> Result<IndexCandidate, DataFusionError> {
     let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
 
     let mut indices = indices.into_iter();
     let default_index = indices.next().expect("no default index");
-    let (index, sort_on) = if let Some(projection_column_indices) = &c.projection {
+    let (index, mut partitioned_index, sort_on) = if let Some(projection_column_indices) =
+        &c.projection
+    {
         let projection_columns = CubeTable::project_to_table(&table, &projection_column_indices);
-        if let Some((index, _)) = indices
-            .filter_map(|i| {
-                if let Some((join_on_columns, _)) = sort_on.as_ref() {
-                    // TODO: join_on_columns may be larger than sort_key_size of the index.
-                    let join_columns_in_index = join_on_columns
-                        .iter()
-                        .map(|c| {
-                            i.get_row()
-                                .get_columns()
-                                .iter()
-                                .find(|ic| ic.get_name().as_str() == c.as_str())
-                                .cloned()
-                        })
-                        .collect::<Option<Vec<_>>>();
-                    let join_columns_in_index = match join_columns_in_index {
-                        None => return None,
-                        Some(c) => c,
-                    };
-                    let join_columns_indices =
-                        CubeTable::project_to_index_positions(&join_columns_in_index, &i);
-                    for (i, col_i) in join_columns_indices.iter().enumerate() {
-                        if col_i != &Some(i) {
-                            return None;
-                        }
-                    }
+        let mut partitioned_index = None;
+        let mut ordinary_index = None;
+        let mut ordinary_score = usize::MAX;
+        for i in indices {
+            if let Some((join_on_columns, _)) = sort_on.as_ref() {
+                // TODO: join_on_columns may be larger than sort_key_size of the index.
+                let join_columns_in_index = join_on_columns
+                    .iter()
+                    .map(|c| {
+                        i.get_row()
+                            .get_columns()
+                            .iter()
+                            .find(|ic| ic.get_name().as_str() == c.as_str())
+                            .cloned()
+                    })
+                    .collect::<Option<Vec<_>>>();
+                let join_columns_in_index = match join_columns_in_index {
+                    None => continue,
+                    Some(c) => c,
+                };
+                let join_columns_indices =
+                    CubeTable::project_to_index_positions(&join_columns_in_index, &i);
+
+                let matches = join_columns_indices
+                    .iter()
+                    .enumerate()
+                    .all(|(i, col_i)| Some(i) == *col_i);
+                if !matches {
+                    continue;
                 }
-                let projected_index_positions =
-                    CubeTable::project_to_index_positions(&projection_columns, &i);
-                let score = projected_index_positions
-                    .into_iter()
-                    .fold_options(0, |a, b| a + b);
-                score.map(|s| (i, s))
-            })
-            .min_by_key(|(_, s)| *s)
-        {
-            (index, sort_on)
+            }
+            let projected_index_positions =
+                CubeTable::project_to_index_positions(&projection_columns, &i);
+            let score = projected_index_positions
+                .into_iter()
+                .fold_options(0, |a, b| a + b);
+            if let Some(score) = score {
+                if i.get_row().multi_index_id().is_some() {
+                    debug_assert!(partitioned_index.is_none());
+                    partitioned_index = Some(i);
+                    continue;
+                }
+                if score < ordinary_score {
+                    ordinary_index = Some(i);
+                    ordinary_score = score;
+                }
+            }
+        }
+        if let Some(index) = ordinary_index {
+            (index, partitioned_index, sort_on)
         } else {
             if let Some((join_on_columns, true)) = sort_on.as_ref() {
                 let table_name = c.table.table_name();
@@ -384,7 +488,7 @@ async fn pick_index(
                     join_on_columns.join(", ")
                 )));
             }
-            (default_index, None)
+            (default_index, partitioned_index, None)
         }
     } else {
         if let Some((join_on_columns, _)) = sort_on {
@@ -394,17 +498,33 @@ async fn pick_index(
                 join_on_columns.join(", ")
             )));
         }
-        (default_index, None)
+        (default_index, None, None)
     };
 
-    Ok(IndexSnapshot {
-        index,
-        partitions: Vec::new(), // filled with results of `pick_partitions` later.
-        table_path: TablePath {
-            table,
-            schema: Arc::new(schema),
-        },
-        sort_on: sort_on.map(|(cols, _)| cols.clone()),
+    // Only use partitioned index for joins. Joins are indicated by the required flag.
+    if !sort_on
+        .as_ref()
+        .map(|(_, required)| *required)
+        .unwrap_or(false)
+    {
+        partitioned_index = None;
+    }
+
+    let schema = Arc::new(schema);
+    let create_snapshot = |index| {
+        IndexSnapshot {
+            index,
+            partitions: Vec::new(), // filled with results of `pick_partitions` later.
+            table_path: TablePath {
+                table: table.clone(),
+                schema: schema.clone(),
+            },
+            sort_on: sort_on.as_ref().map(|(cols, _)| (*cols).clone()),
+        }
+    };
+    Ok(IndexCandidate {
+        ordinary_index: create_snapshot(index),
+        partitioned_index: partitioned_index.map(create_snapshot),
     })
 }
 
@@ -653,7 +773,7 @@ impl CubeExtensionPlanner {
                 schema,
                 c.clone(),
                 self.serialized_plan.clone(),
-                snapshots.clone(),
+                snapshots,
                 input,
                 use_streaming,
             )))
@@ -753,6 +873,7 @@ pub mod tests {
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
+    use crate::metastore::multi_index::MultiPartition;
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
     use crate::queryplanner::planning::{choose_index, PlanIndexStore};
@@ -761,6 +882,7 @@ pub mod tests {
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::CubeError;
     use datafusion::catalog::TableReference;
+    use std::collections::HashMap;
 
     #[tokio::test]
     pub async fn test_choose_index() {
@@ -999,6 +1121,7 @@ pub mod tests {
                 put_first("customer_city", &customers_cols),
                 1,
                 None,
+                None,
             )
             .unwrap(),
         );
@@ -1027,6 +1150,7 @@ pub mod tests {
                 put_first("order_customer", &orders_cols),
                 2,
                 None,
+                None,
             )
             .unwrap(),
         );
@@ -1036,6 +1160,7 @@ pub mod tests {
                 customers,
                 put_first("order_city", &orders_cols),
                 2,
+                None,
                 None,
             )
             .unwrap(),
@@ -1101,6 +1226,7 @@ pub mod tests {
                     table_id,
                     t.get_columns().clone(),
                     t.get_columns().len() as u64,
+                    None,
                     None,
                 )
                 .unwrap(),
@@ -1193,6 +1319,14 @@ pub mod tests {
                         .collect()
                 })
                 .collect())
+        }
+
+        async fn get_multi_partition_subtree(
+            &self,
+            multi_part_ids: Vec<u64>,
+        ) -> Result<HashMap<u64, MultiPartition>, CubeError> {
+            assert!(multi_part_ids.is_empty());
+            Ok(HashMap::new())
         }
     }
 

@@ -2,17 +2,20 @@ pub mod hll;
 mod optimizations;
 mod partition_filter;
 mod planning;
+pub use planning::PlanningMeta;
 pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
+mod filter_by_key_range;
 mod now;
 pub mod udfs;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore, MetaStoreTable};
 use crate::queryplanner::now::MaterializeNow;
@@ -42,13 +45,12 @@ use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{cube_ext, datasource::TableProvider, prelude::ExecutionContext};
-use itertools::Itertools;
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
 use std::any::Any;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -71,7 +73,7 @@ crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
-    Select(SerializedPlan, /*partitions*/ Vec<Vec<u64>>),
+    Select(SerializedPlan, /*workers*/ Vec<String>),
 }
 
 #[async_trait]
@@ -91,17 +93,18 @@ impl QueryPlanner for QueryPlannerImpl {
         trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            let (logical_plan, index_snapshots) = choose_index_ext(
+            let (logical_plan, meta) = choose_index_ext(
                 &logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
             )
             .await?;
-            let partitions = extract_partitions(&logical_plan)?;
-            QueryPlan::Select(
-                SerializedPlan::try_new(logical_plan, index_snapshots).await?,
-                partitions,
-            )
+            let workers = compute_workers(
+                self.config.as_ref(),
+                &logical_plan,
+                &meta.multi_part_subtree,
+            )?;
+            QueryPlan::Select(SerializedPlan::try_new(logical_plan, meta).await?, workers)
         } else {
             QueryPlan::Meta(logical_plan)
         };
@@ -476,11 +479,17 @@ impl TableProvider for CubeTableLogical {
     }
 }
 
-fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
-    struct Visitor {
-        snapshots: Vec<Vec<u64>>,
+fn compute_workers(
+    config: &dyn ConfigObj,
+    p: &LogicalPlan,
+    tree: &HashMap<u64, MultiPartition>,
+) -> Result<Vec<String>, CubeError> {
+    struct Visitor<'a> {
+        config: &'a dyn ConfigObj,
+        tree: &'a HashMap<u64, MultiPartition>,
+        workers: Vec<String>,
     }
-    impl PlanVisitor for Visitor {
+    impl<'a> PlanVisitor for Visitor<'a> {
         type Error = ();
 
         fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, ()> {
@@ -494,11 +503,12 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
                     } else {
                         return Ok(true);
                     }
-
-                    self.snapshots = ClusterSendExec::logical_partitions(&snapshots)
-                        .into_iter()
-                        .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
-                        .collect_vec();
+                    let workers = ClusterSendExec::distribute_to_workers(
+                        self.config,
+                        snapshots.as_slice(),
+                        self.tree,
+                    );
+                    self.workers = workers.into_iter().map(|w| w.0).collect();
                     Ok(false)
                 }
                 _ => Ok(true),
@@ -507,10 +517,12 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
     }
 
     let mut v = Visitor {
-        snapshots: Vec::new(),
+        config,
+        tree,
+        workers: Vec::new(),
     };
     match p.accept(&mut v) {
-        Ok(false) => Ok(v.snapshots),
+        Ok(false) => Ok(v.workers),
         Ok(true) => Err(CubeError::internal(
             "no cluster send node found in plan".to_string(),
         )),

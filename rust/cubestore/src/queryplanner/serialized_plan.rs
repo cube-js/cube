@@ -1,6 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
-use crate::queryplanner::planning::ClusterSendNode;
+use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -8,6 +8,7 @@ use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
+use crate::table::Row;
 use crate::CubeError;
 use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
@@ -24,20 +25,57 @@ use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::ast::RollingOffset;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct RowRange {
+    /// Inclusive lower bound.
+    pub start: Option<Row>,
+    /// Exclusive upper bound.
+    pub end: Option<Row>,
+}
+
+impl RowRange {
+    pub fn matches_all_rows(&self) -> bool {
+        self.start.is_none() && self.end.is_none()
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct RowFilter {
+    pub or_filters: Vec<RowRange>,
+}
+
+impl RowFilter {
+    pub fn append_or(&mut self, r: RowRange) {
+        if self.matches_all_rows() {
+            return;
+        }
+        if r.matches_all_rows() {
+            self.or_filters.clear();
+            self.or_filters.push(r);
+        } else {
+            self.or_filters.push(r);
+        }
+    }
+
+    pub fn matches_all_rows(&self) -> bool {
+        self.or_filters.len() == 1 && self.or_filters[0].matches_all_rows()
+    }
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
     logical_plan: Arc<SerializedLogicalPlan>,
     schema_snapshot: Arc<SchemaSnapshot>,
-    partition_ids_to_execute: HashSet<u64>,
+    partition_ids_to_execute: Vec<(u64, RowFilter)>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SchemaSnapshot {
-    index_snapshots: Vec<IndexSnapshot>,
+    index_snapshots: PlanningMeta,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -201,12 +239,16 @@ pub enum SerializePartitioning {
 
 pub struct WorkerContext {
     remote_to_local_names: HashMap<String, String>,
-    worker_partition_ids: HashSet<u64>,
+    worker_partition_ids: Vec<(u64, RowFilter)>,
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
 }
 
 impl SerializedLogicalPlan {
     fn logical_plan(&self, worker_context: &WorkerContext) -> Result<LogicalPlan, CubeError> {
+        debug_assert!(worker_context
+            .worker_partition_ids
+            .iter()
+            .is_sorted_by_key(|(id, _)| id));
         Ok(match self {
             SerializedLogicalPlan::Projection {
                 expr,
@@ -600,26 +642,25 @@ pub enum SerializedTableSource {
 impl SerializedPlan {
     pub async fn try_new(
         plan: LogicalPlan,
-        index_snapshots: Vec<IndexSnapshot>,
+        index_snapshots: PlanningMeta,
     ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
         Ok(SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
-            partition_ids_to_execute: HashSet::new(),
+            partition_ids_to_execute: Vec::new(),
         })
     }
 
-    pub fn with_partition_id_to_execute(&self, partition_ids_to_execute: HashSet<u64>) -> Self {
+    pub fn with_partition_id_to_execute(
+        &self,
+        partition_ids_to_execute: Vec<(u64, RowFilter)>,
+    ) -> Self {
         Self {
             logical_plan: self.logical_plan.clone(),
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
         }
-    }
-
-    pub fn partition_ids_to_execute(&self) -> HashSet<u64> {
-        self.partition_ids_to_execute.clone()
     }
 
     pub fn logical_plan(
@@ -629,17 +670,25 @@ impl SerializedPlan {
     ) -> Result<LogicalPlan, CubeError> {
         self.logical_plan.logical_plan(&WorkerContext {
             remote_to_local_names,
-            worker_partition_ids: self.partition_ids_to_execute(),
+            worker_partition_ids: self.partition_ids_to_execute.clone(),
             chunk_id_to_record_batches,
         })
     }
 
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
+        &self.schema_snapshot.index_snapshots.indices
+    }
+
+    pub fn planning_meta(&self) -> &PlanningMeta {
         &self.schema_snapshot.index_snapshots
     }
 
     pub fn files_to_download(&self) -> Vec<String> {
-        self.list_files_to_download(|id| self.partition_ids_to_execute.contains(&id))
+        self.list_files_to_download(|id| {
+            self.partition_ids_to_execute
+                .binary_search_by_key(&id, |(id, _)| *id)
+                .is_ok()
+        })
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
@@ -677,7 +726,11 @@ impl SerializedPlan {
     }
 
     pub fn in_memory_chunks_to_load(&self) -> Vec<IdRow<Chunk>> {
-        self.list_in_memory_chunks_to_load(|id| self.partition_ids_to_execute.contains(&id))
+        self.list_in_memory_chunks_to_load(|id| {
+            self.partition_ids_to_execute
+                .binary_search_by_key(&id, |(id, _)| *id)
+                .is_ok()
+        })
     }
 
     fn list_in_memory_chunks_to_load(
