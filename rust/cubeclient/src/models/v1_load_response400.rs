@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct V1LoadResponse400 {
     #[serde(rename = "error")]
     pub error: String,
