@@ -97,7 +97,7 @@ fn compile_select_expr(
                 builder.with_time_dimension(
                     V1LoadRequestQueryTimeDimension {
                         dimension: dimension.name.clone(),
-                        granularity,
+                        granularity: Some(granularity),
                         date_range: None,
                     },
                     CompiledQueryFieldMeta {
@@ -632,14 +632,71 @@ fn compile_where_expression(
     }
 }
 
+fn optimize_where_inner_filter(
+    tree: Box<CompiledFilterTree>,
+    builder: &mut QueryBuilder,
+) -> Option<Box<CompiledFilterTree>> {
+    match *tree {
+        CompiledFilterTree::Filter(ref filter) => match filter {
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values,
+            } => {
+                if operator.eq(&"inDateRange".to_string()) {
+                    let filter_pushdown = builder.push_date_range_for_time_dimenssion(
+                        member,
+                        json!(values.as_ref().unwrap()),
+                    );
+                    if filter_pushdown {
+                        None
+                    } else {
+                        debug!("Unable to push down {}", member);
+
+                        Some(tree)
+                    }
+                } else {
+                    Some(tree)
+                }
+            }
+            CompiledFilter::SegmentFilter { member } => {
+                builder.with_segment(member.clone());
+
+                None
+            }
+            _ => Some(tree),
+        },
+        _ => Some(tree),
+    }
+}
+
 fn optimize_where_filters(
     parent: Option<CompiledFilterTree>,
     current: CompiledFilterTree,
     builder: &mut QueryBuilder,
 ) -> Option<CompiledFilterTree> {
     if parent.is_none() {
-        match &current {
-            CompiledFilterTree::Filter(filter) => {
+        match current {
+            CompiledFilterTree::And(left, right) => {
+                let left_recompile = optimize_where_inner_filter(left, builder);
+                let right_recompile = optimize_where_inner_filter(right, builder);
+
+                match (left_recompile, right_recompile) {
+                    (Some(l), Some(r)) => {
+                        return Some(CompiledFilterTree::And(l, r));
+                    }
+                    (Some(l), None) => {
+                        return Some(*l);
+                    }
+                    (None, Some(r)) => {
+                        return Some(*r);
+                    }
+                    (None, None) => {
+                        return None;
+                    }
+                }
+            }
+            CompiledFilterTree::Filter(ref filter) => {
                 match filter {
                     CompiledFilter::Filter {
                         member,
@@ -1851,7 +1908,7 @@ mod tests {
                         segments: Some(vec![]),
                         time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                             dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: expected_granularity.to_string(),
+                            granularity: Some(expected_granularity.to_string()),
                             date_range: None,
                         }]),
                         order: None,
@@ -1878,30 +1935,73 @@ mod tests {
 
     #[test]
     fn test_where_filter_daterange() {
-        let query = convert_simple_select(
-            "SELECT 
-                COUNT(*), DATE(order_date) AS __timestamp
+        let to_check = vec![
+            // // Filter push down to TD (day)
+            (
+                "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
+                "order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // Create a new TD (dateRange filter pushdown)
+            (
+                "COUNT(*)".to_string(),
+                "order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // Create a new TD (dateRange filter pushdown from right side of CompiledFilterTree::And)
+            (
+                "COUNT(*)".to_string(),
+                "customer_gender = 'FEMALE' AND (order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'))".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // similar as below but from left side
+            (
+                "COUNT(*)".to_string(),
+                "(order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')) AND customer_gender = 'FEMALE'".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+        ];
+
+        for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
+            let query = convert_simple_select(format!(
+                "SELECT 
+                {}
                 FROM KibanaSampleDataEcommerce
-                WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
-                GROUP BY __timestamp"
-            .to_string(),
-        );
+                WHERE {}
+                GROUP BY __timestamp",
+                sql_projection, sql_filter
+            ));
 
-        let req = query.request;
-
-        assert_eq!(
-            req.time_dimensions,
-            Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: "day".to_string(),
-                date_range: Some(json!(vec![
-                    "2021-08-31T00:00:00+00:00".to_string(),
-                    "2021-09-06T23:59:59.999+00:00".to_string()
-                ])),
-            }])
-        );
-
-        assert_eq!(req.filters, None);
+            assert_eq!(query.request.time_dimensions, *expected_tdm)
+        }
     }
 
     #[test]
@@ -2065,6 +2165,11 @@ mod tests {
             (
                 "is_male = true".to_string(),
                 // This filter will be pushed to segments
+                None,
+            ),
+            (
+                "is_male = true AND is_female = true".to_string(),
+                // This filters will be pushed to segments
                 None,
             ),
         ];
@@ -2273,7 +2378,7 @@ mod tests {
                         })
                     ]),
                     and: None,
-                }],
+                }]
             ),
         ];
 
