@@ -2,7 +2,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
-use crate::metastore::{IdRow, MetaStore, Partition, PartitionData};
+use crate::metastore::{Chunk, IdRow, MetaStore, Partition, PartitionData};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
@@ -229,13 +229,13 @@ impl CompactionService for CompactionServiceImpl {
         let count_and_min =
             write_to_files(records, total_rows as usize, store, new_local_files2).await?;
 
-        let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
         if let Some(c) = &new_chunk {
             assert_eq!(new_local_files.len(), 1);
             let remote = ChunkStore::chunk_remote_path(c.get_id());
             self.remote_fs
                 .upload_file(&new_local_files[0], &remote)
                 .await?;
+            let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
             let swapped = self
                 .meta_store
                 .swap_compacted_chunks(partition_id, chunk_ids, c.get_id())
@@ -251,7 +251,6 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let mut filtered_partitions = Vec::new();
-
         for (i, p) in new_partitions
             .into_iter()
             .zip_longest(count_and_min.iter())
@@ -279,14 +278,14 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
+        let num_filtered = filtered_partitions.len();
+
+        let partition_min = partition.get_row().get_min_val().clone();
+        let partition_max = partition.get_row().get_max_val().clone();
         self.meta_store
             .swap_active_partitions(
-                vec![partition_id],
-                filtered_partitions
-                    .iter()
-                    .map(|p| p.get_id())
-                    .collect::<Vec<_>>(),
-                chunk_ids,
+                vec![(partition, chunks)],
+                filtered_partitions,
                 count_and_min
                     .iter()
                     .zip_longest(count_and_min.iter().skip(1 as usize))
@@ -294,9 +293,9 @@ impl CompactionService for CompactionServiceImpl {
                     .map(|(i, item)| -> Result<_, CubeError> {
                         match item {
                             EitherOrBoth::Both((c, min), (_, next_min)) => {
-                                if i == 0 && partition.get_row().get_min_val().is_none() {
+                                if i == 0 && partition_min.is_none() {
                                     Ok((*c as u64, (None, Some(Row::new(next_min.clone())))))
-                                } else if i < filtered_partitions.len() - 1 {
+                                } else if i < num_filtered - 1 {
                                     Ok((
                                         *c as u64,
                                         (
@@ -307,43 +306,37 @@ impl CompactionService for CompactionServiceImpl {
                                 } else {
                                     Err(CubeError::internal(format!(
                                         "Unexpected state for {} new partitions: {}, {:?}",
-                                        filtered_partitions.len(),
-                                        i,
-                                        item
+                                        num_filtered, i, item
                                     )))
                                 }
                             }
                             EitherOrBoth::Left((c, min)) => {
-                                if i == 0 && filtered_partitions.len() == 1 {
+                                if i == 0 && num_filtered == 1 {
                                     Ok((
                                         *c as u64,
                                         (
-                                            partition.get_row().get_min_val().clone(),
-                                            partition.get_row().get_max_val().clone(),
+                                            partition_min.clone(),
+                                            partition_max.clone(),
                                         ),
                                     ))
-                                } else if i == filtered_partitions.len() - 1 {
+                                } else if i == num_filtered - 1 {
                                     Ok((
                                         *c as u64,
                                         (
                                             Some(Row::new(min.clone())),
-                                            partition.get_row().get_max_val().clone(),
+                                            partition_max.clone(),
                                         ),
                                     ))
                                 } else {
                                     Err(CubeError::internal(format!(
                                         "Unexpected state for {} new partitions: {}, {:?}",
-                                        filtered_partitions.len(),
-                                        i,
-                                        item
+                                        num_filtered, i, item
                                     )))
                                 }
                             }
                             EitherOrBoth::Right(_) => Err(CubeError::internal(format!(
                                 "Unexpected state for {} new partitions: {}, {:?}",
-                                filtered_partitions.len(),
-                                i,
-                                item
+                                num_filtered, i, item
                             ))),
                         }
                     })
@@ -417,7 +410,7 @@ impl CompactionService for CompactionServiceImpl {
             multi_partition_id,
             mchildren,
         );
-        for p in &partitions {
+        for p in partitions {
             s.split_single_partition(p).await?;
         }
         s.finish().await
@@ -459,7 +452,7 @@ impl CompactionService for CompactionServiceImpl {
             multi_partition_id,
             children,
         );
-        s.split_single_partition(&data).await?;
+        s.split_single_partition(data).await?;
         s.finish().await
     }
 }
@@ -991,9 +984,8 @@ struct MultiSplit {
     multi_partition_id: u64,
     new_multi_parts: Vec<IdRow<MultiPartition>>,
     new_multi_rows: Vec<u64>,
-    old_chunks: Vec<u64>,
-    old_partitions: Vec<u64>,
-    new_partitions: Vec<u64>,
+    old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+    new_partitions: Vec<IdRow<Partition>>,
     new_partition_rows: Vec<u64>,
     uploads: Vec<JoinHandle<Result<(), CubeError>>>,
 }
@@ -1016,7 +1008,6 @@ impl MultiSplit {
             multi_partition_id,
             new_multi_parts,
             new_multi_rows,
-            old_chunks: Vec::new(),
             old_partitions: Vec::new(),
             new_partitions: Vec::new(),
             new_partition_rows: Vec::new(),
@@ -1024,10 +1015,9 @@ impl MultiSplit {
         }
     }
 
-    async fn split_single_partition(&mut self, p: &PartitionData) -> Result<(), CubeError> {
+    async fn split_single_partition(&mut self, p: PartitionData) -> Result<(), CubeError> {
         let mchildren = &self.new_multi_parts;
         let mrow_counts = &mut self.new_multi_rows;
-        let old_chunks = &mut self.old_chunks;
         let old_partitions = &mut self.old_partitions;
         let new_partitions = &mut self.new_partitions;
         let new_partition_rows = &mut self.new_partition_rows;
@@ -1075,14 +1065,10 @@ impl MultiSplit {
         for i in 0..row_counts.len() {
             mrow_counts[i] += row_counts[i] as u64;
         }
-        old_partitions.push(p.partition.get_id());
-        for c in &p.chunks {
-            old_chunks.push(c.get_id());
-        }
-        for i in 0..children.len() {
-            new_partitions.push(children[i].get_id());
-            new_partition_rows.push(row_counts[i] as u64)
-        }
+        old_partitions.push((p.partition, p.chunks));
+        assert_eq!(children.len(), row_counts.len());
+        new_partitions.extend(children);
+        new_partition_rows.extend(row_counts.iter().map(|n| *n as u64));
         for i in 0..row_counts.len() {
             if row_counts[i] == 0 {
                 continue;
@@ -1113,7 +1099,6 @@ impl MultiSplit {
                 mids,
                 self.new_multi_rows,
                 self.old_partitions,
-                self.old_chunks,
                 self.new_partitions,
                 self.new_partition_rows,
             )
