@@ -818,6 +818,7 @@ pub trait MetaStore: DIService + Send + Sync {
         columns: Vec<Column>,
         if_not_exists: bool,
     ) -> Result<IdRow<MultiIndex>, CubeError>;
+    async fn drop_partitioned_index(&self, schema: String, name: String) -> Result<(), CubeError>;
     async fn get_multi_partition(&self, id: u64) -> Result<IdRow<MultiPartition>, CubeError>;
     /// Retrieve a partial subtrees that contain common parents for all [multi_part_ids]. We
     /// guarantee that all nodes on the paths to common parents are in the results. No attempt is
@@ -2703,43 +2704,12 @@ impl MetaStore for RocksMetaStore {
         self.write_operation(move |db_ref, batch_pipe| {
             let tables_table = TableRocksTable::new(db_ref.clone());
             let indexes_table = IndexRocksTable::new(db_ref.clone());
-            let partitions_table = PartitionRocksTable::new(db_ref.clone());
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
-            let multi_partitions_table = MultiPartitionRocksTable::new(db_ref.clone());
-
-            let indexes = indexes_table
-                .get_rows_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?;
-            for index in indexes.into_iter() {
-                let partitions = partitions_table.get_rows_by_index(
-                    &PartitionIndexKey::ByIndexId(index.get_id()),
-                    &PartitionRocksIndex::IndexId,
-                )?;
-                for partition in partitions.into_iter() {
-                    let mut removed_rows = 0;
-                    if partition.row.is_active() {
-                        removed_rows += partition.row.main_table_row_count;
-                    }
-                    let chunks = chunks_table.get_rows_by_index(
-                        &ChunkIndexKey::ByPartitionId(partition.get_id()),
-                        &ChunkRocksIndex::PartitionId,
-                    )?;
-                    for chunk in chunks.into_iter() {
-                        if chunk.row.active {
-                            removed_rows += chunk.row.row_count;
-                        }
-                        chunks_table.delete(chunk.get_id(), batch_pipe)?;
-                    }
-                    partitions_table.delete(partition.get_id(), batch_pipe)?;
-
-                    if let Some(m) = partition.row.multi_partition_id {
-                        multi_partitions_table.update_with_fn(
-                            m,
-                            |r| r.subtract_rows(removed_rows),
-                            batch_pipe,
-                        )?;
-                    }
-                }
-                indexes_table.delete(index.get_id(), batch_pipe)?;
+            let indexes = indexes_table.get_row_ids_by_index(
+                &IndexIndexKey::TableId(table_id),
+                &IndexRocksIndex::TableID,
+            )?;
+            for index in indexes {
+                RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
             }
             Ok(tables_table.delete(table_id, batch_pipe)?)
         })
@@ -3202,6 +3172,44 @@ impl MetaStore for RocksMetaStore {
             let r = mindexes.insert(MultiIndex::new(schema_id, name, key_columns), pipe)?;
             mpartitions.insert(MultiPartition::new_root(r.id), pipe)?;
             Ok(r)
+        })
+        .await
+    }
+
+    async fn drop_partitioned_index(&self, schema: String, name: String) -> Result<(), CubeError> {
+        self.write_operation(move |db, pipe| {
+            let schema_id = SchemaRocksTable::new(db.clone())
+                .get_single_row_by_index(&schema, &SchemaRocksIndex::Name)?
+                .id;
+
+            let multi_index_t = MultiIndexRocksTable::new(db.clone());
+            let multi_index_id = multi_index_t
+                .get_single_row_by_index(
+                    &MultiIndexIndexKey::ByName(schema_id, name),
+                    &MultiIndexRocksIndex::ByName,
+                )?
+                .id;
+            multi_index_t.delete(multi_index_id, pipe)?;
+
+            let index_t = IndexRocksTable::new(db.clone());
+            let indexes = index_t.get_row_ids_by_index(
+                &IndexIndexKey::MultiIndexId(Some(multi_index_id)),
+                &IndexRocksIndex::MultiIndexId,
+            )?;
+            for index in indexes {
+                RocksMetaStore::drop_index(db.clone(), pipe, index, false)?;
+            }
+
+            let multi_part_t = MultiPartitionRocksTable::new(db.clone());
+            let multi_partitions = multi_part_t.get_row_ids_by_index(
+                &MultiPartitionIndexKey::ByMultiIndexId(multi_index_id),
+                &MultiPartitionRocksIndex::ByMultiIndexId,
+            )?;
+            for mp in multi_partitions {
+                multi_part_t.delete(mp, pipe)?;
+            }
+
+            Ok(())
         })
         .await
     }
@@ -4727,6 +4735,53 @@ impl RocksMetaStore {
                 batch_pipe,
             )?;
         }
+        Ok(())
+    }
+}
+
+impl RocksMetaStore {
+    fn drop_index(
+        db: DbTableRef,
+        pipe: &mut BatchPipe,
+        index_id: u64,
+        update_multi_partitions: bool,
+    ) -> Result<(), CubeError> {
+        let partitions_table = PartitionRocksTable::new(db.clone());
+        let partitions = partitions_table.get_rows_by_index(
+            &PartitionIndexKey::ByIndexId(index_id),
+            &PartitionRocksIndex::IndexId,
+        )?;
+
+        let chunks_table = ChunkRocksTable::new(db.clone());
+        let multi_partitions_table = MultiPartitionRocksTable::new(db.clone());
+        for partition in partitions.into_iter() {
+            let mut removed_rows = 0;
+            if partition.row.is_active() {
+                removed_rows += partition.row.main_table_row_count;
+            }
+            let chunks = chunks_table.get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(partition.get_id()),
+                &ChunkRocksIndex::PartitionId,
+            )?;
+            for chunk in chunks.into_iter() {
+                if chunk.row.active {
+                    removed_rows += chunk.row.row_count;
+                }
+                chunks_table.delete(chunk.get_id(), pipe)?;
+            }
+            partitions_table.delete(partition.get_id(), pipe)?;
+
+            if update_multi_partitions {
+                if let Some(m) = partition.row.multi_partition_id {
+                    multi_partitions_table.update_with_fn(
+                        m,
+                        |r| r.subtract_rows(removed_rows),
+                        pipe,
+                    )?;
+                }
+            }
+        }
+        IndexRocksTable::new(db.clone()).delete(index_id, pipe)?;
         Ok(())
     }
 }

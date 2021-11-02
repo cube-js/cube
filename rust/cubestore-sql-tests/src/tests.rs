@@ -91,6 +91,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "partitioned_index_if_not_exists",
             partitioned_index_if_not_exists,
         ),
+        t("drop_partitioned_index", drop_partitioned_index),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
@@ -2170,6 +2171,92 @@ async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) {
         .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.other_ind(id int, url text)")
         .await
         .unwrap();
+}
+
+async fn drop_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, some_column int)")
+        .await
+        .unwrap();
+    // DROP without any data.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    // Another drop fails as index does not exist.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap_err();
+    // Note columns are different.
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data3(id3 int, url3 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id3, url3)",
+        )
+        .await
+        .unwrap_err(); // Fails as the index does not exist anymore.
+
+    // Query can still run from the default table data.
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
 }
 
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
