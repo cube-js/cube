@@ -283,19 +283,23 @@ export class ApiGateway {
     const guestMiddlewares = [];
 
     app.use(`${this.basePath}/graphql`, userMiddlewares, (() => {
-      let schema; // memoized schema
+      let cache;
       return (async (req, res) => {
-        if (!schema) {
+        if (!cache) {
           const metaConfig = await this.getCompilerApi(req.context).metaConfig({
             requestId: req.context.requestId,
           });
-          schema = makeSchema(metaConfig);
+          cache = {
+            metaConfig,
+            schema: makeSchema(metaConfig)
+          };
         }
 
         return graphqlHTTP({
-          schema,
+          schema: cache.schema,
           context: {
             req,
+            metaConfig: cache.metaConfig,
             apiGateway: this
           },
           graphiql: getEnv('nodeEnv') !== 'production'
