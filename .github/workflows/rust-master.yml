@@ -155,7 +155,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-          - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
         include:
           - os: ubuntu-20.04
@@ -170,13 +169,6 @@ jobs:
             cross: true
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
-            compress: false
-          - os: ubuntu-20.04
-            target: x86_64-pc-windows-gnu
-            executable_name: cubestored.exe
-            cross: true
-            strip: true
-            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
           - os: macos-latest
             target: x86_64-apple-darwin
