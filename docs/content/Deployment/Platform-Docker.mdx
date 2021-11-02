@@ -88,7 +88,7 @@ services:
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/router:/cube/data
 
   cubestore_worker_1:
     restart: always
@@ -100,7 +100,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_1:/cube/data
     depends_on:
       - cubestore_router
 
@@ -114,7 +114,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_2:/cube/data
     depends_on:
       - cubestore_router
 
