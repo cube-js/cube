@@ -230,7 +230,14 @@ class AppLayout extends React.Component<
                     }
                   >
                     {pageFrameworkOfChoice && (
-                      <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                      <div
+                        className={styles.contentWrapper}
+                        style={{ margin: '0 24px' }}
+                      >
+                        <div className={styles.frameworkSwitcherWrapper}>
+                          <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                        </div>
+                      </div>
                     )}
                     <Layout.Content
                       className={styles.contentWrapper}
