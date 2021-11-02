@@ -12,12 +12,8 @@ import { aliasSeries } from './utils';
 dayjs.extend(quarterOfYear);
 
 // When granularity is week, weekStart Value must be 1. However, since the client can change it globally (https://day.js.org/docs/en/i18n/changing-locale)
-// So the proxy code below has been added.
-const internalDayjs = new Proxy(dayjs, {
-  apply(target, thisArg, argumentsList) {
-    return target(...argumentsList).locale({ ...en, weekStart: 1 });
-  }
-});
+// So the function below has been added.
+const internalDayjs = (...args) => dayjs(...args).locale({ ...en, weekStart: 1 });
 
 export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
