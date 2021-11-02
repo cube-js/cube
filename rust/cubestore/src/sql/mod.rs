@@ -694,6 +694,11 @@ impl SqlService for SqlServiceImpl {
                             .await?;
                         self.db.drop_table(table.get_id()).await?;
                     }
+                    ObjectType::PartitionedIndex => {
+                        let schema = names[0].0[0].value.clone();
+                        let name = names[0].0[1].value.clone();
+                        self.db.drop_partitioned_index(schema, name).await?;
+                    }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 }
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))

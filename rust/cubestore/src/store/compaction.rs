@@ -312,20 +312,11 @@ impl CompactionService for CompactionServiceImpl {
                             }
                             EitherOrBoth::Left((c, min)) => {
                                 if i == 0 && num_filtered == 1 {
-                                    Ok((
-                                        *c as u64,
-                                        (
-                                            partition_min.clone(),
-                                            partition_max.clone(),
-                                        ),
-                                    ))
+                                    Ok((*c as u64, (partition_min.clone(), partition_max.clone())))
                                 } else if i == num_filtered - 1 {
                                     Ok((
                                         *c as u64,
-                                        (
-                                            Some(Row::new(min.clone())),
-                                            partition_max.clone(),
-                                        ),
+                                        (Some(Row::new(min.clone())), partition_max.clone()),
                                     ))
                                 } else {
                                     Err(CubeError::internal(format!(
