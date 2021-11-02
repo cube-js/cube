@@ -779,9 +779,8 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<bool, CubeError>;
     async fn swap_active_partitions(
         &self,
-        current_active: Vec<u64>,
-        new_active: Vec<u64>,
-        compacted_chunk_ids: Vec<u64>,
+        current_active: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+        new_active: Vec<IdRow<Partition>>,
         new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError>;
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
@@ -840,9 +839,8 @@ pub trait MetaStore: DIService + Send + Sync {
         multi_partition_id: u64,
         new_multi_partitions: Vec<u64>,
         new_multi_partition_rows: Vec<u64>,
-        old_partitions: Vec<u64>,
-        old_chunks: Vec<u64>,
-        new_partitions: Vec<u64>,
+        old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+        new_partitions: Vec<IdRow<Partition>>,
         new_partition_rows: Vec<u64>,
     ) -> Result<(), CubeError>;
     async fn find_unsplit_partitions(&self, multi_partition_id: u64)
@@ -2839,28 +2837,37 @@ impl MetaStore for RocksMetaStore {
 
     async fn swap_active_partitions(
         &self,
-        current_active: Vec<u64>,
-        new_active: Vec<u64>,
-        compacted_chunk_ids: Vec<u64>,
+        current_active: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+        new_active: Vec<IdRow<Partition>>,
         mut new_active_min_max: Vec<(u64, (Option<Row>, Option<Row>))>,
     ) -> Result<(), CubeError> {
         trace!(
             "Swapping partitions: deactivating ({}), deactivating chunks ({}), activating ({})",
-            current_active.iter().join(", "),
-            compacted_chunk_ids.iter().join(", "),
-            new_active.iter().join(", ")
+            current_active.iter().map(|(p, _)| p.id).join(", "),
+            current_active
+                .iter()
+                .flat_map(|(_, cs)| cs)
+                .map(|c| c.id)
+                .join(", "),
+            new_active.iter().map(|p| p.id).join(", ")
         );
         self.write_operation(move |db, pipe| {
             swap_active_partitions_impl(
                 db,
                 pipe,
-                current_active,
-                new_active,
-                compacted_chunk_ids,
+                &current_active,
+                &new_active,
                 move |i, p| {
                     let (rows, (min, max)) = take(&mut new_active_min_max[i]);
                     p.update_min_max_and_row_count(min, max, rows)
                 },
+                |current_i| {
+                    Err(CubeError::internal(format!(
+                        "Current partition is not found during swap active: {}",
+                        current_active[current_i].0.id
+                    )))
+                },
+                |_| panic!("error from current partition must propagate before this call"),
             )
         })
         .await
@@ -3828,32 +3835,59 @@ impl MetaStore for RocksMetaStore {
         &self,
         multi_partition_id: u64,
         new_multi_partitions: Vec<u64>,
-        new_multi_partition_rows: Vec<u64>,
-        old_partitions: Vec<u64>,
-        old_chunks: Vec<u64>,
-        new_partitions: Vec<u64>,
+        mut new_multi_partition_rows: Vec<u64>,
+        old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
+        new_partitions: Vec<IdRow<Partition>>,
         new_partition_rows: Vec<u64>,
     ) -> Result<(), CubeError> {
         assert_eq!(new_multi_partitions.len(), new_multi_partition_rows.len());
         assert_eq!(new_partition_rows.len(), new_partitions.len());
-        let total_new_rows = new_multi_partition_rows.iter().sum();
+        assert!(new_multi_partitions.is_sorted());
         self.write_operation(move |db, pipe| {
             log::trace!(
-                "Committing split of multi-partition {} to {:?}. {} rows in old split into {:?}",
+                "Committing split of multi-partition {} to {:?}. (preliminary counts) {} rows split into {:?}",
+                multi_partition_id,
+                new_multi_partitions,
+                new_multi_partition_rows.iter().sum::<u64>(),
+                new_multi_partition_rows
+            );
+            swap_active_partitions_impl(
+                db.clone(),
+                pipe,
+                &old_partitions,
+                &new_partitions,
+                |i, p| p.update_row_count(new_partition_rows[i]),
+                |_| Ok(()), // Concurrent 'DROP TABLE' might remove some partitions. That's ok.
+                |new_i| {
+                    let mi = new_multi_partitions.binary_search(
+                        &new_partitions[new_i].row.multi_partition_id.unwrap())
+                        .expect("could not find multi-partition");
+                    assert!(new_partition_rows[new_i] <= new_multi_partition_rows[mi] ,
+                            "{} <= {}", new_partition_rows[new_i], new_multi_partition_rows[mi]);
+                    new_multi_partition_rows[mi] -= new_partition_rows[new_i];
+                    Ok(())
+                }
+            )?;
+
+            let total_new_rows = new_multi_partition_rows.iter().sum();
+            log::trace!(
+                "Committing split of multi-partition {} to {:?}. (final counts) {} rows split into {:?}",
                 multi_partition_id,
                 new_multi_partitions,
                 total_new_rows,
                 new_multi_partition_rows
             );
-            let mpartitions = MultiPartitionRocksTable::new(db.clone());
+            let mpartitions = MultiPartitionRocksTable::new(db);
             mpartitions.update_with_fn(
                 multi_partition_id,
                 |p| {
-                    assert!(
-                        p.active(),
-                        "refusing to commit split of inactive multi-partition"
-                    );
-                    p.set_active(false).subtract_rows(total_new_rows)
+                    if initial_split {
+                        assert!(p.active(), "refusing to commit split of inactive multi-partition");
+                        p.set_active(false).subtract_rows(total_new_rows)
+                    } else {
+                        assert!(!p.active(), "active multi-partition during postponed split");
+                        p.subtract_rows(total_new_rows)
+                    }
                 },
                 pipe,
             )?;
@@ -3864,14 +3898,6 @@ impl MetaStore for RocksMetaStore {
                     pipe,
                 )?;
             }
-            swap_active_partitions_impl(
-                db,
-                pipe,
-                old_partitions,
-                new_partitions,
-                old_chunks,
-                |i, p| p.update_row_count(new_partition_rows[i]),
-            )?;
             Ok(())
         })
         .await
@@ -3977,13 +4003,17 @@ fn get_default_index_impl(db_ref: DbTableRef, table_id: u64) -> Result<IdRow<Ind
         )))
 }
 
+/// Note that [current_active] and [new_active] are snapshots at some older point in time. The
+/// relevant partitions might be dropped or changed by the time this function runs. Implementation
+/// must take great care to avoid inconsistencies caused by this.
 fn swap_active_partitions_impl(
     db_ref: DbTableRef,
     batch_pipe: &mut BatchPipe,
-    current_active: Vec<u64>,
-    new_active: Vec<u64>,
-    compacted_chunk_ids: Vec<u64>,
+    current_active: &[(IdRow<Partition>, Vec<IdRow<Chunk>>)],
+    new_active: &[IdRow<Partition>],
     mut update_new_partition_stats: impl FnMut(/*index*/ usize, &Partition) -> Partition,
+    mut on_dropped_current_partition: impl FnMut(/*index*/ usize) -> Result<(), CubeError>,
+    mut on_dropped_new_partition: impl FnMut(/*index*/ usize) -> Result<(), CubeError>,
 ) -> Result<(), CubeError> {
     let index_table = IndexRocksTable::new(db_ref.clone());
     let table_table = TableRocksTable::new(db_ref.clone());
@@ -3992,10 +4022,13 @@ fn swap_active_partitions_impl(
 
     // Rows are compacted using unique key columns and totals don't match
     let skip_row_count_sanity_check = if let Some(current) = current_active.first() {
-        let current_partition = table.get_row(*current)?.ok_or(CubeError::internal(format!(
-            "Current partition is not found during swap active: {}",
-            current
-        )))?;
+        let current_partition =
+            table
+                .get_row(current.0.id)?
+                .ok_or(CubeError::internal(format!(
+                    "Current partition is not found during swap active: {}",
+                    current.0.id
+                )))?;
         let index = index_table.get_row_or_not_found(current_partition.get_row().get_index_id())?;
         let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
         table.get_row().unique_key_columns().is_some()
@@ -4006,11 +4039,16 @@ fn swap_active_partitions_impl(
     let mut deactivated_row_count = 0;
     let mut activated_row_count = 0;
 
-    for current in current_active.iter() {
-        let current_partition = table.get_row(*current)?.ok_or(CubeError::internal(format!(
-            "Current partition is not found during swap active: {}",
-            current
-        )))?;
+    let mut dropped_current = HashSet::new();
+    for (current_i, (current, chunks)) in current_active.iter().enumerate() {
+        let current_partition = match table.get_row(current.id)? {
+            None => {
+                on_dropped_current_partition(current_i)?;
+                dropped_current.insert(current.id);
+                continue;
+            }
+            Some(p) => p,
+        };
         // TODO this check is not atomic
         // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (35)
         // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (36)
@@ -4026,14 +4064,33 @@ fn swap_active_partitions_impl(
             current_partition.get_row(),
             batch_pipe,
         )?;
-        deactivated_row_count += current_partition.get_row().main_table_row_count()
+        deactivated_row_count += current_partition.get_row().main_table_row_count();
+
+        for chunk in chunks.iter() {
+            deactivated_row_count += chunk_table
+                .get_row_or_not_found(chunk.id)?
+                .get_row()
+                .get_row_count();
+            chunk_table.update_with_fn(chunk.id, |row| row.deactivate(), batch_pipe)?;
+        }
     }
 
     for i in 0..new_active.len() {
-        let new = new_active[i];
-        let new_partition = table.get_row(new)?.ok_or(CubeError::internal(format!(
+        let new = &new_active[i];
+        if dropped_current.contains(&new.row.parent_partition_id.unwrap()) {
+            on_dropped_new_partition(i)?;
+            if let Err(e) = table.delete(new.id, batch_pipe) {
+                // This might happen during DROP TABLE.
+                log::trace!(
+                    "Failure when removing new partition, likely not an error: {}",
+                    e.display_with_backtrace()
+                );
+            }
+            continue;
+        }
+        let new_partition = table.get_row(new.id)?.ok_or(CubeError::internal(format!(
             "New partition is not found during swap active: {}",
-            new
+            new.id
         )))?;
         if new_partition.get_row().is_active() {
             return Err(CubeError::internal(format!(
@@ -4051,22 +4108,14 @@ fn swap_active_partitions_impl(
         )?;
     }
 
-    for chunk_id in compacted_chunk_ids.iter() {
-        deactivated_row_count += chunk_table
-            .get_row_or_not_found(*chunk_id)?
-            .get_row()
-            .get_row_count();
-        chunk_table.update_with_fn(*chunk_id, |row| row.deactivate(), batch_pipe)?;
-    }
-
     if !skip_row_count_sanity_check && activated_row_count != deactivated_row_count {
         return Err(CubeError::internal(format!(
             "Deactivated row count ({}) doesn't match activated row count ({}) during swap of partition ({}) and ({}) chunks to new partitions ({})",
             deactivated_row_count,
             activated_row_count,
-            current_active.iter().join(", "),
-            compacted_chunk_ids.iter().join(", "),
-            new_active.iter().join(", ")
+            current_active.iter().map(|(p,_)| p.id).join(", "),
+            current_active.iter().flat_map(|(_, cs)| cs).map(|c| c.id).join(", "),
+            new_active.iter().map(|p| p.id).join(", ")
         )));
     }
 
