@@ -1,0 +1,266 @@
+openapi: "3.0.0"
+info:
+  description: "Cube.js Swagger Schema"
+  version: "1.0.0"
+  title: "Cube.js"
+paths:
+  "/v1/meta":
+    get:
+      summary: "Load Metadata"
+      description: ""
+      operationId: "metaV1"
+      responses:
+        "200":
+          description: "successful operation"
+          content:
+            application/json:    
+              schema:
+                $ref: "#/components/schemas/V1MetaResponse"
+  "/v1/load":
+    post:
+      summary: "Load data via Cube JSON Query"
+      operationId: "loadV1"
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              $ref: '#/components/schemas/V1LoadRequest'
+      responses:
+        "200":
+          description: "successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1LoadResponse"
+        "400":
+          description: "successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1LoadResponse400"
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    V1CubeMetaSegment:
+      type: "object"
+      required:
+        - name
+        - title
+        - shortTitle
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
+        shortTitle:
+          type: "string"
+    V1CubeMetaDimension:
+      type: "object"
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: "string"
+        type:
+          type: "string"
+    V1CubeMetaMeasure:
+      type: "object"
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
+        type:
+          type: "string"
+        aggType:
+          type: "string"
+    V1CubeMeta:
+      type: "object"
+      required:
+        - name
+        - measures
+        - dimensions
+        - segments
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
+        measures:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaMeasure"
+        dimensions:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaDimension"
+        segments:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaSegment"
+    V1MetaResponse:
+      type: "object"
+      properties:
+        cubes:
+          type: "array"
+          items: 
+            $ref: "#/components/schemas/V1CubeMeta"
+    V1LoadResultAnnotation:
+      type: "object"
+      required:
+        - measures
+        - dimensions
+        - segments
+        - timeDimensions
+      properties:
+        measures:
+          type: "object"
+        dimensions:
+          type: "object"
+        segments:
+          type: "object"
+        timeDimensions:
+          type: "object"
+    V1LoadResultData:
+      type: "object"
+    V1LoadResult:
+      type: "object"
+      required:
+        - annotation
+        - data
+      properties:
+        dataSource:
+          type: "string"
+        annotation:
+          $ref: "#/components/schemas/V1LoadResultAnnotation"
+        data:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadResultData"
+        refreshKeyValues:
+          type: "array"
+          items:
+            type: "object"
+    V1LoadResponse400:
+      type: "object"
+      required:
+        - "error"
+      properties:
+        error:
+          type: "string"
+    V1LoadResponse:
+      type: "object"
+      required:
+        - results
+      properties:
+        pivotQuery:
+          type: "object"
+        slowQuery:
+          type: "boolean"
+        queryType:
+          type: "string"
+        results:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadResult"
+    V1LoadRequestQueryFilterLogicalAnd:
+      type: "object"
+      properties:
+        and:
+          type: "array"
+          items:
+            type: "object"
+    V1LoadRequestQueryFilterLogicalOr:
+      type: "object"
+      properties:
+        or:
+          type: "array"
+          items:
+            type: "object"
+    V1LoadRequestQueryFilterBase:
+      type: "object"
+      properties:
+        member:
+          type: "string"
+        operator:
+          type: "string"
+        values:
+          type: "array"
+          items:
+            type: "string"
+    V1LoadRequestQueryTimeDimension:
+      type: "object"
+      required:
+        - "dimension"
+        - "granularity"
+      properties:
+        dimension:
+          type: "string"
+        granularity:
+          type: "string"
+        dateRange:
+          type: "object"
+          # Dont work in rust code-gen
+          # oneOf:
+          #   - type: "string"
+          #   - type: "array"
+          #     items:
+          #       type: "string"
+    V1LoadRequestQueryFilterItem:
+      oneOf:
+        - $ref: "#/components/schemas/V1LoadRequestQueryFilterBase"
+        - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalOr"
+        - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalAnd"
+    V1LoadRequestQuery:
+      type: "object"
+      properties:
+        measures:
+          type: "array"
+          items:
+            type: "string"
+        dimensions:
+          type: "array"
+          items:
+            type: "string"
+        segments:
+          type: "array"
+          items:
+            type: "string"
+        timeDimensions:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadRequestQueryTimeDimension"
+        order:
+          type: "array"
+          items:
+            type: "array"
+            items:
+              type: "string"
+        limit:
+          type: "integer"
+          format: "int32"
+        offset:
+          type: "integer"
+          format: "int32"
+        filters:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadRequestQueryFilterItem"
+    V1LoadRequest:
+      type: "object"
+      properties:
+        queryType:
+          type: "string"
+        query:
+          type: "object"
+          $ref: "#/components/schemas/V1LoadRequestQuery"
