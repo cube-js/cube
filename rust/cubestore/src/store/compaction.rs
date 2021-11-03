@@ -413,7 +413,7 @@ impl CompactionService for CompactionServiceImpl {
         for p in partitions {
             s.split_single_partition(p).await?;
         }
-        s.finish().await
+        s.finish(true).await
     }
 
     async fn finish_multi_split(
@@ -453,7 +453,7 @@ impl CompactionService for CompactionServiceImpl {
             children,
         );
         s.split_single_partition(data).await?;
-        s.finish().await
+        s.finish(false).await
     }
 }
 
@@ -1083,7 +1083,7 @@ impl MultiSplit {
         Ok(())
     }
 
-    async fn finish(self) -> Result<(), CubeError> {
+    async fn finish(self, initial_split: bool) -> Result<(), CubeError> {
         for u in self.uploads {
             u.await??;
         }
@@ -1101,6 +1101,7 @@ impl MultiSplit {
                 self.old_partitions,
                 self.new_partitions,
                 self.new_partition_rows,
+                initial_split,
             )
             .await
     }
