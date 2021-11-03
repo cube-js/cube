@@ -905,16 +905,14 @@ export class PreAggregationLoader {
     const table = this.targetTableName(newVersionEntry);
 
     this.logBuildPreAggregationSql('Uploading external pre-aggregation');
-    try {
-      await saveCancelFn(
-        externalDriver.uploadTableWithIndexes(
-          table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
-        )
-      );
-    } catch (error) {
+    await saveCancelFn(
+      externalDriver.uploadTableWithIndexes(
+        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
+      )
+    ).catch(error => {
       this.logBuildPreAggregationSql('Uploading external pre-aggregation error', error);
       throw error;
-    }
+    });
     this.logBuildPreAggregationSql('Uploading external pre-aggregation completed');
 
     await this.loadCache.fetchTables(this.preAggregation);
