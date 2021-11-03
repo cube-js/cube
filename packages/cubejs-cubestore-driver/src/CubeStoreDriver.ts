@@ -139,7 +139,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
           params,
         );
       }
-    } catch (e: any) {
+    } catch (e) {
       await this.dropTable(table);
       throw e;
     }
@@ -191,7 +191,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         const err = await res.json();
         throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
       }
-
       await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
