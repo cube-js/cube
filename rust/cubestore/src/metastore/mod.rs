@@ -3899,6 +3899,7 @@ impl MetaStore for RocksMetaStore {
                 mpartitions.update_with_fn(
                     new_multi_partitions[i],
                     |p| {
+                        assert_eq!(p.parent_multi_partition_id(), Some(multi_partition_id));
                         if initial_split {
                             assert!(!p.active(), "new multi-partition active on initial split");
                             p.set_active(true).add_rows(new_multi_partition_rows[i])
