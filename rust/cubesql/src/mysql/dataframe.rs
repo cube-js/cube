@@ -2,7 +2,8 @@ use std::fmt::{self, Debug, Formatter};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
 use datafusion::arrow::array::{
-    Array, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
+    Array, Float64Array, Int32Array, Int64Array, StringArray, TimestampMicrosecondArray,
+    UInt32Array,
 };
 use datafusion::arrow::{
     array::{BooleanArray, TimestampNanosecondArray, UInt64Array},
@@ -308,6 +309,8 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
+                DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int64, i64),
+                DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int64, i64),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int64, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int64, i64),
                 DataType::Float64 => {

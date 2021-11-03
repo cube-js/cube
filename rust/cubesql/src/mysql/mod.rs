@@ -1,5 +1,7 @@
 use std::env;
 use std::io;
+
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -22,6 +24,7 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::compile::convert_statement_to_cube_query;
 use crate::compile::parser::MySqlDialectWithBackTicks;
+use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::schema::SchemaService;
@@ -34,6 +37,8 @@ pub mod dataframe;
 struct Backend {
     auth: Arc<dyn SqlAuthService>,
     schema: Arc<dyn SchemaService>,
+    props: QueryPlannerExecutionProps,
+    // From Auth Service
     context: Option<AuthContext>,
 }
 
@@ -183,20 +188,6 @@ impl Backend {
                     )
                 ),
             )
-        } else if query_lower.eq("select connection_id()") {
-            return Ok(
-                Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "connection_id".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::Int64(2)
-                        ])]
-                    )
-                ),
-            )
         } else if query_lower.eq("select @@transaction_isolation") {
             return Ok(
                 Arc::new(
@@ -292,7 +283,7 @@ impl Backend {
                         .get_ctx_for_tenant(auth_ctx)
                     .await?;
 
-                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx))?;
+                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx), &self.props)?;
 
                     return Ok(Arc::new(dataframe::DataFrame::new(
                         vec![
@@ -425,7 +416,7 @@ impl Backend {
                 .get_ctx_for_tenant(auth_ctx)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx))?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
             match plan {
                 crate::compile::QueryPlan::Meta(data_frame) => {
                     return Ok(data_frame);
@@ -499,6 +490,10 @@ impl Backend {
 #[async_trait]
 impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     type Error = io::Error;
+
+    fn connection_id(&self) -> u32 {
+        self.props.connection_id()
+    }
 
     async fn on_prepare<'a>(
         &'a mut self,
@@ -614,6 +609,8 @@ impl ProcessingLoop for MySqlServer {
 
         println!("🔗 Cube SQL is listening on {}", self.address);
 
+        let mut connection_id_incr = 0;
+
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
             let (socket, _) = tokio::select! {
@@ -637,11 +634,23 @@ impl ProcessingLoop for MySqlServer {
 
             let auth = self.auth.clone();
             let schema = self.schema.clone();
+
+            let connection_id = if connection_id_incr > 100_000_u32 {
+                connection_id_incr = 1;
+
+                connection_id_incr
+            } else {
+                connection_id_incr += 1;
+
+                connection_id_incr
+            };
+
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
                         auth,
                         schema,
+                        props: QueryPlannerExecutionProps::new(connection_id, None),
                         context: None,
                     },
                     socket,
