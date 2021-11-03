@@ -3,6 +3,7 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 
+
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -25,12 +26,12 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::ColumnType;
+use msql_srv::{AsyncMysqlShim, ColumnType};
 
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
-use self::engine::udf::{create_db_udf, create_version_udf};
+use self::engine::udf::{create_connection_id_udf, create_db_udf, create_version_udf};
 
 pub mod builder;
 pub mod context;
@@ -1033,6 +1034,27 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
     Ok(builder)
 }
 
+#[derive(Debug)]
+pub struct QueryPlannerExecutionProps {
+    connection_id: u32,
+    database: Option<String>,
+}
+
+impl QueryPlannerExecutionProps {
+    pub fn new(connection_id: u32, database: Option<String>) -> Self {
+        Self {
+            connection_id,
+            database,
+        }
+    }
+}
+
+impl QueryPlannerExecutionProps {
+    pub fn connection_id(&self) -> u32 {
+        self.connection_id
+    }
+}
+
 struct QueryPlanner {
     context: Arc<ctx::TenantContext>,
 }
@@ -1042,7 +1064,11 @@ impl QueryPlanner {
         Self { context }
     }
 
-    pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
+    pub fn plan(
+        &self,
+        stmt: &ast::Statement,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
         let (query, select) = match stmt {
             ast::Statement::Query(q) => {
                 if q.with.is_some() {
@@ -1067,11 +1093,11 @@ impl QueryPlanner {
                 ))));
             }
             ast::Statement::ShowVariable { variable } => {
-                return self.show_variable_to_plan(&variable);
+                return self.show_variable_to_plan(variable, props);
             }
             // Proxy some queries to DF
             ast::Statement::ShowColumns { .. } | ast::Statement::ShowVariable { .. } => {
-                return self.create_df_logical_plan(stmt.clone());
+                return self.create_df_logical_plan(stmt.clone(), props);
             }
             _ => {
                 return Err(CompilationError::Unsupported(
@@ -1107,7 +1133,7 @@ impl QueryPlanner {
 
             &select.from[0]
         } else {
-            return self.create_df_logical_plan(stmt.clone());
+            return self.create_df_logical_plan(stmt.clone(), props);
         };
 
         let (schema_name, table_name) = match &from_table.relation {
@@ -1184,10 +1210,14 @@ impl QueryPlanner {
         }
     }
 
-    fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
+    fn show_variable_to_plan(
+        &self,
+        variable: &Vec<Ident>,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
         let name = ObjectName(variable.to_vec()).to_string();
         if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
-            return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
                 vec![dataframe::Column::new(
                     "Database".to_string(),
                     ColumnType::MYSQL_TYPE_STRING,
@@ -1203,22 +1233,30 @@ impl QueryPlanner {
                     )]),
                     dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
                 ],
-            ))));
+            ))))
         } else {
-            return self.create_df_logical_plan(ast::Statement::ShowVariable {
-                variable: variable.clone(),
-            });
+            self.create_df_logical_plan(
+                ast::Statement::ShowVariable {
+                    variable: variable.clone(),
+                },
+                props,
+            )
         }
     }
 
-    fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+    fn create_df_logical_plan(
+        &self,
+        stmt: ast::Statement,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
         let mut ctx = ExecutionContext::new();
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
 
         ctx.register_udf(create_version_udf());
-        ctx.register_udf(create_db_udf());
+        ctx.register_udf(create_db_udf(props));
+        ctx.register_udf(create_connection_id_udf(props));
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);
@@ -1239,10 +1277,11 @@ impl QueryPlanner {
 
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
-    tenant: Arc<ctx::TenantContext>,
+    tenant_ctx: Arc<ctx::TenantContext>,
+    props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
-    let planner = QueryPlanner::new(tenant);
-    planner.plan(stmt)
+    let planner = QueryPlanner::new(tenant_ctx);
+    planner.plan(stmt, props)
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -1288,6 +1327,7 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     tenant: Arc<ctx::TenantContext>,
+    props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     let dialect = MySqlDialectWithBackTicks {};
     let parse_result = Parser::parse_sql(&dialect, query);
@@ -1300,7 +1340,7 @@ pub fn convert_sql_to_cube_query(
         Ok(stmts) => {
             let stmt = &stmts[0];
 
-            convert_statement_to_cube_query(stmt, tenant)
+            convert_statement_to_cube_query(stmt, tenant, props)
         }
     }
 }
@@ -1402,7 +1442,14 @@ mod tests {
     }
 
     fn convert_simple_select(query: String) -> CompiledQuery {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx());
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            &QueryPlannerExecutionProps {
+                connection_id: 8,
+                database: None,
+            },
+        );
         match query.unwrap() {
             QueryPlan::CubeSelect(query) => query,
             _ => panic!("Must return CubeSelect instead of DF plan"),
@@ -1863,7 +1910,14 @@ mod tests {
         ];
 
         for (input_query, expected_error) in variants.iter() {
-            let query = convert_sql_to_cube_query(&input_query, get_test_tenant_ctx());
+            let query = convert_sql_to_cube_query(
+                &input_query,
+                get_test_tenant_ctx(),
+                &QueryPlannerExecutionProps {
+                    connection_id: 8,
+                    database: None,
+                },
+            );
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
