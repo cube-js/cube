@@ -3,7 +3,6 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 
-
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;

@@ -1,7 +1,6 @@
 use std::env;
 use std::io;
 
-
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -490,6 +489,10 @@ impl Backend {
 #[async_trait]
 impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     type Error = io::Error;
+
+    fn server_version(&self) -> &str {
+        "8.0.25"
+    }
 
     fn connection_id(&self) -> u32 {
         self.props.connection_id()
