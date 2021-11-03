@@ -1193,7 +1193,7 @@ dependencies = [
 [[package]]
 name = "msql-srv"
 version = "0.9.2"
-source = "git+https://github.com/cube-js/msql-srv?rev=21158a8b10747f9e2f06824310b4472fe3f48cc0#21158a8b10747f9e2f06824310b4472fe3f48cc0"
+source = "git+https://github.com/cube-js/msql-srv?rev=218ad4595d371b446431089f1fae66cd41e63941#218ad4595d371b446431089f1fae66cd41e63941"
 dependencies = [
  "async-trait",
  "byteorder",

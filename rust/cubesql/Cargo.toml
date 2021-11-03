@@ -29,7 +29,7 @@ simple_logger = "1.7.0"
 async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '744e47e4cf6ca52eaa79c07428ef2e81fabc7071' }
+msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '218ad4595d371b446431089f1fae66cd41e63941' }
 bincode = "1.3.1"
 chrono = "0.4.15"
 mockall = "0.8.1"
