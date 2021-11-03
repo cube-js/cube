@@ -842,6 +842,7 @@ pub trait MetaStore: DIService + Send + Sync {
         old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
         new_partitions: Vec<IdRow<Partition>>,
         new_partition_rows: Vec<u64>,
+        initial_split: bool,
     ) -> Result<(), CubeError>;
     async fn find_unsplit_partitions(&self, multi_partition_id: u64)
         -> Result<Vec<u64>, CubeError>;
@@ -3839,13 +3840,15 @@ impl MetaStore for RocksMetaStore {
         old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
         new_partitions: Vec<IdRow<Partition>>,
         new_partition_rows: Vec<u64>,
+        initial_split: bool,
     ) -> Result<(), CubeError> {
         assert_eq!(new_multi_partitions.len(), new_multi_partition_rows.len());
         assert_eq!(new_partition_rows.len(), new_partitions.len());
         assert!(new_multi_partitions.is_sorted());
         self.write_operation(move |db, pipe| {
             log::trace!(
-                "Committing split of multi-partition {} to {:?}. (preliminary counts) {} rows split into {:?}",
+                "Committing {} split of multi-partition {} to {:?}. (preliminary counts) {} rows split into {:?}",
+                if initial_split { "initial" }  else {"postponed"},
                 multi_partition_id,
                 new_multi_partitions,
                 new_multi_partition_rows.iter().sum::<u64>(),
@@ -3871,7 +3874,8 @@ impl MetaStore for RocksMetaStore {
 
             let total_new_rows = new_multi_partition_rows.iter().sum();
             log::trace!(
-                "Committing split of multi-partition {} to {:?}. (final counts) {} rows split into {:?}",
+                "Committing {} split of multi-partition {} to {:?}. (final counts) {} rows split into {:?}",
+                if initial_split { "initial" }  else {"postponed"},
                 multi_partition_id,
                 new_multi_partitions,
                 total_new_rows,
@@ -3894,7 +3898,14 @@ impl MetaStore for RocksMetaStore {
             for i in 0..new_multi_partitions.len() {
                 mpartitions.update_with_fn(
                     new_multi_partitions[i],
-                    |p| p.set_active(true).add_rows(new_multi_partition_rows[i]),
+                    |p| {
+                        if initial_split {
+                            assert!(!p.active(), "new multi-partition active on initial split");
+                            p.set_active(true).add_rows(new_multi_partition_rows[i])
+                        } else {
+                            p.add_rows(new_multi_partition_rows[i])
+                        }
+                    },
                     pipe,
                 )?;
             }
