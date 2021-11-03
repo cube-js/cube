@@ -3921,6 +3921,13 @@ impl MetaStore for RocksMetaStore {
     ) -> Result<Vec<u64>, CubeError> {
         self.read_operation(move |db| {
             let mparts = MultiPartitionRocksTable::new(db.clone());
+            if mparts
+                .get_row_or_not_found(multi_partition_id)?
+                .row
+                .active()
+            {
+                return Ok(Vec::new());
+            }
             let mchildren = mparts.get_row_ids_by_index(
                 &MultiPartitionIndexKey::ByParentId(Some(multi_partition_id)),
                 &MultiPartitionRocksIndex::ByParentId,
@@ -3959,6 +3966,13 @@ impl MetaStore for RocksMetaStore {
                 partition_id
             );
             let mpartitions = MultiPartitionRocksTable::new(db.clone());
+            assert!(
+                !mpartitions
+                    .get_row_or_not_found(multi_partition_id)?
+                    .row
+                    .active(),
+                "attempting to split active multi-partition"
+            );
             let children = mpartitions.get_rows_by_index(
                 &MultiPartitionIndexKey::ByParentId(Some(multi_partition_id)),
                 &MultiPartitionRocksIndex::ByParentId,
