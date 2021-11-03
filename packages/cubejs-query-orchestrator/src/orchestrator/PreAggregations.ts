@@ -794,10 +794,7 @@ export class PreAggregationLoader {
     }
 
     this.logExecutingSql(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
-    this.logger('Downloading external pre-aggregation via query', {
-      preAggregation: this.preAggregation,
-      requestId: this.requestId
-    });
+    this.logBuildPreAggregationSql('Downloading external pre-aggregation via query');
     const externalDriver = await this.externalDriverFactory();
     const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
@@ -808,7 +805,11 @@ export class PreAggregationLoader {
         ...capabilities,
         ...this.getStreamingOptions(),
       }
-    ));
+    )).catch(error => {
+      this.logBuildPreAggregationSql('Downloading external pre-aggregation via query error', error);
+      throw error;
+    });
+    this.logBuildPreAggregationSql('Downloading external pre-aggregation via query completed');
 
     try {
       await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn);
@@ -850,37 +851,49 @@ export class PreAggregationLoader {
     }
 
     const table = this.targetTableName(newVersionEntry);
-    this.logger('Downloading external pre-aggregation', {
-      preAggregation: this.preAggregation,
-      requestId: this.requestId
-    });
+    this.logBuildPreAggregationSql('Downloading external pre-aggregation');
 
-    const externalDriver = await this.externalDriverFactory();
-    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
-
-    let tableData: DownloadTableData;
-
-    if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
-    } else if (capabilities.streamImport && client.stream) {
-      tableData = await saveCancelFn(
-        client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
-      );
-
-      if (client.unload) {
-        const stream = new LargeStreamWarning(preAggregation.preAggregationId);
-        tableData.rowStream.pipe(stream);
-        tableData.rowStream = stream;
+    try {
+      const externalDriver = await this.externalDriverFactory();
+      const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+  
+      let tableData: DownloadTableData;
+  
+      if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+        tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
+      } else if (capabilities.streamImport && client.stream) {
+        tableData = await saveCancelFn(
+          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
+        );
+  
+        if (client.unload) {
+          const stream = new LargeStreamWarning(preAggregation.preAggregationId);
+          tableData.rowStream.pipe(stream);
+          tableData.rowStream = stream;
+        }
+      } else {
+        tableData = await saveCancelFn(client.downloadTable(table, capabilities));
       }
-    } else {
-      tableData = await saveCancelFn(client.downloadTable(table, capabilities));
-    }
+  
+      if (!tableData.types) {
+        tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+      }
+      this.logBuildPreAggregationSql('Downloading external pre-aggregation completed');
 
-    if (!tableData.types) {
-      tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+      return tableData;
+    } catch (error) {
+      this.logBuildPreAggregationSql('Downloading external pre-aggregation error', error);
+      throw error;
     }
+  }
 
-    return tableData;
+  protected logBuildPreAggregationSql(event: string, error?: any) {
+    const payload = {
+      preAggregation: this.preAggregation,
+      requestId: this.requestId,
+      error: error.message || error.stack
+    };
+    this.logger(event, payload);
   }
 
   protected async uploadExternalPreAggregation(
@@ -891,16 +904,18 @@ export class PreAggregationLoader {
     const externalDriver: DriverInterface = await this.externalDriverFactory();
     const table = this.targetTableName(newVersionEntry);
 
-    this.logger('Uploading external pre-aggregation', {
-      preAggregation: this.preAggregation,
-      requestId: this.requestId
-    });
-
-    await saveCancelFn(
-      externalDriver.uploadTableWithIndexes(
-        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
-      )
-    );
+    this.logBuildPreAggregationSql('Uploading external pre-aggregation');
+    try {
+      await saveCancelFn(
+        externalDriver.uploadTableWithIndexes(
+          table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry), this.preAggregation.uniqueKeyColumns
+        )
+      );
+    } catch (error) {
+      this.logBuildPreAggregationSql('Uploading external pre-aggregation error', error);
+      throw error;
+    }
+    this.logBuildPreAggregationSql('Uploading external pre-aggregation completed');
 
     await this.loadCache.fetchTables(this.preAggregation);
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true);
