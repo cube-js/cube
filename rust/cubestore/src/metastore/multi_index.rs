@@ -237,8 +237,8 @@ impl BaseRocksSecondaryIndex<MultiPartition> for MultiPartitionRocksIndex {
 
 #[derive(Clone, Copy, Debug)]
 pub enum MultiPartitionRocksIndex {
-    ByMultiIndexId = 0,
-    ByParentId = 1,
+    ByMultiIndexId = 1,
+    ByParentId,
 }
 
 impl RocksSecondaryIndex<MultiPartition, MultiPartitionIndexKey> for MultiPartitionRocksIndex {
