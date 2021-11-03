@@ -1003,6 +1003,8 @@ export class PreAggregationLoader {
 export class PreAggregationPartitionRangeLoader {
   protected waitForRenew: boolean;
 
+  protected cacheOnly: boolean;
+
   protected requestId: string;
 
   protected dataSource: string;
@@ -1021,6 +1023,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
+    this.cacheOnly = options.cacheOnly;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1039,6 +1042,7 @@ export class PreAggregationPartitionRangeLoader {
         priority: this.priority(10),
         requestId: this.requestId,
         dataSource: this.dataSource,
+        cacheOnly: this.cacheOnly,
         useInMemory: true,
         external: queryOptions?.external,
         renewalKey: partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null
@@ -1397,6 +1401,8 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
+          // TODO: Should we use cacheOnly for loadAllPreAggregationsIfNeeded
+          cacheOnly: queryBody.cacheOnly,
           externalRefresh: this.externalRefresh
         }
       );
@@ -1454,7 +1460,8 @@ export class PreAggregations {
         {
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
-          externalRefresh: this.externalRefresh
+          externalRefresh: this.externalRefresh,
+          cacheOnly: queryBody.cacheOnly
         }
       );
 

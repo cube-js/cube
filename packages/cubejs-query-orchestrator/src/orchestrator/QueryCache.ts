@@ -411,13 +411,17 @@ export class QueryCache {
     waitForRenew?: boolean,
     forceNoCache?: boolean,
     useInMemory?: boolean,
+    cacheOnly?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
-    const fetchNew = () => (
-      this.queryWithRetryAndRelease(query, values, {
+    const fetchNew = () => {
+      if (options.cacheOnly) {
+        throw new Error('Prevent fetchNew cache by cacheOnly=true option');
+      }
+      return this.queryWithRetryAndRelease(query, values, {
         priority: options.priority,
         cacheKey,
         external: options.external,
@@ -445,8 +449,8 @@ export class QueryCache {
             }));
         }
         throw e;
-      })
-    );
+      });
+    };
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId });

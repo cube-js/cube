@@ -357,6 +357,7 @@ export class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregations({
+          cacheOnly: req.query.cacheOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -492,7 +493,7 @@ export class ApiGateway {
     }
   }
 
-  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
       const compilerApi = this.getCompilerApi(context);
@@ -506,7 +507,8 @@ export class ApiGateway {
             {
               timezones: this.scheduledRefreshTimeZones,
               preAggregations: preAggregations.map(p => ({
-                id: p.id
+                id: p.id,
+                cacheOnly,
               }))
             },
           )
@@ -539,10 +541,11 @@ export class ApiGateway {
           query
         );
 
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p.error);
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
-          preAggregationPartitions,
+          preAggregationPartitionsWithoutError,
           compilerApi.preAggregationsSchema
         );
 

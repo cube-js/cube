@@ -20,6 +20,7 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
   contextSymbols: {
     securityContext: object,
   };
+  cacheOnly?: boolean,
   timezones: string[]
 };
 
@@ -28,6 +29,7 @@ type PreAggregationsQueryingOptions = {
   timezones: string[],
   preAggregations: {
     id: string,
+    cacheOnly?: boolean,
     partitions?: string[]
   }[]
 };
@@ -60,7 +62,8 @@ export class RefreshScheduler {
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
       preAggregations: [preAggregationDescription],
       preAggregationsLoadCacheByDataSource,
-      requestId: context.requestId
+      requestId: context.requestId,
+      cacheOnly: queryingOptions.cacheOnly,
     });
 
     return Promise.all(partitions.preAggregations.map(async partition => ({
@@ -216,11 +219,12 @@ export class RefreshScheduler {
 
     return Promise.all(preAggregations.map(async preAggregation => {
       const { timezones } = queryingOptions;
-      const { partitions: partitionsFilter } = preAggregationsQueryingOptions[preAggregation.id] || {};
+      const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
       const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
 
-      const partitions = !isRollupJoin && (await Promise.all(
+      let error;
+      let partitions: any[] = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => {
           const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
             context,
@@ -232,6 +236,7 @@ export class RefreshScheduler {
               concurrency: undefined,
               workerIndices: undefined,
               timezone,
+              cacheOnly,
               contextSymbols: {
                 securityContext: context.securityContext || {},
               }
@@ -240,11 +245,16 @@ export class RefreshScheduler {
 
           return queriesForPreAggregation;
         })
-      ))
+      ).catch(e => {
+        error = e;
+        return [];
+      }));
+
+      partitions = (partitions || [])
         .reduce((target, source) => [...target, ...source], [])
         .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p.sql?.tableName));
       
-      const [partition] = partitions || [];
+      const [partition] = partitions;
       const { invalidateKeyQueries, preAggregationStartEndQueries } = partition?.sql || {};
       const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
       const [[refreshKey]] = invalidateKeyQueries || [[]];
@@ -275,7 +285,8 @@ export class RefreshScheduler {
             ...preAggRefreshesWithSql
           }
         },
-        partitions
+        partitions,
+        error: error?.stack || error?.message,
       };
     }));
   }
