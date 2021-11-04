@@ -301,7 +301,7 @@ export function makeSchema(metaConfig: any) {
       definition(t) {
         cube.config.measures.forEach(measure => {
           if (measure.isVisible) {
-            t.field(safeName(measure.name), {
+            t.nonNull.field(safeName(measure.name), {
               type: mapType(measure.type),
               description: measure.description
             });
@@ -309,7 +309,7 @@ export function makeSchema(metaConfig: any) {
         });
         cube.config.dimensions.forEach(dimension => {
           if (dimension.isVisible) {
-            t.field(safeName(dimension.name), {
+            t.nonNull.field(safeName(dimension.name), {
               type: mapType(dimension.type),
               description: dimension.description
             });
