@@ -82,23 +82,43 @@ const OrderBy = enumType({
   ]
 });
 
-const Granularity = enumType({
-  name: 'Granularity',
-  members: [
-    'second',
-    'minute',
-    'hour',
-    'day',
-    'week',
-    'month',
-    'year'
-  ]
+export const TimeDimension = objectType({
+  name: 'TimeDimension',
+  definition(t) {
+    t.nonNull.field('value', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('second', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('minute', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('hour', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('day', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('week', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('month', {
+      type: 'DateTime',
+    });
+    t.nonNull.field('quarter', {
+      type: 'DateTime'
+    });
+    t.nonNull.field('year', {
+      type: 'DateTime',
+    });
+  },
 });
 
-function mapType(type: string) {
+function mapType(type: string, isInputType?: boolean) {
   switch (type) {
     case 'time':
-      return 'DateTime';
+      return isInputType ? 'DateTime' : 'TimeDimension';
     case 'string':
       return 'String';
     case 'number':
@@ -168,11 +188,11 @@ function applyDirectives(
 }
 
 function getFieldNodeChildren(node: FieldNode, infos: GraphQLResolveInfo) {
-  return node.selectionSet?.selections.filter((childNode) => (
+  return (node.selectionSet?.selections.filter((childNode) => (
     childNode.kind === 'Field' &&
     childNode.name.value !== '__typename' &&
     applyDirectives(childNode.directives, infos.variableValues)
-  )) as FieldNode[];
+  )) || []) as FieldNode[];
 }
 
 function parseArgumentValue(value: ValueNode) {
@@ -272,7 +292,7 @@ export function makeSchema(metaConfig: any) {
     StringFilter,
     DateTimeFilter,
     OrderBy,
-    Granularity
+    TimeDimension
   ];
 
   metaConfig.forEach(cube => {
@@ -306,14 +326,14 @@ export function makeSchema(metaConfig: any) {
         cube.config.measures.forEach(measure => {
           if (measure.isVisible) {
             t.field(safeName(measure.name), {
-              type: `${mapType(measure.type)}Filter`,
+              type: `${mapType(measure.type, true)}Filter`,
             });
           }
         });
         cube.config.dimensions.forEach(dimension => {
           if (dimension.isVisible) {
             t.field(safeName(dimension.name), {
-              type: `${mapType(dimension.type)}Filter`,
+              type: `${mapType(dimension.type, true)}Filter`,
             });
           }
         });
@@ -339,21 +359,6 @@ export function makeSchema(metaConfig: any) {
         });
       }
     }));
-
-    if (cube.config.dimensions.filter(dimension => dimension.isVisible).length > 0) {
-      types.push(inputObjectType({
-        name: `${cube.config.name}GranularityInput`,
-        definition(t) {
-          cube.config.dimensions.forEach(dimension => {
-            if (dimension.isVisible && dimension.type === 'time') {
-              t.field(safeName(dimension.name), {
-                type: 'Granularity',
-              });
-            }
-          });
-        }
-      }));
-    }
   });
 
   types.push(inputObjectType({
@@ -382,11 +387,6 @@ export function makeSchema(metaConfig: any) {
             orderBy: arg({
               type: `${cube.config.name}OrderByInput`
             }),
-            ...(cube.config.dimensions.filter(dimension => dimension.isVisible).length > 0 && {
-              granularity: arg({
-                type: `${cube.config.name}GranularityInput`
-              })
-            })
           }
         });
       });
@@ -418,32 +418,39 @@ export function makeSchema(metaConfig: any) {
             filters = [...filters, ...rootWhereArgToQueryFilters(where)];
           }
 
-          getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(node => {
-            const cubeName = capitalize(node.name.value);
-            const orderByArg = getArgumentValue(node, 'orderBy');
+          getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
+            const cubeName = capitalize(cubeNode.name.value);
+            const orderByArg = getArgumentValue(cubeNode, 'orderBy');
             if (orderByArg) {
               Object.keys(orderByArg).forEach(key => {
                 order[`${cubeName}.${key}`] = orderByArg[key];
               });
             }
 
-            const whereArg = getArgumentValue(node, 'where');
+            const whereArg = getArgumentValue(cubeNode, 'where');
             if (whereArg) {
               filters = [...filters, ...whereArgToQueryFilters(whereArg, cubeName)];
             }
 
-            getFieldNodeChildren(node, infos).forEach(childNode => {
-              const memberName = childNode.name.value;
+            getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
+              const memberName = memberNode.name.value;
               const memberType = getMemberType(context.metaConfig, cubeName, memberName);
 
               if (memberType === 'measure') {
                 measures.push(`${cubeName}.${memberName}`);
               } else if (memberType === 'dimension') {
-                const granularity = getArgumentValue(node, 'granularity');
-                if (granularity && Object.keys(granularity).includes(memberName)) {
-                  timeDimensions.push({
-                    dimension: `${cubeName}.${memberName}`,
-                    granularity: granularity[memberName]
+                const granularityNodes = getFieldNodeChildren(memberNode, infos);
+                if (granularityNodes.length > 0) {
+                  granularityNodes.forEach(granularityNode => {
+                    const granularityName = granularityNode.name.value;
+                    if (granularityName === 'value') {
+                      dimensions.push(`${cubeName}.${memberName}`);
+                    } else {
+                      timeDimensions.push({
+                        dimension: `${cubeName}.${memberName}`,
+                        granularity: granularityName
+                      });
+                    }
                   });
                 } else {
                   dimensions.push(`${cubeName}.${memberName}`);
@@ -487,9 +494,13 @@ export function makeSchema(metaConfig: any) {
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
-              const path = pair[0].split('.');
+              let path = pair[0].split('.');
               path[0] = unCapitalize(path[0]);
-              return R.set(R.lensPath(path), pair[1], res);
+              if (results.annotation.dimensions[pair[0]]?.type === "time") {
+                path = [...path, 'value'];
+              }
+              return (results.annotation.timeDimensions[pair[0]] && path.length != 3)
+                ? res : R.set(R.lensPath(path), pair[1], res);
             }, {}));
         }
       });
