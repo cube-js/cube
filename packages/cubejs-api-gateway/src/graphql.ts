@@ -496,10 +496,10 @@ export function makeSchema(metaConfig: any) {
             .reduce((res, pair) => {
               let path = pair[0].split('.');
               path[0] = unCapitalize(path[0]);
-              if (results.annotation.dimensions[pair[0]]?.type === "time") {
+              if (results.annotation.dimensions[pair[0]]?.type === 'time') {
                 path = [...path, 'value'];
               }
-              return (results.annotation.timeDimensions[pair[0]] && path.length != 3)
+              return (results.annotation.timeDimensions[pair[0]] && path.length !== 3)
                 ? res : R.set(R.lensPath(path), pair[1], res);
             }, {}));
         }
