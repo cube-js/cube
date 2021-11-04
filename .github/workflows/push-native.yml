@@ -1,0 +1,112 @@
+name: Build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/push-native.yml'
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/js-wrapper/**'
+      - 'rust/tsconfig.json'
+      - 'rust/package.json'
+      - 'rust/cubesql/**'
+      - 'rust/cubeclient/**'
+    branches:
+      - 'master'
+  pull_request:
+    paths:
+      - '.github/workflows/push-native.yml'
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/js-wrapper/**'
+      - 'rust/tsconfig.json'
+      - 'rust/package.json'
+      - 'rust/cubesql/**'
+      - 'rust/cubeclient/**'
+
+jobs:
+  native_linux:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
+    strategy:
+      matrix:
+        node-version: [10, 12, 14, 15, 16]
+        image: ["stretch"]
+      fail-fast: false
+    container:
+      image: node:${{ matrix.node-version }}-${{ matrix.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build native
+        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+
+  native:
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
+        os-version: [windows-2019, macos-11]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        run: yarn install --frozen-lockfile
+      - name: Build native
+        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
