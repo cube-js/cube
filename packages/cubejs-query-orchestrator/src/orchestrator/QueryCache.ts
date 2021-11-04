@@ -4,6 +4,7 @@ import { MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
+import { CacheOnlyError } from './CacheOnlyError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -419,7 +420,7 @@ export class QueryCache {
     const redisKey = this.queryRedisKey(cacheKey);
     const fetchNew = () => {
       if (options.cacheOnly) {
-        throw new Error('Prevent fetchNew cache by cacheOnly=true option');
+        throw new CacheOnlyError();
       }
       return this.queryWithRetryAndRelease(query, values, {
         priority: options.priority,

@@ -1,6 +1,7 @@
 export * from './AsyncRedisClient';
 export * from './BaseQueueDriver';
 export * from './ContinueWaitError';
+export * from './CacheOnlyError';
 export * from './LocalCacheDriver';
 export * from './LocalQueueDriver';
 export * from './PreAggregations';

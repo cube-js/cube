@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { v4 as uuidv4 } from 'uuid';
 import { Required } from '@cubejs-backend/shared';
+import { CacheOnlyError } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
@@ -223,7 +224,7 @@ export class RefreshScheduler {
 
       const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
 
-      let error;
+      let error: CacheOnlyError;
       let partitions: any[] = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => {
           const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
@@ -246,6 +247,9 @@ export class RefreshScheduler {
           return queriesForPreAggregation;
         })
       ).catch(e => {
+        if (!(e instanceof CacheOnlyError)) {
+          throw e;
+        }
         error = e;
         return [];
       }));
