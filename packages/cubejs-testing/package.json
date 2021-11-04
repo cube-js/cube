@@ -28,6 +28,8 @@
     "birdbox:postgresql-cubestore:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-cubestore.test.js",
     "birdbox:cli:postgresql": "jest --forceExit --verbose -i dist/test/cli-postgresql.test.js",
     "birdbox:cli:postgresql:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
+    "birdbox:local:postgresql": "USE_LOCAL_CUBEJS_BINARY=true jest --forceExit --verbose -i dist/test/cli-postgresql.test.js",
+    "birdbox:local:postgresql:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "birdbox:local:postgresql-pre-aggregations": "jest --forceExit --verbose -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "birdbox:local:postgresql-pre-aggregations:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "cypress:install": "cypress install",
