@@ -120,5 +120,14 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         }
       }
     });
+
+    it('Failing query rewrite', async () => {
+      try {
+        await httpClient.load({ measures: ['Orders.toRemove'] });
+        throw new Error('Should not successfully run Orders.toRemove query');
+      } catch (e) {
+        expect(e.toString()).toContain('Query should contain either');
+      }
+    });
   });
 }
