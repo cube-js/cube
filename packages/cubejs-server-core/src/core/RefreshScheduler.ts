@@ -34,9 +34,9 @@ type PreAggregationsQueryingOptions = {
   }[]
 };
 
-class UnUsedPreAggregationError extends Error {
+class CacheOnlyError extends Error {
   public constructor() {
-    super('Un used pre-aggregation');
+    super('Cache only');
   }
 }
 
@@ -62,7 +62,7 @@ export class RefreshScheduler {
     // Return a empty array for cases with 2 same pre-aggregations but with different partitionGranularity
     // Only the most detailed pre-aggregations will be use
     if (!preAggregationDescription) {
-      throw new UnUsedPreAggregationError();
+      return [];
     }
 
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
@@ -71,6 +71,10 @@ export class RefreshScheduler {
       requestId: context.requestId,
       cacheOnly: queryingOptions.cacheOnly,
     });
+
+    if (queryingOptions.cacheOnly && !partitions.length) {
+      throw new CacheOnlyError();
+    }
 
     return Promise.all(partitions.preAggregations.map(async partition => ({
       sql: partition
@@ -229,7 +233,7 @@ export class RefreshScheduler {
 
       const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
 
-      let error: UnUsedPreAggregationError;
+      let error: CacheOnlyError;
       let partitions: any[] = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => {
           const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
@@ -252,7 +256,7 @@ export class RefreshScheduler {
           return queriesForPreAggregation;
         })
       ).catch(e => {
-        if (!(e instanceof UnUsedPreAggregationError)) {
+        if (!(e instanceof CacheOnlyError)) {
           throw e;
         }
         error = e;
