@@ -24,6 +24,7 @@ import { BaseDriver, DownloadTableData, StreamOptions, UnloadOptions } from '../
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
+import { CacheOnlyError } from './CacheOnlyError';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -1029,11 +1030,15 @@ export class PreAggregationPartitionRangeLoader {
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
+    if (this.cacheOnly) {
+      const res = await this.queryCache.resultFromCacheIfExists({ query, values });
+      return res?.data || null;
+    }
 
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      [query, values],
+      [query, values, []],
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
@@ -1042,7 +1047,6 @@ export class PreAggregationPartitionRangeLoader {
         priority: this.priority(10),
         requestId: this.requestId,
         dataSource: this.dataSource,
-        cacheOnly: this.cacheOnly,
         useInMemory: true,
         external: queryOptions?.external,
         renewalKey: partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null
@@ -1401,8 +1405,6 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          // TODO: Should we use cacheOnly for loadAllPreAggregationsIfNeeded
-          cacheOnly: queryBody.cacheOnly,
           externalRefresh: this.externalRefresh
         }
       );
