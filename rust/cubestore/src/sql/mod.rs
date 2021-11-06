@@ -1334,6 +1334,7 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
 
     #[tokio::test]
@@ -1358,6 +1359,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1408,6 +1410,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1667,6 +1670,105 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn delete_middle_main() {
+        Config::test("delete_middle_main")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 10;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
+
+                for i in 0..100 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+
+                    let partitions = services
+                        .meta_store
+                        .get_partitions_with_chunks_created_seconds_ago(0)
+                        .await
+                        .unwrap();
+                    for p in partitions.into_iter() {
+                        services
+                            .injector
+                            .get_service_typed::<SchedulerImpl>()
+                            .await
+                            .schedule_partition_to_compact(&p)
+                            .await
+                            .unwrap()
+                    }
+                }
+
+                let to_repartition = services
+                    .meta_store
+                    .all_inactive_partitions_to_repartition()
+                    .await
+                    .unwrap();
+
+                for p in to_repartition.into_iter() {
+                    services
+                        .injector
+                        .get_service_typed::<SchedulerImpl>()
+                        .await
+                        .schedule_repartition_if_needed(&p)
+                        .await
+                        .unwrap();
+                }
+
+                let chunks = services.meta_store.chunks_table().all_rows().await.unwrap();
+
+                println!("All chunks: {:?}", chunks);
+
+                for c in chunks.into_iter().filter(|c| !c.get_row().active()) {
+                    let _ = services.meta_store.delete_chunk(c.get_id()).await;
+                }
+
+                let all_inactive_partitions = services
+                    .meta_store
+                    .all_inactive_middle_man_partitions()
+                    .await
+                    .unwrap();
+                println!("Middle man partitions: {:?}", all_inactive_partitions);
+                let mut futures = Vec::new();
+                for p in all_inactive_partitions.into_iter() {
+                    futures.push(services.meta_store.delete_middle_man_partition(p.get_id()))
+                }
+                join_all(futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+
+                println!(
+                    "All partitions: {:?}",
+                    services
+                        .meta_store
+                        .partition_table()
+                        .all_rows()
+                        .await
+                        .unwrap()
+                );
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
             })
             .await;
     }

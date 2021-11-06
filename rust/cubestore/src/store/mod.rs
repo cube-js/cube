@@ -23,6 +23,7 @@ use std::{
 
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::table::data::cmp_partition_key;
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
@@ -156,6 +157,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
+    config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
@@ -277,6 +279,7 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
+        config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
@@ -284,6 +287,7 @@ impl ChunkStore {
             remote_fs,
             cluster,
             chunk_size,
+            config,
             memory_chunks: RwLock::new(HashMap::new()),
         };
 
@@ -329,10 +333,22 @@ impl ChunkDataStore for ChunkStore {
                 partition
             )));
         }
+        let mut size = 0;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
-            .await?;
+            .await?
+            .into_iter()
+            .take_while(|c| {
+                if size == 0 {
+                    size += c.get_row().get_row_count();
+                    true
+                } else {
+                    size += c.get_row().get_row_count();
+                    size <= self.config.compaction_chunks_total_size_threshold()
+                }
+            })
+            .collect::<Vec<_>>();
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
         for chunk in chunks.into_iter() {
@@ -557,6 +573,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 10,
             );
 

@@ -165,6 +165,15 @@ impl SchedulerImpl {
                 .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
         }
 
+        let all_inactive_partitions_to_repartition = self
+            .meta_store
+            .all_inactive_partitions_to_repartition()
+            .await?;
+
+        for partition in all_inactive_partitions_to_repartition.iter() {
+            self.schedule_repartition_if_needed(&partition).await?;
+        }
+
         let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
 
         for partition in all_inactive_partitions.iter() {
@@ -270,7 +279,7 @@ impl SchedulerImpl {
                 self.cluster
                     .free_memory_chunk(&node_name, chunk.get_id())
                     .await?;
-            } else {
+            } else if chunk.get_row().uploaded() {
                 self.remote_fs
                     .delete_file(ChunkStore::chunk_remote_path(chunk.get_id()).as_str())
                     .await?
@@ -369,7 +378,10 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    async fn schedule_repartition_if_needed(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
+    pub async fn schedule_repartition_if_needed(
+        &self,
+        p: &IdRow<Partition>,
+    ) -> Result<(), CubeError> {
         let chunk_rows = self
             .meta_store
             .get_partition_chunk_sizes(p.get_id())
@@ -485,7 +497,10 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    async fn schedule_partition_to_compact(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
+    pub async fn schedule_partition_to_compact(
+        &self,
+        p: &IdRow<Partition>,
+    ) -> Result<(), CubeError> {
         let node = self.cluster.node_name_by_partition(p);
         let job = self
             .meta_store

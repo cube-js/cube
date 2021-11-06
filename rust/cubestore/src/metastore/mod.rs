@@ -790,6 +790,9 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_id: u64,
     ) -> Result<IdRow<Partition>, CubeError>;
     async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError>;
+    async fn all_inactive_partitions_to_repartition(
+        &self,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_partitions_with_chunks_created_seconds_ago(
         &self,
@@ -2916,16 +2919,18 @@ impl MetaStore for RocksMetaStore {
                 )));
             }
 
-            let child = partitions_table
+            let children = partitions_table
                 .get_rows_by_index(
                     &PartitionIndexKey::ByIndexId(partition.get_row().get_index_id()),
                     &PartitionRocksIndex::IndexId,
                 )?
                 .into_iter()
-                .find(|p| p.get_row().parent_partition_id() == &Some(partition.get_id()));
+                .filter(|p| p.get_row().parent_partition_id() == &Some(partition.get_id())).collect::<Vec<_>>();
 
-            if let Some(child) = child {
-                partitions_table.update_with_fn(child.get_id(), |c| c.update_parent_partition_id(partition.get_row().parent_partition_id().clone()), batch_pipe)?;
+            if !children.is_empty() {
+                for child in children.into_iter() {
+                    partitions_table.update_with_fn(child.get_id(), |c| c.update_parent_partition_id(partition.get_row().parent_partition_id().clone()), batch_pipe)?;
+                }
             } else {
                 return Err(CubeError::internal(format!(
                     "Can't drop partition {:?} without children",
@@ -2987,6 +2992,34 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn all_inactive_partitions_to_repartition(
+        &self,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut partitions_with_chunks = HashSet::new();
+
+            let chunks = chunks_table.all_rows()?;
+
+            for chunk in chunks.iter() {
+                partitions_with_chunks.insert(chunk.get_row().get_partition_id());
+            }
+
+            let to_repartition = partitions_table
+                .all_rows()?
+                .into_iter()
+                .filter(|p| {
+                    !p.get_row().is_active() && partitions_with_chunks.contains(&p.get_id())
+                })
+                .collect::<Vec<_>>();
+
+            Ok(to_repartition)
+        })
+        .await
+    }
+
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
         self.read_operation(move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
@@ -3042,7 +3075,7 @@ impl MetaStore for RocksMetaStore {
                             .as_ref()
                             .map(|created_at| {
                                 now.signed_duration_since(created_at.clone()).num_seconds()
-                                    > seconds_ago
+                                    >= seconds_ago
                             })
                             .unwrap_or(false)
                 })
@@ -3590,6 +3623,9 @@ impl MetaStore for RocksMetaStore {
                 .all_rows()?
                 .into_iter()
                 .filter(|j| {
+                    if let JobStatus::Scheduled(_) = j.get_row().status() {
+                        return false;
+                    }
                     let duration1 =
                         time.signed_duration_since(j.get_row().last_heart_beat().clone());
                     duration1 > duration
