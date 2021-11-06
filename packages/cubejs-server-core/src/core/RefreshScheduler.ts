@@ -72,7 +72,7 @@ export class RefreshScheduler {
       cacheOnly: queryingOptions.cacheOnly,
     });
 
-    if (queryingOptions.cacheOnly && !partitions.length) {
+    if (queryingOptions.cacheOnly && !partitions?.preAggregations?.length) {
       throw new CacheOnlyError();
     }
 
