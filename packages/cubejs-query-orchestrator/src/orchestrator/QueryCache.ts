@@ -4,7 +4,6 @@ import { MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
-import { CacheOnlyError } from './CacheOnlyError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -418,35 +417,37 @@ export class QueryCache {
     const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
-    const fetchNew = () => this.queryWithRetryAndRelease(query, values, {
-      priority: options.priority,
-      cacheKey,
-      external: options.external,
-      requestId: options.requestId,
-      dataSource: options.dataSource
-    }).then(res => {
-      const result = {
-        time: (new Date()).getTime(),
-        result: res,
-        renewalKey
-      };
-      return this.cacheDriver.set(redisKey, result, expiration)
-        .then(() => {
-          this.logger('Renewed', { cacheKey, requestId: options.requestId });
-          return res;
-        });
-    }).catch(e => {
-      if (!(e instanceof ContinueWaitError)) {
-        this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId });
-        this.cacheDriver.remove(redisKey)
-          .catch(err => this.logger('Error removing key', {
-            cacheKey,
-            error: err.stack || err,
-            requestId: options.requestId
-          }));
-      }
-      throw e;
-    });
+    const fetchNew = () => (
+      this.queryWithRetryAndRelease(query, values, {
+        priority: options.priority,
+        cacheKey,
+        external: options.external,
+        requestId: options.requestId,
+        dataSource: options.dataSource
+      }).then(res => {
+        const result = {
+          time: (new Date()).getTime(),
+          result: res,
+          renewalKey
+        };
+        return this.cacheDriver.set(redisKey, result, expiration)
+          .then(() => {
+            this.logger('Renewed', { cacheKey, requestId: options.requestId });
+            return res;
+          });
+      }).catch(e => {
+        if (!(e instanceof ContinueWaitError)) {
+          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId });
+          this.cacheDriver.remove(redisKey)
+            .catch(err => this.logger('Error removing key', {
+              cacheKey,
+              error: err.stack || err,
+              requestId: options.requestId
+            }));
+        }
+        throw e;
+      })
+    );
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId });
@@ -542,8 +543,6 @@ export class QueryCache {
 
   public async resultFromCacheIfExists(queryBody) {
     const cacheKey = QueryCache.queryCacheKey(queryBody);
-    console.log('resultFromCacheIfExists.cacheKey', cacheKey);
-    console.log('resultFromCacheIfExists.redisKey', this.queryRedisKey(cacheKey));
     const cachedValue = await this.cacheDriver.get(this.queryRedisKey(cacheKey));
     if (cachedValue) {
       return {

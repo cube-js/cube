@@ -1,7 +1,6 @@
 import R from 'ramda';
 import { v4 as uuidv4 } from 'uuid';
 import { Required } from '@cubejs-backend/shared';
-import { CacheOnlyError } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
@@ -35,6 +34,12 @@ type PreAggregationsQueryingOptions = {
   }[]
 };
 
+class UnUsedPreAggregationError extends Error {
+  public constructor() {
+    super('Un used pre-aggregation');
+  }
+}
+
 export class RefreshScheduler {
   public constructor(
     protected readonly serverCore: CubejsServerCore,
@@ -57,7 +62,7 @@ export class RefreshScheduler {
     // Return a empty array for cases with 2 same pre-aggregations but with different partitionGranularity
     // Only the most detailed pre-aggregations will be use
     if (!preAggregationDescription) {
-      return [];
+      throw new UnUsedPreAggregationError();
     }
 
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
@@ -224,7 +229,7 @@ export class RefreshScheduler {
 
       const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
 
-      let error: CacheOnlyError;
+      let error: UnUsedPreAggregationError;
       let partitions: any[] = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => {
           const queriesForPreAggregation = await this.refreshQueriesForPreAggregation(
@@ -247,7 +252,7 @@ export class RefreshScheduler {
           return queriesForPreAggregation;
         })
       ).catch(e => {
-        if (!(e instanceof CacheOnlyError)) {
+        if (!(e instanceof UnUsedPreAggregationError)) {
           throw e;
         }
         error = e;

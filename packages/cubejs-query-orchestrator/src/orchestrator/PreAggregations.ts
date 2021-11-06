@@ -24,7 +24,6 @@ import { BaseDriver, DownloadTableData, StreamOptions, UnloadOptions } from '../
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
-import { CacheOnlyError } from './CacheOnlyError';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -1030,10 +1029,6 @@ export class PreAggregationPartitionRangeLoader {
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
-    if (this.cacheOnly) {
-      const res = await this.queryCache.resultFromCacheIfExists({ query, values });
-      return res?.data || null;
-    }
 
     return this.queryCache.cacheQueryResult(
       query,
@@ -1215,8 +1210,19 @@ export class PreAggregationPartitionRangeLoader {
     );
   }
 
+  private async loadBuildRangeIsCached() {
+    const { preAggregationStartEndQueries } = this.preAggregation;
+    
+    const result = await Promise.all(preAggregationStartEndQueries.map(([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })));
+    return result.every(res => res?.data);
+  }
+
   public async loadBuildRange(): Promise<QueryDateRange> {
     const { preAggregationStartEndQueries } = this.preAggregation;
+    if (this.cacheOnly && !(await this.loadBuildRangeIsCached())) {
+      return ['', ''];
+    }
+
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
         async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
