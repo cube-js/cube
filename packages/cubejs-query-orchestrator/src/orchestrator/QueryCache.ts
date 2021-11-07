@@ -411,7 +411,6 @@ export class QueryCache {
     waitForRenew?: boolean,
     forceNoCache?: boolean,
     useInMemory?: boolean,
-    cacheOnly?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
