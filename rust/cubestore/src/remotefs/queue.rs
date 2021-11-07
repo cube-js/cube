@@ -127,9 +127,11 @@ impl QueueRemoteFs {
         }
 
         let to_move = queue_remote_fs.clone();
-        futures.push(tokio::task::spawn(async move {
-            to_move.cleanup_loop().await;
-        }));
+        if queue_remote_fs.config.upload_to_remote() {
+            futures.push(tokio::task::spawn(async move {
+                to_move.cleanup_loop().await;
+            }));
+        }
         join_all(futures)
             .await
             .into_iter()
@@ -292,10 +294,8 @@ impl RemoteFs for QueueRemoteFs {
         remote_path: &str,
     ) -> Result<(), CubeError> {
         if !self.config.upload_to_remote() {
-            return Err(CubeError::internal(format!(
-                "Refusing to upload {}",
-                remote_path
-            )));
+            log::info!("Skipping upload {}", remote_path);
+            return Ok(());
         }
         let mut receiver = self.result_sender.subscribe();
         self.upload_queue.push(RemoteFsOp::Upload {
@@ -341,10 +341,8 @@ impl RemoteFs for QueueRemoteFs {
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         if !self.config.upload_to_remote() {
-            return Err(CubeError::internal(format!(
-                "Refusing to delete {}",
-                remote_path
-            )));
+            log::info!("Skipping delete {}", remote_path);
+            return Ok(());
         }
         let mut receiver = self.result_sender.subscribe();
         self.upload_queue

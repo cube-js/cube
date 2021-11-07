@@ -906,6 +906,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn wal_uploaded(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wals_for_table(&self, table_id: u64) -> Result<Vec<IdRow<WAL>>, CubeError>;
 
+    async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
     async fn get_job_by_ref(
@@ -924,6 +925,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
+    async fn delete_all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
 
     async fn create_or_update_source(
         &self,
@@ -3569,6 +3571,11 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
+        self.read_operation(move |db_ref| Ok(JobRocksTable::new(db_ref).all_rows()?))
+            .await
+    }
+
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref.clone());
@@ -3693,6 +3700,18 @@ impl MetaStore for RocksMetaStore {
                 |row| row.update_status(status),
                 batch_pipe,
             )?)
+        })
+        .await
+    }
+
+    async fn delete_all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let all_jobs = jobs_table.all_rows()?;
+            for job in all_jobs.iter() {
+                jobs_table.delete(job.get_id(), batch_pipe)?;
+            }
+            Ok(all_jobs)
         })
         .await
     }

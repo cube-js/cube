@@ -130,6 +130,8 @@ pub trait Cluster: DIService + Send + Sync {
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
 
     async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage;
+
+    async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockCluster, [Cluster]);
@@ -492,6 +494,22 @@ impl Cluster for ClusterImpl {
             }
             x => panic!("Unexpected message: {:?}", x),
         }
+    }
+
+    async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
+        let node = self.node_name_by_partition(p);
+        let job = self
+            .meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, p.get_id()),
+                JobType::Repartition,
+                node.to_string(),
+            ))
+            .await?;
+        if job.is_some() {
+            self.notify_job_runner(node).await?;
+        }
+        Ok(())
     }
 }
 

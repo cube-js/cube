@@ -1,5 +1,5 @@
 use sqlparser::ast::{
-    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement,
+    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
@@ -53,7 +53,14 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
+    System(SystemCommand),
     Dump(Box<Query>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SystemCommand {
+    KillAllJobs,
+    Repartition { partition_id: u64 },
 }
 
 pub struct CubeStoreParser<'a> {
@@ -73,6 +80,10 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.parser.peek_token() {
             Token::Word(w) => match w.keyword {
+                _ if w.value.eq_ignore_ascii_case("sys") => {
+                    self.parser.next_token();
+                    self.parse_system()
+                }
                 Keyword::CREATE => {
                     self.parser.next_token();
                     self.parse_create()
@@ -107,6 +118,44 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_create_source()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
+        }
+    }
+
+    fn parse_system(&mut self) -> Result<Statement, ParserError> {
+        if self.parse_custom_token("kill")
+            && self.parser.parse_keywords(&[Keyword::ALL])
+            && self.parse_custom_token("jobs")
+        {
+            Ok(Statement::System(SystemCommand::KillAllJobs))
+        } else if self.parse_custom_token("repartition") {
+            match self.parser.parse_number_value()? {
+                Value::Number(id, _) => Ok(Statement::System(SystemCommand::Repartition {
+                    partition_id: id.parse::<u64>().map_err(|e| {
+                        ParserError::ParserError(format!("Can't parse partition id: {}", e))
+                    })?,
+                })),
+                x => Err(ParserError::ParserError(format!(
+                    "Partition id expected but {:?} found",
+                    x
+                ))),
+            }
+        } else {
+            Err(ParserError::ParserError(
+                "Unknown system command".to_string(),
+            ))
+        }
+    }
+
+    fn parse_custom_token(&mut self, token: &str) -> bool {
+        if let Token::Word(w) = self.parser.peek_token() {
+            if w.value.eq_ignore_ascii_case(token) {
+                self.parser.next_token();
+                true
+            } else {
+                false
+            }
+        } else {
+            false
         }
     }
 

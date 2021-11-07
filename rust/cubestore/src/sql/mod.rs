@@ -51,7 +51,7 @@ use crate::queryplanner::serialized_plan::RowFilter;
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
@@ -512,6 +512,17 @@ impl SqlService for SqlServiceImpl {
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
+            CubeStoreStatement::System(command) => match command {
+                SystemCommand::KillAllJobs => {
+                    self.db.delete_all_jobs().await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+                SystemCommand::Repartition { partition_id } => {
+                    let partition = self.db.get_partition(partition_id).await?;
+                    self.cluster.schedule_repartition(&partition).await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+            },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }

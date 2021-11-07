@@ -149,7 +149,13 @@ impl CompactionService for CompactionServiceImpl {
         let num_columns = index.get_row().columns().len();
         for chunk in chunks.iter() {
             for b in self.chunk_store.get_chunk_columns(chunk.clone()).await? {
-                assert_eq!(num_columns, b.num_columns());
+                assert_eq!(
+                    num_columns,
+                    b.num_columns(),
+                    "Column len mismatch for {:?} and {:?}",
+                    index,
+                    chunk
+                );
                 data.push(b)
             }
         }
