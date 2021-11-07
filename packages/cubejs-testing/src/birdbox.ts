@@ -117,6 +117,7 @@ export interface StartCliWithEnvOptions {
   dbType: string;
   useCubejsServerBinary?: boolean;
   loadScript?: string;
+  cubejsConfig?: string;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -169,17 +170,23 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     path.join(testDir, 'schema')
   );
 
+  if (options.cubejsConfig) {
+    fsExtra.copySync(
+      path.join(process.cwd(), 'birdbox-fixtures', options.dbType, options.cubejsConfig),
+      path.join(testDir, 'cube.js')
+    );
+  }
+
   const cli = spawn(
-    options.useCubejsServerBinary ? '../cubejs-server/bin/server' : 'npm',
+    options.useCubejsServerBinary ? path.resolve(process.cwd(), '../cubejs-server/bin/server') : 'npm',
     options.useCubejsServerBinary ? [] : ['run', 'dev'],
     {
-      cwd: options.useCubejsServerBinary ? process.cwd() : testDir,
+      cwd: testDir,
       shell: true,
       // Show output of Cube.js process in console
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        CUBEJS_SCHEMA_PATH: options.useCubejsServerBinary ? path.join('birdbox-fixtures', options.dbType, 'schema') : 'schema',
         CUBEJS_DB_TYPE: 'postgres',
         CUBEJS_DB_HOST: db.getHost(),
         CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
@@ -193,9 +200,9 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
       },
     }
   );
-  // cli.stdout.on('data', (msg) => {
-  //   console.log(msg.toString());
-  // });
+  cli.stdout.on('data', (msg) => {
+    console.log(msg.toString());
+  });
   cli.stderr.on('data', (msg) => {
     console.log(msg.toString());
   });

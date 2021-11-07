@@ -9,11 +9,11 @@ import {
 
 import { aliasSeries } from './utils';
 
-dayjs.locale({
-  ...en,
-  weekStart: 1,
-});
 dayjs.extend(quarterOfYear);
+
+// When granularity is week, weekStart Value must be 1. However, since the client can change it globally (https://day.js.org/docs/en/i18n/changing-locale)
+// So the function below has been added.
+const internalDayjs = (...args) => dayjs(...args).locale({ ...en, weekStart: 1 });
 
 export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
@@ -60,8 +60,8 @@ export const dayRange = (from, to) => ({
   by: (value) => {
     const results = [];
 
-    let start = dayjs(from);
-    const end = dayjs(to);
+    let start = internalDayjs(from);
+    const end = internalDayjs(to);
 
     while (start.isBefore(end) || start.isSame(end)) {
       results.push(start);
@@ -70,9 +70,9 @@ export const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(dayjs(from).startOf(value), dayjs(to).endOf(value)),
-  start: dayjs(from),
-  end: dayjs(to),
+  snapTo: (value) => dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value)),
+  start: internalDayjs(from),
+  end: internalDayjs(to),
 });
 
 export const QUERY_TYPE = {
@@ -318,7 +318,7 @@ class ResultSet {
     if (!dateRange) {
       const member = ResultSet.timeDimensionMember(timeDimension);
       const dates = pipe(
-        map(row => row[member] && dayjs(row[member])),
+        map(row => row[member] && internalDayjs(row[member])),
         filter(Boolean)
       )(this.timeDimensionBackwardCompatibleData(resultIndex));
 

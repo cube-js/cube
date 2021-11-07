@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct V1LoadRequestQuery {
     #[serde(rename = "measures", skip_serializing_if = "Option::is_none")]
     pub measures: Option<Vec<String>>,

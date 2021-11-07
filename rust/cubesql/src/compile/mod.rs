@@ -10,7 +10,7 @@ use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace};
 use serde::Serialize;
 use serde_json::json;
-use sqlparser::ast;
+use sqlparser::ast::{self, Ident, ObjectName};
 use sqlparser::parser::Parser;
 
 use cubeclient::models::{
@@ -25,12 +25,12 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::ColumnType;
+use msql_srv::{AsyncMysqlShim, ColumnType};
 
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
-use self::engine::udf::{create_db_udf, create_version_udf};
+use self::engine::udf::{create_connection_id_udf, create_db_udf, create_version_udf};
 
 pub mod builder;
 pub mod context;
@@ -97,7 +97,7 @@ fn compile_select_expr(
                 builder.with_time_dimension(
                     V1LoadRequestQueryTimeDimension {
                         dimension: dimension.name.clone(),
-                        granularity,
+                        granularity: Some(granularity),
                         date_range: None,
                     },
                     CompiledQueryFieldMeta {
@@ -632,14 +632,71 @@ fn compile_where_expression(
     }
 }
 
+fn optimize_where_inner_filter(
+    tree: Box<CompiledFilterTree>,
+    builder: &mut QueryBuilder,
+) -> Option<Box<CompiledFilterTree>> {
+    match *tree {
+        CompiledFilterTree::Filter(ref filter) => match filter {
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values,
+            } => {
+                if operator.eq(&"inDateRange".to_string()) {
+                    let filter_pushdown = builder.push_date_range_for_time_dimenssion(
+                        member,
+                        json!(values.as_ref().unwrap()),
+                    );
+                    if filter_pushdown {
+                        None
+                    } else {
+                        debug!("Unable to push down {}", member);
+
+                        Some(tree)
+                    }
+                } else {
+                    Some(tree)
+                }
+            }
+            CompiledFilter::SegmentFilter { member } => {
+                builder.with_segment(member.clone());
+
+                None
+            }
+            _ => Some(tree),
+        },
+        _ => Some(tree),
+    }
+}
+
 fn optimize_where_filters(
     parent: Option<CompiledFilterTree>,
     current: CompiledFilterTree,
     builder: &mut QueryBuilder,
 ) -> Option<CompiledFilterTree> {
     if parent.is_none() {
-        match &current {
-            CompiledFilterTree::Filter(filter) => {
+        match current {
+            CompiledFilterTree::And(left, right) => {
+                let left_recompile = optimize_where_inner_filter(left, builder);
+                let right_recompile = optimize_where_inner_filter(right, builder);
+
+                match (left_recompile, right_recompile) {
+                    (Some(l), Some(r)) => {
+                        return Some(CompiledFilterTree::And(l, r));
+                    }
+                    (Some(l), None) => {
+                        return Some(*l);
+                    }
+                    (None, Some(r)) => {
+                        return Some(*r);
+                    }
+                    (None, None) => {
+                        return None;
+                    }
+                }
+            }
+            CompiledFilterTree::Filter(ref filter) => {
                 match filter {
                     CompiledFilter::Filter {
                         member,
@@ -976,6 +1033,27 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
     Ok(builder)
 }
 
+#[derive(Debug)]
+pub struct QueryPlannerExecutionProps {
+    connection_id: u32,
+    database: Option<String>,
+}
+
+impl QueryPlannerExecutionProps {
+    pub fn new(connection_id: u32, database: Option<String>) -> Self {
+        Self {
+            connection_id,
+            database,
+        }
+    }
+}
+
+impl QueryPlannerExecutionProps {
+    pub fn connection_id(&self) -> u32 {
+        self.connection_id
+    }
+}
+
 struct QueryPlanner {
     context: Arc<ctx::TenantContext>,
 }
@@ -985,7 +1063,11 @@ impl QueryPlanner {
         Self { context }
     }
 
-    pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
+    pub fn plan(
+        &self,
+        stmt: &ast::Statement,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
         let (query, select) = match stmt {
             ast::Statement::Query(q) => {
                 if q.with.is_some() {
@@ -1009,9 +1091,12 @@ impl QueryPlanner {
                     vec![],
                 ))));
             }
+            ast::Statement::ShowVariable { variable } => {
+                return self.show_variable_to_plan(variable, props);
+            }
             // Proxy some queries to DF
             ast::Statement::ShowColumns { .. } | ast::Statement::ShowVariable { .. } => {
-                return self.create_df_logical_plan(stmt.clone());
+                return self.create_df_logical_plan(stmt.clone(), props);
             }
             _ => {
                 return Err(CompilationError::Unsupported(
@@ -1047,7 +1132,7 @@ impl QueryPlanner {
 
             &select.from[0]
         } else {
-            return self.create_df_logical_plan(stmt.clone());
+            return self.create_df_logical_plan(stmt.clone(), props);
         };
 
         let (schema_name, table_name) = match &from_table.relation {
@@ -1124,14 +1209,53 @@ impl QueryPlanner {
         }
     }
 
-    fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+    fn show_variable_to_plan(
+        &self,
+        variable: &Vec<Ident>,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
+        let name = ObjectName(variable.to_vec()).to_string();
+        if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
+            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                vec![dataframe::Column::new(
+                    "Database".to_string(),
+                    ColumnType::MYSQL_TYPE_STRING,
+                )],
+                vec![
+                    dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "information_schema".to_string(),
+                    )]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String("mysql".to_string())]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "performance_schema".to_string(),
+                    )]),
+                    dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
+                ],
+            ))))
+        } else {
+            self.create_df_logical_plan(
+                ast::Statement::ShowVariable {
+                    variable: variable.clone(),
+                },
+                props,
+            )
+        }
+    }
+
+    fn create_df_logical_plan(
+        &self,
+        stmt: ast::Statement,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
         let mut ctx = ExecutionContext::new();
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
 
         ctx.register_udf(create_version_udf());
-        ctx.register_udf(create_db_udf());
+        ctx.register_udf(create_db_udf(props));
+        ctx.register_udf(create_connection_id_udf(props));
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);
@@ -1152,10 +1276,11 @@ impl QueryPlanner {
 
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
-    tenant: Arc<ctx::TenantContext>,
+    tenant_ctx: Arc<ctx::TenantContext>,
+    props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
-    let planner = QueryPlanner::new(tenant);
-    planner.plan(stmt)
+    let planner = QueryPlanner::new(tenant_ctx);
+    planner.plan(stmt, props)
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -1201,6 +1326,7 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     tenant: Arc<ctx::TenantContext>,
+    props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     let dialect = MySqlDialectWithBackTicks {};
     let parse_result = Parser::parse_sql(&dialect, query);
@@ -1213,7 +1339,7 @@ pub fn convert_sql_to_cube_query(
         Ok(stmts) => {
             let stmt = &stmts[0];
 
-            convert_statement_to_cube_query(stmt, tenant)
+            convert_statement_to_cube_query(stmt, tenant, props)
         }
     }
 }
@@ -1315,7 +1441,14 @@ mod tests {
     }
 
     fn convert_simple_select(query: String) -> CompiledQuery {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx());
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            &QueryPlannerExecutionProps {
+                connection_id: 8,
+                database: None,
+            },
+        );
         match query.unwrap() {
             QueryPlan::CubeSelect(query) => query,
             _ => panic!("Must return CubeSelect instead of DF plan"),
@@ -1776,7 +1909,14 @@ mod tests {
         ];
 
         for (input_query, expected_error) in variants.iter() {
-            let query = convert_sql_to_cube_query(&input_query, get_test_tenant_ctx());
+            let query = convert_sql_to_cube_query(
+                &input_query,
+                get_test_tenant_ctx(),
+                &QueryPlannerExecutionProps {
+                    connection_id: 8,
+                    database: None,
+                },
+            );
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
@@ -1821,7 +1961,7 @@ mod tests {
                         segments: Some(vec![]),
                         time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                             dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: expected_granularity.to_string(),
+                            granularity: Some(expected_granularity.to_string()),
                             date_range: None,
                         }]),
                         order: None,
@@ -1848,30 +1988,73 @@ mod tests {
 
     #[test]
     fn test_where_filter_daterange() {
-        let query = convert_simple_select(
-            "SELECT 
-                COUNT(*), DATE(order_date) AS __timestamp
+        let to_check = vec![
+            // // Filter push down to TD (day)
+            (
+                "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
+                "order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // Create a new TD (dateRange filter pushdown)
+            (
+                "COUNT(*)".to_string(),
+                "order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // Create a new TD (dateRange filter pushdown from right side of CompiledFilterTree::And)
+            (
+                "COUNT(*)".to_string(),
+                "customer_gender = 'FEMALE' AND (order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'))".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+            // similar as below but from left side
+            (
+                "COUNT(*)".to_string(),
+                "(order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')) AND customer_gender = 'FEMALE'".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-06T23:59:59.999+00:00".to_string()
+                    ])),
+                }])
+            ),
+        ];
+
+        for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
+            let query = convert_simple_select(format!(
+                "SELECT 
+                {}
                 FROM KibanaSampleDataEcommerce
-                WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
-                GROUP BY __timestamp"
-            .to_string(),
-        );
+                WHERE {}
+                GROUP BY __timestamp",
+                sql_projection, sql_filter
+            ));
 
-        let req = query.request;
-
-        assert_eq!(
-            req.time_dimensions,
-            Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: "day".to_string(),
-                date_range: Some(json!(vec![
-                    "2021-08-31T00:00:00+00:00".to_string(),
-                    "2021-09-06T23:59:59.999+00:00".to_string()
-                ])),
-            }])
-        );
-
-        assert_eq!(req.filters, None);
+            assert_eq!(query.request.time_dimensions, *expected_tdm)
+        }
     }
 
     #[test]
@@ -2035,6 +2218,11 @@ mod tests {
             (
                 "is_male = true".to_string(),
                 // This filter will be pushed to segments
+                None,
+            ),
+            (
+                "is_male = true AND is_female = true".to_string(),
+                // This filters will be pushed to segments
                 None,
             ),
         ];
@@ -2243,7 +2431,7 @@ mod tests {
                         })
                     ]),
                     and: None,
-                }],
+                }]
             ),
         ];
 

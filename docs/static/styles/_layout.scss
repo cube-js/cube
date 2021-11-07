@@ -927,9 +927,13 @@ section[type=h2] h2 {
   }
 }
 
+.frameworkSwitcherWrapper {
+  max-width: $content-max-width;
+}
+
 .frameworkSwitcher.frameworkSwitcher {
   padding-top: 40px;
-  padding-left: 32px;
+  //padding-left: 32px;
 
   :global {
     .ant-radio-button-wrapper {

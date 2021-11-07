@@ -15,6 +15,7 @@ impl Index {
         columns: Vec<Column>,
         sort_key_size: u64,
         partition_split_key_size: Option<u64>,
+        multi_index_id: Option<u64>,
     ) -> Result<Index, CubeError> {
         if sort_key_size == 0 {
             return Err(CubeError::user(format!(
@@ -28,6 +29,7 @@ impl Index {
             columns,
             sort_key_size,
             partition_split_key_size,
+            multi_index_id,
         })
     }
 
@@ -55,12 +57,17 @@ impl Index {
     pub fn partition_split_key_size(&self) -> &Option<u64> {
         &self.partition_split_key_size
     }
+
+    pub fn multi_index_id(&self) -> Option<u64> {
+        self.multi_index_id
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum IndexRocksIndex {
     Name = 1,
     TableID,
+    MultiIndexId,
 }
 
 impl BaseRocksSecondaryIndex<Index> for IndexRocksIndex {
@@ -81,6 +88,7 @@ rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
     vec![
         Box::new(IndexRocksIndex::TableID),
         Box::new(IndexRocksIndex::Name),
+        Box::new(IndexRocksIndex::MultiIndexId),
     ]
 });
 
@@ -88,6 +96,7 @@ rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
 pub enum IndexIndexKey {
     TableId(u64),
     Name(u64, String),
+    MultiIndexId(Option<u64>),
 }
 
 impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
@@ -95,6 +104,7 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
         match self {
             IndexRocksIndex::TableID => IndexIndexKey::TableId(row.table_id),
             IndexRocksIndex::Name => IndexIndexKey::Name(row.table_id, row.name.to_string()),
+            IndexRocksIndex::MultiIndexId => IndexIndexKey::MultiIndexId(row.multi_index_id),
         }
     }
 
@@ -112,6 +122,17 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
                 buf.write_all(bytes).unwrap();
                 buf.into_inner()
             }
+            IndexIndexKey::MultiIndexId(multi_index_id) => {
+                let mut buf = Cursor::new(Vec::with_capacity(9));
+                match multi_index_id {
+                    None => buf.write_u8(0).unwrap(),
+                    Some(id) => {
+                        buf.write_u8(1).unwrap();
+                        buf.write_u64::<BigEndian>(*id).unwrap();
+                    }
+                }
+                buf.into_inner()
+            }
         }
     }
 
@@ -119,6 +140,7 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
         match self {
             IndexRocksIndex::TableID => false,
             IndexRocksIndex::Name => true,
+            IndexRocksIndex::MultiIndexId => false,
         }
     }
 

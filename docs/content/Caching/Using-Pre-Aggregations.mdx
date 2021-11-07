@@ -258,7 +258,7 @@ slow to return results.
 (such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
 rack up costs.
 
-## Optimizing Pre-Aggregation Build Times
+## Pre-Aggregation Build Strategies
 
 <InfoBox>
 
@@ -266,6 +266,12 @@ For ideal performance, pre-aggregations should be built using a dedicated
 Refresh Worker. [See here for more details][ref-prod-list-refresh].
 
 </InfoBox>
+
+Cube supports three different strategies for building pre-aggregations.
+To see which strategies your database supports, please refer to it's individual
+page from [Connecting to the Database][ref-config-db].
+
+### Simple
 
 By default, Cube.js will use the source database as a temporary staging area for
 writing pre-aggregations to determine column types. The data is loaded back into
@@ -283,7 +289,7 @@ memory before writing them to Cube Store (or an external database).
 If the dataset is large (more than 100k rows), then Cube.js can face issues when
 the Node runtime runs out of memory.
 
-### <--{"id" : "Optimizing Pre-Aggregation Build Times"}--> Batching
+### Batching
 
 Batching is a more performant strategy where Cube.js sends compressed CSVs for
 Cube Store to ingest.
@@ -301,7 +307,7 @@ The performance scales to the amount of memory available on the Cube.js
 instance. Batching is automatically enabled for any databases that can support
 it.
 
-### <--{"id" : "Optimizing Pre-Aggregation Build Times"}--> Export bucket
+### Export bucket
 
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source
@@ -330,7 +336,7 @@ retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
 [ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
-[ref-config-connect-db]: /connecting-to-the-database
+[ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
 [ref-config-env]: /reference/environment-variables#cube-store
 [ref-config-env-general]: /config#general

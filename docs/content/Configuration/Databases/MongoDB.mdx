@@ -49,7 +49,14 @@ file][mongobi-with-remote-db].
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
 
-## Pre-Aggregations
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
@@ -89,5 +96,7 @@ SSL-related environment variables can be left unset.
 [mongobi-download]: https://www.mongodb.com/download-center/bi-connector
 [nodejs-docs-tls-ciphers]:
   https://nodejs.org/docs/latest/api/tls.html#tls_modifying_the_default_tls_cipher_suite
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [self-preaggs-batching]: #batching

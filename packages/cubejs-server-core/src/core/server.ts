@@ -290,13 +290,9 @@ export class CubejsServerCore {
     return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
   }
 
-  private requireCubeStoreDriver = () => requireFromPackage<{
-    isCubeStoreSupported: typeof isCubeStoreSupported,
-    CubeStoreHandler: typeof CubeStoreHandler,
-    CubeStoreDevDriver: typeof CubeStoreDevDriver,
-  }>('@cubejs-backend/cubestore-driver', {
-    relative: isDockerImage(),
-  });
+  // requireFromPackage was used here. Removed as it wasn't necessary check and conflicts with local E2E test running.
+  // eslint-disable-next-line import/no-extraneous-dependencies
+  private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [

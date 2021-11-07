@@ -70,15 +70,34 @@ impl QueryBuilder {
         member: &String,
         date_range: serde_json::Value,
     ) -> bool {
-        for tdm in self.time_dimensions.iter_mut() {
-            if tdm.dimension.eq(member) {
-                tdm.date_range = Some(date_range);
+        let tdm_member_cnt = self
+            .time_dimensions
+            .iter()
+            .filter(|tdm| tdm.dimension.eq(member))
+            .count();
+        if tdm_member_cnt == 0 {
+            // If we didnt find any TD for member, let's push a new one without granularity (supported by Cube.js)
+            self.time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                dimension: member.clone(),
+                date_range: Some(date_range),
+                granularity: None,
+            });
 
-                return true;
+            true
+        } else if tdm_member_cnt == 1 {
+            for tdm in self.time_dimensions.iter_mut() {
+                if tdm.dimension.eq(member) {
+                    tdm.date_range = Some(date_range);
+
+                    return true;
+                }
             }
-        }
 
-        false
+            false
+        } else {
+            // We found multiple TD filters for specific filter and we cannot select which filter we should update
+            false
+        }
     }
 
     pub fn with_measure(&mut self, name: String, meta: CompiledQueryFieldMeta) {

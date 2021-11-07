@@ -23,6 +23,7 @@ use std::{
 
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::table::data::cmp_partition_key;
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
@@ -156,6 +157,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
+    config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
@@ -277,6 +279,7 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
+        config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
@@ -284,6 +287,7 @@ impl ChunkStore {
             remote_fs,
             cluster,
             chunk_size,
+            config,
             memory_chunks: RwLock::new(HashMap::new()),
         };
 
@@ -329,10 +333,22 @@ impl ChunkDataStore for ChunkStore {
                 partition
             )));
         }
+        let mut size = 0;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
-            .await?;
+            .await?
+            .into_iter()
+            .take_while(|c| {
+                if size == 0 {
+                    size += c.get_row().get_row_count();
+                    true
+                } else {
+                    size += c.get_row().get_row_count();
+                    size <= self.config.compaction_chunks_total_size_threshold()
+                }
+            })
+            .collect::<Vec<_>>();
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
         for chunk in chunks.into_iter() {
@@ -367,18 +383,15 @@ impl ChunkDataStore for ChunkStore {
 
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError> {
         if chunk.get_row().in_memory() {
-            let node_name = self
-                .cluster
-                .node_name_by_partitions(&[chunk.get_row().get_partition_id()])
-                .await?;
-            let server_name = self.cluster.server_name();
-            if node_name != server_name {
-                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
-            }
             let partition = self
                 .meta_store
                 .get_partition(chunk.get_row().get_partition_id())
                 .await?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            let server_name = self.cluster.server_name();
+            if node_name != server_name {
+                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
+            }
             let index = self
                 .meta_store
                 .get_index(partition.get_row().get_index_id())
@@ -560,6 +573,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 10,
             );
 
@@ -720,10 +734,7 @@ impl ChunkStore {
                 chunk
             );
             let batch = RecordBatch::try_new(Arc::new(arrow_schema(&index.get_row())), data)?;
-            let node_name = self
-                .cluster
-                .node_name_by_partitions(&[partition.get_id()])
-                .await?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
             Ok(cube_ext::spawn(async move {
                 cluster
