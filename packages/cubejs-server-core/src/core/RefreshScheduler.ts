@@ -65,12 +65,20 @@ export class RefreshScheduler {
       return [];
     }
 
-    const partitions = await orchestratorApi.expandPartitionsInPreAggregations({
+    const queryBody = {
       preAggregations: [preAggregationDescription],
       preAggregationsLoadCacheByDataSource,
-      requestId: context.requestId,
-      cacheOnly: queryingOptions.cacheOnly,
-    });
+      requestId: context.requestId
+    };
+
+    if (queryingOptions.cacheOnly) {
+      const [{ isCached }]: any = await orchestratorApi.checkPartitionsBuildRangeCache(queryBody);
+      if (!isCached) {
+        throw new CacheOnlyError();
+      }
+    }
+
+    const partitions = await orchestratorApi.expandPartitionsInPreAggregations(queryBody);
 
     if (queryingOptions.cacheOnly && !partitions?.preAggregations?.length) {
       throw new CacheOnlyError();

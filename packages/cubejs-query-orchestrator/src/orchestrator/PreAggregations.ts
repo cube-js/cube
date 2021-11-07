@@ -1003,8 +1003,6 @@ export class PreAggregationLoader {
 export class PreAggregationPartitionRangeLoader {
   protected waitForRenew: boolean;
 
-  protected cacheOnly: boolean;
-
   protected requestId: string;
 
   protected dataSource: string;
@@ -1023,7 +1021,6 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.cacheOnly = options.cacheOnly;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1210,7 +1207,7 @@ export class PreAggregationPartitionRangeLoader {
     );
   }
 
-  private async loadBuildRangeIsCached() {
+  public async loadBuildRangeIsCached() {
     const { preAggregationStartEndQueries } = this.preAggregation;
     
     const result = await Promise.all(preAggregationStartEndQueries.map(([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })));
@@ -1219,9 +1216,6 @@ export class PreAggregationPartitionRangeLoader {
 
   public async loadBuildRange(): Promise<QueryDateRange> {
     const { preAggregationStartEndQueries } = this.preAggregation;
-    if (this.cacheOnly && !(await this.loadBuildRangeIsCached())) {
-      return ['', ''];
-    }
 
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
@@ -1438,6 +1432,22 @@ export class PreAggregations {
     }));
   }
 
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    const preAggregations = queryBody.preAggregations || [];
+
+    const result = await Promise.all(preAggregations.map(async preAggregation => {
+      const { preAggregationStartEndQueries } = preAggregation;
+      
+      const cacheResults = await Promise.all(preAggregationStartEndQueries.map(([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })));
+      return {
+        preAggregation,
+        isCached: cacheResults.every((res: any) => res?.data)
+      };
+    }));
+
+    return result;
+  }
+
   public async expandPartitionsInPreAggregations(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
 
@@ -1469,7 +1479,6 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,
-          cacheOnly: queryBody.cacheOnly
         }
       );
 

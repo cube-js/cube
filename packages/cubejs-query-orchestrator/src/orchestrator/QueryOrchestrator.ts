@@ -250,6 +250,10 @@ export class QueryOrchestrator {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
+  }
+
   public async getPreAggregationQueueStates(dataSource = 'default') {
     return this.preAggregations.getQueueState(dataSource);
   }
