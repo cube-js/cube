@@ -891,7 +891,7 @@ export class PreAggregationLoader {
     const payload = {
       preAggregation: this.preAggregation,
       requestId: this.requestId,
-      error: error.message || error.stack
+      error: error?.stack || error?.message
     };
     this.logger(event, payload);
   }
