@@ -393,20 +393,7 @@ impl SchedulerImpl {
     }
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partition(p);
-        let job = self
-            .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, p.get_id()),
-                JobType::Repartition,
-                node.to_string(),
-            ))
-            .await?;
-        if job.is_some() {
-            // TODO queue failover
-            self.cluster.notify_job_runner(node).await?;
-        }
-        Ok(())
+        self.cluster.schedule_repartition(p).await
     }
 
     async fn schedule_table_import(
