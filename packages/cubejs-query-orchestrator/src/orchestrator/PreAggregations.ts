@@ -1030,7 +1030,7 @@ export class PreAggregationPartitionRangeLoader {
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      [query, values],
+      [query, values, []],
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
@@ -1429,11 +1429,15 @@ export class PreAggregations {
 
     const result = await Promise.all(preAggregations.map(async preAggregation => {
       const { preAggregationStartEndQueries } = preAggregation;
-      
-      const cacheResults = await Promise.all(preAggregationStartEndQueries.map(([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })));
+
+      const isCached = preAggregation.partitionGranularity ? (await Promise.all(
+        preAggregationStartEndQueries.map(
+          ([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })
+        )
+      )).every((res: any) => res?.data) : true;
       return {
         preAggregation,
-        isCached: cacheResults.every((res: any) => res?.data)
+        isCached
       };
     }));
 
