@@ -874,6 +874,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
