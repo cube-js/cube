@@ -2009,7 +2009,11 @@ mod tests {
                     .collect::<Vec<_>>();
                 assert_eq!(
                     files,
-                    vec![format!("{}.parquet", last_active_partition.get_id())]
+                    vec![format!(
+                        "{}-{}.parquet",
+                        last_active_partition.get_id(),
+                        last_active_partition.get_row().suffix().as_ref().unwrap()
+                    )]
                 )
             })
             .await
