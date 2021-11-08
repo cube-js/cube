@@ -124,7 +124,7 @@ impl SchedulerImpl {
             self.meta_store.delete_job(job.get_id()).await?;
         }
         // Using get_tables_with_path due to it's cached
-        let tables = self.meta_store.get_tables_with_path().await?;
+        let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
             if table.table.get_row().is_ready() {
                 if let Some(locations) = table.table.get_row().locations() {

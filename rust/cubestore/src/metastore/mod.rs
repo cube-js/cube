@@ -754,7 +754,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Table>, CubeError>;
     async fn get_table_by_id(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError>;
-    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError>;
+    async fn get_tables_with_path(
+        &self,
+        include_non_ready: bool,
+    ) -> Result<Arc<Vec<TablePath>>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
@@ -2682,7 +2685,10 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn get_tables_with_path(&self) -> Result<Arc<Vec<TablePath>>, CubeError> {
+    async fn get_tables_with_path(
+        &self,
+        include_non_ready: bool,
+    ) -> Result<Arc<Vec<TablePath>>, CubeError> {
         let cache = self.cached_tables.clone();
         self.read_operation(move |db_ref| {
             let cached = cache.lock().unwrap().clone();
@@ -2692,7 +2698,7 @@ impl MetaStore for RocksMetaStore {
             let tables = TableRocksTable::new(db_ref.clone())
                 .all_rows()?
                 .into_iter()
-                .filter(|t| t.get_row().is_ready())
+                .filter(|t| include_non_ready || t.get_row().is_ready())
                 .collect::<Vec<_>>();
             let schemas = SchemaRocksTable::new(db_ref);
             let tables = Arc::new(schemas.build_path_rows(

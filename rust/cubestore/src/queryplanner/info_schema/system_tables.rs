@@ -14,7 +14,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
     type T = TablePath;
 
     async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        meta_store.get_tables_with_path().await
+        meta_store.get_tables_with_path(true).await
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

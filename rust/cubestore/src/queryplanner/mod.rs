@@ -90,7 +90,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let ctx = self.execution_context().await?;
 
         let schema_provider = MetaStoreSchemaProvider::new(
-            self.meta_store.get_tables_with_path().await?,
+            self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
         );
 
