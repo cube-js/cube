@@ -1686,6 +1686,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn delete_middle_main() {
         Config::test("delete_middle_main")
             .update_config(|mut c| {
