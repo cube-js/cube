@@ -172,11 +172,11 @@ impl CompactionService for CompactionServiceImpl {
         };
         let mut new_local_files = Vec::new();
         if let Some(c) = &new_chunk {
-            let remote = ChunkStore::chunk_remote_path(c.get_id());
+            let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
             new_local_files.push(self.remote_fs.temp_upload_path(&remote).await?);
         } else {
             for p in new_partitions.iter() {
-                let new_remote_path = partition_file_name(p.get_id());
+                let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
                 new_local_files.push(self.remote_fs.temp_upload_path(&new_remote_path).await?);
             }
         }
@@ -237,7 +237,7 @@ impl CompactionService for CompactionServiceImpl {
 
         if let Some(c) = &new_chunk {
             assert_eq!(new_local_files.len(), 1);
-            let remote = ChunkStore::chunk_remote_path(c.get_id());
+            let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
             self.remote_fs
                 .upload_file(&new_local_files[0], &remote)
                 .await?;
@@ -264,7 +264,7 @@ impl CompactionService for CompactionServiceImpl {
         {
             match p {
                 EitherOrBoth::Both(p, _) => {
-                    let new_remote_path = partition_file_name(p.get_id());
+                    let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
                     self.remote_fs
                         .upload_file(&new_local_files[i], new_remote_path.as_str())
                         .await?;
@@ -555,7 +555,10 @@ fn collect_remote_files(p: &PartitionData, out: &mut Vec<String>) {
         }
     }
     for c in &p.chunks {
-        out.push(ChunkStore::chunk_remote_path(c.get_id()));
+        out.push(ChunkStore::chunk_remote_path(
+            c.get_id(),
+            c.get_row().suffix(),
+        ));
     }
 }
 
@@ -1040,7 +1043,7 @@ impl MultiSplit {
         let mut out_files = Vec::with_capacity(children.len());
         let mut out_remote_paths = Vec::with_capacity(children.len());
         for c in &children {
-            let remote_path = partition_file_name(c.get_id());
+            let remote_path = partition_file_name(c.get_id(), c.get_row().suffix());
             out_files.push(self.fs.temp_upload_path(&remote_path).await?);
             out_remote_paths.push(remote_path);
         }

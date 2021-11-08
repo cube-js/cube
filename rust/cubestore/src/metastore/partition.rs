@@ -6,6 +6,8 @@ use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 
@@ -26,6 +28,11 @@ impl Partition {
             warmed_up: false,
             main_table_row_count: 0,
             last_used: None,
+            suffix: Some(
+                String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
+                    .unwrap()
+                    .to_lowercase(),
+            ),
         }
     }
 
@@ -40,6 +47,11 @@ impl Partition {
             warmed_up: false,
             main_table_row_count: 0,
             last_used: None,
+            suffix: Some(
+                String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
+                    .unwrap()
+                    .to_lowercase(),
+            ),
         }
     }
     pub fn get_min_val(&self) -> &Option<Row> {
@@ -53,7 +65,7 @@ impl Partition {
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
         match self.has_main_table_file() {
             false => None,
-            true => Some(partition_file_name(partition_id)),
+            true => Some(partition_file_name(partition_id, self.suffix())),
         }
     }
 
@@ -121,10 +133,21 @@ impl Partition {
     pub fn main_table_row_count(&self) -> u64 {
         self.main_table_row_count
     }
+
+    pub fn suffix(&self) -> &Option<String> {
+        &self.suffix
+    }
 }
 
-pub fn partition_file_name(partition_id: u64) -> String {
-    format!("{}.parquet", partition_id)
+pub fn partition_file_name(partition_id: u64, suffix: &Option<String>) -> String {
+    format!(
+        "{}{}.parquet",
+        partition_id,
+        suffix
+            .as_ref()
+            .map(|h| format!("-{}", h))
+            .unwrap_or("".to_string())
+    )
 }
 
 #[derive(Clone, Copy, Debug)]

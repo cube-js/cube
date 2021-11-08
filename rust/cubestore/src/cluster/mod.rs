@@ -1470,7 +1470,11 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                ack_error!(self.remote_fs.download_file(&chunk_file_name(c)).await);
+                ack_error!(
+                    self.remote_fs
+                        .download_file(&chunk_file_name(c.get_id(), c.get_row().suffix()))
+                        .await
+                );
             }
         }
         log::debug!("Startup warmup finished");

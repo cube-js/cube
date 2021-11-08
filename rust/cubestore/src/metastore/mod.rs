@@ -545,7 +545,9 @@ pub struct Partition {
     main_table_row_count: u64,
     /// Not used or updated anymore.
     #[serde(default)]
-    last_used: Option<DateTime<Utc>>
+    last_used: Option<DateTime<Utc>>,
+    #[serde(default)]
+    suffix: Option<String>
 }
 }
 
@@ -562,7 +564,9 @@ pub struct Chunk {
     #[serde(default)]
     in_memory: bool,
     #[serde(default)]
-    created_at: Option<DateTime<Utc>>
+    created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    suffix: Option<String>
 }
 }
 
@@ -863,7 +867,7 @@ pub trait MetaStore: DIService + Send + Sync {
 
     async fn get_warmup_partitions(
         &self,
-    ) -> Result<Vec<(IdRow<Partition>, Vec</*chunk_id*/ u64>)>, CubeError>;
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
 
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
@@ -3283,7 +3287,9 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn get_warmup_partitions(&self) -> Result<Vec<(IdRow<Partition>, Vec<u64>)>, CubeError> {
+    async fn get_warmup_partitions(
+        &self,
+    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
         self.read_operation(|db| {
             // Do full scan, likely only a small number chunks and partitions are inactive.
             let mut partition_to_chunks = HashMap::new();
@@ -3295,7 +3301,7 @@ impl MetaStore for RocksMetaStore {
                 partition_to_chunks
                     .entry(c.row.partition_id)
                     .or_insert(Vec::new())
-                    .push(c.id)
+                    .push(c.clone())
             }
 
             let mut partitions = Vec::new();

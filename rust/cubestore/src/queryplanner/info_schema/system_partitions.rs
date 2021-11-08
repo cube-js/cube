@@ -1,3 +1,4 @@
+use crate::metastore::partition::partition_file_name;
 use crate::metastore::{IdRow, MetaStore, MetaStoreTable, Partition};
 use crate::queryplanner::InfoSchemaTableDef;
 use crate::CubeError;
@@ -25,6 +26,17 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                         partitions
                             .iter()
                             .map(|row| row.get_id())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("file_name", DataType::Utf8, false),
+                Box::new(|partitions| {
+                    Arc::new(StringArray::from(
+                        partitions
+                            .iter()
+                            .map(|row| partition_file_name(row.get_id(), row.get_row().suffix()))
                             .collect::<Vec<_>>(),
                     ))
                 }),

@@ -24,6 +24,7 @@ use std::{
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::metastore::chunks::chunk_file_name;
 use crate::table::data::cmp_partition_key;
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
@@ -299,11 +300,11 @@ impl ChunkStore {
     }
 
     pub fn chunk_file_name(chunk: IdRow<Chunk>) -> String {
-        Self::chunk_remote_path(chunk.get_id())
+        Self::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix())
     }
 
-    pub fn chunk_remote_path(chunk_id: u64) -> String {
-        format!("{}.chunk.parquet", chunk_id)
+    pub fn chunk_remote_path(chunk_id: u64, suffix: &Option<String>) -> String {
+        chunk_file_name(chunk_id, suffix)
     }
 }
 

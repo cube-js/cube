@@ -281,7 +281,10 @@ impl SchedulerImpl {
                     .await?;
             } else if chunk.get_row().uploaded() {
                 self.remote_fs
-                    .delete_file(ChunkStore::chunk_remote_path(chunk.get_id()).as_str())
+                    .delete_file(
+                        ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix())
+                            .as_str(),
+                    )
                     .await?
             }
         }
