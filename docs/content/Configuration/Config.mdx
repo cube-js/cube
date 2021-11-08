@@ -163,7 +163,7 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSourceId`][self-opts-ctx-to-datasourceid]. Can return a
+Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
 `Promise` which resolves to a driver.
 
 ```javascript
@@ -715,7 +715,7 @@ the additional transpiler for check duplicates.
 [self-opts-req-ctx]: #request-context
 [self-opts-checkauth]: #check-auth
 [self-opts-ctx-to-appid]: #context-to-app-id
-[self-opts-ctx-to-datasourceid]: #context-to-data-source-id
+[ref-schema-ref-datasource]: /schema/reference/cube#data-source
 [self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
 [self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
