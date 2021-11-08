@@ -36,7 +36,13 @@ export class WebSocketServer {
         throw new Error(`Socket for ${connectionId} is not found found`);
       }
 
-      connectionIdToSocket[connectionId].send(JSON.stringify(message));
+      const strMessage = JSON.stringify(message);
+      const bytes = Buffer.byteLength(strMessage);
+      this.serverCore.logger('Outgoing network usage', {
+        protocol: 'ws',
+        bytes,
+      });
+      connectionIdToSocket[connectionId].send(strMessage);
     });
 
     this.wsServer.on('connection', (ws) => {

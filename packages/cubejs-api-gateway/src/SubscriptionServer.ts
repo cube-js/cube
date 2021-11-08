@@ -33,6 +33,16 @@ export class SubscriptionServer {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
+    const bytes = Buffer.byteLength(
+      typeof message === 'string' ? message : JSON.stringify(message)
+    );
+
+    this.apiGateway.log({
+      type: 'Incoming network usage',
+      protocol: 'ws',
+      bytes,
+    });
+
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
