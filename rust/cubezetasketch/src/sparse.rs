@@ -20,7 +20,7 @@ use crate::normal::NormalRepresentation;
 use crate::state::State;
 use crate::Result;
 use crate::ZetaError;
-use itertools::Itertools;
+use std::cmp::min;
 
 #[derive(Debug, Clone)]
 pub struct SparseRepresentation {
@@ -114,11 +114,7 @@ impl SparseRepresentation {
     ) -> Result<Option<NormalRepresentation>> {
         // TODO: Add special case when 'this' is empty and 'other' has only encoded data.
         // In that case, we can just copy over the sparse data without needing to decode and dedupe.
-        return self.add_sparse_values(
-            state,
-            &other.encoding,
-            Self::sorted_iterator(other_state.sparse_data.as_deref()),
-        );
+        return self.add_sparse_values(state, &other.encoding, other_state.sparse_data.as_deref());
     }
 
     #[must_use]
@@ -133,43 +129,119 @@ impl SparseRepresentation {
         return Ok(Some(normal));
     }
 
-    fn add_sparse_values<Iter: Iterator<Item = Result<u32>> + Clone>(
+    fn add_sparse_values(
         &mut self,
         state: &mut State,
         encoding: &SparseEncoding,
-        sparse_values: Iter,
+        sparse_data: Option<&[u8]>,
     ) -> Result<Option<NormalRepresentation>> {
         self.encoding.assert_compatible(encoding);
 
         // Special case when encodings are the same. Then we can profit from the fact that sparse_values
         // are sorted (as defined in the add_sparse_values contract) and do a merge-join.
         let self_data = state.sparse_data.take();
-        let iter =
-            Self::sorted_iterator(self_data.as_deref()).merge_by(sparse_values, |l, r| {
-                match (l, r) {
-                    (Err(_), _) => true,
-                    (_, Err(_)) => false,
-                    (Ok(l), Ok(r)) => l <= r,
-                }
-            });
-
+        self.merge_and_set(
+            state,
+            Self::sorted_iterator(self_data.as_deref()),
+            Self::sorted_iterator(sparse_data),
+        )?;
         // TODO: Merge without risking to grow this representation above its maximum size.
-        Self::set(state, self.encoding.dedupe(iter))?;
         return Ok(self.update_representation(state)?);
     }
 
-    fn set<Iter: Iterator<Item = Result<u32>>>(state: &mut State, mut iter: Iter) -> Result<()> {
+    fn merge_and_set<Iter: Iterator<Item = Result<u32>>>(
+        &self,
+        state: &mut State,
+        mut l: Iter,
+        mut r: Iter,
+    ) -> Result<()> {
         let mut data = Vec::new();
-        let mut encoder = DifferenceEncoder::new(&mut data);
-        let mut size = 0;
-        while let Some(x) = iter.next() {
-            encoder.put_int(x?);
-            size += 1;
+        struct MergeState<'a> {
+            encoder: DifferenceEncoder<'a>,
+            size: i32,
         }
+        impl MergeState<'_> {
+            fn put_int(&mut self, v: u32) {
+                self.encoder.put_int(v);
+                self.size += 1;
+            }
+            fn consume<Iter: Iterator<Item = Result<u32>>>(&mut self, mut it: Iter) -> Result<()> {
+                while let Some(v) = it.next().transpose()? {
+                    self.encoder.put_int(v);
+                    self.size += 1;
+                }
+                Ok(())
+            }
+        }
+        let mut s = MergeState {
+            encoder: DifferenceEncoder::new(&mut data),
+            size: 0,
+        };
+        // First iteration.
+        let (mut lv, mut rv) = match (l.next().transpose()?, r.next().transpose()?) {
+            (None, None) => {
+                let size = s.size;
+                return Self::set_sparse(state, data, size);
+            }
+            (Some(v), None) => {
+                s.put_int(v);
+                s.consume(l)?;
+                let size = s.size;
+                return Self::set_sparse(state, data, size);
+            }
+            (None, Some(v)) => {
+                s.put_int(v);
+                s.consume(r)?;
+                let size = s.size;
+                return Self::set_sparse(state, data, size);
+            }
+            (Some(lv), Some(rv)) => (lv, rv),
+        };
 
+        let mut last = min(lv, rv);
+        let mut last_index = self.encoding.decode_sparse_index(last as i32);
+        loop {
+            let next = min(lv, rv);
+            let next_index = self.encoding.decode_sparse_index(next as i32);
+            if last_index != next_index {
+                s.put_int(last)
+            }
+            last = next;
+            last_index = next_index;
+            if lv < rv {
+                match l.next().transpose()? {
+                    Some(v) => lv = v,
+                    None => {
+                        if self.encoding.decode_sparse_index(rv as i32) != last_index {
+                            s.put_int(last)
+                        }
+                        s.put_int(rv);
+                        s.consume(r)?;
+                        break;
+                    }
+                }
+            } else {
+                match r.next().transpose()? {
+                    Some(v) => rv = v,
+                    None => {
+                        if self.encoding.decode_sparse_index(lv as i32) != last_index {
+                            s.put_int(last)
+                        }
+                        s.put_int(lv);
+                        s.consume(l)?;
+                        break;
+                    }
+                }
+            }
+        }
+        let size = s.size;
+        return Self::set_sparse(state, data, size);
+    }
+
+    fn set_sparse(state: &mut State, data: Vec<u8>, size: i32) -> Result<()> {
         state.sparse_data = Some(data);
         state.sparse_size = size;
-        return Ok(());
+        Ok(())
     }
 
     pub(crate) fn sorted_iterator(sparse_data: Option<&[u8]>) -> DifferenceDecoder {
