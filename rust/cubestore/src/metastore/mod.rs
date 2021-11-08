@@ -1251,12 +1251,15 @@ trait RocksTable: Debug + Send + Sync {
 
         let (row_id, inserted_row) = self.insert_row(serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Insert(self.table_id(), row_id));
+        if self.snapshot().get(&inserted_row.key)?.is_some() {
+            return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
+        }
         batch_pipe.batch().put(inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
         for to_insert in index_row {
             if self.snapshot().get(&to_insert.key)?.is_some() {
-                return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
+                return Err(CubeError::internal(format!("Primary key constraint violation in secondary index. Primary key already exists for a row id {}: {:?}", row_id, &row)));
             }
             batch_pipe.batch().put(to_insert.key, to_insert.val);
         }
