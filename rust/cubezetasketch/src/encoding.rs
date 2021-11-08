@@ -19,9 +19,7 @@
 ///    - Retrieval of HyperLogLog++ properties such as the index and the *ρ(w)* of a
 ///      uniform hash of the input value.
 ///    - Encoding and decoding of HyperLogLog++ sparse values.
-use crate::error::Result;
 use std::cmp::max;
-use std::iter::Peekable;
 
 /// Computes HyperLogLog++ properties for the normal encoding at a given precision.
 #[derive(Debug, Clone)]
@@ -123,7 +121,7 @@ impl SparseEncoding {
 
     /// Decodes the sparse index from an encoded sparse value. See the class Javadoc for details on
     /// the two representations with which sparse values are encoded.
-    fn decode_sparse_index(&self, sparse_value: i32) -> i32 {
+    pub(crate) fn decode_sparse_index(&self, sparse_value: i32) -> i32 {
         // If the sparse rhoW' is not encoded, then the value consists of just the sparse index.
         if (sparse_value & self.rho_encoded_flag) == 0 {
             return sparse_value as i32;
@@ -168,87 +166,6 @@ impl SparseEncoding {
         // sparse index where all zero. The normal rhoW is therefore rhoW' + sp - p.
         return ((sparse_value & Self::RHOW_MASK) + self.sparse_precision - self.normal_precision)
             as u8;
-    }
-
-    /// Takes a sorted iterator of sparse values and returns an iterator with deduplicated indices,
-    /// returning only the one with the largest *ρ(w')*. For example, a list of sparse
-    /// values with *p=4* and *sp=7* such as:
-    ///
-    /// <pre>{@code
-    /// 0 000 0010100
-    /// 0 000 1010100
-    /// 0 000 1010101
-    /// 1 1010 001100
-    /// 1 1010 010000
-    /// 1 1110 000000
-    /// }</pre>
-    ///
-    /// Will be deduplicated to
-    ///
-    /// <pre>{@code
-    /// 0 000 0010100
-    /// 0 000 1010100
-    /// 0 000 1010101
-    /// 1 1010 010000
-    /// 1 1110 000000
-    /// }</pre>
-    pub fn dedupe<Iter: Iterator<Item = Result<u32>>>(
-        &self,
-        sorted_values: Iter,
-    ) -> SparseDedupIterator<Iter> {
-        return SparseDedupIterator {
-            enc: &self,
-            buf: sorted_values.peekable(),
-        };
-    }
-}
-
-pub struct SparseDedupIterator<'l, Iter>
-where
-    Iter: Iterator<Item = Result<u32>>,
-{
-    buf: Peekable<Iter>,
-    enc: &'l SparseEncoding,
-}
-
-impl<'l, I: Iterator<Item = Result<u32>>> Iterator for SparseDedupIterator<'l, I> {
-    type Item = Result<u32>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.buf.next()?;
-        if let Err(e) = next {
-            return Some(Err(e));
-        }
-        let next = next.unwrap();
-
-        // Value is not rho-encoded so we don't need to do any special decoding as the value is
-        // the sparse index. Simply skip exact duplicates.
-        if (next & self.enc.rho_encoded_flag as u32) == 0 {
-            let sparse_index = next;
-            while self
-                .buf
-                .peek()
-                .map(|v| v.is_ok() && *v.as_ref().unwrap() == sparse_index)
-                == Some(true)
-            {
-                self.buf.next();
-            }
-            return Some(Ok(sparse_index));
-        }
-
-        // Keep consuming values until we encounter one with a different index or run out of
-        // values. We return the largest value (which will be the one with the largest rhoW).
-        let sparse_index = self.enc.decode_sparse_index(next as i32);
-        let mut max_sparse_value = next;
-        let buf = &mut self.buf;
-        let enc = &mut self.enc;
-        while buf.peek().map(|v| {
-            v.is_ok() && enc.decode_sparse_index(*v.as_ref().unwrap() as i32) == sparse_index
-        }) == Some(true)
-        {
-            max_sparse_value = *buf.next().unwrap().as_ref().unwrap();
-        }
-        return Some(Ok(max_sparse_value));
     }
 }
 
