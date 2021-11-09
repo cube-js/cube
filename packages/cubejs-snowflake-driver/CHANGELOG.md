@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.54](https://github.com/cube-js/cube.js/compare/v0.28.53...v0.28.54) (2021-11-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Do not trigger cluster start on test connection ([3bb2d8f](https://github.com/cube-js/cube.js/commit/3bb2d8f466987402a9af6e5c0a7e6667846b1d19))
+
+
+
+
+
 ## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver
