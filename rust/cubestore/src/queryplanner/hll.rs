@@ -40,7 +40,7 @@ impl Hll {
         }
     }
 
-    pub fn cardinality(&self) -> u64 {
+    pub fn cardinality(&mut self) -> u64 {
         match self {
             Hll::Airlift(h) => h.cardinality(),
             Hll::ZetaSketch(h) => h.cardinality(),
