@@ -242,6 +242,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!connection.isUp()) {
       throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
     }
+    await new Promise(
+      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
   }
 
   protected async initConnection() {
