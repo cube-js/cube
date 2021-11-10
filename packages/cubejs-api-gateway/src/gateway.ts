@@ -541,7 +541,7 @@ export class ApiGateway {
           query
         );
 
-      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p.errors.length);
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
 
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
