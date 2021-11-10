@@ -95,6 +95,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
+        t(
+            "planning_join_with_partitioned_index",
+            planning_join_with_partitioned_index,
+        ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
@@ -2630,6 +2634,54 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
+}
+
+async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.by_customer(customer_id int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Customers(customer_id int, customer_name text) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT order_id, customer_name \
+                 FROM s.Orders `o`\
+                 JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "ClusterSend, partitions: [[1, 3]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Worker\
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty",
+    );
 }
 
 async fn topk_query(service: Box<dyn SqlClient>) {
