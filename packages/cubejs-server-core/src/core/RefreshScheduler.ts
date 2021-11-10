@@ -286,7 +286,7 @@ export class RefreshScheduler {
         }
       });
 
-      const errors = [...new Set(queriesForPreAggregation.map(q => q?.error).filter(e => e))];
+      const errors = [...new Set((queriesForPreAggregation || []).map(q => q?.error).filter(e => e))];
 
       return {
         timezones,
