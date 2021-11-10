@@ -880,16 +880,21 @@ pub mod tests {
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
+    use crate::config::Config;
     use crate::metastore::multi_index::MultiPartition;
     use crate::metastore::table::{Table, TablePath};
     use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
-    use crate::queryplanner::planning::{choose_index, PlanIndexStore};
+    use crate::queryplanner::planning::{choose_index, try_extract_cluster_send, PlanIndexStore};
     use crate::queryplanner::pretty_printers::PPOptions;
+    use crate::queryplanner::query_executor::ClusterSendExec;
+    use crate::queryplanner::serialized_plan::RowRange;
     use crate::queryplanner::{pretty_printers, CubeTableLogical};
     use crate::sql::parser::{CubeStoreParser, Statement};
+    use crate::table::{Row, TableValue};
     use crate::CubeError;
     use datafusion::catalog::TableReference;
     use std::collections::HashMap;
+    use std::iter::FromIterator;
 
     #[tokio::test]
     pub async fn test_choose_index() {
@@ -1100,9 +1105,171 @@ pub mod tests {
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
     }
 
-    /// Most tests in this module use this schema.
+    #[tokio::test]
+    pub async fn test_partitioned_index_join() {
+        let mut indices = indices_with_partitioned_index();
+        let plan = initial_plan(
+            "SELECT customer_name, order_city FROM s.Orders JOIN s.Customers \
+               ON order_customer = customer_id",
+            &indices,
+        );
+
+        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
+                      \n  Projection, [s.Customers.customer_name, s.Orders.order_city]\
+                      \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
+                      \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
+                      \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+
+        // Add some multi-partitions and validate how it runs.
+        indices
+            .multi_partitions
+            .push(MultiPartition::new_root(0).set_active(false));
+        indices.multi_partitions.push(
+            MultiPartition::new_child(
+                &indices.get_multi_partition(0),
+                None,
+                Some(Row::new(vec![TableValue::Int(100)])),
+            )
+            .set_active(false),
+        );
+        indices.multi_partitions.push(
+            MultiPartition::new_child(
+                &indices.get_multi_partition(0),
+                Some(Row::new(vec![TableValue::Int(100)])),
+                None,
+            )
+            .set_active(true),
+        );
+        indices.multi_partitions.push(
+            MultiPartition::new_child(
+                &indices.get_multi_partition(1),
+                None,
+                Some(Row::new(vec![TableValue::Int(25)])),
+            )
+            .set_active(true),
+        );
+        indices.multi_partitions.push(
+            MultiPartition::new_child(
+                &indices.get_multi_partition(1),
+                Some(Row::new(vec![TableValue::Int(25)])),
+                Some(Row::new(vec![TableValue::Int(100)])),
+            )
+            .set_active(true),
+        );
+        for i in 0..indices.indices.len() {
+            // This name marks indices for multi-index.
+            if indices.indices[i].get_name() == "#mi0" {
+                add_multipart_partitions(
+                    i as u64,
+                    &indices.multi_partitions,
+                    &mut indices.partitions,
+                );
+            }
+        }
+        for p in 0..indices.partitions.len() {
+            indices
+                .chunks
+                .push(Chunk::new(p as u64, 123, false).set_uploaded(true));
+        }
+
+        // Plan again.
+        let (with_index, meta) = choose_index(&plan, &indices).await.unwrap();
+        let pp = pretty_printers::pp_plan(&with_index);
+        assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
+                      \n  Projection, [s.Customers.customer_name, s.Orders.order_city]\
+                      \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
+                      \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[5, 6, 7, 8, 9]:sort_on[order_customer]), fields: [order_customer, order_city]\
+                      \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[0, 1, 2, 3, 4]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+
+        let c = Config::test("partitioned_index_join").update_config(|mut c| {
+            c.server_name = "router".to_string();
+            c.select_workers = vec!["worker1".to_string(), "worker2".to_string()];
+            c
+        });
+        let cs = &try_extract_cluster_send(&with_index).unwrap().snapshots;
+        let assigned = ClusterSendExec::distribute_to_workers(
+            c.config_obj().as_ref(),
+            &cs,
+            &meta.multi_part_subtree,
+        );
+
+        let part = |id: u64, start: Option<i64>, end: Option<i64>| {
+            let start = start.map(|i| Row::new(vec![TableValue::Int(i)]));
+            let end = end.map(|i| Row::new(vec![TableValue::Int(i)]));
+            (id, RowRange { start, end })
+        };
+        assert_eq!(
+            assigned,
+            vec![
+                (
+                    "worker1".to_string(),
+                    vec![
+                        part(2, None, None),
+                        part(7, None, None),
+                        part(0, Some(100), None),
+                        part(5, Some(100), None),
+                        part(3, None, None),
+                        part(8, None, None),
+                        part(1, None, Some(25)),
+                        part(6, None, Some(25)),
+                        part(0, None, Some(25)),
+                        part(5, None, Some(25)),
+                    ]
+                ),
+                (
+                    "worker2".to_string(),
+                    vec![
+                        part(4, None, None),
+                        part(9, None, None),
+                        part(1, Some(25), Some(100)),
+                        part(6, Some(25), Some(100)),
+                        part(0, Some(25), Some(100)),
+                        part(5, Some(25), Some(100)),
+                    ]
+                )
+            ]
+        );
+    }
+
     fn default_indices() -> TestIndices {
+        make_test_indices(false)
+    }
+
+    fn indices_with_partitioned_index() -> TestIndices {
+        make_test_indices(true)
+    }
+
+    fn add_multipart_partitions(
+        index_id: u64,
+        multi_parts: &[MultiPartition],
+        partitions: &mut Vec<Partition>,
+    ) {
+        let first_part_i = partitions.len() as u64;
+        for i in 0..multi_parts.len() {
+            let mp = &multi_parts[i];
+            let mut p = Partition::new(
+                index_id,
+                Some(i as u64),
+                mp.min_row().cloned(),
+                mp.max_row().cloned(),
+            );
+            if let Some(parent) = mp.parent_multi_partition_id() {
+                assert!(parent <= multi_parts.len() as u64);
+                p = p.update_parent_partition_id(Some(first_part_i + parent));
+            }
+            if mp.active() {
+                p = p.to_warmed_up().to_active(true);
+            }
+
+            partitions.push(p);
+        }
+    }
+
+    /// Most tests in this module use this schema.
+    fn make_test_indices(add_multi_indices: bool) -> TestIndices {
         const SCHEMA: u64 = 0;
+        const PARTITIONED_INDEX: u64 = 0; // Only 1 partitioned index for now.
         let mut i = TestIndices::default();
 
         let customers_cols = int_columns(&[
@@ -1132,6 +1299,19 @@ pub mod tests {
             )
             .unwrap(),
         );
+        if add_multi_indices {
+            i.indices.push(
+                Index::try_new(
+                    "#mi0".to_string(),
+                    customers,
+                    put_first("customer_id", &customers_cols),
+                    1,
+                    None,
+                    Some(PARTITIONED_INDEX),
+                )
+                .unwrap(),
+            );
+        }
 
         let orders_cols = int_columns(&[
             "order_id",
@@ -1172,6 +1352,19 @@ pub mod tests {
             )
             .unwrap(),
         );
+        if add_multi_indices {
+            i.indices.push(
+                Index::try_new(
+                    "#mi0".to_string(),
+                    orders,
+                    put_first("order_customer", &orders_cols),
+                    1,
+                    None,
+                    Some(PARTITIONED_INDEX),
+                )
+                .unwrap(),
+            );
+        }
 
         i.add_table(Table::new(
             "Products".to_string(),
@@ -1221,6 +1414,8 @@ pub mod tests {
         tables: Vec<Table>,
         indices: Vec<Index>,
         partitions: Vec<Partition>,
+        chunks: Vec<Chunk>,
+        multi_partitions: Vec<MultiPartition>,
     }
 
     impl TestIndices {
@@ -1240,6 +1435,21 @@ pub mod tests {
             );
             self.tables.push(t);
             table_id
+        }
+
+        pub fn get_multi_partition(&self, id: u64) -> IdRow<MultiPartition> {
+            IdRow::new(id, self.multi_partitions[id as usize].clone())
+        }
+
+        pub fn chunks_for_partition(&self, partition_id: u64) -> Vec<IdRow<Chunk>> {
+            let mut r = Vec::new();
+            for i in 0..self.chunks.len() {
+                if self.chunks[i].get_partition_id() != partition_id {
+                    continue;
+                }
+                r.push(IdRow::new(i as u64, self.chunks[i].clone()));
+            }
+            r
         }
 
         pub fn schema(&self) -> IdRow<Schema> {
@@ -1322,7 +1532,13 @@ pub mod tests {
                         .iter()
                         .enumerate()
                         .filter(|(_, p)| p.get_index_id() == *index_id)
-                        .map(|(id, p)| (IdRow::new(id as u64, p.clone()), vec![]))
+                        .map(|(id, p)| {
+                            (
+                                IdRow::new(id as u64, p.clone()),
+                                self.chunks_for_partition(id as u64),
+                            )
+                        })
+                        .filter(|(p, chunks)| p.get_row().is_active() || !chunks.is_empty())
                         .collect()
                 })
                 .collect())
@@ -1330,10 +1546,14 @@ pub mod tests {
 
         async fn get_multi_partition_subtree(
             &self,
-            multi_part_ids: Vec<u64>,
+            _multi_part_ids: Vec<u64>,
         ) -> Result<HashMap<u64, MultiPartition>, CubeError> {
-            assert!(multi_part_ids.is_empty());
-            Ok(HashMap::new())
+            Ok(HashMap::from_iter(
+                self.multi_partitions
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| (i as u64, p.clone())),
+            ))
         }
     }
 

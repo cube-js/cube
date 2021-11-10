@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
     /// Inclusive lower bound.
     pub start: Option<Row>,
