@@ -541,7 +541,8 @@ export class ApiGateway {
           query
         );
 
-      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p.error);
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p.errors.length);
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
@@ -553,8 +554,8 @@ export class ApiGateway {
         ...props,
         preAggregation,
         partitions: partitions.map(partition => {
-          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
-          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition?.tableName];
           return partition;
         }),
       });
@@ -590,12 +591,12 @@ export class ApiGateway {
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition.sql
+          preAggregationPartition
         )
       });
     } catch (e) {
