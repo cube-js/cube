@@ -1559,6 +1559,10 @@ trait RocksTable: Debug + Send + Sync {
         Ok(res)
     }
 
+    fn scan_all_rows<'a>(&'a self) -> Result<TableScanIter<'a, Self>, CubeError> {
+        self.table_scan(self.snapshot())
+    }
+
     fn table_scan<'a>(&'a self, db: &'a Snapshot) -> Result<TableScanIter<'a, Self>, CubeError> {
         let my_table_id = self.table_id();
         let key_min = RowKey::Table(my_table_id, 0);
@@ -2694,26 +2698,41 @@ impl MetaStore for RocksMetaStore {
     ) -> Result<Arc<Vec<TablePath>>, CubeError> {
         let cache = self.cached_tables.clone();
         self.read_operation(move |db_ref| {
-            let cached = cache.lock().unwrap().clone();
-            if let Some(t) = cached {
-                return Ok(t);
+            if include_non_ready {
+                let tables = TableRocksTable::new(db_ref.clone())
+                    .all_rows()?
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                let schemas = SchemaRocksTable::new(db_ref);
+                let tables = Arc::new(schemas.build_path_rows(
+                    tables,
+                    |t| t.get_row().get_schema_id(),
+                    |table, schema| TablePath { table, schema },
+                )?);
+
+                Ok(tables)
+            } else {
+                let cached = cache.lock().unwrap().clone();
+                if let Some(t) = cached {
+                    return Ok(t);
+                }
+                let tables = TableRocksTable::new(db_ref.clone())
+                    .all_rows()?
+                    .into_iter()
+                    .filter(|t| t.get_row().is_ready())
+                    .collect::<Vec<_>>();
+                let schemas = SchemaRocksTable::new(db_ref);
+                let tables = Arc::new(schemas.build_path_rows(
+                    tables,
+                    |t| t.get_row().get_schema_id(),
+                    |table, schema| TablePath { table, schema },
+                )?);
+
+                let to_cache = tables.clone();
+                *cache.lock().unwrap() = Some(to_cache);
+
+                Ok(tables)
             }
-            let tables = TableRocksTable::new(db_ref.clone())
-                .all_rows()?
-                .into_iter()
-                .filter(|t| include_non_ready || t.get_row().is_ready())
-                .collect::<Vec<_>>();
-            let schemas = SchemaRocksTable::new(db_ref);
-            let tables = Arc::new(schemas.build_path_rows(
-                tables,
-                |t| t.get_row().get_schema_id(),
-                |table, schema| TablePath { table, schema },
-            )?);
-
-            let to_cache = tables.clone();
-            *cache.lock().unwrap() = Some(to_cache);
-
-            Ok(tables)
         })
         .await
     }
@@ -3016,19 +3035,20 @@ impl MetaStore for RocksMetaStore {
 
             let mut partitions_with_chunks = HashSet::new();
 
-            let chunks = chunks_table.all_rows()?;
+            let chunks = chunks_table.scan_all_rows()?;
 
-            for chunk in chunks.iter() {
-                partitions_with_chunks.insert(chunk.get_row().get_partition_id());
+            for chunk in chunks {
+                partitions_with_chunks.insert(chunk?.get_row().get_partition_id());
             }
 
-            let to_repartition = partitions_table
-                .all_rows()?
-                .into_iter()
-                .filter(|p| {
-                    !p.get_row().is_active() && partitions_with_chunks.contains(&p.get_id())
-                })
-                .collect::<Vec<_>>();
+            let mut to_repartition = Vec::new();
+
+            for partition in partitions_table.scan_all_rows()? {
+                let p = partition?;
+                if !p.get_row().is_active() && partitions_with_chunks.contains(&p.get_id()) {
+                    to_repartition.push(p);
+                }
+            }
 
             Ok(to_repartition)
         })
@@ -3056,13 +3076,17 @@ impl MetaStore for RocksMetaStore {
 
             for partition in orphaned_partitions {
                 if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
-                    let parent_partition =
-                        partitions_table.get_row_or_not_found(*parent_partition_id)?;
-                    if parent_partition.get_row().get_max_val() == partition.get_row().get_max_val()
-                        && parent_partition.get_row().get_min_val()
-                            == partition.get_row().get_min_val()
+                    // TODO it actually should fail if it isn't found but skip for now due to bug in reconciliation process which led to missing parents
+                    if let Ok(parent_partition) =
+                        partitions_table.get_row_or_not_found(*parent_partition_id)
                     {
-                        result.push(partition);
+                        if parent_partition.get_row().get_max_val()
+                            == partition.get_row().get_max_val()
+                            && parent_partition.get_row().get_min_val()
+                                == partition.get_row().get_min_val()
+                        {
+                            result.push(partition);
+                        }
                     }
                 }
             }
