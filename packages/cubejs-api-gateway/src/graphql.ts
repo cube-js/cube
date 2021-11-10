@@ -407,7 +407,7 @@ export function makeSchema(metaConfig: any) {
           timezone: stringArg(),
           renewQuery: booleanArg(),
         },
-        resolve: async (parent, { where, limit, offset, timezone, renewQuery }, context, infos) => {
+        resolve: async (parent, { where, limit, offset, timezone, renewQuery }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
@@ -434,7 +434,7 @@ export function makeSchema(metaConfig: any) {
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
-              const memberType = getMemberType(context.metaConfig, cubeName, memberName);
+              const memberType = getMemberType(metaConfig, cubeName, memberName);
 
               if (memberType === 'measure') {
                 measures.push(`${cubeName}.${memberName}`);
@@ -474,10 +474,10 @@ export function makeSchema(metaConfig: any) {
           // eslint-disable-next-line no-async-promise-executor
           const results = await (new Promise<any>(async (resolve, reject) => {
             try {
-              await context.apiGateway.load({
+              await apiGateway.load({
                 query,
                 queryType: QUERY_TYPE.REGULAR_QUERY,
-                context: context.req.context,
+                context: req.context,
                 res: (message) => {
                   if (message.error) {
                     reject(new Error(message.error));

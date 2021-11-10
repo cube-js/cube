@@ -282,30 +282,26 @@ export class ApiGateway {
     // @todo Should we pass requestLoggerMiddleware?
     const guestMiddlewares = [];
 
-    app.use(`${this.basePath}/graphql`, userMiddlewares, (() => {
-      let cache;
-      return (async (req, res) => {
-        if (!cache) {
-          const metaConfig = await this.getCompilerApi(req.context).metaConfig({
-            requestId: req.context.requestId,
-          });
-          cache = {
-            metaConfig,
-            schema: makeSchema(metaConfig)
-          };
-        }
+    app.use(`${this.basePath}/graphql`, userMiddlewares, async (req, res) => {
+      const compilerApi = this.getCompilerApi(req.context);
+      let schema = compilerApi.getGraphQLSchema();
+      if (!schema) {
+        const metaConfig = await compilerApi.metaConfig({
+          requestId: req.context.requestId,
+        });
+        schema = makeSchema(metaConfig);
+        compilerApi.setGraphQLSchema(schema);
+      }
 
-        return graphqlHTTP({
-          schema: cache.schema,
-          context: {
-            req,
-            metaConfig: cache.metaConfig,
-            apiGateway: this
-          },
-          graphiql: getEnv('nodeEnv') !== 'production'
-        })(req, res);
-      });
-    })());
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: this
+        },
+        graphiql: getEnv('nodeEnv') !== 'production'
+      })(req, res);
+    });
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
