@@ -114,7 +114,11 @@ pub async fn choose_index_ext(
             .into_iter()
             .map(|c| c.partitioned_index.unwrap())
             .collect(),
-        false => candidates.into_iter().map(|c| c.ordinary_index).collect(),
+        // We sometimes propagate 'index for join not found' error here.
+        false => candidates
+            .into_iter()
+            .map(|c| c.ordinary_index)
+            .collect::<Result<_, DataFusionError>>()?,
     };
 
     let partitions = metastore
@@ -406,7 +410,8 @@ impl ChooseIndex<'_> {
 }
 
 struct IndexCandidate {
-    pub ordinary_index: IndexSnapshot,
+    /// May contain for unmatched index.
+    pub ordinary_index: Result<IndexSnapshot, DataFusionError>,
     pub partitioned_index: Option<IndexSnapshot>,
 }
 
@@ -474,11 +479,11 @@ async fn pick_index(
             }
         }
         if let Some(index) = ordinary_index {
-            (index, partitioned_index, sort_on)
+            (Ok(index), partitioned_index, sort_on)
         } else {
             if let Some((join_on_columns, true)) = sort_on.as_ref() {
                 let table_name = c.table.table_name();
-                return Err(DataFusionError::Plan(format!(
+                let err = Err(DataFusionError::Plan(format!(
                     "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
                     table_name,
                     join_on_columns.join(", "),
@@ -487,8 +492,10 @@ async fn pick_index(
                     table_name,
                     join_on_columns.join(", ")
                 )));
+                (err, partitioned_index, sort_on)
+            } else {
+                (Ok(default_index), partitioned_index, None)
             }
-            (default_index, partitioned_index, None)
         }
     } else {
         if let Some((join_on_columns, _)) = sort_on {
@@ -498,7 +505,7 @@ async fn pick_index(
                 join_on_columns.join(", ")
             )));
         }
-        (default_index, None, None)
+        (Ok(default_index), None, None)
     };
 
     // Only use partitioned index for joins. Joins are indicated by the required flag.
@@ -523,7 +530,7 @@ async fn pick_index(
         }
     };
     Ok(IndexCandidate {
-        ordinary_index: create_snapshot(index),
+        ordinary_index: index.map(create_snapshot),
         partitioned_index: partitioned_index.map(create_snapshot),
     })
 }
