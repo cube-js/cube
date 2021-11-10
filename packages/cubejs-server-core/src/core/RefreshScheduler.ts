@@ -260,9 +260,9 @@ export class RefreshScheduler {
             }
           }
         ))
-      ));
+      )) || [];
 
-      const partitions = (queriesForPreAggregation || [])
+      const partitions = queriesForPreAggregation
         .reduce((target, source) => [...target, ...source.partitions], [])
         .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p?.tableName));
       
@@ -286,7 +286,7 @@ export class RefreshScheduler {
         }
       });
 
-      const errors = [...new Set((queriesForPreAggregation || []).map(q => q?.error).filter(e => e))];
+      const errors = [...new Set(queriesForPreAggregation.map(q => q?.error).filter(e => e))];
 
       return {
         timezones,
