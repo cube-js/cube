@@ -3503,7 +3503,12 @@ impl MetaStore for RocksMetaStore {
         deactivate_ids: Vec<u64>,
         uploaded_ids: Vec<u64>,
     ) -> Result<(), CubeError> {
-        assert!(!uploaded_ids.is_empty());
+        if !uploaded_ids.is_empty() {
+            return Err(CubeError::internal(format!(
+                "Can't swap chunks: {:?} to {:?} empty",
+                deactivate_ids, uploaded_ids
+            )));
+        }
         self.write_operation(move |db_ref, batch_pipe| {
             RocksMetaStore::swap_chunks_impl(deactivate_ids, uploaded_ids, db_ref, batch_pipe)
         })
