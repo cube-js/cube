@@ -1383,15 +1383,15 @@ export class ApiGateway {
   protected logNetworkUsage: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     this.log({
       type: 'Incoming network usage',
-      protocol: 'http',
-      path: req.url,
+      service: 'api-http',
+      context: req.context,
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
     });
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
-        protocol: 'http',
-        path: req.url,
+        service: 'api-http',
+        context: req.context,
         bytes: Number(res.get('content-length')) || 0,
       });
     });

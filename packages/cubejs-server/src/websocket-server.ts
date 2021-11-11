@@ -39,7 +39,7 @@ export class WebSocketServer {
       const strMessage = JSON.stringify(message);
       const bytes = Buffer.byteLength(strMessage);
       this.serverCore.logger('Outgoing network usage', {
-        protocol: 'ws',
+        service: 'api-ws',
         bytes,
       });
       connectionIdToSocket[connectionId].send(strMessage);

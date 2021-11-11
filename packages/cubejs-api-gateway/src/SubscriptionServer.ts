@@ -37,12 +37,6 @@ export class SubscriptionServer {
       typeof message === 'string' ? message : JSON.stringify(message)
     );
 
-    this.apiGateway.log({
-      type: 'Incoming network usage',
-      protocol: 'ws',
-      bytes,
-    });
-
     try {
       if (typeof message === 'string') {
         message = JSON.parse(message);
@@ -90,6 +84,13 @@ export class SubscriptionServer {
       const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
       const requestId = `${baseRequestId}-span-${uuidv4()}`;
       context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
+
+      this.apiGateway.log({
+        type: 'Incoming network usage',
+        service: 'api-ws',
+        context,
+        bytes,
+      });
 
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
