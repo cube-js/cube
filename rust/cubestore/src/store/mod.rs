@@ -350,6 +350,9 @@ impl ChunkDataStore for ChunkStore {
                 }
             })
             .collect::<Vec<_>>();
+        if chunks.is_empty() {
+            return Ok(());
+        }
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
         for chunk in chunks.into_iter() {
