@@ -47,9 +47,9 @@ function wrapNativeFunctionWithChannelCallback(
     return async (extra: any, channel: any) => {
         try {
             const result = await fn(JSON.parse(extra));
-            native.channel_resolve(channel, JSON.stringify(result));
-          } catch (e) {
-            native.channel_reject(channel);
+            channel.resolve(JSON.stringify(result));
+          } catch (e: any) {
+            channel.reject(e.message || 'Unknown JS exception');
 
             throw e;
           }

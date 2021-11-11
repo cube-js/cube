@@ -1,8 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use cubesql::CubeError;
+#[cfg(build = "debug")]
+use log::trace;
 use neon::prelude::*;
 use tokio::sync::oneshot;
+
+use crate::utils::bind_method;
 
 type JsAsyncChannelCallback = Box<dyn Fn(Result<String, CubeError>) + Send>;
 
@@ -10,40 +14,66 @@ pub struct JsAsyncChannel {
     callback: JsAsyncChannelCallback,
 }
 
+impl Finalize for JsAsyncChannel {}
+
+fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    #[cfg(build = "debug")]
+    trace!("JsAsyncChannel.resolved");
+
+    let this = cx
+        .this()
+        .downcast_or_throw::<JsBox<JsAsyncChannel>, _>(&mut cx)?;
+    let result = cx.argument::<JsString>(0)?;
+
+    this.resolve(result.value(&mut cx));
+
+    Ok(cx.undefined())
+}
+
+fn js_async_channel_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    #[cfg(build = "debug")]
+    trace!("JsAsyncChannel.reject");
+
+    let this = cx
+        .this()
+        .downcast_or_throw::<JsBox<JsAsyncChannel>, _>(&mut cx)?;
+    let error = cx.argument::<JsString>(0)?;
+
+    this.reject(error.value(&mut cx));
+
+    Ok(cx.undefined())
+}
+
 impl JsAsyncChannel {
     pub fn new(callback: JsAsyncChannelCallback) -> Self {
         Self { callback }
     }
 
+    fn to_object<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsObject> {
+        let obj = cx.empty_object();
+        // Pass JsAsyncChannel as this, because JsFunction cannot use closure (fn with move)
+        let obj_this = cx.boxed(self).upcast::<JsValue>();
+
+        let resolve_fn = JsFunction::new(cx, js_async_channel_resolve)?;
+        let resolve = bind_method(cx, resolve_fn, obj_this)?;
+        obj.set(cx, "resolve", resolve)?;
+
+        let reject_fn = JsFunction::new(cx, js_async_channel_reject)?;
+        let reject = bind_method(cx, reject_fn, obj_this)?;
+        obj.set(cx, "reject", reject)?;
+
+        Ok(obj)
+    }
+
     fn resolve(&self, result: String) {
         let callback = &self.callback;
-        callback(Ok(result))
+        callback(Ok(result));
     }
 
-    fn reject(&self) {
+    fn reject(&self, error: String) {
         let callback = &self.callback;
-        callback(Err(CubeError::internal(
-            "Async channel was rejected".to_string(),
-        )))
+        callback(Err(CubeError::internal(error)));
     }
-}
-
-impl Finalize for JsAsyncChannel {}
-
-pub fn channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let channel = cx.argument::<JsBox<JsAsyncChannel>>(0)?;
-    let result = cx.argument::<JsString>(1)?;
-
-    channel.resolve(result.value(&mut cx));
-
-    Ok(cx.undefined())
-}
-
-pub fn channel_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let channel = cx.argument::<JsBox<JsAsyncChannel>>(0)?;
-    channel.reject();
-
-    Ok(cx.undefined())
 }
 
 pub async fn call_js_with_channel_as_callback<R>(
@@ -90,7 +120,7 @@ where
             } else {
                 cx.null().upcast::<JsValue>()
             },
-            cx.boxed(async_channel).upcast::<JsValue>(),
+            async_channel.to_object(&mut cx)?.upcast::<JsValue>(),
         ];
 
         method.call(&mut cx, this, args)?;
