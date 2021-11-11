@@ -21,7 +21,11 @@ export class CompilerApi {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
-    ).toString();
+    );
+
+    if (typeof compilerVersion === 'object') {
+      compilerVersion = JSON.stringify(compilerVersion);
+    }
 
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
