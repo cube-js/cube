@@ -215,6 +215,22 @@ services:
       - cubestore_router
 ```
 
+### AWS
+
+Cube Store can retrieve security credentials from instance metadata
+automatically. This means you can skip defining the
+`CUBESTORE_AWS_ACCESS_KEY_ID` and `CUBESTORE_AWS_SECRET_ACCESS_KEY` environment
+variables.
+
+<WarningBox>
+
+Cube Store currently does not take the key expiration time returned from
+instance metadata into account; instead the refresh duration for the key is
+defined by `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`, which is set to `180` by
+default.
+
+</WarningBox>
+
 ## Security
 
 Cube Store currently does not have any in-built authentication mechanisms. For
