@@ -5,11 +5,11 @@ mod auth;
 mod channel;
 mod config;
 mod transport;
+mod utils;
 
 use std::{collections::HashMap, sync::Arc};
 
 use auth::NodeBridgeAuthService;
-use channel::{channel_reject, channel_resolve};
 use config::NodeConfig;
 use cubesql::telemetry::{track_event, ReportingLogger};
 use log::Level;
@@ -108,8 +108,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setLogLevel", set_log_level)?;
     cx.export_function("registerInterface", register_interface)?;
-    cx.export_function("channel_resolve", channel_resolve)?;
-    cx.export_function("channel_reject", channel_reject)?;
 
     Ok(())
 }
