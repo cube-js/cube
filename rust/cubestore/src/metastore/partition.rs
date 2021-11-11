@@ -70,7 +70,7 @@ impl Partition {
     }
 
     pub fn has_main_table_file(&self) -> bool {
-        self.main_table_row_count != 0
+        self.active && self.main_table_row_count != 0
     }
 
     pub fn to_active(&self, active: bool) -> Partition {

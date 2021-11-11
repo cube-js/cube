@@ -2330,34 +2330,19 @@ impl RocksMetaStore {
         Ok(table)
     }
 
-    fn chunks_by_partitioned_with_non_repartitioned(
+    fn chunks_by_partition(
         partition_id: u64,
         table: &ChunkRocksTable,
-        partition_table: &PartitionRocksTable,
+        include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        let mut partitions_up_to_root = Vec::new();
-        let mut current_partition = partition_table.get_row_or_not_found(partition_id)?;
-        partitions_up_to_root.push(current_partition.get_id());
-        while let Some(parent_id) = current_partition.get_row().parent_partition_id() {
-            let parent = partition_table.get_row_or_not_found(*parent_id)?;
-            partitions_up_to_root.push(parent.get_id());
-            current_partition = parent;
-        }
-
-        let mut chunks = Vec::new();
-
-        for partition_id in partitions_up_to_root.into_iter() {
-            chunks.extend(
-                table
-                    .get_rows_by_index(
-                        &ChunkIndexKey::ByPartitionId(partition_id),
-                        &ChunkRocksIndex::PartitionId,
-                    )?
-                    .into_iter()
-                    .filter(|c| c.get_row().uploaded() && c.get_row().active()),
-            );
-        }
-
+        let chunks = table
+            .get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(partition_id),
+                &ChunkRocksIndex::PartitionId,
+            )?
+            .into_iter()
+            .filter(|c| include_inactive || c.get_row().uploaded() && c.get_row().active())
+            .collect();
         Ok(chunks)
     }
 
@@ -3296,24 +3281,35 @@ impl MetaStore for RocksMetaStore {
 
             let mut results = Vec::with_capacity(index_id.len());
             for index_id in index_id {
-                // TODO iterate over range
-                let result = rocks_partition
-                    .get_rows_by_index(
-                        &PartitionIndexKey::ByIndexId(index_id),
-                        &PartitionRocksIndex::IndexId,
-                    )?
-                    .into_iter()
-                    .filter(|r| r.get_row().active)
-                    .map(|p| -> Result<_, CubeError> {
-                        let chunks = Self::chunks_by_partitioned_with_non_repartitioned(
-                            p.get_id(),
-                            &rocks_chunk,
-                            &rocks_partition,
-                        )?;
-                        Ok((p, chunks))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                results.push(result)
+                let mut processed = HashSet::new();
+                let mut partitions = Vec::new();
+                let mut add_with_parents = |mut p: u64| -> Result<(), CubeError> {
+                    loop {
+                        if !processed.insert(p) {
+                            break;
+                        }
+                        let r = rocks_partition.get_row_or_not_found(p)?;
+                        let parent = r.row.parent_partition_id().clone();
+                        partitions.push((r, Vec::new()));
+                        match parent {
+                            None => break,
+                            Some(parent) => p = parent,
+                        }
+                    }
+                    Ok(())
+                };
+                // TODO iterate over range.
+                for p in rocks_partition.get_row_ids_by_index(
+                    &PartitionIndexKey::ByIndexId(index_id),
+                    &PartitionRocksIndex::IndexId,
+                )? {
+                    add_with_parents(p)?;
+                }
+
+                for (p, chunks) in &mut partitions {
+                    *chunks = Self::chunks_by_partition(p.id, &rocks_chunk, false)?;
+                }
+                results.push(partitions)
             }
             Ok(results)
         })
@@ -3389,16 +3385,8 @@ impl MetaStore for RocksMetaStore {
         partition_id: u64,
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation(move |db_ref| {
-            let table = ChunkRocksTable::new(db_ref);
-            Ok(table
-                .get_rows_by_index(
-                    &ChunkIndexKey::ByPartitionId(partition_id),
-                    &ChunkRocksIndex::PartitionId,
-                )?
-                .into_iter()
-                .filter(|c| include_inactive || c.get_row().uploaded() && c.get_row().active())
-                .collect::<Vec<_>>())
+        self.read_operation(move |db| {
+            Self::chunks_by_partition(partition_id, &ChunkRocksTable::new(db), include_inactive)
         })
         .await
     }
