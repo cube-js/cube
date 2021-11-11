@@ -1,6 +1,7 @@
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
+use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::remotefs::RemoteFs;
@@ -394,12 +395,12 @@ impl SchedulerImpl {
             if !partition.get_row().is_active() {
                 self.schedule_repartition_if_needed(&partition).await?;
                 if partition.get_row().main_table_row_count() > 0 {
-                    if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                        let deadline =
-                            Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-                        self.gc_sender
-                            .send(GCTimedTask(deadline, GCTask::RemoveRemoteFile(file_name)))?;
-                    }
+                    let file_name =
+                        partition_file_name(partition.get_id(), partition.get_row().suffix());
+                    let deadline =
+                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    self.gc_sender
+                        .send(GCTimedTask(deadline, GCTask::RemoveRemoteFile(file_name)))?;
                 }
             }
         }
