@@ -38,6 +38,16 @@ CUBEJS_DB_SCHEMA=my_prestodb_schema
 | `CUBEJS_DB_SCHEMA`   | The schema within the database to connect to                            | A valid schema name within a Presto database  |    ✅    |
 | `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`                               |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+used in pre-aggregations when using PrestoDB as a source database. To learn more
+about PrestoDB's support for approximate aggregate functions, [click
+here][presto-docs-approx-agg-fns].
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube.js and PrestoDB, set the
@@ -46,4 +56,8 @@ configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
 [prestodb]: https://prestodb.io/
+[presto-docs-approx-agg-fns]:
+  https://prestodb.io/docs/current/functions/aggregate.html
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx

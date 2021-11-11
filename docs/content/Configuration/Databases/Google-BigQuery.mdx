@@ -52,6 +52,16 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcs`                                                                   |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+used in pre-aggregations when using Google BigQuery as a source database. To
+learn more about Google BigQuery's support for approximate aggregate functions,
+[click here][bq-docs-approx-agg-fns].
+
 ## Pre-Aggregation Build Strategies
 
 <InfoBox>
@@ -112,6 +122,8 @@ BigQuery connections are made over HTTPS.
   https://console.cloud.google.com/apis/credentials/serviceaccountkey
 [bq-docs-regional-locations]:
   https://cloud.google.com/bigquery/docs/locations#regional-locations
+[bq-docs-approx-agg-fns]:
+  https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions
 [google-cloud-docs-projects]:
   https://cloud.google.com/resource-manager/docs/creating-managing-projects#before_you_begin
 [google-support-create-svc-account]:
@@ -120,4 +132,6 @@ BigQuery connections are made over HTTPS.
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-env-var]: /reference/environment-variables#database-connection
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching

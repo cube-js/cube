@@ -42,6 +42,16 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                        |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key         |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+used in pre-aggregations when using Snowflake as a source database. To learn
+more about Snowflake's support for approximate aggregate functions, [click
+here][snowflake-docs-approx-agg-fns].
+
 ## Pre-Aggregation Build Strategies
 
 <InfoBox>
@@ -117,6 +127,8 @@ connections are made over HTTPS.
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-env-var]: /reference/environment-variables#database-connection
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-connection-options]:
@@ -125,3 +137,5 @@ connections are made over HTTPS.
   https://docs.snowflake.com/en/user-guide/data-load-gcs-config.html
 [snowflake-docs-regions]:
   https://docs.snowflake.com/en/user-guide/intro-regions.html
+[snowflake-docs-approx-agg-fns]:
+  https://docs.snowflake.com/en/sql-reference/functions/approx_count_distinct.html
