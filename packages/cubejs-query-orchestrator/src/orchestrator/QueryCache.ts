@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import LRUCache from 'lru-cache';
+import sizeOf from 'object-sizeof';
 import { MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 import { QueryQueue } from './QueryQueue';
@@ -432,6 +433,13 @@ export class QueryCache {
         return this.cacheDriver.set(redisKey, result, expiration)
           .then(() => {
             this.logger('Renewed', { cacheKey, requestId: options.requestId });
+            if (this.cacheDriver instanceof RedisCacheDriver) {
+              this.logger('Outgoing network usage', {
+                service: 'redis',
+                context: { requestId: options.requestId },
+                bytes: sizeOf(res),
+              });
+            }
             return res;
           });
       }).catch(e => {
@@ -504,6 +512,13 @@ export class QueryCache {
         renewalThreshold,
         requestId: options.requestId
       });
+      if (this.cacheDriver instanceof RedisCacheDriver) {
+        this.logger('Incoming network usage', {
+          service: 'redis',
+          context: { requestId: options.requestId },
+          bytes: sizeOf(res),
+        });
+      }
       if (
         renewalKey && (
           !renewalThreshold ||
