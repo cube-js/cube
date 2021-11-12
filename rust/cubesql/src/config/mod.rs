@@ -90,11 +90,14 @@ pub trait ConfigObj: DIService {
     fn bind_address(&self) -> &Option<String>;
 
     fn query_timeout(&self) -> u64;
+
+    fn nonce(&self) -> &Option<Vec<u8>>;
 }
 
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
+    pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
 }
 
@@ -104,6 +107,10 @@ crate::di_service!(MockConfigObj, [ConfigObj]);
 impl ConfigObj for ConfigObjImpl {
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn nonce(&self) -> &Option<Vec<u8>> {
+        &self.nonce
     }
 
     fn query_timeout(&self) -> u64 {
@@ -131,6 +138,7 @@ impl Config {
                             .map(|v| v.parse::<u16>().unwrap())
                             .unwrap_or(3306u16)),
                 )),
+                nonce: None,
                 query_timeout,
             }),
         }
@@ -142,6 +150,7 @@ impl Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 bind_address: None,
+                nonce: None,
                 query_timeout,
             }),
         }
@@ -186,15 +195,12 @@ impl Config {
                 .await;
             self.injector
                 .register_typed::<MySqlServer, _, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
                     MySqlServer::new(
-                        i.get_service_typed::<dyn ConfigObj>()
-                            .await
-                            .bind_address()
-                            .as_ref()
-                            .unwrap()
-                            .to_string(),
+                        config.bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                         i.get_service_typed().await,
+                        config.nonce().clone(),
                     )
                 })
                 .await;

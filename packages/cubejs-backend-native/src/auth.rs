@@ -6,8 +6,10 @@ use cubesql::{
 };
 use log::trace;
 use neon::prelude::*;
+use serde::Deserialize;
 use serde_derive::Serialize;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::channel::call_js_with_channel_as_callback;
 
@@ -27,8 +29,19 @@ impl NodeBridgeAuthService {
 }
 
 #[derive(Debug, Serialize)]
+pub struct TransportRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Serialize)]
 struct CheckAuthRequest {
-    authorization: Option<String>,
+    request: TransportRequest,
+    user: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckAuthResponse {
+    password: Option<String>,
 }
 
 #[async_trait]
@@ -36,10 +49,15 @@ impl SqlAuthService for NodeBridgeAuthService {
     async fn authenticate(&self, user: Option<String>) -> Result<AuthContext, CubeError> {
         trace!("[auth] Request ->");
 
+        let request_id = Uuid::new_v4().to_string();
+
         let extra = serde_json::to_string(&CheckAuthRequest {
-            authorization: user.clone(),
+            request: TransportRequest {
+                id: format!("{}-span-1", request_id),
+            },
+            user: user.clone(),
         })?;
-        let response: serde_json::Value = call_js_with_channel_as_callback(
+        let response: CheckAuthResponse = call_js_with_channel_as_callback(
             self.channel.clone(),
             self.check_auth.clone(),
             Some(extra),
@@ -47,18 +65,11 @@ impl SqlAuthService for NodeBridgeAuthService {
         .await?;
         trace!("[auth] Request <- {:?}", response);
 
-        let auth_success = response.as_bool().unwrap_or(false);
-        if auth_success {
-            Ok(AuthContext {
-                password: None,
-                access_token: user.unwrap_or("fake".to_string()),
-                base_path: "fake".to_string(),
-            })
-        } else {
-            Err(CubeError::user(
-                "Incorrect user name or password".to_string(),
-            ))
-        }
+        Ok(AuthContext {
+            password: response.password,
+            access_token: user.unwrap_or("fake".to_string()),
+            base_path: "fake".to_string(),
+        })
     }
 }
 

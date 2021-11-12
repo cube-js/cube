@@ -11,18 +11,27 @@ use std::{collections::HashMap, sync::Arc};
 
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
-use cubesql::telemetry::{track_event, ReportingLogger};
+use cubesql::{
+    config::CubeServices,
+    telemetry::{track_event, ReportingLogger},
+};
 use log::Level;
 use neon::prelude::*;
 use simple_logger::SimpleLogger;
 use tokio::runtime::Builder;
 use transport::NodeBridgeTransport;
 
-struct SQLInterface {}
+struct SQLInterface {
+    services: Arc<CubeServices>,
+}
 
 impl Finalize for SQLInterface {}
 
-impl SQLInterface {}
+impl SQLInterface {
+    pub fn new(services: Arc<CubeServices>) -> Self {
+        Self { services }
+    }
+}
 
 fn init_logger(log_level: Level) {
     let logger = SimpleLogger::new()
@@ -68,12 +77,19 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .downcast_or_throw::<JsFunction, _>(&mut cx)?
         .root(&mut cx);
 
-    let port = options.get(&mut cx, "port")?;
-    let configuration_port = if port.is_a::<JsNumber, _>(&mut cx) {
-        let value = port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
-        let port = value.value(&mut cx) as u16;
+    let nonce_handle = options.get(&mut cx, "nonce")?;
+    let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
+        let value = nonce_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
+        Some(value.value(&mut cx))
+    } else {
+        None
+    };
 
-        Some(port)
+    let port_handle = options.get(&mut cx, "port")?;
+    let port = if port_handle.is_a::<JsNumber, _>(&mut cx) {
+        let value = port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+
+        Some(value.value(&mut cx) as u16)
     } else {
         None
     };
@@ -85,17 +101,22 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(configuration_port);
+        let config = NodeConfig::new(port, nonce);
 
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-        // @todo await real?
-        channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
-
         runtime.block_on(async move {
-            let services = config
-                .configure(Arc::new(transport_service), Arc::new(auth_service))
-                .await;
+            let services = Arc::new(
+                config
+                    .configure(Arc::new(transport_service), Arc::new(auth_service))
+                    .await,
+            );
+
+            let services_arc = services.clone();
+            channel.settle_with(deferred, move |cx| {
+                Ok(cx.boxed(SQLInterface::new(services_arc)))
+            });
+
             track_event("Cube SQL Start".to_string(), HashMap::new()).await;
             services.wait_processing_loops().await.unwrap();
         });
@@ -104,10 +125,29 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
+fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+
+    let (deferred, promise) = cx.promise();
+    let channel = cx.channel();
+
+    let services = interface.services.clone();
+    // @todo Await without runtime?
+    #[warn(unused_must_use)]
+    services.stop_processing_loops();
+
+    // @todo How to stop tokio runtime?
+
+    channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
+
+    Ok(promise)
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setLogLevel", set_log_level)?;
     cx.export_function("registerInterface", register_interface)?;
+    cx.export_function("shutdownInterface", shutdown_interface)?;
 
     Ok(())
 }

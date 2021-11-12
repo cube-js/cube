@@ -6,6 +6,7 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
+use datafusion::arrow::datatypes::ToByteSlice;
 use datafusion::execution::dataframe_impl::DataFrameImpl;
 use datafusion::prelude::DataFrame as DFDataFrame;
 
@@ -37,8 +38,10 @@ struct Backend {
     auth: Arc<dyn SqlAuthService>,
     schema: Arc<dyn SchemaService>,
     props: QueryPlannerExecutionProps,
-    // From Auth Service
+    // Auth result from SqlAuthService
     context: Option<AuthContext>,
+    // From MysqlServerOptions
+    nonce: Arc<Option<Vec<u8>>>,
 }
 
 impl Backend {
@@ -58,6 +61,7 @@ impl Backend {
         let query_lower = query_lower.replace("`", "");
 
         let ignore = match query_lower.as_str() {
+            "set names utf8" => true,
             "set names utf8mb4" => true,
             "set names latin1" => true,
             "rollback" => true,
@@ -593,6 +597,19 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
         Ok(passwd)
     }
+
+    /// Generate salt for native auth plugin
+    async fn generate_nonce<'a>(&'a mut self) -> Result<Vec<u8>, Self::Error>
+    where
+        W: 'async_trait,
+    {
+        if let Some(n) = &*self.nonce {
+            Ok(n.clone())
+        } else {
+            let random_bytes: Vec<u8> = (0..20).map(|_| rand::random::<u8>()).collect();
+            Ok(random_bytes)
+        }
+    }
 }
 
 pub struct MySqlServer {
@@ -601,6 +618,7 @@ pub struct MySqlServer {
     schema: Arc<dyn SchemaService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
+    nonce: Arc<Option<Vec<u8>>>,
 }
 
 crate::di_service!(MySqlServer, []);
@@ -637,6 +655,7 @@ impl ProcessingLoop for MySqlServer {
 
             let auth = self.auth.clone();
             let schema = self.schema.clone();
+            let nonce = self.nonce.clone();
 
             let connection_id = if connection_id_incr > 100_000_u32 {
                 connection_id_incr = 1;
@@ -655,6 +674,7 @@ impl ProcessingLoop for MySqlServer {
                         schema,
                         props: QueryPlannerExecutionProps::new(connection_id, None),
                         context: None,
+                        nonce,
                     },
                     socket,
                 )
@@ -677,12 +697,14 @@ impl MySqlServer {
         address: String,
         auth: Arc<dyn SqlAuthService>,
         schema: Arc<dyn SchemaService>,
+        nonce: Option<Vec<u8>>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
             address,
             auth,
             schema,
+            nonce: Arc::new(nonce),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })
