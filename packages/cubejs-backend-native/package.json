@@ -3,8 +3,8 @@
   "version": "0.28.53",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
-  "main": "dist/lib/index.js",
-  "typings": "dist/lib/index.d.ts",
+  "main": "dist/js/index.js",
+  "typings": "dist/js/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cube-js/cube.js.git"
@@ -17,14 +17,14 @@
     "native:build-release": "npm run native:build -- --release",
     "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
     "upload-binary": "npm run native:build-release && mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
-    "test:unit": "jest --verbose --forceExit test",
+    "test:unit": "jest --forceExit test",
     "test:cargo": "cargo test"
   },
   "engines": {
     "node": ">=10.8.0"
   },
   "files": [
-    "dist/lib"
+    "dist/js"
   ],
   "bundledDependencies": [
     "@mapbox/node-pre-gyp"
@@ -51,7 +51,8 @@
     "pkg_path": "."
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "verbose": true
   },
   "license": "Apache-2.0",
   "publishConfig": {

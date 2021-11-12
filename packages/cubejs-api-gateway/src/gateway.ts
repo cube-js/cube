@@ -466,7 +466,7 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
-    
+
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }

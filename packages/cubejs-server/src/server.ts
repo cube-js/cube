@@ -14,7 +14,7 @@ import util from 'util';
 import bodyParser from 'body-parser';
 import cors, { CorsOptions } from 'cors';
 
-import type { SQLServer } from '@cubejs-backend/api-gateway';
+import type { SQLServer, SQLServerOptions } from '@cubejs-backend/api-gateway';
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { WebSocketServer, WebSocketServerOptions } from './websocket-server';
@@ -34,9 +34,8 @@ interface HttpOptions {
   cors?: CorsOptions;
 }
 
-export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions {
+export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions, SQLServerOptions {
   webSockets?: boolean;
-  sqlPort?: number | false;
   initApp?: InitAppFn;
   http?: HttpOptions;
   gracefulShutdown?: number;
@@ -66,6 +65,7 @@ export class CubejsServer {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
+      sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
       http: {
         ...config.http,
         cors: {
@@ -113,7 +113,7 @@ export class CubejsServer {
 
       if (this.config.sqlPort) {
         this.sqlServer = this.core.initSQLServer();
-        await this.sqlServer.init(<any> this.config);
+        await this.sqlServer.init(this.config);
       }
 
       const PORT = getEnv('port');

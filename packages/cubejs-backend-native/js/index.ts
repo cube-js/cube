@@ -1,22 +1,29 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface Request {
+    id: string
+}
+
 export interface CheckAuthPayload {
-    authorization: string
+    request: Request,
+    user: string|null
 }
 
 export interface LoadPayload {
-    authorization: string,
-    request_id: string,
+    request: Request,
+    user: string,
     query: any
 }
 
 export interface MetaPayload {
-    authorization: string
+    request: Request,
+    user: string|null
 }
 
 export type SQLInterfaceOptions = {
     port?: number,
+    nonce?: string,
     checkAuth: (payload: CheckAuthPayload) => unknown | Promise<unknown>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
@@ -32,7 +39,9 @@ function loadNative() {
         return require(path.join(__dirname, '/../../native/index.node'))
     }
 
-    throw new Error('Unable to load @cubejs-backend/native, probably your system is not supported.');
+    throw new Error(
+      `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) is not supported.`
+    );
 }
 
 export function isSupported(): boolean {
@@ -51,7 +60,7 @@ function wrapNativeFunctionWithChannelCallback(
           } catch (e: any) {
             channel.reject(e.message || 'Unknown JS exception');
 
-            throw e;
+            // throw e;
           }
     };
 };
@@ -63,7 +72,9 @@ export const setLogLevel = (level: LogLevel): void => {
     native.setLogLevel(level);
 };
 
-export const registerInterface = async (options: SQLInterfaceOptions) => {
+export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
+
+export const registerInterface = async (options: SQLInterfaceOptions): Promise<SqlInterfaceInstance> => {
     if (typeof options !== 'object' && options == null) {
         throw new Error('Argument options must be an object');
     }
@@ -88,3 +99,11 @@ export const registerInterface = async (options: SQLInterfaceOptions) => {
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
     });
 };
+
+export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
+    const native = loadNative();
+
+    await native.shutdownInterface(instance);
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+}

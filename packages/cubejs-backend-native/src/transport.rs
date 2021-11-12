@@ -10,7 +10,7 @@ use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::channel::call_js_with_channel_as_callback;
+use crate::{auth::TransportRequest, channel::call_js_with_channel_as_callback};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
@@ -31,14 +31,15 @@ impl NodeBridgeTransport {
 
 #[derive(Debug, Serialize)]
 struct LoadRequest {
-    authorization: String,
-    request_id: String,
+    request: TransportRequest,
+    user: Option<String>,
     query: V1LoadRequestQuery,
 }
 
 #[derive(Debug, Serialize)]
 struct MetaRequest {
-    authorization: String,
+    request: TransportRequest,
+    user: Option<String>,
 }
 
 #[async_trait]
@@ -46,8 +47,12 @@ impl SchemaService for NodeBridgeTransport {
     async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
         trace!("[transport] Meta ->");
 
+        let request_id = Uuid::new_v4().to_string();
         let extra = serde_json::to_string(&MetaRequest {
-            authorization: ctx.access_token.clone(),
+            request: TransportRequest {
+                id: format!("{}-span-1", request_id),
+            },
+            user: Some(ctx.access_token.clone()),
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
@@ -74,8 +79,10 @@ impl SchemaService for NodeBridgeTransport {
 
         loop {
             let extra = serde_json::to_string(&LoadRequest {
-                authorization: ctx.access_token.clone(),
-                request_id: format!("{}-span-{}", request_id, span_counter),
+                request: TransportRequest {
+                    id: format!("{}-span-{}", request_id, span_counter),
+                },
+                user: Some(ctx.access_token.clone()),
                 query: query.clone(),
             })?;
             let response: serde_json::Value = call_js_with_channel_as_callback(
