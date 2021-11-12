@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.53",
+  "version": "0.28.55",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -27,8 +27,8 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "^0.28.53",
-    "@cubejs-backend/shared": "^0.28.52",
+    "@cubejs-backend/native": "^0.28.55",
+    "@cubejs-backend/shared": "^0.28.55",
     "@hapi/joi": "^15.1.1",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.2.6",
@@ -47,17 +47,17 @@
     "@types/jest": "^26.0.20",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/jwk-to-pem": "^2.0.0",
+    "@types/mysql": "^2.15.19",
     "@types/node-fetch": "^2.5.8",
     "@types/ramda": "^0.27.32",
     "@types/supertest": "^2.0.10",
-    "@types/mysql": "^2.15.19",
     "@types/uuid": "^8.3.1",
     "express": "^4.17.1",
     "jest": "^26.6.3",
+    "mysql": "^2.18.1",
     "should": "^13.2.3",
     "supertest": "^4.0.2",
-    "typescript": "~4.1.5",
-    "mysql": "^2.18.1"
+    "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {

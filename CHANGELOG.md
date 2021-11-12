@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+
+### Bug Fixes
+
+* **cubestore:** fix float comparisons causing unsorted data in merges ([c5b5d2c](https://github.com/cube-js/cube.js/commit/c5b5d2c2936f8974cbea6fe083ba38ad6caed793))
+* **cubestore:** Timeout for create table finalization ([d715345](https://github.com/cube-js/cube.js/commit/d7153456a7c2e6d5cae035d83ea55ba488455cb7))
+* JSON.stringify schema version instead of calling .toString() to simplify usage with objects ([50a191e](https://github.com/cube-js/cube.js/commit/50a191ecbc9df970ccb44126f5ad743bda0868e0))
+* **cubestore:** Do not fail `swap_chunks` with assert -- allow to gracefully capture error ([8c8b6eb](https://github.com/cube-js/cube.js/commit/8c8b6ebe328c609ba782495415d2ff3562fe31f8))
+* **cubestore:** Do not fail on repartition of empty chunks ([41b3054](https://github.com/cube-js/cube.js/commit/41b30549b9c3ec2cca0899f1f778c8334168b94b))
+* **cubestore:** speed up HLL++ merges, up to 180x in some cases ([24ecbc3](https://github.com/cube-js/cube.js/commit/24ecbc38462071fa0acb465261471e868bf6e1c4))
+* **cubestore:** system.tables can affect table visibility cache by including non ready tables. Ignore delete middle man reconciliation errors. ([dce711f](https://github.com/cube-js/cube.js/commit/dce711ff73460ee8ef9893ef4e6cc17273f55f7b))
+
+
+### Features
+
+* Introduce checkSqlAuth (auth hook for SQL API) ([3191b73](https://github.com/cube-js/cube.js/commit/3191b73816cd63d242349041c54a7037e9027c1a))
+
+
+
+
+
 ## [0.28.54](https://github.com/cube-js/cube.js/compare/v0.28.53...v0.28.54) (2021-11-09)
 
 

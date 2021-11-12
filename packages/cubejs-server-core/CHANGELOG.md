@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+
+### Bug Fixes
+
+* JSON.stringify schema version instead of calling .toString() to simplify usage with objects ([50a191e](https://github.com/cube-js/cube.js/commit/50a191ecbc9df970ccb44126f5ad743bda0868e0))
+
+
+### Features
+
+* Introduce checkSqlAuth (auth hook for SQL API) ([3191b73](https://github.com/cube-js/cube.js/commit/3191b73816cd63d242349041c54a7037e9027c1a))
+
+
+
+
+
 ## [0.28.54](https://github.com/cube-js/cube.js/compare/v0.28.53...v0.28.54) (2021-11-09)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
