@@ -3,8 +3,7 @@ const express = require('express')
 var cors = require('cors')
 const bodyParser = require('body-parser');
 
-const username = '5RGJS3US4PUQKAZ5'
-const password = 'y7j6w8Mb8wfA+/2+BYlJWqq5DnUmn3NbkbV7E7wCJuo/8f0Nr/BzK3ty+M1ihSAN'
+const { KAFKA_USERNAME: username, KAFKA_PASSWORD: password } = process.env
 const sasl = username && password ? { username, password, mechanism: 'plain' } : null
 const ssl = !!sasl
 
