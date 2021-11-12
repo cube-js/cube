@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use cubesql::{
-    config::{Config, ConfigObj, CubeServices},
+    config::{Config, CubeServices},
     mysql::SqlAuthService,
     schema::SchemaService,
 };
@@ -13,10 +13,6 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn config(&self) -> Arc<dyn ConfigObj> {
-        self.config.config_obj()
-    }
-
     pub fn new(port: Option<u16>, nonce: Option<String>) -> NodeConfig {
         let config = Config::default();
         let config = config.update_config(|mut c| {

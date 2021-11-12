@@ -1,3 +1,7 @@
+#![allow(
+    // Clippy bug: https://github.com/rust-lang/rust-clippy/issues/7422
+    clippy::nonstandard_macro_braces,
+)]
 #![feature(in_band_lifetimes)]
 #![feature(test)]
 #![feature(backtrace)]

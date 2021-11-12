@@ -1,15 +1,18 @@
 use crate::CubeError;
-use async_trait::async_trait;
 use std::any::{type_name, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+#[allow(deprecated)]
 use std::raw::TraitObject;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
+use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
 pub struct Injector {
-    services: RwLock<HashMap<String, Arc<RwLock<Option<Arc<dyn DIService>>>>>>,
+    this: Weak<Injector>,
+    init_guards: RwLock<HashMap<String, Arc<Mutex<()>>>>,
+    services: RwLock<HashMap<String, Arc<dyn DIService>>>,
     factories: RwLock<
         HashMap<
             String,
@@ -22,17 +25,11 @@ pub struct Injector {
     >,
 }
 
-#[async_trait]
-pub trait InjectorRef: Send + Sync {
-    async fn get_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> Arc<T>;
-    async fn get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Arc<T>;
-    async fn has_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> bool;
-    async fn has_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> bool;
-}
-
 impl Injector {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {
+        Arc::new_cyclic(|this| Self {
+            this: this.clone(),
+            init_guards: RwLock::new(HashMap::new()),
             services: RwLock::new(HashMap::new()),
             factories: RwLock::new(HashMap::new()),
         })
@@ -68,10 +65,10 @@ impl Injector {
                 })
             }),
         );
-        self.services
+        self.init_guards
             .write()
             .await
-            .insert(name, Arc::new(RwLock::new(None)));
+            .insert(name, Arc::new(Mutex::new(())));
     }
 
     pub async fn register<F>(
@@ -88,81 +85,77 @@ impl Injector {
                 Box::pin(async move { fn_to_move(i.clone()).await })
             }),
         );
+        self.init_guards
+            .write()
+            .await
+            .insert(name.to_string(), Arc::new(Mutex::new(())));
+    }
+}
+
+impl Injector {
+    pub async fn get_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> Arc<T> {
+        if let Some(s) = self.try_get_service(name).await {
+            return s;
+        }
+
+        let pending = self
+            .init_guards
+            .read()
+            .await
+            .get(name)
+            .expect(&format!("Service is not found: {}", name))
+            .clone();
+        // println!("Locking service: {}", name);
+        // TODO cycle depends lead to dead lock here
+        let _l = pending.lock().await;
+
+        if let Some(s) = self.try_get_service(name).await {
+            return s;
+        }
+
+        let factories = self.factories.read().await;
+        let factory = factories
+            .get(name)
+            .expect(&format!("Service not found: {}", name));
+        let service = factory(self.this.upgrade().unwrap()).await;
+        // println!("Setting service: {}", name);
         self.services
             .write()
             .await
-            .insert(name.to_string(), Arc::new(RwLock::new(None)));
-    }
-}
-
-pub async fn get_service<T: ?Sized + Send + Sync + 'static>(
-    injector: &Arc<Injector>,
-    name: &str,
-) -> Arc<T> {
-    if injector
-        .services
-        .read()
-        .await
-        .get(name)
-        .unwrap_or_else(|| panic!("Service is not found: {}", name))
-        .read()
-        .await
-        .is_none()
-    {
-        let service_opt_lock = {
-            let map_lock = injector.services.read().await;
-            map_lock.get(name).unwrap().clone()
-        };
-        // println!("Locking service: {}", name);
-        // TODO cycle depends lead to dead lock here
-        let mut service_opt = service_opt_lock.write().await;
-        if service_opt.is_none() {
-            let factories = injector.factories.read().await;
-            let factory = factories
-                .get(name)
-                .unwrap_or_else(|| panic!("Service not found: {}", name));
-            let service = factory(injector.clone()).await;
-            // println!("Setting service: {}", name);
-            *service_opt = Some(service);
-        }
-    }
-    let map_lock = injector.services.read().await;
-    let opt_lock = map_lock.get(name).unwrap();
-    let arc = opt_lock
-        .read()
-        .await
-        .as_ref()
-        .expect("Unexpected state")
-        .clone();
-    arc.downcast::<T>(arc.clone()).unwrap()
-}
-
-pub async fn get_service_typed<T: ?Sized + Send + Sync + 'static>(
-    injector: &Arc<Injector>,
-) -> Arc<T> {
-    get_service(injector, type_name::<T>()).await
-}
-
-#[async_trait]
-impl InjectorRef for Arc<Injector> {
-    async fn get_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> Arc<T> {
-        get_service(self, name).await
+            .insert(name.to_string(), service.clone());
+        return service.clone().downcast(service).unwrap();
     }
 
-    async fn get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Arc<T> {
-        get_service_typed(self).await
+    pub async fn try_get_service<T: ?Sized + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Option<Arc<T>> {
+        self.services
+            .read()
+            .await
+            .get(name)
+            .map(|s| s.clone().downcast(s.clone()).unwrap())
     }
 
-    async fn has_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> bool {
+    pub async fn get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Arc<T> {
+        self.get_service(type_name::<T>()).await
+    }
+
+    pub async fn try_get_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.try_get_service(type_name::<T>()).await
+    }
+
+    pub async fn has_service<T: ?Sized + Send + Sync + 'static>(&self, name: &str) -> bool {
         self.factories.read().await.contains_key(name)
     }
 
-    async fn has_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> bool {
+    pub async fn has_service_typed<T: ?Sized + Send + Sync + 'static>(&self) -> bool {
         self.factories.read().await.contains_key(type_name::<T>())
     }
 }
 
 pub trait DIService: Send + Sync {
+    #[allow(deprecated)]
     fn downcast_ref(
         &self,
         target: TypeId,
@@ -178,6 +171,7 @@ impl dyn DIService {
     ) -> Result<Arc<T>, CubeError> {
         unsafe {
             let obj = self.downcast_ref(TypeId::of::<T>(), type_name::<T>(), arc)?;
+            #[allow(deprecated)]
             let ptr = *(&obj as *const TraitObject as *const &T);
             Ok(Arc::from_raw(ptr))
         }
@@ -187,6 +181,7 @@ impl dyn DIService {
 #[macro_export]
 macro_rules! di_service (
     ( $ty: ident, [ $( $trait_ty: ident ),* ]) => {
+        #[allow(deprecated)]
         impl $crate::config::injection::DIService for $ty {
             fn downcast_ref(
                 &self,
