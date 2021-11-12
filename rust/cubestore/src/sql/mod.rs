@@ -111,6 +111,7 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
     query_timeout: Duration,
+    create_table_timeout: Duration,
     cache: SqlResultCache,
 }
 
@@ -127,6 +128,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        create_table_timeout: Duration,
         max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
@@ -138,6 +140,7 @@ impl SqlServiceImpl {
             cluster,
             rows_per_chunk,
             query_timeout,
+            create_table_timeout,
             remote_fs,
             cache: SqlResultCache::new(max_cached_queries),
         })
@@ -245,7 +248,14 @@ impl SqlServiceImpl {
             )
             .await?;
 
-        if let Err(e) = self.finalize_external_table(&table, listener).await {
+        let finalize_res = tokio::time::timeout(
+            self.create_table_timeout,
+            self.finalize_external_table(&table, listener),
+        )
+        .await
+        .map_err(|_| CubeError::internal(format!("Timeout during create table {:?}", table)))
+        .flatten();
+        if let Err(e) = finalize_res {
             if let Err(inner) = self.db.drop_table(table.get_id()).await {
                 log::error!(
                     "Drop table ({}) after error failed: {}",
@@ -1384,6 +1394,7 @@ mod tests {
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
+                query_timeout,
                 10_000, // max_cached_queries
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -1434,6 +1445,7 @@ mod tests {
                 Arc::new(MockCluster::new()),
                 remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
                 query_timeout,
                 10_000, // max_cached_queries
             );

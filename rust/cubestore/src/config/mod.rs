@@ -973,6 +973,7 @@ impl Config {
                     i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
+                    Duration::from_secs(c.import_job_timeout() * 2),
                     c.max_cached_queries(),
                 )
             })
