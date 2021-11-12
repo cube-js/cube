@@ -253,7 +253,12 @@ impl SqlServiceImpl {
             self.finalize_external_table(&table, listener),
         )
         .await
-        .map_err(|_| CubeError::internal(format!("Timeout during create table {:?}", table)))
+        .map_err(|_| {
+            CubeError::internal(format!(
+                "Timeout during create table finalization: {:?}",
+                table
+            ))
+        })
         .flatten();
         if let Err(e) = finalize_res {
             if let Err(inner) = self.db.drop_table(table.get_id()).await {
