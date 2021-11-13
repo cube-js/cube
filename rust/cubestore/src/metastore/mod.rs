@@ -609,6 +609,7 @@ struct BatchPipe<'a> {
     db: &'a DB,
     write_batch: WriteBatch,
     events: Vec<MetaStoreEvent>,
+    invalidate_tables_cache: bool,
 }
 
 impl<'a> BatchPipe<'a> {
@@ -617,6 +618,7 @@ impl<'a> BatchPipe<'a> {
             db,
             write_batch: WriteBatch::default(),
             events: Vec::new(),
+            invalidate_tables_cache: false,
         }
     }
 
@@ -632,6 +634,10 @@ impl<'a> BatchPipe<'a> {
         let db = self.db;
         db.write(self.write_batch)?;
         Ok(self.events)
+    }
+
+    fn invalidate_tables_cache(&mut self) {
+        self.invalidate_tables_cache = true;
     }
 }
 
@@ -1843,6 +1849,7 @@ impl RocksMetaStore {
             seq_store: self.seq_store.clone(),
         };
         let db_to_send = db.clone();
+        let cached_tables = self.cached_tables.clone();
         let (spawn_res, events) =
             cube_ext::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
@@ -1855,11 +1862,13 @@ impl RocksMetaStore {
                     },
                     &mut batch,
                 )?;
+                if batch.invalidate_tables_cache {
+                    *cached_tables.lock().unwrap() = None;
+                }
                 let write_result = batch.batch_write_rows()?;
                 Ok((res, write_result))
             })
             .await??;
-        self.invalidate_caches();
 
         mem::drop(db);
         mem::drop(db_span);
@@ -2367,10 +2376,6 @@ impl RocksMetaStore {
         }
         return Ok((activated_row_count, partitions));
     }
-
-    fn invalidate_caches(&self) {
-        *self.cached_tables.lock().unwrap() = None;
-    }
 }
 
 #[async_trait]
@@ -2403,6 +2408,7 @@ impl MetaStore for RocksMetaStore {
         if_not_exists: bool,
     ) -> Result<IdRow<Schema>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let table = SchemaRocksTable::new(db_ref.clone());
             if if_not_exists {
                 let rows = table.get_rows_by_index(&schema_name, &SchemaRocksIndex::Name)?;
@@ -2456,6 +2462,7 @@ impl MetaStore for RocksMetaStore {
         new_schema_name: String,
     ) -> Result<IdRow<Schema>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let table = SchemaRocksTable::new(db_ref.clone());
             let existing_keys =
                 table.get_row_ids_by_index(&old_schema_name, &SchemaRocksIndex::Name)?;
@@ -2478,6 +2485,7 @@ impl MetaStore for RocksMetaStore {
         new_schema_name: String,
     ) -> Result<IdRow<Schema>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let table = SchemaRocksTable::new(db_ref.clone());
 
             let old_schema = table.get_row(schema_id)?.unwrap();
@@ -2492,6 +2500,7 @@ impl MetaStore for RocksMetaStore {
 
     async fn delete_schema(&self, schema_name: String) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let table = SchemaRocksTable::new(db_ref.clone());
             let existing_keys =
                 table.get_row_ids_by_index(&schema_name, &SchemaRocksIndex::Name)?;
@@ -2507,6 +2516,7 @@ impl MetaStore for RocksMetaStore {
 
     async fn delete_schema_by_id(&self, schema_id: u64) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let table = SchemaRocksTable::new(db_ref.clone());
             table.delete(schema_id, batch_pipe)?;
 
@@ -2533,6 +2543,7 @@ impl MetaStore for RocksMetaStore {
         unique_key_column_names: Option<Vec<String>>,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
@@ -2654,6 +2665,7 @@ impl MetaStore for RocksMetaStore {
 
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let rocks_table = TableRocksTable::new(db_ref.clone());
             Ok(rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?)
         })
@@ -2758,6 +2770,7 @@ impl MetaStore for RocksMetaStore {
 
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
             let tables_table = TableRocksTable::new(db_ref.clone());
             let indexes_table = IndexRocksTable::new(db_ref.clone());
             let indexes = indexes_table.get_row_ids_by_index(
