@@ -405,6 +405,11 @@ impl ImportServiceImpl {
             while let Some(bytes) = stream.next().await {
                 file.write_all(bytes?.as_ref()).await?;
             }
+            log::info!(
+                "Import downloaded {} ({} bytes)",
+                location,
+                file.metadata().await?.len()
+            );
             file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
