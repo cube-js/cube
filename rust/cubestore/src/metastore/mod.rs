@@ -758,6 +758,10 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         include_non_ready: bool,
     ) -> Result<Arc<Vec<TablePath>>, CubeError>;
+    async fn not_ready_tables(
+        &self,
+        created_seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Table>>, CubeError>;
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError>;
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
@@ -2718,6 +2722,36 @@ impl MetaStore for RocksMetaStore {
 
                 Ok(tables)
             }
+        })
+        .await
+    }
+
+    async fn not_ready_tables(
+        &self,
+        created_seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Table>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let table_rocks_table = TableRocksTable::new(db_ref);
+            let tables = table_rocks_table.scan_all_rows()?;
+            let mut res = Vec::new();
+            let now = Utc::now();
+            for table in tables {
+                let table = table?;
+                if !table.get_row().is_ready()
+                    && table
+                        .get_row()
+                        .created_at()
+                        .as_ref()
+                        .map(|created_at| {
+                            now.signed_duration_since(created_at.clone()).num_seconds()
+                                >= created_seconds_ago
+                        })
+                        .unwrap_or(false)
+                {
+                    res.push(table);
+                }
+            }
+            Ok(res)
         })
         .await
     }

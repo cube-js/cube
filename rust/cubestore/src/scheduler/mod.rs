@@ -138,6 +138,16 @@ impl SchedulerImpl {
         };
 
         if let Err(e) = warn_long_fut(
+            "Drop not ready tables reconciliation",
+            Duration::from_millis(5000),
+            self.drop_not_ready_tables(),
+        )
+        .await
+        {
+            error!("Error during dropping not ready tables: {}", e);
+        };
+
+        if let Err(e) = warn_long_fut(
             "Remove inactive chunks",
             Duration::from_millis(5000),
             self.remove_inactive_chunks(),
@@ -279,10 +289,19 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    async fn drop_not_ready_tables(&self) -> Result<(), CubeError> {
+        // TODO config
+        let not_ready_tables = self.meta_store.not_ready_tables(1800).await?;
+        for table in not_ready_tables.into_iter() {
+            self.meta_store.drop_table(table.get_id()).await?;
+        }
+        Ok(())
+    }
+
     async fn remove_orphaned_jobs(&self) -> Result<(), CubeError> {
         let orphaned_jobs = self
             .meta_store
-            .get_orphaned_jobs(Duration::from_secs(120))
+            .get_orphaned_jobs(Duration::from_secs(120)) // TODO config
             .await?;
         for job in orphaned_jobs {
             log::info!("Removing orphaned job: {:?}", job);
@@ -337,7 +356,6 @@ impl SchedulerImpl {
                     .await?;
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
-                        // TODO config
                         self.schedule_compaction_if_needed(&partition).await?;
                     } else {
                         self.schedule_repartition(&partition).await?;
