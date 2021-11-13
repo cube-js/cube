@@ -2700,10 +2700,7 @@ impl MetaStore for RocksMetaStore {
         let cache = self.cached_tables.clone();
         self.read_operation(move |db_ref| {
             if include_non_ready {
-                let tables = TableRocksTable::new(db_ref.clone())
-                    .all_rows()?
-                    .into_iter()
-                    .collect::<Vec<_>>();
+                let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
                 let schemas = SchemaRocksTable::new(db_ref);
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
@@ -2717,11 +2714,15 @@ impl MetaStore for RocksMetaStore {
                 if let Some(t) = cached {
                     return Ok(t);
                 }
-                let tables = TableRocksTable::new(db_ref.clone())
-                    .all_rows()?
-                    .into_iter()
-                    .filter(|t| t.get_row().is_ready())
-                    .collect::<Vec<_>>();
+
+                let table_rocks_table = TableRocksTable::new(db_ref.clone());
+                let mut tables = Vec::new();
+                for t in table_rocks_table.scan_all_rows()? {
+                    let t = t?;
+                    if t.get_row().is_ready() {
+                        tables.push(t);
+                    }
+                }
                 let schemas = SchemaRocksTable::new(db_ref);
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
@@ -3094,30 +3095,33 @@ impl MetaStore for RocksMetaStore {
 
             let mut partitions_with_chunks = HashSet::new();
 
-            let chunks = chunks_table.all_rows()?;
+            let chunks = chunks_table.scan_all_rows()?;
 
-            for chunk in chunks.iter() {
-                partitions_with_chunks.insert(chunk.get_row().get_partition_id());
+            for chunk in chunks {
+                partitions_with_chunks.insert(chunk?.get_row().get_partition_id());
             }
 
-            let orphaned_partitions = partitions_table.all_rows()?.into_iter().filter(|p| {
-                !p.get_row().is_active() && !partitions_with_chunks.contains(&p.get_id())
-            });
+            let orphaned_partitions = partitions_table.scan_all_rows()?;
 
             let mut result = Vec::new();
 
             for partition in orphaned_partitions {
-                if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
-                    // TODO it actually should fail if it isn't found but skip for now due to bug in reconciliation process which led to missing parents
-                    if let Ok(parent_partition) =
-                        partitions_table.get_row_or_not_found(*parent_partition_id)
-                    {
-                        if parent_partition.get_row().get_max_val()
-                            == partition.get_row().get_max_val()
-                            && parent_partition.get_row().get_min_val()
-                                == partition.get_row().get_min_val()
+                let partition = partition?;
+                if !partition.get_row().is_active()
+                    && !partitions_with_chunks.contains(&partition.get_id())
+                {
+                    if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
+                        // TODO it actually should fail if it isn't found but skip for now due to bug in reconciliation process which led to missing parents
+                        if let Ok(parent_partition) =
+                            partitions_table.get_row_or_not_found(*parent_partition_id)
                         {
-                            result.push(partition);
+                            if parent_partition.get_row().get_max_val()
+                                == partition.get_row().get_max_val()
+                                && parent_partition.get_row().get_min_val()
+                                    == partition.get_row().get_min_val()
+                            {
+                                result.push(partition);
+                            }
                         }
                     }
                 }
@@ -3136,25 +3140,26 @@ impl MetaStore for RocksMetaStore {
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
             let now = Utc::now();
-            let partition_ids = chunks_table
-                .all_rows()?
-                .into_iter()
-                .filter(|c| {
-                    c.get_row().active()
-                        && c.get_row()
-                            .created_at()
-                            .as_ref()
-                            .map(|created_at| {
-                                now.signed_duration_since(created_at.clone()).num_seconds()
-                                    >= seconds_ago
-                            })
-                            .unwrap_or(false)
-                })
-                .map(|c| c.get_row().get_partition_id())
-                .unique();
+            let mut partition_ids = HashSet::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().active()
+                    && c.get_row()
+                        .created_at()
+                        .as_ref()
+                        .map(|created_at| {
+                            now.signed_duration_since(created_at.clone()).num_seconds()
+                                >= seconds_ago
+                        })
+                        .unwrap_or(false)
+                {
+                    partition_ids.insert(c.get_row().get_partition_id());
+                }
+            }
 
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let partitions = partition_ids
+                .into_iter()
                 .map(|id| partitions_table.get_row_or_not_found(id))
                 .collect::<Result<Vec<_>, _>>()?;
 
@@ -3569,11 +3574,14 @@ impl MetaStore for RocksMetaStore {
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
-            Ok(table
-                .all_rows()?
-                .into_iter()
-                .filter(|c| !c.get_row().active() && c.get_row().uploaded())
-                .collect())
+            let mut res = Vec::new();
+            for c in table.scan_all_rows()? {
+                let c = c?;
+                if !c.get_row().active() && c.get_row().uploaded() {
+                    res.push(c);
+                }
+            }
+            Ok(res)
         })
         .await
     }
@@ -3581,11 +3589,17 @@ impl MetaStore for RocksMetaStore {
     async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         self.read_operation(move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
-            Ok(table
-                .all_rows()?
-                .into_iter()
-                .filter(|c| !c.get_row().active() && !c.get_row().uploaded())
-                .collect())
+
+            let mut res = Vec::new();
+
+            for c in table.scan_all_rows()? {
+                let c = c?;
+                if !c.get_row().active() && !c.get_row().uploaded() {
+                    res.push(c);
+                }
+            }
+
+            Ok(res)
         })
         .await
     }
