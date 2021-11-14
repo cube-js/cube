@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
+
+
+### Bug Fixes
+
+* **cubestore:** Drop not ready tables 30 minutes after creation to avoid metastore bloating ([e775682](https://github.com/cube-js/cube.js/commit/e775682464402e194be5cf1e22eba6880747644f))
+* **cubestore:** Invalidate tables cache only on table changing operations to reduce write lock contention ([28549b8](https://github.com/cube-js/cube.js/commit/28549b8906a7da446d409a9550d414ea3afe7025))
+* **cubestore:** Replace all_rows access with scans to optimize allocations ([ab985c8](https://github.com/cube-js/cube.js/commit/ab985c89b16e9bb5786be8224d444c58819288d9))
+
+
+
+
+
 ## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
 
 
