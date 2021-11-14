@@ -3,6 +3,11 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 
+use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use datafusion::catalog::catalog::MemoryCatalogProvider;
+use datafusion::catalog::schema::{MemorySchemaProvider, SchemaProvider};
+
+use datafusion::datasource::MemTable;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -20,6 +25,7 @@ use cubeclient::models::{
 use crate::compile::parser::MySqlDialectWithBackTicks;
 use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
+use crate::schema::V1CubeMetaExt;
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
@@ -1167,6 +1173,10 @@ impl QueryPlanner {
             }
         };
 
+        if schema_name.to_lowercase() == "information_schema" {
+            return self.create_df_logical_plan(stmt.clone(), props);
+        }
+
         if schema_name.to_lowercase() != "db" {
             return Err(CompilationError::Unsupported(format!(
                 "Unable to access schema {}",
@@ -1276,7 +1286,8 @@ impl QueryPlanner {
         stmt: ast::Statement,
         props: &QueryPlannerExecutionProps,
     ) -> CompilationResult<QueryPlan> {
-        let mut ctx = ExecutionContext::new();
+        let mut ctx =
+            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(true));
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
@@ -1286,6 +1297,40 @@ impl QueryPlanner {
         ctx.register_udf(create_connection_id_udf(props));
         ctx.register_udf(create_user_udf(props));
         ctx.register_udf(create_current_user_udf(props));
+
+        {
+            let schema_provider = MemorySchemaProvider::new();
+
+            for cube in &self.context.cubes {
+                let mut schema_fields = vec![];
+
+                for column in cube.get_columns() {
+                    let data_type = match column.mysql_type_as_str().as_str() {
+                        "int" => DataType::Int64,
+                        "time" => DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        _ => DataType::Utf8,
+                    };
+
+                    schema_fields.push(Field::new(
+                        column.get_name(),
+                        data_type,
+                        column.mysql_can_be_null(),
+                    ));
+                }
+
+                let schema = Arc::new(Schema::new(schema_fields));
+                let provider = MemTable::try_new(schema.clone(), vec![vec![]]).unwrap();
+
+                schema_provider
+                    .register_table(cube.name.clone(), Arc::new(provider))
+                    .map_err(|err| CubeError::internal(err.to_string()));
+            }
+
+            let catalog_provider = MemoryCatalogProvider::new();
+            catalog_provider.register_schema("db", Arc::new(schema_provider));
+
+            ctx.register_catalog("db", Arc::new(catalog_provider));
+        }
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);
