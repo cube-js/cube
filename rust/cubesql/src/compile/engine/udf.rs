@@ -31,7 +31,7 @@ pub fn create_version_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_db_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
+pub fn create_db_udf(name: String, props: &QueryPlannerExecutionProps) -> ScalarUDF {
     // Due our requirements it's more easy to clone this variable rather then Arc
     let db_state = props.database.clone().unwrap_or("db".to_string());
 
@@ -43,7 +43,7 @@ pub fn create_db_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
     });
 
     create_udf(
-        "database",
+        name.as_str(),
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -60,7 +60,7 @@ pub fn create_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
         if let Some(user) = &state_user {
             builder.append_value(user.clone() + "@127.0.0.1").unwrap();
         } else {
-            builder.append_null();
+            builder.append_null()?;
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -84,7 +84,7 @@ pub fn create_current_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF 
         if let Some(user) = &state_user {
             builder.append_value(user.clone() + "@%").unwrap();
         } else {
-            builder.append_null();
+            builder.append_null()?;
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
