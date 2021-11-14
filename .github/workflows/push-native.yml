@@ -36,7 +36,7 @@ jobs:
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
       - name: Clippy Native
-        run: cd rust/cubesql && cargo clippy -- -D warnings
+        run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
       # CubeSQL is not ready for Clippy
       #- name: Clippy CubeSQL
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
