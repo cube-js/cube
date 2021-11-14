@@ -103,7 +103,7 @@ impl Injector {
             .read()
             .await
             .get(name)
-            .expect(&format!("Service is not found: {}", name))
+            .unwrap_or_else(|| panic!("Service is not found: {}", name))
             .clone();
         // println!("Locking service: {}", name);
         // TODO cycle depends lead to dead lock here
@@ -116,14 +116,14 @@ impl Injector {
         let factories = self.factories.read().await;
         let factory = factories
             .get(name)
-            .expect(&format!("Service not found: {}", name));
+            .unwrap_or_else(|| panic!("Service not found: {}", name));
         let service = factory(self.this.upgrade().unwrap()).await;
         // println!("Setting service: {}", name);
         self.services
             .write()
             .await
             .insert(name.to_string(), service.clone());
-        return service.clone().downcast(service).unwrap();
+        service.clone().downcast(service).unwrap()
     }
 
     pub async fn try_get_service<T: ?Sized + Send + Sync + 'static>(
