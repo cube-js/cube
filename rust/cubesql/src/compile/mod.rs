@@ -1293,7 +1293,8 @@ impl QueryPlanner {
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
 
         ctx.register_udf(create_version_udf());
-        ctx.register_udf(create_db_udf(props));
+        ctx.register_udf(create_db_udf("database".to_string(), props));
+        ctx.register_udf(create_db_udf("schema".to_string(), props));
         ctx.register_udf(create_connection_id_udf(props));
         ctx.register_udf(create_user_udf(props));
         ctx.register_udf(create_current_user_udf(props));
@@ -1323,7 +1324,13 @@ impl QueryPlanner {
 
                 schema_provider
                     .register_table(cube.name.clone(), Arc::new(provider))
-                    .map_err(|err| CubeError::internal(err.to_string()));
+                    .map_err(|err| {
+                        CompilationError::Internal(format!(
+                            "Unable to register table provider for {}: {}",
+                            cube.name.clone(),
+                            err
+                        ))
+                    })?;
             }
 
             let catalog_provider = MemoryCatalogProvider::new();
