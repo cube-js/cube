@@ -133,8 +133,10 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     let services = interface.services.clone();
     // @todo Await without runtime?
-    #[warn(unused_must_use)]
-    services.stop_processing_loops();
+    #[allow(unused_must_use)]
+    {
+        services.stop_processing_loops();
+    }
 
     // @todo How to stop tokio runtime?
 

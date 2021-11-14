@@ -6,7 +6,6 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
-use datafusion::arrow::datatypes::ToByteSlice;
 use datafusion::execution::dataframe_impl::DataFrameImpl;
 use datafusion::prelude::DataFrame as DFDataFrame;
 

@@ -25,7 +25,7 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::{AsyncMysqlShim, ColumnType};
+use msql_srv::ColumnType;
 
 use self::builder::*;
 use self::context::*;
@@ -664,7 +664,6 @@ fn optimize_where_inner_filter(
 
                 None
             }
-            _ => Some(tree),
         },
         _ => Some(tree),
     }
@@ -1095,7 +1094,7 @@ impl QueryPlanner {
                 return self.show_variable_to_plan(variable, props);
             }
             // Proxy some queries to DF
-            ast::Statement::ShowColumns { .. } | ast::Statement::ShowVariable { .. } => {
+            ast::Statement::ShowColumns { .. } => {
                 return self.create_df_logical_plan(stmt.clone(), props);
             }
             _ => {

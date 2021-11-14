@@ -67,7 +67,7 @@ impl SqlAuthService for NodeBridgeAuthService {
 
         Ok(AuthContext {
             password: response.password,
-            access_token: user.unwrap_or("fake".to_string()),
+            access_token: user.unwrap_or_else(|| "fake".to_string()),
             base_path: "fake".to_string(),
         })
     }

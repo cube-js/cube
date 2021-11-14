@@ -1,7 +1,7 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::config::injection::{DIService, Injector, InjectorRef};
+use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::schema::{SchemaService, SchemaServiceDefaultImpl};

@@ -49,6 +49,7 @@ impl JsAsyncChannel {
         Self { callback }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_object<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsObject> {
         let obj = cx.empty_object();
         // Pass JsAsyncChannel as this, because JsFunction cannot use closure (fn with move)

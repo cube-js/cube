@@ -5,9 +5,6 @@ on:
     paths:
       - '.github/workflows/push-native.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
       - 'rust/cubesql/**'
       - 'rust/cubeclient/**'
     branches:
@@ -16,14 +13,36 @@ on:
     paths:
       - '.github/workflows/push-native.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
       - 'rust/cubesql/**'
       - 'rust/cubeclient/**'
 
 jobs:
+  precheck:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 20
+    name: Check fmt/clippy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt, clippy
+      - name: Lint CubeSQL
+        run: cd rust/cubesql && cargo fmt --all -- --check
+      - name: Lint Native
+        run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
+      - name: Clippy Native
+        run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
+      # CubeSQL is not ready for Clippy
+      #- name: Clippy CubeSQL
+      #  run: cd rust/cubesql && cargo clippy -- -D warnings
+
   native_linux:
+    needs: [precheck]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
@@ -66,6 +85,7 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
 
   native:
+    needs: [precheck]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
