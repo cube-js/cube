@@ -53,10 +53,8 @@ options][link-config].
 | `CUBEJS_EXT_DB_USER`                 | The username used to connect to the external pre-aggregations database                                                                                                           | A valid database username                                   |
 | `CUBEJS_TOPIC_NAME`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                             | A valid topic name                                          |
 
-[ref-config-sched-refresh-timer]:
-  /config#scheduled-refresh-timer
-[ref-config-preagg-schema-name]:
-  /config#pre-aggregations-schema
+[ref-config-sched-refresh-timer]: /config#scheduled-refresh-timer
+[ref-config-preagg-schema-name]: /config#pre-aggregations-schema
 [gh-ioredis]: https://github.com/luin/ioredis
 [gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -166,17 +164,18 @@ databases [in this guide][link-connecting-to-db].
 
 ### <--{"id" : "Cube Store"}--> Cloud Storage
 
-| Environment variable              | Description                                                                                             | Possible Values                                                                         |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `CUBESTORE_AWS_ACCESS_KEY_ID`     | The Access Key ID for AWS. Required when using AWS S3                                                   | [A valid AWS Access Key ID][link-aws-creds]                                             |
-| `CUBESTORE_AWS_SECRET_ACCESS_KEY` | The Secret Access Key for AWS. Required when using AWS S3                                               | [A valid AWS Secret Access Key][link-aws-creds]                                         |
-| `CUBESTORE_S3_BUCKET`             | The name of a bucket in AWS S3. Required when using AWS S3                                              | A valid bucket name in the AWS account                                                  |
-| `CUBESTORE_S3_REGION`             | The region of a bucket in AWS S3. Required when using AWS S3                                            | [A valid AWS region][link-aws-regions]                                                  |
-| `CUBESTORE_S3_SUB_PATH`           | The path in a AWS S3 bucket to store pre-aggregations. Optional                                         | -                                                                                       |
-| `CUBESTORE_GCP_CREDENTIALS`       | A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage | [A valid Google BigQuery JSON key file encoded as a Base64 string][link-gcp-creds-json] |
-| `CUBESTORE_GCP_KEY_FILE`          | The path to a JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage    | [A valid Google Cloud JSON key file][link-gcp-creds-json]                               |
-| `CUBESTORE_GCS_BUCKET`            | The name of a bucket in GCS. Required when using GCS                                                    | A valid bucket name in the Google Cloud account                                         |
-| `CUBESTORE_GCS_SUB_PATH`          | The path in a GCS bucket to store pre-aggregations. Optional                                            | -                                                                                       |
+| Environment variable                     | Description                                                                                                                             | Possible Values                                                                         |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `CUBESTORE_AWS_ACCESS_KEY_ID`            | The Access Key ID for AWS. Required when using AWS S3                                                                                   | [A valid AWS Access Key ID][link-aws-creds]                                             |
+| `CUBESTORE_AWS_SECRET_ACCESS_KEY`        | The Secret Access Key for AWS. Required when using AWS S3                                                                               | [A valid AWS Secret Access Key][link-aws-creds]                                         |
+| `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS` | The number of minutes after which Cube Store should refresh AWS credentials. Required when using an AWS instance role. Default is `180` | A valid number in minutes                                                               |
+| `CUBESTORE_S3_BUCKET`                    | The name of a bucket in AWS S3. Required when using AWS S3                                                                              | A valid bucket name in the AWS account                                                  |
+| `CUBESTORE_S3_REGION`                    | The region of a bucket in AWS S3. Required when using AWS S3                                                                            | [A valid AWS region][link-aws-regions]                                                  |
+| `CUBESTORE_S3_SUB_PATH`                  | The path in a AWS S3 bucket to store pre-aggregations. Optional                                                                         | -                                                                                       |
+| `CUBESTORE_GCP_CREDENTIALS`              | A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage                                 | [A valid Google BigQuery JSON key file encoded as a Base64 string][link-gcp-creds-json] |
+| `CUBESTORE_GCP_KEY_FILE`                 | The path to a JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage                                    | [A valid Google Cloud JSON key file][link-gcp-creds-json]                               |
+| `CUBESTORE_GCS_BUCKET`                   | The name of a bucket in GCS. Required when using GCS                                                                                    | A valid bucket name in the Google Cloud account                                         |
+| `CUBESTORE_GCS_SUB_PATH`                 | The path in a GCS bucket to store pre-aggregations. Optional                                                                            | -                                                                                       |
 
 [link-aws-creds]:
   https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys

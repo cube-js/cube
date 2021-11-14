@@ -267,15 +267,23 @@ Refresh Worker. [See here for more details][ref-prod-list-refresh].
 
 </InfoBox>
 
-Cube supports three different strategies for building pre-aggregations.
-To see which strategies your database supports, please refer to it's individual
-page from [Connecting to the Database][ref-config-db].
+Cube supports three different strategies for building pre-aggregations. To see
+which strategies your database supports, please refer to its individual page
+from [Connecting to the Database][ref-config-db].
 
 ### Simple
 
-By default, Cube.js will use the source database as a temporary staging area for
-writing pre-aggregations to determine column types. The data is loaded back into
-memory before writing them to Cube Store (or an external database).
+When using the simple strategy, Cube will use the source database as a temporary
+staging area for writing pre-aggregations to determine column types. The data is
+loaded back into memory before writing them to Cube Store (or an external
+database).
+
+<InfoBox>
+
+For larger datasets, we strongly recommend using the [Batching][self-batching]
+or [Export Bucket][self-export-bucket] strategies instead.
+
+</InfoBox>
 
 <div style="text-align: center">
   <img
@@ -285,9 +293,6 @@ memory before writing them to Cube Store (or an external database).
     width="100%"
   />
 </div>
-
-If the dataset is large (more than 100k rows), then Cube.js can face issues when
-the Node runtime runs out of memory.
 
 ### Batching
 
@@ -360,4 +365,8 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-schema-ref-preaggs-sched-refresh]:
   /schema/reference/pre-aggregations#scheduled-refresh
 [ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
+
+[self-batching]: #batching
+[self-export-bucket]: #export-bucket
+
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

@@ -707,7 +707,7 @@ impl Config {
         if clean_remote {
             let remote_files = remote_fs.list("").await.unwrap();
             for file in remote_files {
-                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+                let _ = remote_fs.delete_file(file.as_str()).await;
             }
         }
     }
@@ -973,6 +973,7 @@ impl Config {
                     i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
+                    Duration::from_secs(c.import_job_timeout() * 2),
                     c.max_cached_queries(),
                 )
             })

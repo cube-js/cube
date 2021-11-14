@@ -1,5 +1,4 @@
 use crate::util::decimal::Decimal;
-use crate::util::ordfloat::OrdF64;
 
 use arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
@@ -9,6 +8,7 @@ use arrow::array::{
 use arrow::datatypes::{DataType, TimeUnit};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
+use datafusion::cube_ext::ordfloat::OrdF64;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;

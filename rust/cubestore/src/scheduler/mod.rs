@@ -1,10 +1,12 @@
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
+use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
+use crate::util::time_span::warn_long_fut;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use chrono::Utc;
@@ -115,16 +117,154 @@ impl SchedulerImpl {
     }
 
     pub async fn reconcile(&self) -> Result<(), CubeError> {
-        let orphaned_jobs = self
-            .meta_store
-            .get_orphaned_jobs(Duration::from_secs(120))
-            .await?;
-        for job in orphaned_jobs {
-            log::info!("Removing orphaned job: {:?}", job);
-            self.meta_store.delete_job(job.get_id()).await?;
+        if let Err(e) = warn_long_fut(
+            "Removing orphaned jobs",
+            Duration::from_millis(5000),
+            self.remove_orphaned_jobs(),
+        )
+        .await
+        {
+            error!("Error removing orphaned jobs: {}", e);
         }
+
+        if let Err(e) = warn_long_fut(
+            "Table import reconciliation",
+            Duration::from_millis(5000),
+            self.reconcile_table_imports(),
+        )
+        .await
+        {
+            error!("Error reconciling table imports: {}", e);
+        };
+
+        if let Err(e) = warn_long_fut(
+            "Drop not ready tables reconciliation",
+            Duration::from_millis(5000),
+            self.drop_not_ready_tables(),
+        )
+        .await
+        {
+            error!("Error during dropping not ready tables: {}", e);
+        };
+
+        if let Err(e) = warn_long_fut(
+            "Remove inactive chunks",
+            Duration::from_millis(5000),
+            self.remove_inactive_chunks(),
+        )
+        .await
+        {
+            error!("Error removing inactive chunks: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
+            "Remove inactive not uploaded chunks",
+            Duration::from_millis(5000),
+            self.remove_inactive_not_uploaded_chunks(),
+        )
+        .await
+        {
+            error!("Error removing inactive not uploaded chunks: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
+            "Scheduling compactions",
+            Duration::from_millis(5000),
+            self.schedule_all_pending_compactions(),
+        )
+        .await
+        {
+            error!("Error scheduling partitions compaction: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
+            "Scheduling repartition",
+            Duration::from_millis(5000),
+            self.schedule_all_pending_repartitions(),
+        )
+        .await
+        {
+            error!("Error scheduling repartition: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
+            "Delete middle man partitions",
+            Duration::from_millis(5000),
+            self.delete_middle_man_partitions(),
+        )
+        .await
+        {
+            error!("Error deleting middle man partitions: {}", e);
+        }
+
+        Ok(())
+    }
+
+    async fn schedule_all_pending_repartitions(&self) -> Result<(), CubeError> {
+        let all_inactive_partitions_to_repartition = self
+            .meta_store
+            .all_inactive_partitions_to_repartition()
+            .await?;
+
+        for partition in all_inactive_partitions_to_repartition.iter() {
+            self.schedule_repartition(&partition).await?;
+        }
+        Ok(())
+    }
+
+    async fn delete_middle_man_partitions(&self) -> Result<(), CubeError> {
+        let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
+
+        for partition in all_inactive_partitions.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender.send(GCTimedTask(
+                deadline,
+                GCTask::DeleteMiddleManPartition(partition.get_id()),
+            ))?;
+        }
+        Ok(())
+    }
+
+    async fn schedule_all_pending_compactions(&self) -> Result<(), CubeError> {
+        let partition_compaction_candidates_id = self
+            .meta_store
+            // TODO config
+            .get_partitions_with_chunks_created_seconds_ago(60)
+            .await?;
+
+        for p in partition_compaction_candidates_id {
+            self.schedule_compaction_if_needed(&p).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_inactive_not_uploaded_chunks(&self) -> Result<(), CubeError> {
+        let all_inactive_not_uploaded_chunks =
+            self.meta_store.all_inactive_not_uploaded_chunks().await?;
+
+        for chunk in all_inactive_not_uploaded_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+        Ok(())
+    }
+
+    async fn remove_inactive_chunks(&self) -> Result<(), CubeError> {
+        // TODO we can do this reconciliation more rarely
+        let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
+
+        for chunk in all_inactive_chunks.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            self.gc_sender
+                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+        }
+        Ok(())
+    }
+
+    async fn reconcile_table_imports(&self) -> Result<(), CubeError> {
         // Using get_tables_with_path due to it's cached
-        let tables = self.meta_store.get_tables_with_path().await?;
+        let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
             if table.table.get_row().is_ready() {
                 if let Some(locations) = table.table.get_row().locations() {
@@ -146,54 +286,27 @@ impl SchedulerImpl {
                 }
             }
         }
+        Ok(())
+    }
 
-        // TODO we can do this reconciliation more rarely
-        let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
-
-        for chunk in all_inactive_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-            self.gc_sender
-                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
+    async fn drop_not_ready_tables(&self) -> Result<(), CubeError> {
+        // TODO config
+        let not_ready_tables = self.meta_store.not_ready_tables(1800).await?;
+        for table in not_ready_tables.into_iter() {
+            self.meta_store.drop_table(table.get_id()).await?;
         }
+        Ok(())
+    }
 
-        let all_inactive_not_uploaded_chunks =
-            self.meta_store.all_inactive_not_uploaded_chunks().await?;
-
-        for chunk in all_inactive_not_uploaded_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_sender
-                .send(GCTimedTask(deadline, GCTask::DeleteChunk(chunk.get_id())))?;
-        }
-
-        let all_inactive_partitions_to_repartition = self
+    async fn remove_orphaned_jobs(&self) -> Result<(), CubeError> {
+        let orphaned_jobs = self
             .meta_store
-            .all_inactive_partitions_to_repartition()
+            .get_orphaned_jobs(Duration::from_secs(120)) // TODO config
             .await?;
-
-        for partition in all_inactive_partitions_to_repartition.iter() {
-            self.schedule_repartition_if_needed(&partition).await?;
+        for job in orphaned_jobs {
+            log::info!("Removing orphaned job: {:?}", job);
+            self.meta_store.delete_job(job.get_id()).await?;
         }
-
-        let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
-
-        for partition in all_inactive_partitions.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_sender.send(GCTimedTask(
-                deadline,
-                GCTask::DeleteMiddleManPartition(partition.get_id()),
-            ))?;
-        }
-
-        let partition_compaction_candidates_id = self
-            .meta_store
-            // TODO config
-            .get_partitions_with_chunks_created_seconds_ago(60)
-            .await?;
-
-        for p in partition_compaction_candidates_id {
-            self.schedule_compaction_if_needed(&p).await?;
-        }
-
         Ok(())
     }
 
@@ -243,7 +356,6 @@ impl SchedulerImpl {
                     .await?;
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
-                        // TODO config
                         self.schedule_compaction_if_needed(&partition).await?;
                     } else {
                         self.schedule_repartition(&partition).await?;
@@ -281,7 +393,10 @@ impl SchedulerImpl {
                     .await?;
             } else if chunk.get_row().uploaded() {
                 self.remote_fs
-                    .delete_file(ChunkStore::chunk_remote_path(chunk.get_id()).as_str())
+                    .delete_file(
+                        ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix())
+                            .as_str(),
+                    )
                     .await?
             }
         }
@@ -298,12 +413,12 @@ impl SchedulerImpl {
             if !partition.get_row().is_active() {
                 self.schedule_repartition_if_needed(&partition).await?;
                 if partition.get_row().main_table_row_count() > 0 {
-                    if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                        let deadline =
-                            Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-                        self.gc_sender
-                            .send(GCTimedTask(deadline, GCTask::RemoveRemoteFile(file_name)))?;
-                    }
+                    let file_name =
+                        partition_file_name(partition.get_id(), partition.get_row().suffix());
+                    let deadline =
+                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    self.gc_sender
+                        .send(GCTimedTask(deadline, GCTask::RemoveRemoteFile(file_name)))?;
                 }
             }
         }
@@ -393,20 +508,7 @@ impl SchedulerImpl {
     }
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
-        let node = self.cluster.node_name_by_partition(p);
-        let job = self
-            .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, p.get_id()),
-                JobType::Repartition,
-                node.to_string(),
-            ))
-            .await?;
-        if job.is_some() {
-            // TODO queue failover
-            self.cluster.notify_job_runner(node).await?;
-        }
-        Ok(())
+        self.cluster.schedule_repartition(p).await
     }
 
     async fn schedule_table_import(

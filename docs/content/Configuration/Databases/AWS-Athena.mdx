@@ -35,6 +35,16 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 | `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
 | `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+used in pre-aggregations when using AWS Athena as a source database. To learn
+more about AWS Athena's support for approximate aggregate functions, [click
+here][aws-athena-docs-approx-agg-fns].
+
 ## Pre-Aggregation Build Strategies
 
 <InfoBox>
@@ -81,6 +91,10 @@ Athena connections are made over HTTPS.
   https://docs.aws.amazon.com/athena/latest/ug/querying.html
 [aws-docs-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[aws-athena-docs-approx-agg-fns]:
+  https://prestodb.io/docs/0.217/functions/aggregate.html#approximate-aggregate-functions
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-simple]: #simple

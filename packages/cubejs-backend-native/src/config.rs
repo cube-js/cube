@@ -17,12 +17,16 @@ impl NodeConfig {
         self.config.config_obj()
     }
 
-    pub fn new(port: Option<u16>) -> NodeConfig {
+    pub fn new(port: Option<u16>, nonce: Option<String>) -> NodeConfig {
         let config = Config::default();
         let config = config.update_config(|mut c| {
             if let Some(p) = port {
                 c.bind_address = Some(format!("0.0.0.0:{}", p));
             };
+
+            if let Some(n) = nonce {
+                c.nonce = Some(n.as_bytes().to_vec());
+            }
 
             c
         });

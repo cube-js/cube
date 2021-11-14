@@ -293,31 +293,32 @@ impl LocalDirRemoteFs {
         if fs::metadata(dir.clone()).await.is_err() {
             return Ok(vec![]);
         }
-        let mut dir = fs::read_dir(dir).await?;
-        while let Some(file) = dir.next_entry().await? {
-            if file.file_type().await?.is_dir() {
-                result.append(
-                    &mut Self::list_recursive_boxed(
-                        remote_dir.clone(),
-                        remote_prefix.to_string(),
-                        file.path(),
-                    )
-                    .await?,
-                );
-            } else {
-                let relative_name = file
-                    .path()
-                    .to_str()
-                    .unwrap()
-                    .to_string()
-                    .replace(&remote_dir.to_str().unwrap().to_string(), "")
-                    .trim_start_matches("/")
-                    .to_string();
-                if relative_name.starts_with(&remote_prefix) {
-                    result.push(RemoteFile {
-                        remote_path: relative_name.to_string(),
-                        updated: DateTime::from(file.metadata().await?.modified()?),
-                    });
+        if let Ok(mut dir) = fs::read_dir(dir).await {
+            while let Ok(Some(file)) = dir.next_entry().await {
+                if let Ok(true) = file.file_type().await.map(|r| r.is_dir()) {
+                    result.append(
+                        &mut Self::list_recursive_boxed(
+                            remote_dir.clone(),
+                            remote_prefix.to_string(),
+                            file.path(),
+                        )
+                        .await?,
+                    );
+                } else if let Ok(metadata) = file.metadata().await {
+                    let relative_name = file
+                        .path()
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                        .replace(&remote_dir.to_str().unwrap().to_string(), "")
+                        .trim_start_matches("/")
+                        .to_string();
+                    if relative_name.starts_with(&remote_prefix) {
+                        result.push(RemoteFile {
+                            remote_path: relative_name.to_string(),
+                            updated: DateTime::from(metadata.modified()?),
+                        });
+                    }
                 }
             }
         }

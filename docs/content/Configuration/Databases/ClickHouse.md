@@ -34,6 +34,14 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`                | The password used to connect to the database            | A valid database password |    ✅    |
 | `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not | `true`, `false`           |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can not be
+used in pre-aggregations when using ClickHouse as a source database.
+
 ## Pre-Aggregation Build Strategies
 
 <InfoBox>
@@ -80,4 +88,6 @@ You can connect to a ClickHouse database when your user's permissions are
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching

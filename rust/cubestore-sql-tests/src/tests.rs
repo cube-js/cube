@@ -95,6 +95,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
+        t(
+            "planning_join_with_partitioned_index",
+            planning_join_with_partitioned_index,
+        ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
@@ -121,6 +125,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("float_order", float_order),
         t("date_add", date_add),
         t("now", now),
         t("dump", dump),
@@ -2632,6 +2637,54 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         );
 }
 
+async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.by_customer(customer_id int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Customers(customer_id int, customer_name text) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT order_id, customer_name \
+                 FROM s.Orders `o`\
+                 JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "ClusterSend, partitions: [[1, 3]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Worker\
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty",
+    );
+}
+
 async fn topk_query(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3730,6 +3783,36 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
+
+/// Ensure DataFusion code consistently uses IEEE754 total order for comparing floats.
+async fn float_order(s: Box<dyn SqlClient>) {
+    s.exec_query("CREATE SCHEMA s").await.unwrap();
+    s.exec_query("CREATE TABLE s.data(f float, i int)")
+        .await
+        .unwrap();
+    s.exec_query("INSERT INTO s.data(f, i) VALUES (0., -1), (-0., 1), (-0., 2), (0., -2)")
+        .await
+        .unwrap();
+
+    // Sorting one and multiple columns use different code paths in DataFusion. Test both.
+    let r = s
+        .exec_query("SELECT f FROM s.data ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[-0., -0., 0., 0.]));
+    let r = s
+        .exec_query("SELECT f, i FROM s.data ORDER BY f, i")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1), (-0., 2), (0., -2), (0., -1)]));
+
+    // DataFusion compares grouping keys with a separate code path.
+    let r = s
+        .exec_query("SELECT f, min(i), max(i) FROM s.data GROUP BY f ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1, 2), (0., -2, -1)]));
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {

@@ -368,8 +368,8 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 Filters can contain `or` and `and` logical operators. Logical operators have
 only one of the following properties:
 
-- `or` An array with two or more filters or other logical operators
-- `and` An array with two or more filters or other logical operators
+- `or` An array with one or more filters or other logical operators
+- `and` An array with one or more filters or other logical operators
 
 ```js
 {

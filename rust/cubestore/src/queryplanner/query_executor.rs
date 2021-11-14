@@ -709,7 +709,7 @@ impl ClusterSendExec {
         }
     }
 
-    pub fn distribute_to_workers(
+    pub(crate) fn distribute_to_workers(
         config: &dyn ConfigObj,
         snapshots: &[Vec<IndexSnapshot>],
         tree: &HashMap<u64, MultiPartition>,
@@ -766,13 +766,17 @@ impl ClusterSendExec {
                 has_children.insert(p);
             }
         }
+        // Ensure stable output order.
+        for parts in multi_partitions.values_mut() {
+            parts.sort_unstable_by_key(|p| p.get_id());
+        }
+
         // Append partitions from ancestors to leaves.
         let mut leaves = HashMap::new();
         for (m, parts) in multi_partitions.iter_mut() {
             if !has_children.contains(m) {
-                continue;
+                leaves.insert(*m, take(parts));
             }
-            leaves.insert(*m, take(parts));
         }
 
         for (m, parts) in leaves.iter_mut() {
@@ -785,14 +789,10 @@ impl ClusterSendExec {
             }
         }
 
-        let mut r = Vec::new();
-        for (m, parts) in multi_partitions {
-            if has_children.contains(&m) {
-                continue;
-            }
-            r.push(parts)
-        }
-        r
+        // Ensure stable output order.
+        let mut ps: Vec<_> = leaves.into_values().collect();
+        ps.sort_unstable_by_key(|ps| ps[0].get_id());
+        ps
     }
 
     fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {

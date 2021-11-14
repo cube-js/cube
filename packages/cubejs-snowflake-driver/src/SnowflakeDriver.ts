@@ -233,7 +233,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.query('SELECT 1 as number');
+    const connection = snowflake.createConnection(this.config);
+    await new Promise(
+      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...rest } = this.config;
+    if (!connection.isUp()) {
+      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+    }
+    await new Promise(
+      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
   }
 
   protected async initConnection() {

@@ -447,6 +447,7 @@ dependencies = [
  "msql-srv",
  "mysql_common 0.26.0",
  "nanoid",
+ "rand 0.8.4",
  "regex",
  "reqwest",
  "serde",

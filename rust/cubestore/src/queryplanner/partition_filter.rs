@@ -590,11 +590,10 @@ mod tests {
 
         assert_eq!(
             extract("a NOT IN (NULL)").min_max,
-            vec![] // TODO: below is expected result, but the parser never produces negated `in list`.
-                   // vec![MinMaxCondition {
-                   //     min: vec![Some(TableValue::Int(i64::min_value()))],
-                   //     max: vec![None],
-                   // }]
+            vec![MinMaxCondition {
+                min: vec![Some(TableValue::Int(i64::min_value()))],
+                max: vec![None],
+            }]
         );
 
         // Parentheses do not change anything. Note that parentheses are removed by the parser.
