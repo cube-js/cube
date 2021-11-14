@@ -74,6 +74,18 @@ impl Backend {
             _ => false,
         };
 
+        if query_lower.eq("show variables like 'aurora\\_version'") {
+            return Ok(Arc::new(dataframe::DataFrame::new(
+                vec![
+                    dataframe::Column::new(
+                        "Variable_name".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                    ),
+                    dataframe::Column::new("Value".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                ],
+                vec![],
+            )));
+        }
         if query_lower.eq("show variables like 'sql_mode'") {
             return Ok(
                 Arc::new(
@@ -592,6 +604,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
         let passwd = ctx.password.clone().map(|p| p.as_bytes().to_vec());
 
+        self.props.set_user(user.clone());
         self.context = Some(ctx);
 
         Ok(passwd)
@@ -671,7 +684,7 @@ impl ProcessingLoop for MySqlServer {
                     Backend {
                         auth,
                         schema,
-                        props: QueryPlannerExecutionProps::new(connection_id, None),
+                        props: QueryPlannerExecutionProps::new(connection_id, None, None),
                         context: None,
                         nonce,
                     },

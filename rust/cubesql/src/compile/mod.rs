@@ -30,7 +30,10 @@ use msql_srv::ColumnType;
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
-use self::engine::udf::{create_connection_id_udf, create_db_udf, create_version_udf};
+use self::engine::udf::{
+    create_connection_id_udf, create_current_user_udf, create_db_udf, create_user_udf,
+    create_version_udf,
+};
 
 pub mod builder;
 pub mod context;
@@ -1035,15 +1038,21 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 #[derive(Debug)]
 pub struct QueryPlannerExecutionProps {
     connection_id: u32,
+    user: Option<String>,
     database: Option<String>,
 }
 
 impl QueryPlannerExecutionProps {
-    pub fn new(connection_id: u32, database: Option<String>) -> Self {
+    pub fn new(connection_id: u32, user: Option<String>, database: Option<String>) -> Self {
         Self {
             connection_id,
+            user,
             database,
         }
+    }
+
+    pub fn set_user(&mut self, user: Option<String>) {
+        self.user = user;
     }
 }
 
@@ -1241,6 +1250,17 @@ impl QueryPlanner {
                 ],
                 vec![],
             ))))
+        } else if name.eq_ignore_ascii_case("variables like 'aurora\\_version'") {
+            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                vec![
+                    dataframe::Column::new(
+                        "Variable_name".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                    ),
+                    dataframe::Column::new("Value".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
+                ],
+                vec![dataframe::Row::new(vec![])],
+            ))))
         } else {
             self.create_df_logical_plan(
                 ast::Statement::ShowVariable {
@@ -1264,6 +1284,8 @@ impl QueryPlanner {
         ctx.register_udf(create_version_udf());
         ctx.register_udf(create_db_udf(props));
         ctx.register_udf(create_connection_id_udf(props));
+        ctx.register_udf(create_user_udf(props));
+        ctx.register_udf(create_current_user_udf(props));
 
         let state = ctx.state.lock().unwrap().clone();
         let df_query_planner = SqlToRel::new(&state);
@@ -1454,6 +1476,7 @@ mod tests {
             get_test_tenant_ctx(),
             &QueryPlannerExecutionProps {
                 connection_id: 8,
+                user: Some("ovr".to_string()),
                 database: None,
             },
         );
@@ -1922,6 +1945,7 @@ mod tests {
                 get_test_tenant_ctx(),
                 &QueryPlannerExecutionProps {
                     connection_id: 8,
+                    user: Some("ovr".to_string()),
                     database: None,
                 },
             );
