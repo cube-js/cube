@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
     /// Inclusive lower bound.
     pub start: Option<Row>,
@@ -768,7 +768,7 @@ impl SerializedPlan {
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
                 if let LogicalPlan::TableScan { table_name, .. } = plan {
                     let name_split = table_name.split(".").collect::<Vec<_>>();
-                    if name_split[0].to_string() != "information_schema" {
+                    if name_split[0] != "information_schema" && name_split[0] != "system" {
                         self.seen_data_scans = true;
                         return Ok(false);
                     }

@@ -107,4 +107,10 @@ export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressRespon
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
 export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void> | void;
 
+export type CheckSQLAuthSuccessResponse = {
+  password: string | null,
+  securityContext?: any
+};
+export type CheckSQLAuthFn = (ctx: any, user: string | null) => Promise<CheckSQLAuthSuccessResponse> | CheckSQLAuthSuccessResponse;
+
 export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension> | RequestExtension;

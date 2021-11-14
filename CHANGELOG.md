@@ -3,6 +3,86 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+
+### Bug Fixes
+
+* **cubestore:** fix float comparisons causing unsorted data in merges ([c5b5d2c](https://github.com/cube-js/cube.js/commit/c5b5d2c2936f8974cbea6fe083ba38ad6caed793))
+* **cubestore:** Timeout for create table finalization ([d715345](https://github.com/cube-js/cube.js/commit/d7153456a7c2e6d5cae035d83ea55ba488455cb7))
+* JSON.stringify schema version instead of calling .toString() to simplify usage with objects ([50a191e](https://github.com/cube-js/cube.js/commit/50a191ecbc9df970ccb44126f5ad743bda0868e0))
+* **cubestore:** Do not fail `swap_chunks` with assert -- allow to gracefully capture error ([8c8b6eb](https://github.com/cube-js/cube.js/commit/8c8b6ebe328c609ba782495415d2ff3562fe31f8))
+* **cubestore:** Do not fail on repartition of empty chunks ([41b3054](https://github.com/cube-js/cube.js/commit/41b30549b9c3ec2cca0899f1f778c8334168b94b))
+* **cubestore:** speed up HLL++ merges, up to 180x in some cases ([24ecbc3](https://github.com/cube-js/cube.js/commit/24ecbc38462071fa0acb465261471e868bf6e1c4))
+* **cubestore:** system.tables can affect table visibility cache by including non ready tables. Ignore delete middle man reconciliation errors. ([dce711f](https://github.com/cube-js/cube.js/commit/dce711ff73460ee8ef9893ef4e6cc17273f55f7b))
+
+
+### Features
+
+* Introduce checkSqlAuth (auth hook for SQL API) ([3191b73](https://github.com/cube-js/cube.js/commit/3191b73816cd63d242349041c54a7037e9027c1a))
+
+
+
+
+
+## [0.28.54](https://github.com/cube-js/cube.js/compare/v0.28.53...v0.28.54) (2021-11-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Do not trigger cluster start on test connection ([3bb2d8f](https://github.com/cube-js/cube.js/commit/3bb2d8f466987402a9af6e5c0a7e6667846b1d19))
+* **cubestore:** Introduce file suffixes to avoid parquet write clashes in case of meta store recovery ([#3639](https://github.com/cube-js/cube.js/issues/3639)) ([4d01e8b](https://github.com/cube-js/cube.js/commit/4d01e8b99b9cc5496d3e6f587b3502efe0fc4584))
+* **cubestore:** Row with id is not found for PartitionRocksTable. Repartition not active partitions on reconcile. Do not drop orphaned jobs that weren't scheduled. Repartition only limited amount of rows during single repartition job. ([#3636](https://github.com/cube-js/cube.js/issues/3636)) ([55bbc60](https://github.com/cube-js/cube.js/commit/55bbc606ff0a013917731ec939cfda5927413925))
+
+
+### Features
+
+* **cubestore:** System tables and commands for debugging ([#3638](https://github.com/cube-js/cube.js/issues/3638)) ([22650a1](https://github.com/cube-js/cube.js/commit/22650a1f8e5c3bae85c735fbe9f31632610f567f))
+
+
+
+
+
+## [0.28.53](https://github.com/cube-js/cube.js/compare/v0.28.52...v0.28.53) (2021-11-04)
+
+
+### Bug Fixes
+
+* **playground:** displaying boolean values ([76396ea](https://github.com/cube-js/cube.js/commit/76396ea4b28b4c7f72f11a51857955730d2f421f))
+* `TypeError: Cannot read property 'joins' of null` in case of queryRewrite returns empty query ([#3627](https://github.com/cube-js/cube.js/issues/3627)) ([d880d0c](https://github.com/cube-js/cube.js/commit/d880d0ca434e754858cad18815ba34a132950ce2))
+
+
+### Features
+
+* **cubesql:** Real connection_id ([24d9804](https://github.com/cube-js/cube.js/commit/24d98041b4752f15156b9062dad98c801761ab0f))
+* **cubesql:** Specify MySQL version as 8.0.25 in protocol ([eb7e73e](https://github.com/cube-js/cube.js/commit/eb7e73eac5819f8549f51e841f2f4fdc90ba7f32))
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+
+### Bug Fixes
+
+* **client-core:** dayjs global locale conflict ([#3606](https://github.com/cube-js/cube.js/issues/3606)) Thanks @LvtLvt! ([de7471d](https://github.com/cube-js/cube.js/commit/de7471dfecd1c49f2e9554c92307d3f7c5b8eb9a))
+* **cubesql:** MYSQL_TYPE_STRING for Booleans was null ([fcdd8f5](https://github.com/cube-js/cube.js/commit/fcdd8f57c34766f3d9d3827795142474a3489422))
+* Empty data partitioned pre-aggregations are incorrectly handled -- value provided is not in a recognized RFC2822 or ISO format ([9f3acd5](https://github.com/cube-js/cube.js/commit/9f3acd572bcd2421bf8d3581c4c6287b62e77313))
+* packages/cubejs-query-orchestrator/package.json to reduce vulnerabilities ([#3281](https://github.com/cube-js/cube.js/issues/3281)) ([a6a62ea](https://github.com/cube-js/cube.js/commit/a6a62ea5832a13b519ca4455af1f317cf7af64d9))
+
+
+### Features
+
+* **cubeclient:** Granularity is an optional field ([c381570](https://github.com/cube-js/cube.js/commit/c381570b786d27c49deb701c43858cd6e2facf02))
+* **cubesql:** Execute SHOW DATABASES from AST ([cd2b4ac](https://github.com/cube-js/cube.js/commit/cd2b4acac41db5ced6d706c4acc6dcf46f9179ac))
+* **cubesql:** Improve filter pushing (dateRange -> timeDimension) and segment ([8d7ea9b](https://github.com/cube-js/cube.js/commit/8d7ea9b076c26d6576474d6122dbffedeacd6e8e))
+* **cubestore:** partitioned indexes for faster joins ([8ca605f](https://github.com/cube-js/cube.js/commit/8ca605f8cf2e0a2bf6cc08755f74ff4f8c096cb0))
+
+
+
+
+
 ## [0.28.51](https://github.com/cube-js/cube.js/compare/v0.28.50...v0.28.51) (2021-10-30)
 
 

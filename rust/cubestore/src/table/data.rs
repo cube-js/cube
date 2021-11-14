@@ -1,12 +1,12 @@
 use crate::metastore::{Column, ColumnType};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
-use crate::util::ordfloat::OrdF64;
 use arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
+use datafusion::cube_ext::ordfloat::OrdF64;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use std::fmt;

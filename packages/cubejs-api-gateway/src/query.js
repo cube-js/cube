@@ -147,6 +147,18 @@ const checkQueryFilters = (filter) => {
   return true;
 };
 
+export const validatePostRewrite = (query) => {
+  const validQuery = query.measures && query.measures.length ||
+    query.dimensions && query.dimensions.length ||
+    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  if (!validQuery) {
+    throw new UserError(
+      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
+    );
+  }
+  return query;
+};
+
 export const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {

@@ -91,9 +91,14 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "partitioned_index_if_not_exists",
             partitioned_index_if_not_exists,
         ),
+        t("drop_partitioned_index", drop_partitioned_index),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
+        t(
+            "planning_join_with_partitioned_index",
+            planning_join_with_partitioned_index,
+        ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
@@ -120,6 +125,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("float_index", float_index),
+        t("float_order", float_order),
         t("date_add", date_add),
         t("now", now),
         t("dump", dump),
@@ -2172,6 +2178,92 @@ async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) {
         .unwrap();
 }
 
+async fn drop_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, some_column int)")
+        .await
+        .unwrap();
+    // DROP without any data.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    // Another drop fails as index does not exist.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap_err();
+    // Note columns are different.
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data3(id3 int, url3 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id3, url3)",
+        )
+        .await
+        .unwrap_err(); // Fails as the index does not exist anymore.
+
+    // Query can still run from the default table data.
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2543,6 +2635,54 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
+}
+
+async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.by_customer(customer_id int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Customers(customer_id int, customer_name text) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT order_id, customer_name \
+                 FROM s.Orders `o`\
+                 JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "ClusterSend, partitions: [[1, 3]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Worker\
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty",
+    );
 }
 
 async fn topk_query(service: Box<dyn SqlClient>) {
@@ -3643,6 +3783,36 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
+
+/// Ensure DataFusion code consistently uses IEEE754 total order for comparing floats.
+async fn float_order(s: Box<dyn SqlClient>) {
+    s.exec_query("CREATE SCHEMA s").await.unwrap();
+    s.exec_query("CREATE TABLE s.data(f float, i int)")
+        .await
+        .unwrap();
+    s.exec_query("INSERT INTO s.data(f, i) VALUES (0., -1), (-0., 1), (-0., 2), (0., -2)")
+        .await
+        .unwrap();
+
+    // Sorting one and multiple columns use different code paths in DataFusion. Test both.
+    let r = s
+        .exec_query("SELECT f FROM s.data ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[-0., -0., 0., 0.]));
+    let r = s
+        .exec_query("SELECT f, i FROM s.data ORDER BY f, i")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1), (-0., 2), (0., -2), (0., -1)]));
+
+    // DataFusion compares grouping keys with a separate code path.
+    let r = s
+        .exec_query("SELECT f, min(i), max(i) FROM s.data GROUP BY f ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1, 2), (0., -2, -1)]));
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {

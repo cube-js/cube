@@ -1,10 +1,12 @@
 use std::env;
 use std::io;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
 
+use datafusion::arrow::datatypes::ToByteSlice;
 use datafusion::execution::dataframe_impl::DataFrameImpl;
 use datafusion::prelude::DataFrame as DFDataFrame;
 
@@ -22,6 +24,7 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::compile::convert_statement_to_cube_query;
 use crate::compile::parser::MySqlDialectWithBackTicks;
+use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::schema::SchemaService;
@@ -34,7 +37,11 @@ pub mod dataframe;
 struct Backend {
     auth: Arc<dyn SqlAuthService>,
     schema: Arc<dyn SchemaService>,
+    props: QueryPlannerExecutionProps,
+    // Auth result from SqlAuthService
     context: Option<AuthContext>,
+    // From MysqlServerOptions
+    nonce: Arc<Option<Vec<u8>>>,
 }
 
 impl Backend {
@@ -54,6 +61,7 @@ impl Backend {
         let query_lower = query_lower.replace("`", "");
 
         let ignore = match query_lower.as_str() {
+            "set names utf8" => true,
             "set names utf8mb4" => true,
             "set names latin1" => true,
             "rollback" => true,
@@ -183,20 +191,6 @@ impl Backend {
                     )
                 ),
             )
-        } else if query_lower.eq("select connection_id()") {
-            return Ok(
-                Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "connection_id".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::Int64(2)
-                        ])]
-                    )
-                ),
-            )
         } else if query_lower.eq("select @@transaction_isolation") {
             return Ok(
                 Arc::new(
@@ -292,7 +286,7 @@ impl Backend {
                         .get_ctx_for_tenant(auth_ctx)
                     .await?;
 
-                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx))?;
+                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx), &self.props)?;
 
                     return Ok(Arc::new(dataframe::DataFrame::new(
                         vec![
@@ -425,7 +419,7 @@ impl Backend {
                 .get_ctx_for_tenant(auth_ctx)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx))?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
             match plan {
                 crate::compile::QueryPlan::Meta(data_frame) => {
                     return Ok(data_frame);
@@ -499,6 +493,14 @@ impl Backend {
 #[async_trait]
 impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     type Error = io::Error;
+
+    fn server_version(&self) -> &str {
+        "8.0.25"
+    }
+
+    fn connection_id(&self) -> u32 {
+        self.props.connection_id()
+    }
 
     async fn on_prepare<'a>(
         &'a mut self,
@@ -595,6 +597,19 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
         Ok(passwd)
     }
+
+    /// Generate salt for native auth plugin
+    async fn generate_nonce<'a>(&'a mut self) -> Result<Vec<u8>, Self::Error>
+    where
+        W: 'async_trait,
+    {
+        if let Some(n) = &*self.nonce {
+            Ok(n.clone())
+        } else {
+            let random_bytes: Vec<u8> = (0..20).map(|_| rand::random::<u8>()).collect();
+            Ok(random_bytes)
+        }
+    }
 }
 
 pub struct MySqlServer {
@@ -603,6 +618,7 @@ pub struct MySqlServer {
     schema: Arc<dyn SchemaService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
+    nonce: Arc<Option<Vec<u8>>>,
 }
 
 crate::di_service!(MySqlServer, []);
@@ -613,6 +629,8 @@ impl ProcessingLoop for MySqlServer {
         let listener = TcpListener::bind(self.address.clone()).await?;
 
         println!("🔗 Cube SQL is listening on {}", self.address);
+
+        let mut connection_id_incr = 0;
 
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
@@ -637,12 +655,26 @@ impl ProcessingLoop for MySqlServer {
 
             let auth = self.auth.clone();
             let schema = self.schema.clone();
+            let nonce = self.nonce.clone();
+
+            let connection_id = if connection_id_incr > 100_000_u32 {
+                connection_id_incr = 1;
+
+                connection_id_incr
+            } else {
+                connection_id_incr += 1;
+
+                connection_id_incr
+            };
+
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
                         auth,
                         schema,
+                        props: QueryPlannerExecutionProps::new(connection_id, None),
                         context: None,
+                        nonce,
                     },
                     socket,
                 )
@@ -665,12 +697,14 @@ impl MySqlServer {
         address: String,
         auth: Arc<dyn SqlAuthService>,
         schema: Arc<dyn SchemaService>,
+        nonce: Option<Vec<u8>>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
             address,
             auth,
             schema,
+            nonce: Arc::new(nonce),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })

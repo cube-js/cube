@@ -1,4 +1,4 @@
-const native = require('../dist/lib/index');
+const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
 (async () => {
@@ -18,23 +18,51 @@ const meta_fixture = require('./meta');
         return meta_fixture;
     };
 
-    const checkAuth = async (extra) => {
+    const checkAuth = async ({ request, user }) => {
       console.log('[js] checkAuth',  {
-        extra,
+        request,
+        user,
       });
 
-      return true;
+      if (user) {
+        // without password
+        if (user == 'wp') {
+          return {
+            password: null,
+            // securityContext: {}
+          };
+        }
+
+        return {
+          password: 'test',
+        }
+      }
+
+      throw new Error('Please specify password');
     };
 
     native.setLogLevel('trace');
 
     const interface = await native.registerInterface({
+      // nonce: '12345678910111213141516'.substring(0, 20),
       checkAuth,
       load,
       meta,
     });
     console.log({
       interface
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('SIGINT signal');
+
+      try {
+        await native.shutdownInterface(interface);
+      } catch (e) {
+        console.log(e);
+      } finally {
+        process.exit(1);
+      }
     });
 
     // block

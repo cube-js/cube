@@ -51,7 +51,7 @@ use crate::queryplanner::serialized_plan::RowFilter;
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
@@ -111,6 +111,7 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
     query_timeout: Duration,
+    create_table_timeout: Duration,
     cache: SqlResultCache,
 }
 
@@ -127,6 +128,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        create_table_timeout: Duration,
         max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
@@ -138,6 +140,7 @@ impl SqlServiceImpl {
             cluster,
             rows_per_chunk,
             query_timeout,
+            create_table_timeout,
             remote_fs,
             cache: SqlResultCache::new(max_cached_queries),
         })
@@ -245,7 +248,19 @@ impl SqlServiceImpl {
             )
             .await?;
 
-        if let Err(e) = self.finalize_external_table(&table, listener).await {
+        let finalize_res = tokio::time::timeout(
+            self.create_table_timeout,
+            self.finalize_external_table(&table, listener),
+        )
+        .await
+        .map_err(|_| {
+            CubeError::internal(format!(
+                "Timeout during create table finalization: {:?}",
+                table
+            ))
+        })
+        .flatten();
+        if let Err(e) = finalize_res {
             if let Err(inner) = self.db.drop_table(table.get_id()).await {
                 log::error!(
                     "Drop table ({}) after error failed: {}",
@@ -512,6 +527,17 @@ impl SqlService for SqlServiceImpl {
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
+            CubeStoreStatement::System(command) => match command {
+                SystemCommand::KillAllJobs => {
+                    self.db.delete_all_jobs().await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+                SystemCommand::Repartition { partition_id } => {
+                    let partition = self.db.get_partition(partition_id).await?;
+                    self.cluster.schedule_repartition(&partition).await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+            },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
@@ -693,6 +719,11 @@ impl SqlService for SqlServiceImpl {
                             .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
                             .await?;
                         self.db.drop_table(table.get_id()).await?;
+                    }
+                    ObjectType::PartitionedIndex => {
+                        let schema = names[0].0[0].value.clone();
+                        let name = names[0].0[1].value.clone();
+                        self.db.drop_partitioned_index(schema, name).await?;
                     }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 }
@@ -1329,6 +1360,7 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
 
     #[tokio::test]
@@ -1353,6 +1385,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1365,6 +1398,7 @@ mod tests {
                 Arc::new(MockCluster::new()),
                 remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
                 query_timeout,
                 10_000, // max_cached_queries
             );
@@ -1403,6 +1437,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                config.config_obj(),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1415,6 +1450,7 @@ mod tests {
                 Arc::new(MockCluster::new()),
                 remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
                 query_timeout,
                 10_000, // max_cached_queries
             );
@@ -1667,6 +1703,105 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn delete_middle_main() {
+        Config::test("delete_middle_main")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 10;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
+
+                for i in 0..100 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+
+                    let partitions = services
+                        .meta_store
+                        .get_partitions_with_chunks_created_seconds_ago(0)
+                        .await
+                        .unwrap();
+                    for p in partitions.into_iter() {
+                        services
+                            .injector
+                            .get_service_typed::<SchedulerImpl>()
+                            .await
+                            .schedule_partition_to_compact(&p)
+                            .await
+                            .unwrap()
+                    }
+                }
+
+                let to_repartition = services
+                    .meta_store
+                    .all_inactive_partitions_to_repartition()
+                    .await
+                    .unwrap();
+
+                for p in to_repartition.into_iter() {
+                    services
+                        .injector
+                        .get_service_typed::<SchedulerImpl>()
+                        .await
+                        .schedule_repartition_if_needed(&p)
+                        .await
+                        .unwrap();
+                }
+
+                let chunks = services.meta_store.chunks_table().all_rows().await.unwrap();
+
+                println!("All chunks: {:?}", chunks);
+
+                for c in chunks.into_iter().filter(|c| !c.get_row().active()) {
+                    let _ = services.meta_store.delete_chunk(c.get_id()).await;
+                }
+
+                let all_inactive_partitions = services
+                    .meta_store
+                    .all_inactive_middle_man_partitions()
+                    .await
+                    .unwrap();
+                println!("Middle man partitions: {:?}", all_inactive_partitions);
+                let mut futures = Vec::new();
+                for p in all_inactive_partitions.into_iter() {
+                    futures.push(services.meta_store.delete_middle_man_partition(p.get_id()))
+                }
+                join_all(futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+
+                println!(
+                    "All partitions: {:?}",
+                    services
+                        .meta_store
+                        .partition_table()
+                        .all_rows()
+                        .await
+                        .unwrap()
+                );
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn high_frequency_inserts_s3() {
         if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
             return;
@@ -1891,7 +2026,11 @@ mod tests {
                     .collect::<Vec<_>>();
                 assert_eq!(
                     files,
-                    vec![format!("{}.parquet", last_active_partition.get_id())]
+                    vec![format!(
+                        "{}-{}.parquet",
+                        last_active_partition.get_id(),
+                        last_active_partition.get_row().suffix().as_ref().unwrap()
+                    )]
                 )
             })
             .await

@@ -33,7 +33,7 @@ dependencies = [
  "copyless",
  "futures-channel",
  "futures-util",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "tokio 0.2.25",
 ]
 
@@ -138,7 +138,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#f6a3075ab37239f655a982c2c15989d80d72a3db"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#e91265e16d6d91da606b271a3414bf66e08211b7"
 dependencies = [
  "bitflags",
  "chrono",
@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#f6a3075ab37239f655a982c2c15989d80d72a3db"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#e91265e16d6d91da606b271a3414bf66e08211b7"
 dependencies = [
  "arrow 5.0.0",
  "base64 0.13.0",
@@ -1090,17 +1090,18 @@ dependencies = [
  "lazy_static",
  "log",
  "mockall",
- "msql-srv 0.9.2 (git+https://github.com/cube-js/msql-srv?rev=21158a8b10747f9e2f06824310b4472fe3f48cc0)",
+ "msql-srv 0.9.2 (git+https://github.com/cube-js/msql-srv?rev=218ad4595d371b446431089f1fae66cd41e63941)",
  "mysql_common 0.26.0",
  "nanoid",
  "pretty_assertions 1.0.0",
+ "rand 0.8.4",
  "regex",
  "reqwest 0.11.4",
  "serde",
  "serde_derive",
  "serde_json",
  "simple_logger",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "sqlparser 0.11.1-alpha.0",
  "thiserror",
  "tokio 1.9.0",
@@ -1172,7 +1173,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simple_logger",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "sqlparser 0.9.0",
  "tarpc",
  "tempfile",
@@ -1217,7 +1218,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#ff85bdd9c52f849f63b541979b67a1f3ec8f5b77"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#ba2f7a83170fba3a70e13dd6377186026dcd9c27"
 dependencies = [
  "ahash 0.7.4",
  "arrow 5.0.0",
@@ -1239,7 +1240,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sha2 0.9.5",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "sqlparser 0.9.0",
  "tokio 1.9.0",
  "tokio-stream",
@@ -1266,7 +1267,7 @@ dependencies = [
  "paste",
  "pin-project-lite 0.2.7",
  "rand 0.8.4",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "sqlparser 0.11.1-alpha.0",
  "tokio 1.9.0",
  "tokio-stream",
@@ -1488,7 +1489,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbf606a9d6674ad82094652789cf69b0e6e598c2d3c9137c28970eec13f11644"
 dependencies = [
  "bitflags",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
 ]
 
 [[package]]
@@ -1498,7 +1499,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef4c5738bcd7fad10315029c50026f83c9da5e4a21f8ed66826f43e0e2bde5f6"
 dependencies = [
  "bitflags",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "thiserror",
 ]
 
@@ -2611,7 +2612,7 @@ dependencies = [
 [[package]]
 name = "msql-srv"
 version = "0.9.2"
-source = "git+https://github.com/cube-js/msql-srv?rev=21158a8b10747f9e2f06824310b4472fe3f48cc0#21158a8b10747f9e2f06824310b4472fe3f48cc0"
+source = "git+https://github.com/cube-js/msql-srv?rev=218ad4595d371b446431089f1fae66cd41e63941#218ad4595d371b446431089f1fae66cd41e63941"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -3141,14 +3142,14 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.10",
- "smallvec 1.6.1",
+ "smallvec 1.7.0",
  "winapi 0.3.9",
 ]
 
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#f6a3075ab37239f655a982c2c15989d80d72a3db"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#e91265e16d6d91da606b271a3414bf66e08211b7"
 dependencies = [
  "arrow 5.0.0",
  "base64 0.13.0",
@@ -4257,9 +4258,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
+checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "snap"
@@ -4297,7 +4298,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.9.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=e6e90af10616c1699ecd21f27d1e67a7f646d042#e6e90af10616c1699ecd21f27d1e67a7f646d042"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=dcc51a662fca14772f63f5169a81e6558aa07af9#dcc51a662fca14772f63f5169a81e6558aa07af9"
 dependencies = [
  "log",
 ]

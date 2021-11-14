@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "include": [
-    "lib",
+    "js",
     "test"
   ],
   "compilerOptions": {

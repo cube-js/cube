@@ -6,10 +6,11 @@ import bodyParser from 'body-parser';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
-  Response, NextFunction,
   Application as ExpressApplication,
+  ErrorRequestHandler,
+  NextFunction,
   RequestHandler,
-  ErrorRequestHandler
+  Response,
 } from 'express';
 
 import { getRequestIdFromRequest, requestParser } from './requestParser';
@@ -21,21 +22,21 @@ import {
   getPivotQuery,
   getQueryGranularity,
   normalizeQuery,
-  normalizeQueryPreAggregations,
-  normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
-  QUERY_TYPE
+  normalizeQueryPreAggregationPreview,
+  normalizeQueryPreAggregations,
+  QUERY_TYPE, validatePostRewrite,
 } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
-  QueryRewriteFn,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  Request,
   ExtendedRequestContext,
   JWTOptions,
+  QueryRewriteFn,
+  Request,
+  RequestContext,
+  RequestLoggerMiddlewareFn,
   SecurityContextExtractorFn,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
@@ -466,7 +467,7 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
-    
+
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
@@ -675,7 +676,7 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map((currentQuery) => this.queryRewrite(normalizeQuery(currentQuery), context))
+      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
