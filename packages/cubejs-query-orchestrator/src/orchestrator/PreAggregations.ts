@@ -1030,7 +1030,7 @@ export class PreAggregationPartitionRangeLoader {
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      [query, values],
+      QueryCache.queryCacheKey({ query, values }),
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
@@ -1422,6 +1422,26 @@ export class PreAggregations {
       preAggregationsTablesToTempTables,
       values: queryParamsReplacement
     }));
+  }
+
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    const preAggregations = queryBody.preAggregations || [];
+
+    const result = await Promise.all(preAggregations.map(async preAggregation => {
+      const { preAggregationStartEndQueries } = preAggregation;
+
+      const isCached = preAggregation.partitionGranularity ? (await Promise.all(
+        preAggregationStartEndQueries.map(
+          ([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })
+        )
+      )).every((res: any) => res?.data) : true;
+      return {
+        preAggregation,
+        isCached
+      };
+    }));
+
+    return result;
   }
 
   public async expandPartitionsInPreAggregations(queryBody) {

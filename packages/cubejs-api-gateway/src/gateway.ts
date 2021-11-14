@@ -358,6 +358,7 @@ export class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregations({
+          cacheOnly: req.query.cacheOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -493,7 +494,7 @@ export class ApiGateway {
     }
   }
 
-  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
       const compilerApi = this.getCompilerApi(context);
@@ -507,7 +508,8 @@ export class ApiGateway {
             {
               timezones: this.scheduledRefreshTimeZones,
               preAggregations: preAggregations.map(p => ({
-                id: p.id
+                id: p.id,
+                cacheOnly,
               }))
             },
           )
@@ -540,10 +542,12 @@ export class ApiGateway {
           query
         );
 
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
-          preAggregationPartitions,
+          preAggregationPartitionsWithoutError,
           compilerApi.preAggregationsSchema
         );
 
@@ -551,8 +555,8 @@ export class ApiGateway {
         ...props,
         preAggregation,
         partitions: partitions.map(partition => {
-          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
-          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition?.tableName];
           return partition;
         }),
       });
@@ -588,12 +592,12 @@ export class ApiGateway {
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition.sql
+          preAggregationPartition
         )
       });
     } catch (e) {

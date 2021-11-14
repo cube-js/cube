@@ -30,32 +30,9 @@ export const preAggregationPartitionsResultFactory = () => ([
   {
     timezone: 'UTC',
     preAggregation: preAggregationsResultFactory()[0],
-    partitions: [
-      {
-        timezone: 'UTC',
-        dimensions: [
-          'Usage.deploymentId',
-          'Usage.tenantId'
-        ],
-        measures: [
-          'Usage.count'
-        ],
-        timeDimensions: [
-          {
-            dimension: 'Usage.createdAt',
-            granularity: 'day',
-            dateRange: [
-              '2021-04-30T00:00:00.000',
-              '2021-04-30T23:59:59.999'
-            ]
-          }
-        ],
-        rollups: [],
-        sql: {
-          tableName: 'dev_pre_aggregations.usage_usages20210430'
-        }
-      }
-    ]
+    partitions: [{
+      tableName: 'dev_pre_aggregations.usage_usages20210430'
+    }]
   }
 ]);
 

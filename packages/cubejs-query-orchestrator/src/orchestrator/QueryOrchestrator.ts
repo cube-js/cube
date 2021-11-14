@@ -206,8 +206,8 @@ export class QueryOrchestrator {
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        if (partition && partition.sql) {
-          obj[partition.sql.tableName] = PreAggregations.structureVersion(partition.sql);
+        if (partition) {
+          obj[partition.tableName] = PreAggregations.structureVersion(partition);
         }
         return obj;
       }, {});
@@ -248,6 +248,10 @@ export class QueryOrchestrator {
 
   public async expandPartitionsInPreAggregations(queryBody) {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
+  }
+
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
   }
 
   public async getPreAggregationQueueStates(dataSource = 'default') {

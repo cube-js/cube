@@ -232,6 +232,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
   timezones: Joi.array().items(Joi.string()),
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
+    cacheOnly: Joi.boolean(),
     partitions: Joi.array().items(Joi.string()),
     refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))

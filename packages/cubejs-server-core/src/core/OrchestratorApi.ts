@@ -193,6 +193,10 @@ export class OrchestratorApi {
     }
   }
 
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
+  }
+
   public async getPreAggregationQueueStates() {
     return this.orchestrator.getPreAggregationQueueStates();
   }
