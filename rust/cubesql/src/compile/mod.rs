@@ -1232,6 +1232,15 @@ impl QueryPlanner {
                     dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
                 ],
             ))))
+        } else if name.eq_ignore_ascii_case("warnings") {
+            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                vec![
+                    dataframe::Column::new("Level".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                    dataframe::Column::new("Code".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
+                    dataframe::Column::new("Message".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                ],
+                vec![],
+            ))))
         } else {
             self.create_df_logical_plan(
                 ast::Statement::ShowVariable {
