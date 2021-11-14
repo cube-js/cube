@@ -1030,7 +1030,7 @@ export class PreAggregationPartitionRangeLoader {
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      [query, values, []],
+      QueryCache.queryCacheKey({ query, values }),
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
