@@ -402,14 +402,14 @@ impl ImportServiceImpl {
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
+            let mut size = 0;
             while let Some(bytes) = stream.next().await {
-                file.write_all(bytes?.as_ref()).await?;
+                let bytes = bytes?;
+                let slice = bytes.as_ref();
+                size += slice.len();
+                file.write_all(slice).await?;
             }
-            log::info!(
-                "Import downloaded {} ({} bytes)",
-                location,
-                file.metadata().await?.len()
-            );
+            log::info!("Import downloaded {} ({} bytes)", location, size);
             file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
