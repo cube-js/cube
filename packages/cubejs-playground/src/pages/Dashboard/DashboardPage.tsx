@@ -55,7 +55,7 @@ class DashboardPage extends Component<any, any> {
         dashboardPort: dashboardStatus.dashboardPort,
         dashboardAppPath: dashboardStatus.dashboardAppPath,
       });
-    } catch (e) {
+    } catch (e: any) {
       this.setState({
         dashboardStarting: false,
         loadError: <pre>{e.toString()}</pre>,

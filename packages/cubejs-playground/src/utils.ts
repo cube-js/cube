@@ -189,7 +189,7 @@ export async function copyToClipboard(value, message = 'Copied to clipboard') {
     notification.success({
       message,
     });
-  } catch (e) {
+  } catch (e: any) {
     notification.error({
       message: "Can't copy to clipboard",
       description: e,

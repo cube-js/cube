@@ -312,7 +312,7 @@ export function ConnectionWizardPage({ history }) {
                         });
 
                         history.push('/schema');
-                      } catch (error) {
+                      } catch (error: any) {
                         setTestConnectionResult({
                           success: false,
                           error,
