@@ -26,7 +26,14 @@ export class SubscriptionServer {
   }
 
   public resultFn(connectionId: string, messageId: string) {
-    return (message, { status } = { status: 200 }) => this.sendMessage(connectionId, { messageId, message, status });
+    return (message, { status } = { status: 200 }) => {
+      this.apiGateway.log({
+        type: 'Outgoing network usage',
+        service: 'api-ws',
+        bytes: Buffer.byteLength(typeof message === 'string' ? message : JSON.stringify(message)),
+      });
+      return this.sendMessage(connectionId, { messageId, message, status });
+    };
   }
 
   public async processMessage(connectionId: string, message, isSubscription) {
