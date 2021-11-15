@@ -435,7 +435,9 @@ export class QueryCache {
             this.logger('Outgoing network usage', {
               service: 'redis',
               context: { requestId: options.requestId },
+              requestId: options.requestId,
               bytes: Buffer.byteLength(value),
+              cacheKey,
             });
             return res;
           });
