@@ -37,7 +37,6 @@
     "lru-cache": "^6.0.0",
     "moment-range": "^4.0.2",
     "moment-timezone": "^0.5.33",
-    "object-sizeof": "^1.6.1",
     "ramda": "^0.27.0",
     "redis": "^3.0.2"
   },
