@@ -99,10 +99,13 @@ jobs:
       - name: Upload artifact
         uses: nick-invision/retry@v2
         with:
-          max_attempts: 5
+          max_attempts: 10
           retry_on: error
           timeout_minutes: 5
-          command: cd packages/cubejs-backend-native && npm run upload-binary
+          retry_wait_seconds: 15
+          command: |
+            cd packages/cubejs-backend-native
+            npm run upload-binary
 
   native:
     runs-on: ${{ matrix.os-version }}
@@ -154,10 +157,13 @@ jobs:
       - name: Upload artifact
         uses: nick-invision/retry@v2
         with:
-          max_attempts: 5
+          max_attempts: 10
           retry_on: error
           timeout_minutes: 5
-          command: cd packages/cubejs-backend-native && npm run upload-binary
+          retry_wait_seconds: 15
+          command: |
+            cd packages/cubejs-backend-native
+            npm run upload-binary
 
   docker-default:
     needs: [npm, cubestore, native_linux]
