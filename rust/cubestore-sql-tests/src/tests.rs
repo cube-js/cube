@@ -124,6 +124,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
+        t("decimal_order", decimal_order),
         t("float_index", float_index),
         t("float_order", float_order),
         t("date_add", date_add),
@@ -3757,6 +3758,44 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn decimal_order(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(i decimal, j decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(i, j) VALUES (1.0, -1.0), (2.0, 0.5), (0.5, 1.0), (100, -25.5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i FROM s.data ORDER BY 1 DESC")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[dec5(100), dec5(2), dec5(1), dec5f1(0, 5)])
+    );
+
+    // Two and more columns use a different code path, so test these too.
+    let r = service
+        .exec_query("SELECT i, j FROM s.data ORDER BY 2, 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (dec5(100), dec5f1(-25, 5)),
+            (dec5(1), dec5(-1)),
+            (dec5(2), dec5f1(0, 5)),
+            (dec5f1(0, 5), dec5(1))
+        ])
+    );
+}
+
 async fn float_index(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -4138,5 +4177,11 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
 }
 
 fn dec5(i: i64) -> Decimal {
-    Decimal::new(i * 100_000)
+    dec5f1(i, 0)
+}
+
+fn dec5f1(i: i64, f: u64) -> Decimal {
+    assert!(f < 10);
+    let f = if i < 0 { -(f as i64) } else { f as i64 };
+    Decimal::new(i * 100_000 + 10_000 * f)
 }
