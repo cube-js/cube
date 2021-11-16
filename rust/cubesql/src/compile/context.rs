@@ -207,14 +207,16 @@ impl QueryContext {
             };
 
             if let Some(time_dimension) = time_dimension_opt {
+                // Convert AST back to string to reduce variants of formating
                 let right_as_str = right_fn.to_string();
 
                 let second_regexp = Regex::new(
-                    r"INTERVAL \(HOUR\([a-zA-Z_]+\) \* 60 \* 60 \+ MINUTE\([a-zA-Z_]+\) \* 60 \+ SECOND\([a-zA-Z_]+\)\)",
+                    r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \* 60 \+ MINUTE\([a-zA-Z_`]+\) \* 60 \+ SECOND\([a-zA-Z_`]+\)\)",
                 )?;
-                let minute_regexp =
-                    Regex::new(r"INTERVAL \(HOUR\([a-z_]+\) \* 60 \+ MINUTE\([a-z_]+\)\) MINUTE")?;
-                let hour_regexp = Regex::new(r"INTERVAL HOUR\([a-z_]+\) HOUR")?;
+                let minute_regexp = Regex::new(
+                    r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \+ MINUTE\([a-zA-Z_`]+\)\) MINUTE",
+                )?;
+                let hour_regexp = Regex::new(r"INTERVAL HOUR\([a-zA-Z_`]+\) HOUR")?;
 
                 let granularity = if second_regexp.is_match(&right_as_str) {
                     "second".to_string()
