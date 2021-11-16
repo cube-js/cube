@@ -17,6 +17,14 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
   }
 
+  setGraphQLSchema(schema) {
+    this.graphqlSchema = schema;
+  }
+
+  getGraphQLSchema() {
+    return this.graphqlSchema;
+  }
+
   async getCompilers({ requestId } = {}) {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||

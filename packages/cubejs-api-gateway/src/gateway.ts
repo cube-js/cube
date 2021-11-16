@@ -3,6 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
+import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
@@ -42,6 +43,8 @@ import {
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
+
+import { makeSchema } from './graphql';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -279,6 +282,27 @@ export class ApiGateway {
 
     // @todo Should we pass requestLoggerMiddleware?
     const guestMiddlewares = [];
+
+    app.use(`${this.basePath}/graphql`, userMiddlewares, async (req, res) => {
+      const compilerApi = this.getCompilerApi(req.context);
+      let schema = compilerApi.getGraphQLSchema();
+      if (!schema) {
+        const metaConfig = await compilerApi.metaConfig({
+          requestId: req.context.requestId,
+        });
+        schema = makeSchema(metaConfig);
+        compilerApi.setGraphQLSchema(schema);
+      }
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: this
+        },
+        graphiql: getEnv('nodeEnv') !== 'production'
+      })(req, res);
+    });
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
