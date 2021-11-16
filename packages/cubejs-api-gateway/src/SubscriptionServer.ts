@@ -15,6 +15,10 @@ const methodParams: Record<string, string[]> = {
   'subscribe.queue.events': []
 };
 
+const calcMessageLength = (message: unknown) => Buffer.byteLength(
+  typeof message === 'string' ? message : JSON.stringify(message)
+);
+
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
@@ -25,12 +29,12 @@ export class SubscriptionServer {
   ) {
   }
 
-  public resultFn(connectionId: string, messageId: string, requestId: string) {
+  public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
     return (message, { status } = { status: 200 }) => {
       this.apiGateway.log({
         type: 'Outgoing network usage',
         service: 'api-ws',
-        bytes: Buffer.byteLength(typeof message === 'string' ? message : JSON.stringify(message)),
+        bytes: calcMessageLength(message),
         requestId,
       });
       return this.sendMessage(connectionId, { messageId, message, status });
@@ -41,9 +45,7 @@ export class SubscriptionServer {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
-    const bytes = Buffer.byteLength(
-      typeof message === 'string' ? message : JSON.stringify(message)
-    );
+    const bytes = calcMessageLength(message);
 
     try {
       if (typeof message === 'string') {
@@ -128,7 +130,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query: message.query,
-        res: this.resultFn(connectionId, message.messageId, context.requestId ?? ''),
+        res: this.resultFn(connectionId, message.messageId, context.requestId),
         context
       });
     }
