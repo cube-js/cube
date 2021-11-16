@@ -79,7 +79,13 @@
   "resolutions": {
     "@types/ramda": "0.27.40",
     "rc-tree": "4.1.5",
+    "@azure/storage-blob": "12.7.0",
+    "@azure/core-paging": "1.1.3",
+    "@azure/logger": "1.0.0",
     "@azure/core-auth": "1.2.0",
+    "@azure/core-lro": "1.0.5",
+    "@azure/core-tracing": "1.0.0-preview.10",
+    "@azure/core-http": "1.2.6",
     "testcontainers": "7.12.1"
   },
   "license": "MIT"
