@@ -101,6 +101,7 @@ jobs:
         with:
           max_attempts: 5
           retry_on: error
+          timeout_minutes: 5
           command: cd packages/cubejs-backend-native && npm run upload-binary
 
   native:
@@ -155,6 +156,7 @@ jobs:
         with:
           max_attempts: 5
           retry_on: error
+          timeout_minutes: 5
           command: cd packages/cubejs-backend-native && npm run upload-binary
 
   docker-default:
