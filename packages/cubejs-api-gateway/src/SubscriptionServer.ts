@@ -25,12 +25,13 @@ export class SubscriptionServer {
   ) {
   }
 
-  public resultFn(connectionId: string, messageId: string) {
+  public resultFn(connectionId: string, messageId: string, requestId: string) {
     return (message, { status } = { status: 200 }) => {
       this.apiGateway.log({
         type: 'Outgoing network usage',
         service: 'api-ws',
         bytes: Buffer.byteLength(typeof message === 'string' ? message : JSON.stringify(message)),
+        requestId,
       });
       return this.sendMessage(connectionId, { messageId, message, status });
     };
@@ -110,7 +111,7 @@ export class SubscriptionServer {
         context,
         signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
         isSubscription,
-        res: this.resultFn(connectionId, message.messageId),
+        res: this.resultFn(connectionId, message.messageId, requestId),
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
           return subscription && subscription.state;
@@ -127,7 +128,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query: message.query,
-        res: this.resultFn(connectionId, message.messageId),
+        res: this.resultFn(connectionId, message.messageId, ''),
         context
       });
     }
