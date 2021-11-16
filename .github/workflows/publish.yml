@@ -95,7 +95,13 @@ jobs:
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
-        run: cd packages/cubejs-backend-native && yarn run upload-binary
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Upload artifact
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 5
+          retry_on: error
+          command: cd packages/cubejs-backend-native && npm run upload-binary
 
   native:
     runs-on: ${{ matrix.os-version }}
@@ -143,7 +149,13 @@ jobs:
           CUBESTORE_SKIP_POST_INSTALL: true
         run: yarn install --frozen-lockfile
       - name: Build native
-        run: cd packages/cubejs-backend-native && yarn run upload-binary
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Upload artifact
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 5
+          retry_on: error
+          command: cd packages/cubejs-backend-native && npm run upload-binary
 
   docker-default:
     needs: [npm, cubestore, native_linux]
