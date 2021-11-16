@@ -30,6 +30,9 @@ These tutorials are great places to start learning Cube.js:
   — learn how to use Query Builder components for React and Vue to build
   customizable query interfaces
 
+- [Building an internal dashboard with Retool](https://cube.dev/blog/building-an-internal-dashboard-with-retool-and-cube/) — learn how
+  to use Retool to build custom internal tools with metrics dashboards
+
 The following tutorials cover advanced concepts of Cube.js:
 
 - [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) —
