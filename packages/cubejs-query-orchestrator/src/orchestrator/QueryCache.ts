@@ -433,8 +433,7 @@ export class QueryCache {
           .then(({ value }) => {
             this.logger('Renewed', { cacheKey, requestId: options.requestId });
             this.logger('Outgoing network usage', {
-              service: 'redis',
-              context: { requestId: options.requestId },
+              service: 'cache',
               requestId: options.requestId,
               bytes: Buffer.byteLength(value),
               cacheKey,
