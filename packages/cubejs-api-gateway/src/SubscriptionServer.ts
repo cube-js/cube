@@ -128,7 +128,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query: message.query,
-        res: this.resultFn(connectionId, message.messageId, ''),
+        res: this.resultFn(connectionId, message.messageId, context.requestId ?? ''),
         context
       });
     }
