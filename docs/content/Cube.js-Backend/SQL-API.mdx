@@ -47,42 +47,48 @@ services:
 
 </InfoBox>
 
-Cube SQL uses the same JWTs as Cube, so we first need to create a JWT. If the
-project uses `CUBEJS_API_SECRET`, then we can generate a JWT token by running
-the following inside the project directory:
 
-<InfoBox>
+<DangerBox>
+Prior to the v0.28.55 version, Cube SQL used the same JWTs as Cube, but we moved to credentials authentication as a workaround for username
+truncation in some MySQL clients.
+</DangerBox>
 
-If custom JWK authentication is configured, then a JWT must be retrieved from
-the external identity provider.
+Cube SQL uses credentials auth,
 
-</InfoBox>
-
-```bash
-$ npx cubejs-cli token
-Warning. Option --user-context was deprecated and payload will be stored inside root instead of u
-Generating Cube.js JWT token
-
------------------------------------------------------------------------------------------
-  Use these manually generated tokens in production with caution.
-  Please refer to https://cube.dev/docs/security for production security best practices.
------------------------------------------------------------------------------------------
-
-Expires in: 30 days
-Payload: {}
-
-Token: eyJhbGc***
+```
+CUBE_SQL_USERNAME=myusername
+CUBE_SQL_PASSWORD=mypassword
 ```
 
-Once the JWT has been generated, we can connect using the `mysql` client:
+Once we specify username and password, we can connect using the `mysql` client:
 
 ```bash
 # Format: mysql -h <CUBE_IP> --port <CUBE_SQL_PORT> -u <JWT_STRING>
-mysql -h 127.0.0.1 --port 3306 -u eyJhbGc...
+mysql -h 127.0.0.1 --port 3306 -u myusername --password mypassword
 ```
 
-Because MySQL does not support JWT authentication, Cube SQL retrieves the JWT
-from the `username` parameter. Leave the `password` field empty.
+## Custom authentication
+
+Cube.js also allows you to provide your own username & password verification logic by setting a
+[`checkSqlAuth()`][ref-config-check-sql-auth] function in the `cube.js` configuration
+file. This function is expected to verify username and returning password and security context.
+
+
+```javascript
+module.exports = {
+  checkSqlAuth: async (req, username) => {
+    const userInfo = await getUserFromLDAP(username);
+    if (userInfo) {
+        return {
+            password: 'mypassword',
+            securityContext: {},
+        }
+    }
+
+    throw new Error('Incorrect user name or password');
+  },
+};
+```
 
 ## Querying Dimensions
 
@@ -294,3 +300,4 @@ default**, and currently there is no way to retrieve ungrouped results.
   https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html#function_min
 [ref-schema-ref-types-formats]: /schema/reference/types-and-formats#min
 [ref-recipe-cube-sql-superset]: /recipes/using-apache-superset-with-cube-sql
+[ref-config-check-sql-auth]: /config#check-sql-auth

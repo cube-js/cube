@@ -35,6 +35,7 @@ interface CubejsConfiguration {
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
   checkAuth: (req: ExpressRequest, authorization: string) => any;
+  checkSqlAuth: (req: SQLRequest, user: string) => any;
   queryRewrite: (query: object, context: RequestContext) => object;
   preAggregationsSchema: string | ((context: RequestContext) => string);
   schemaVersion: (context: RequestContext) => string;
@@ -248,7 +249,7 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> checkAuth
 
-Used in both REST and WebSockets API. Can be an `async` functon. Default
+Used in both REST and WebSockets API. Can be an `async` function. Default
 implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
 header and sets payload to `req.securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
@@ -264,6 +265,34 @@ an example below.
 ```javascript
 module.exports = {
   checkAuth: (req, auth) => {},
+};
+```
+
+### <--{"id" : "Options Reference"}--> checkSqlAuth
+
+Used in [SQL API][ref-sql-api], and can be an `async` function. Default implementation verify username & password from environment variables: `CUBE_SQL_USERNAME`, `CUBE_SQL_PASSWORD`,
+but in [development mode][ref-development-mode] it ignores validation.
+
+Called on each request from Cube SQL API.
+
+Also, you can use empty `checkAuth` function to disable built-in security. See
+an example below.
+
+For example, you can use `checkSqlAuth` to validate username and password.
+
+```javascript
+module.exports = {
+  checkSqlAuth: (req, username) => {
+    const userInfo = await getUserFromLDAP(username);
+    if (userInfo) {
+        return {
+            password: 'mypassword',
+            securityContext: {},
+        }
+    }
+
+    throw new Error('Incorrect user name or password');
+  },
 };
 ```
 
@@ -704,6 +733,7 @@ the additional transpiler for check duplicates.
 [ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
 [ref-rest-api]: /rest-api
+[ref-sql-api]: /sql-api
 [ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
