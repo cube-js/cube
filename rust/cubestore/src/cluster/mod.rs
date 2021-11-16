@@ -254,7 +254,7 @@ lazy_static! {
 #[async_trait]
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
-        if self.server_name == node_name {
+        if self.server_name == node_name || is_self_reference(&node_name) {
             self.job_notify.notify_waiters();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
