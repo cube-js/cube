@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.57](https://github.com/cube-js/cube.js/compare/v0.28.56...v0.28.57) (2021-11-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Support identifier escaping in h/m/s granularaties ([1641b69](https://github.com/cube-js/cube.js/commit/1641b698ef106489e93804bdcf364e863d7ce072))
+
+
+### Features
+
+* **cubesql:** Initial support for INFORMATION_SCHEMA ([d1fac9e](https://github.com/cube-js/cube.js/commit/d1fac9e75cb01cbf6a1207b6e69a999e9d755d1e))
+* **cubesql:** Support schema() ([3af3c84](https://github.com/cube-js/cube.js/commit/3af3c841f3cf4beb6950c83a12c86fe2320cd0bc))
+* **cubesql:** Support SHOW WARNINGS ([73d91c0](https://github.com/cube-js/cube.js/commit/73d91c0f6db1d1b7d0945b15cc93cb349b26f573))
+* **cubesql:** Support USER(), CURRENT_USER() ([8a848aa](https://github.com/cube-js/cube.js/commit/8a848aa872fc5d34456b3ef73e72480c9c0914c0))
+
+
+
+
+
 ## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
 
 
