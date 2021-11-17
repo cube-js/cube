@@ -31,7 +31,7 @@ export class LocalCacheDriver implements CacheDriverInterface {
     };
     return {
       key,
-      value: JSON.stringify(value),
+      bytes: Buffer.byteLength(JSON.stringify(value)),
     };
   }
 

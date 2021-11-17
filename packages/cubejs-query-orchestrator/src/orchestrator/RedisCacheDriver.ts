@@ -77,7 +77,7 @@ export class RedisCacheDriver implements CacheDriverInterface {
       await client.setAsync(key, strValue, 'EX', expiration);
       return {
         key,
-        value: strValue,
+        bytes: Buffer.byteLength(strValue),
       };
     } finally {
       this.redisPool.release(client);
