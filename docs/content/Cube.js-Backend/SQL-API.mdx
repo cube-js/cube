@@ -7,35 +7,52 @@ menuOrder: 3
 
 <WarningBox heading={`🐣  Preview`}>
 
-The Cube SQL connector is currently in Preview, and there may be changes in a
-future version. Full support of the ANSI SQL standard is not guaranteed.
+The Cube SQL API is currently in Preview, and there may be changes in a
+future version.
 
 </WarningBox>
 
-Cube SQL is a SQL emulation layer for Cube. It is extremely useful for
-integrating with existing Business Intelligence (BI) tools such as [Apache
-Superset][superset].
+Cube SQL API allows querying Cube via MySQL-compatible SQL. It enables the use of BIs, Python Notebooks, Reverse ETLs, and other downstream tools on top of Cube.
 
-<InfoBox>
+## Getting started
 
-To see an example of Cube connecting to Apache Superset, check out [this
-recipe][ref-recipe-cube-sql-superset].
 
-</InfoBox>
+[Check out the example of Cube connecting to Apache Superset][ref-recipe-cube-sql-superset]
 
-## Enabling the connector
+### Cube Cloud
 
-To enable the Cube SQL connector, we first need to add a new environment
+The first step to get started with SQL API in Cube Cloud is to create a deployment. You can
+follow this [step-by-step guide on creating deployment within Cube Cloud](/cloud/getting-started/create).
+
+Once the deployment is ready click **How to connect** link on the Overview page.
+It will open the modal with instructions on different ways to connect to Cube,
+navigate to the SQL API tab and enable the SQL API.
+
+Once it is enabled you should see the screen like the one below with your
+connection credentials.
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Since Cube SQL API is MySQL-compatible, please make sure to select **MySQL**
+as a database type when connecting from BI tools.
+
+### Self-hosted Cube
+
+To enable the SQL API, we first need to add a new environment
 variable:
 
 ```dotenv
 CUBEJS_SQL_PORT=3306
 ```
 
-<InfoBox>
-
-If you're running Cube with Docker Compose, remember to add a port mapping to
-the Cube service for `CUBEJS_SQL_PORT`, for example:
+If you're running Cube with Docker, remember to add a port mapping to
+the Cube service for `CUBEJS_SQL_PORT`. Docker compose example:
 
 ```yaml
 services:
@@ -45,94 +62,155 @@ services:
       - 3306:3306 # Cube SQL API
 ```
 
-</InfoBox>
-
-
-<DangerBox>
-Prior to the v0.28.55 version, Cube SQL used the same JWTs as Cube, but we moved to credentials authentication as a workaround for username
-truncation in some MySQL clients.
-</DangerBox>
-
-Cube SQL uses credentials auth,
+Then, set Cube SQL credentials auth:
 
 ```
 CUBE_SQL_USERNAME=myusername
 CUBE_SQL_PASSWORD=mypassword
 ```
 
-Once we specify username and password, we can connect using the `mysql` client:
+Now, you can start your Cube instance and connect via the `mysql` client with
+provided credentials:
 
 ```bash
-# Format: mysql -h <CUBE_IP> --port <CUBE_SQL_PORT> -u <JWT_STRING>
 mysql -h 127.0.0.1 --port 3306 -u myusername --password mypassword
 ```
 
-## Custom authentication
+## Examples
+SQL API exposes cubes as the tables where measures and dimensions are columns.
 
-Cube.js also allows you to provide your own username & password verification logic by setting a
-[`checkSqlAuth()`][ref-config-check-sql-auth] function in the `cube.js` configuration
-file. This function is expected to verify username and returning password and security context.
+Consider the following schema.
 
+```js
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
 
-```javascript
-module.exports = {
-  checkSqlAuth: async (req, username) => {
-    const userInfo = await getUserFromLDAP(username);
-    if (userInfo) {
-        return {
-            password: 'mypassword',
-            securityContext: {},
-        }
-    }
-
-    throw new Error('Incorrect user name or password');
+  measures: {
+    count: {
+      type: `count`,
+    },
   },
-};
-```
-
-## Querying Dimensions
-
-Querying dimensions is straightforward, simply add any required fields to the
-`SELECT` clause. Let's use a sample orders table from an e-commerce database:
-
-```javascript
-cube('Orders', {
-  ...,
 
   dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-    },
     status: {
       sql: `status`,
       type: `string`
     },
-  },
-})
+
+    created: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
+});
 ```
 
-We can then execute the following queries through the Cube SQL connector:
+It would be represented as table in SQL API with `count`, `status`, `created`
+columns.
+
+```bash
+mysql> DESCRIBE Orders;
++---------+--------------+------+------+---------+-------+
+| Field   | Type         | Null | Key  | Default | Extra |
++---------+--------------+------+------+---------+-------+
+| count   | int          | No   |      | NULL    |       |
+| status  | varchar(255) | Yes  |      | NULL    |       |
+| created | datetime     | Yes  |      | NULL    |       |
++---------+--------------+------+------+---------+-------+
+```
+
+To get the count of orders grouped by status we can run the following query.
+
+```
+mysql> SELECT count, status FROM Orders;
++-------+------------+
+| count | status     |
++-------+------------+
+|  3354 | processing |
+|  3346 | completed  |
+|  3300 | shipped    |
++-------+------------+
+```
+
+Cube will automatically apply the `GROUP BY` clause in case it is missing in the
+query. We can also provide the `GROUP BY` statement to control how results are
+grouped. In the following example we group orders by created month and also
+by status within every month.
+
+```
+mysql> SELECT
+    ->   count,
+    ->   status,
+    ->   DATE(DATE_SUB(`created`, INTERVAL DAYOFMONTH(`created`) - 1 DAY)) date
+    -> FROM Orders
+    -> GROUP BY date, status
+    -> ORDER BY date ASC;
++-------+------------+-------------------------+
+| count | status     | date                    |
++-------+------------+-------------------------+
+|    50 | processing | 2019-01-01T00:00:00.000 |
+|    48 | completed  | 2019-01-01T00:00:00.000 |
+|    57 | shipped    | 2019-01-01T00:00:00.000 |
+|    34 | shipped    | 2019-02-01T00:00:00.000 |
+|    39 | processing | 2019-02-01T00:00:00.000 |
+|    54 | completed  | 2019-02-01T00:00:00.000 |
+|    75 | processing | 2019-03-01T00:00:00.000 |
+|    62 | shipped    | 2019-03-01T00:00:00.000 |
+|    77 | completed  | 2019-03-01T00:00:00.000 |
++-------+------------+-------------------------+
+```
+
+### Querying Dimensions
+
+Querying dimensions is straightforward, simply add any required fields to the
+`SELECT` clause.
+
 
 ```sql
-SELECT id FROM Orders;
-SELECT status FROM Orders;
+mysql> SELECT status FROM Orders;
++------------+
+| status     |
++------------+
+| completed  |
+| processing |
+| shipped    |
++------------+
 ```
 
-## Querying Measures
+### Querying Measures
 
 Measures can similarly be queried through Cube SQL.
 
-<InfoBox>
+Because measures are already aggregated in Cube there is no need to apply
+aggregate functions to them in SQL API.
 
-When applying aggregate functions to measures in a Cube SQL query, be sure to
-use the right aggregation function for the measure. If the measure is of [type
-`min`][ref-schema-ref-types-formats], then use the [`MIN()` SQL
-function][mysql-docs-min], for example.
+```
+mysql> SELECT count FROM Orders;
++-------+
+| count |
++-------+
+| 10000 |
++-------+
+```
 
-</InfoBox>
+Some of the BI systems may require you to apply aggregate functions. To support
+this Cube allows aggregate functions on measures as long as they match the type
+of the measure.
 
-Let's examine the schema again:
+`count` measure in our example is of type `count`, It means we can apply
+`COUNT()` aggregate function to it. The below query is similiar to the above
+one.
+
+```
+mysql> SELECT COUNT(count) FROM Orders;
++-------+
+| count |
++-------+
+| 10000 |
++-------+
+```
+
+Let's look at more measures types:
 
 ```javascript
 cube('Orders', {
@@ -188,7 +266,7 @@ SELECT maxValue FROM Orders
 SELECT MAX(maxValue) FROM Orders
 ```
 
-## Querying Segments
+### Querying Segments
 
 Any segments defined in a schema can also be used in Cube SQL queries. Looking
 at the schema below, we have one segment `isCompleted`:
@@ -211,9 +289,36 @@ Segments must be used as `boolean` types in Cube SQL queries:
 WHERE isCompleted = true
 ```
 
+
+## Custom Authentication
+
+Cube can be configured with dynamic username & password verification system by setting a
+[`checkSqlAuth()`][ref-config-check-sql-auth] function in the `cube.js` configuration
+file. This function should verify username and return object with password and security context.
+
+If password returned from this function matches provided in connection string user will be authenticated with provided
+security context.
+
+
+```javascript
+module.exports = {
+  checkSqlAuth: async (req, username) => {
+    const userInfo = await getUserFromLDAP(username);
+    if (userInfo) {
+        return {
+            password: 'mypassword',
+            securityContext: {},
+        }
+    }
+
+    throw new Error('Incorrect user name or password');
+  },
+};
+```
+
 ## Limitations
 
-### SELECT
+### Projection
 
 `SELECT` statements only support the following projections:
 
@@ -235,7 +340,7 @@ SELECT COUNT(*) FROM Orders;
 SELECT COUNT(*) AS order_count FROM Orders;
 ```
 
-### WHERE
+### Selection
 
 Cube SQL supports most conditional checks for the `WHERE` clause.
 
@@ -282,15 +387,86 @@ WHERE name LIKE 'joe'
 WHERE name NOT LIKE 'bloggs'
 ```
 
-**Functions:**
+### Joins
 
-Currently Cube SQL only supports [`STR_TO_DATE()`][mysql-docs-str-to-date].
+SQL API currently does not support joins. We plan to support joins in future
+releases.
 
-### GROUP BY
+As a workaround, it is possible to define proxy dimension or measure inside the
+Cube.
 
-`GROUP BY` clauses in SQL queries sent to Cube SQL are ignored; Cube SQL follows
-the same rules as Cube. Any defined dimensions/measures will be grouped **by
-default**, and currently there is no way to retrieve ungrouped results.
+```js
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
+
+  joins: {
+    Users: {
+      relationship: `belongsTo`,
+      sql: `${CUBE}.user_id = ${Users}.id`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true
+    },
+
+    // this is proxy dimension
+    user_city: {
+      sql: `${Users.city}`,
+      type: `string`
+    }
+  }
+});
+
+cube(`Users`, {
+  sql: `SELECT * FROM public.users`,
+
+  measures: {
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true
+    },
+
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  }
+});
+```
+
+Now, it is possible to get orders count by users city with the following
+query.
+
+```
+mysql> SELECT count, user_city FROM Orders;
++-------+---------------+
+| count | userCity      |
++-------+---------------+
+|  1416 | Los Angeles   |
+|  1412 | Seattle       |
+|  1365 | Mountain View |
+|  1263 | New York      |
+|  1220 | Austin        |
+|  1164 | Chicago       |
+|  1101 | San Francisco |
+|  1059 | Palo Alto     |
++-------+---------------+
+```
+
 
 [superset]: https://superset.apache.org/
 [ms-powerbi]: https://powerbi.microsoft.com/en-gb/
