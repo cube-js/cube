@@ -1,28 +1,31 @@
 ---
 title: SQL API
 permalink: /backend/sql
-category: Cube.js Backend
+category: API Reference
 menuOrder: 3
 ---
 
 <WarningBox heading={`🐣  Preview`}>
 
-The Cube SQL API is currently in Preview, and there may be changes in a
-future version.
+The Cube SQL API is currently in Preview, and there may be changes in a future
+version.
 
 </WarningBox>
 
-Cube SQL API allows querying Cube via MySQL-compatible SQL. It enables the use of BIs, Python Notebooks, Reverse ETLs, and other downstream tools on top of Cube.
+Cube SQL API allows querying Cube via MySQL-compatible SQL. It enables the use
+of BIs, Python Notebooks, Reverse ETLs, and other downstream tools on top of
+Cube.
 
 ## Getting started
 
-
-[Check out the example of Cube connecting to Apache Superset][ref-recipe-cube-sql-superset]
+[Check out the example of Cube connecting to Apache
+Superset][ref-recipe-cube-sql-superset]
 
 ### Cube Cloud
 
-The first step to get started with SQL API in Cube Cloud is to create a deployment. You can
-follow this [step-by-step guide on creating deployment within Cube Cloud](/cloud/getting-started/create).
+The first step to get started with SQL API in Cube Cloud is to create a
+deployment. You can follow this
+[step-by-step guide on creating deployment within Cube Cloud](/cloud/getting-started/create).
 
 Once the deployment is ready click **How to connect** link on the Overview page.
 It will open the modal with instructions on different ways to connect to Cube,
@@ -39,20 +42,19 @@ connection credentials.
   />
 </div>
 
-Since Cube SQL API is MySQL-compatible, please make sure to select **MySQL**
-as a database type when connecting from BI tools.
+Since Cube SQL API is MySQL-compatible, please make sure to select **MySQL** as
+a database type when connecting from BI tools.
 
 ### Self-hosted Cube
 
-To enable the SQL API, we first need to add a new environment
-variable:
+To enable the SQL API, we first need to add a new environment variable:
 
 ```dotenv
 CUBEJS_SQL_PORT=3306
 ```
 
-If you're running Cube with Docker, remember to add a port mapping to
-the Cube service for `CUBEJS_SQL_PORT`. Docker compose example:
+If you're running Cube with Docker, remember to add a port mapping to the Cube
+service for `CUBEJS_SQL_PORT`. Docker compose example:
 
 ```yaml
 services:
@@ -77,6 +79,7 @@ mysql -h 127.0.0.1 --port 3306 -u myusername --password mypassword
 ```
 
 ## Examples
+
 SQL API exposes cubes as the tables where measures and dimensions are columns.
 
 Consider the following schema.
@@ -94,14 +97,14 @@ cube(`Orders`, {
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`
+      type: `string`,
     },
 
     created: {
       sql: `created_at`,
-      type: `time`
-    }
-  }
+      type: `time`,
+    },
+  },
 });
 ```
 
@@ -134,8 +137,8 @@ mysql> SELECT count, status FROM Orders;
 
 Cube will automatically apply the `GROUP BY` clause in case it is missing in the
 query. We can also provide the `GROUP BY` statement to control how results are
-grouped. In the following example we group orders by created month and also
-by status within every month.
+grouped. In the following example we group orders by created month and also by
+status within every month.
 
 ```
 mysql> SELECT
@@ -164,7 +167,6 @@ mysql> SELECT
 
 Querying dimensions is straightforward, simply add any required fields to the
 `SELECT` clause.
-
 
 ```sql
 mysql> SELECT status FROM Orders;
@@ -289,26 +291,25 @@ Segments must be used as `boolean` types in Cube SQL queries:
 WHERE isCompleted = true
 ```
 
-
 ## Custom Authentication
 
-Cube can be configured with dynamic username & password verification system by setting a
-[`checkSqlAuth()`][ref-config-check-sql-auth] function in the `cube.js` configuration
-file. This function should verify username and return object with password and security context.
+Cube can be configured with dynamic username & password verification system by
+setting a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
+`cube.js` configuration file. This function should verify username and return
+object with password and security context.
 
-If password returned from this function matches provided in connection string user will be authenticated with provided
-security context.
-
+If password returned from this function matches provided in connection string
+user will be authenticated with provided security context.
 
 ```javascript
 module.exports = {
   checkSqlAuth: async (req, username) => {
     const userInfo = await getUserFromLDAP(username);
     if (userInfo) {
-        return {
-            password: 'mypassword',
-            securityContext: {},
-        }
+      return {
+        password: 'mypassword',
+        securityContext: {},
+      };
     }
 
     throw new Error('Incorrect user name or password');
@@ -402,8 +403,8 @@ cube(`Orders`, {
   joins: {
     Users: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.user_id = ${Users}.id`
-    }
+      sql: `${CUBE}.user_id = ${Users}.id`,
+    },
   },
 
   measures: {
@@ -416,40 +417,38 @@ cube(`Orders`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
     },
 
     // this is proxy dimension
     user_city: {
       sql: `${Users.city}`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 
 cube(`Users`, {
   sql: `SELECT * FROM public.users`,
 
-  measures: {
-  },
+  measures: {},
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
     },
 
     city: {
       sql: `city`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
 
-Now, it is possible to get orders count by users city with the following
-query.
+Now, it is possible to get orders count by users city with the following query.
 
 ```
 mysql> SELECT count, user_city FROM Orders;
@@ -466,7 +465,6 @@ mysql> SELECT count, user_city FROM Orders;
 |  1059 | Palo Alto     |
 +-------+---------------+
 ```
-
 
 [superset]: https://superset.apache.org/
 [ms-powerbi]: https://powerbi.microsoft.com/en-gb/

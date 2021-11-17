@@ -56,7 +56,7 @@ class IndexPage extends Component<Props> {
           </Row>
           <Row>
             <MainTab
-              title="Cube.js Backend"
+              title="Connecting to the Database"
               img={imgInsights}
               desc="How to connect to database and deploy Cube.js service."
               to="/connecting-to-the-database"
