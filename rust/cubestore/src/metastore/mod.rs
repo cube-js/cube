@@ -4084,14 +4084,17 @@ impl MetaStore for RocksMetaStore {
             {
                 return Ok(Vec::new());
             }
-            let mchildren = mparts.get_row_ids_by_index(
+            let mut mchildren = mparts.get_rows_by_index(
                 &MultiPartitionIndexKey::ByParentId(Some(multi_partition_id)),
                 &MultiPartitionRocksIndex::ByParentId,
             )?;
+            // Some children might be leftovers from errors.
+            mchildren.retain(|m| m.row.was_activated());
 
             let parts = PartitionRocksTable::new(db.clone());
             let mut with_children = HashSet::new();
             for c in mchildren {
+                let c = c.id;
                 let new_parts = parts.get_rows_by_index(
                     &PartitionIndexKey::ByMultiPartitionId(Some(c)),
                     &PartitionRocksIndex::MultiPartitionId,
@@ -4129,10 +4132,11 @@ impl MetaStore for RocksMetaStore {
                     .active(),
                 "attempting to split active multi-partition"
             );
-            let children = mpartitions.get_rows_by_index(
+            let mut children = mpartitions.get_rows_by_index(
                 &MultiPartitionIndexKey::ByParentId(Some(multi_partition_id)),
                 &MultiPartitionRocksIndex::ByParentId,
             )?;
+            children.retain(|c| c.row.was_activated());
 
             let partitions = PartitionRocksTable::new(db.clone());
             let partition = partitions.get_row_or_not_found(partition_id)?;

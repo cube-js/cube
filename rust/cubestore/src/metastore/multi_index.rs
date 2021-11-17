@@ -189,6 +189,9 @@ impl MultiPartition {
     pub fn prepared_for_split(&self) -> bool {
         self.prepared_for_split
     }
+    pub fn was_activated(&self) -> bool {
+        self.active || self.prepared_for_split
+    }
     pub fn multi_index_id(&self) -> u64 {
         self.multi_index_id
     }
