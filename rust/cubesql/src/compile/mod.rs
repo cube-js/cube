@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::{backtrace::Backtrace, fmt};
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{prelude::*, Duration};
 
 use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use datafusion::catalog::catalog::MemoryCatalogProvider;
@@ -174,6 +174,27 @@ enum CompiledExpression {
 }
 
 impl CompiledExpression {
+    pub fn to_date(&self) -> Option<DateTime<Utc>> {
+        match self {
+            CompiledExpression::DateLiteral(date) => Some(date.clone()),
+            CompiledExpression::StringLiteral(s) => {
+                if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
+                    return Some(datetime);
+                };
+
+                if let Ok(ref date) = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d") {
+                    return Some(
+                        Utc.ymd(date.year(), date.month(), date.day())
+                            .and_hms_nano(0, 0, 0, 0),
+                    );
+                }
+
+                None
+            }
+            _ => None,
+        }
+    }
+
     pub fn to_value_as_str(&self) -> CompilationResult<String> {
         match &self {
             CompiledExpression::BooleanLiteral(v) => Ok(if *v {
@@ -348,7 +369,7 @@ fn compiled_binary_op_expr(
 
     let compiled_filter = match selection_to_filter {
         // Compile to CompiledFilter::Filter
-        Selection::Dimension(_) => {
+        Selection::Dimension(dim) => {
             let (value, operator) = match op {
                 ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
                 ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
@@ -363,14 +384,47 @@ fn compiled_binary_op_expr(
                 },
                 ast::BinaryOperator::GtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
-                    _ => (filter_expr, "gte".to_string()),
+                    _ => {
+                        if dim.is_time() {
+                            let casted_filter_expr = filter_expr.to_date();
+                            if let Some(dt) = casted_filter_expr {
+                                (CompiledExpression::DateLiteral(dt), "afterDate".to_string())
+                            } else {
+                                return Err(CompilationError::User(format!(
+                                    "Unable to compare time dimension \"{}\" with not a date value: {}",
+                                    dim.get_real_name(),
+                                    filter_expr.to_value_as_str()?
+                                )));
+                            }
+                        } else {
+                            (filter_expr, "gte".to_string())
+                        }
+                    }
                 },
                 ast::BinaryOperator::Lt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
                         "beforeDate".to_string(),
                     ),
-                    _ => (filter_expr, "lt".to_string()),
+                    _ => {
+                        if dim.is_time() {
+                            let casted_filter_expr = filter_expr.to_date();
+                            if let Some(dt) = casted_filter_expr {
+                                (
+                                    CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
+                                    "beforeDate".to_string(),
+                                )
+                            } else {
+                                return Err(CompilationError::User(format!(
+                                    "Unable to compare time dimension \"{}\" with not a date value: {}",
+                                    dim.get_real_name(),
+                                    filter_expr.to_value_as_str()?
+                                )));
+                            }
+                        } else {
+                            (filter_expr, "lt".to_string())
+                        }
+                    }
                 },
                 ast::BinaryOperator::LtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
@@ -2358,6 +2412,39 @@ mod tests {
                     and: None,
                 }]),
             ),
+            // SIMILAR as BETWEEN but manually
+            (
+                "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
+                None,
+                // This filter will be pushed to time_dimension
+                // Some(vec![V1LoadRequestQueryFilterItem {
+                //     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                //     operator: Some("inDateRange".to_string()),
+                //     values: Some(vec!["2021-08-31".to_string(), "2021-09-07".to_string()]),
+                //     or: None,
+                //     and: None,
+                // }]),
+            ),
+            //  SIMILAR as BETWEEN but without -1 nanosecond because <=
+            (
+                "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                        operator: Some("afterDate".to_string()),
+                        values: Some(vec!["2021-08-31T00:00:00+00:00".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                        operator: Some("lte".to_string()),
+                        values: Some(vec!["2021-09-07".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ]),
+            ),
             // LIKE
             (
                 "customer_gender LIKE 'female'".to_string(),
@@ -2403,6 +2490,44 @@ mod tests {
             ));
 
             assert_eq!(query.request.filters, *expected_fitler)
+        }
+    }
+
+    #[test]
+    fn test_filter_error() {
+        let to_check = vec![
+            (
+                "order_date >= 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
+                "order_date < 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+        ];
+
+        for (sql, expected_error) in to_check.iter() {
+            let query = convert_sql_to_cube_query(
+                &format!(
+                    "SELECT 
+                    COUNT(*), DATE(order_date) AS __timestamp
+                    FROM KibanaSampleDataEcommerce
+                    WHERE {}
+                    GROUP BY __timestamp",
+                    sql
+                ),
+                get_test_tenant_ctx(),
+                &QueryPlannerExecutionProps {
+                    connection_id: 8,
+                    user: Some("ovr".to_string()),
+                    database: None,
+                },
+            );
+
+            match &query {
+                Ok(_) => panic!("Query ({}) should return error", sql),
+                Err(e) => assert_eq!(e, expected_error),
+            }
         }
     }
 
@@ -2660,5 +2785,18 @@ mod tests {
             }
             _ => panic!("Must be DateLiteral"),
         };
+    }
+
+    #[test]
+    fn test_str_literal_to_date() {
+        let d = CompiledExpression::StringLiteral("2021-08-31".to_string())
+            .to_date()
+            .unwrap();
+        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
+
+        let d = CompiledExpression::StringLiteral("2021-08-31 00:00:00.000000".to_string())
+            .to_date()
+            .unwrap();
+        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
     }
 }
