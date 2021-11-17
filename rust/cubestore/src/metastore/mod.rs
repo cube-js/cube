@@ -840,6 +840,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<MultiIndex>, CubeError>;
     async fn drop_partitioned_index(&self, schema: String, name: String) -> Result<(), CubeError>;
     async fn get_multi_partition(&self, id: u64) -> Result<IdRow<MultiPartition>, CubeError>;
+    async fn get_child_multi_partitions(
+        &self,
+        id: u64,
+    ) -> Result<Vec<IdRow<MultiPartition>>, CubeError>;
     /// Retrieve a partial subtrees that contain common parents for all [multi_part_ids]. We
     /// guarantee that all nodes on the paths to common parents are in the results. No attempt is
     /// made to retrieve extra children, however.
@@ -3894,6 +3898,18 @@ impl MetaStore for RocksMetaStore {
     async fn get_multi_partition(&self, id: u64) -> Result<IdRow<MultiPartition>, CubeError> {
         self.read_operation(move |db| MultiPartitionRocksTable::new(db).get_row_or_not_found(id))
             .await
+    }
+    async fn get_child_multi_partitions(
+        &self,
+        id: u64,
+    ) -> Result<Vec<IdRow<MultiPartition>>, CubeError> {
+        self.read_operation(move |db| {
+            MultiPartitionRocksTable::new(db).get_rows_by_index(
+                &MultiPartitionIndexKey::ByParentId(Some(id)),
+                &MultiPartitionRocksIndex::ByParentId,
+            )
+        })
+        .await
     }
 
     async fn get_multi_partition_subtree(

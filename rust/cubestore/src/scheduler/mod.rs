@@ -443,6 +443,21 @@ impl SchedulerImpl {
                         job.get_row().row_reference()
                     ),
                 },
+                JobType::FinishMultiSplit => match job.get_row().row_reference() {
+                    RowKey::Table(TableId::MultiPartitions, m) => {
+                        self.schedule_finish_multi_split_if_needed(*m).await?;
+                        for c in self.meta_store.get_child_multi_partitions(*m).await? {
+                            if !c.get_row().active() && c.get_row().prepared_for_split() {
+                                self.schedule_finish_multi_split_if_needed(c.get_id())
+                                    .await?;
+                            }
+                        }
+                    }
+                    _ => panic!(
+                        "Unexpected row reference: {:?}",
+                        job.get_row().row_reference()
+                    ),
+                },
                 _ => {}
             }
         }
