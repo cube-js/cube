@@ -80,9 +80,7 @@ impl QueryContext {
         column_name: &String,
     ) -> Option<V1CubeMetaDimension> {
         for dimension in self.meta.dimensions.iter() {
-            let (_, dimension_name) = dimension.name.split_once('.').unwrap();
-
-            if dimension_name.eq(column_name) {
+            if dimension.get_real_name().eq_ignore_ascii_case(column_name) {
                 return Some(dimension.clone());
             }
         }
@@ -191,12 +189,7 @@ impl QueryContext {
 
                     let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
-                    self.meta.dimensions.iter().find(|dimension| {
-                        dimension
-                            .get_real_name()
-                            .to_lowercase()
-                            .eq(&possible_dimension_name)
-                    })
+                    self.find_dimension_for_identifier(&possible_dimension_name)
                 }
                 _ => {
                     return Err(CompilationError::User(format!(
@@ -239,6 +232,41 @@ impl QueryContext {
             } else {
                 Ok(None)
             }
+        } else if fn_name.eq("date_trunc") {
+            match f.args.as_slice() {
+                [ast::FunctionArg::Unnamed(ast::Expr::Value(ast::Value::SingleQuotedString(granularity))), ast::FunctionArg::Unnamed(ast::Expr::Identifier(column))] => {
+                    let possible_dimension_name = column.value.to_string();
+
+                    match granularity.as_str() {
+                        "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => (),
+                        _ => {
+                            return Err(CompilationError::User(format!(
+                                "Unsupported granularity {:?}",
+                                granularity
+                            )));
+                        }
+                    };
+
+                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
+                        if r.is_time() {
+                            Ok(Some(Selection::TimeDimension(r.clone(), granularity.clone())))
+                        } else {
+                            Err(CompilationError::User(format!(
+                                "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
+                                possible_dimension_name
+                            )))
+                        }
+                    } else {
+                        Err(CompilationError::User(format!(
+                            "Unknown dimension \"{}\" passed as a column in date_trunc",
+                            possible_dimension_name
+                        )))
+                    }
+                }
+                _ => Err(CompilationError::User(format!(
+                    "Unsupported variation of arguments passed to date_trunc, correct date_trunc(string, column)",
+                ))),
+            }
         } else if fn_name.eq("date") {
             match f.args.as_slice() {
                 [ast::FunctionArg::Unnamed(ast::Expr::Function(date_sub))] => {
@@ -279,26 +307,26 @@ impl QueryContext {
                     let possible_dimension_name =
                         self.unpack_identifier_from_arg(&date_sub.args[0])?;
 
-                    if let Some(r) = self.meta.dimensions.iter().find(|dimension| {
-                        dimension
-                            .get_real_name()
-                            .to_lowercase()
-                            .eq(&possible_dimension_name)
-                    }) {
-                        Ok(Some(Selection::TimeDimension(r.clone(), granularity)))
+                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
+                        if r.is_time() {
+                            Ok(Some(Selection::TimeDimension(r.clone(), granularity)))
+                        } else {
+                            Err(CompilationError::User(format!(
+                                "Unable to use non time dimension \"{}\" in date manipulations, please specify time dimension",
+                                possible_dimension_name
+                            )))
+                        }
                     } else {
-                        Ok(None)
+                        Err(CompilationError::User(format!(
+                            "Unknown dimension \"{}\"",
+                            possible_dimension_name
+                        )))
                     }
                 }
                 [ast::FunctionArg::Unnamed(ast::Expr::Identifier(_i))] => {
                     let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
-                    if let Some(r) = self.meta.dimensions.iter().find(|dimension| {
-                        dimension
-                            .get_real_name()
-                            .to_lowercase()
-                            .eq(&possible_dimension_name)
-                    }) {
+                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
                         Ok(Some(Selection::TimeDimension(r.clone(), "day".to_string())))
                     } else {
                         return Err(CompilationError::User(format!(
@@ -374,11 +402,10 @@ impl QueryContext {
                                 && !measure.is_same_agg_type(&call_agg_type)
                             {
                                 return Err(CompilationError::User(format!(
-                                    "Unable to use measure {} with type {:?} as argument in {} (required {})",
+                                    "Unable to use measure {} of type {} as argument in aggregate function {}(). Aggregate function must match the type of measure.",
                                     measure.get_real_name(),
-                                    measure.agg_type,
-                                    f.to_string(),
-                                    call_agg_type,
+                                    measure.agg_type.unwrap_or("unknown".to_string()),
+                                    f.name.to_string(),
                                 )));
                             } else {
                                 // @todo Should we throw an exception?

@@ -1974,7 +1974,7 @@ mod tests {
             ),
             (
                 "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use measure minPrice with type Some(\"min\") as argument in MAX(minPrice) (required max)".to_string()),
+                CompilationError::User("Unable to use measure minPrice of type min as argument in aggregate function MAX(). Aggregate function must match the type of measure.".to_string()),
             ),
             // Check restrictions for segments usage
             (
@@ -2010,7 +2010,85 @@ mod tests {
     }
 
     #[test]
-    fn test_group_by_date_granularity() {
+    fn test_group_by_date_trunc() {
+        let supported_granularities = vec![
+            // all variants
+            [
+                "DATE_TRUNC('second', order_date)".to_string(),
+                "second".to_string(),
+            ],
+            [
+                "DATE_TRUNC('minute', order_date)".to_string(),
+                "minute".to_string(),
+            ],
+            [
+                "DATE_TRUNC('hour', order_date)".to_string(),
+                "hour".to_string(),
+            ],
+            [
+                "DATE_TRUNC('week', order_date)".to_string(),
+                "week".to_string(),
+            ],
+            [
+                "DATE_TRUNC('month', order_date)".to_string(),
+                "month".to_string(),
+            ],
+            [
+                "DATE_TRUNC('quarter', order_date)".to_string(),
+                "quarter".to_string(),
+            ],
+            [
+                "DATE_TRUNC('year', order_date)".to_string(),
+                "year".to_string(),
+            ],
+            // with escaping
+            [
+                "DATE_TRUNC('second', `order_date`)".to_string(),
+                "second".to_string(),
+            ],
+        ];
+
+        for [subquery, expected_granularity] in supported_granularities.iter() {
+            let query = convert_simple_select(
+                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery)
+            );
+
+            assert_eq!(
+                query,
+                CompiledQuery {
+                    request: V1LoadRequestQuery {
+                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                        dimensions: Some(vec![]),
+                        segments: Some(vec![]),
+                        time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                            granularity: Some(expected_granularity.to_string()),
+                            date_range: None,
+                        }]),
+                        order: None,
+                        limit: None,
+                        offset: None,
+                        filters: None
+                    },
+                    meta: vec![
+                        CompiledQueryFieldMeta {
+                            column_from: "KibanaSampleDataEcommerce.count".to_string(),
+                            column_to: "count".to_string(),
+                            column_type: ColumnType::MYSQL_TYPE_LONGLONG,
+                        },
+                        CompiledQueryFieldMeta {
+                            column_from: "KibanaSampleDataEcommerce.order_date".to_string(),
+                            column_to: "__timestamp".to_string(),
+                            column_type: ColumnType::MYSQL_TYPE_STRING,
+                        }
+                    ]
+                }
+            )
+        }
+    }
+
+    #[test]
+    fn test_group_by_date_granularity_superset() {
         let supported_granularities = vec![
             // With MAKEDATE
             ["MAKEDATE(YEAR(order_date), 1) + INTERVAL QUARTER(order_date) QUARTER - INTERVAL 1 QUARTER".to_string(), "quarter".to_string()],
