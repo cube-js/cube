@@ -89,6 +89,7 @@ pub async fn choose_index_ext(
     rewrite_plan(p, &None, &mut collector)?;
 
     // Consult metastore to choose the index.
+    // TODO should be single snapshot read to ensure read consistency here
     let tables = metastore
         .get_tables_with_indexes(
             collector
@@ -121,6 +122,7 @@ pub async fn choose_index_ext(
             .collect::<Result<_, DataFusionError>>()?,
     };
 
+    // TODO should be single snapshot read to ensure read consistency here
     let partitions = metastore
         .get_active_partitions_and_chunks_by_index_id_for_select(
             indices.iter().map(|i| i.index.get_id()).collect_vec(),
@@ -153,6 +155,7 @@ pub async fn choose_index_ext(
         }
     }
 
+    // TODO should be single snapshot read to ensure read consistency here
     let multi_part_subtree = metastore.get_multi_partition_subtree(multi_parts).await?;
     Ok((
         plan,

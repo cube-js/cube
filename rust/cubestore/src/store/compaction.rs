@@ -122,11 +122,16 @@ impl CompactionService for CompactionServiceImpl {
         // And we never split, multi-partitions have a different process for that.
         let new_chunk = match &multi_part {
             None => None,
-            Some(_) => Some(
-                self.meta_store
-                    .create_chunk(partition_id, chunks_row_count as usize, false)
-                    .await?,
-            ),
+            Some(_) => {
+                if chunks.len() < 2 {
+                    return Ok(());
+                }
+                Some(
+                    self.meta_store
+                        .create_chunk(partition_id, chunks_row_count as usize, false)
+                        .await?,
+                )
+            }
         };
         let mut total_rows = chunks_row_count;
         if new_chunk.is_none() {
