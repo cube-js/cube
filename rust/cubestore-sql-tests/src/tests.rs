@@ -44,6 +44,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
+        t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
@@ -755,6 +756,35 @@ async fn in_list(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn in_list_with_union(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_1 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_2 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_1 (id, city, state) VALUES ('a1', 'San Francisco', 'CA'), ('b1', 'New York', 'NY'), ('c1', 'San Diego', 'CA'), ('d1', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_2 (id, city, state) VALUES ('a2', 'San Francisco', 'CA'), ('b2', 'New York', 'NY'), ('c2', 'San Diego', 'CA'), ('d2', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) from (SELECT * FROM foo.customers_1 UNION ALL SELECT * FROM foo.customers_2) AS `customers` WHERE state in ('CA', 'TX')")
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(6)]));
 }
 
 async fn numeric_cast(service: Box<dyn SqlClient>) {
