@@ -33,14 +33,14 @@
     "@types/jest": "^26",
     "@types/mysql": "^2.15.19",
     "@types/node": "^10",
+    "@cubejs-infra/node-pre-gyp-github": "^1",
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
     "mysql": "^2.18.1",
     "typescript": "~4.1.5"
   },
   "dependencies": {
-    "@mapbox/node-pre-gyp": "^1",
-    "@mathquis/node-pre-gyp-github": "^1"
+    "@mapbox/node-pre-gyp": "^1"
   },
   "binary": {
     "module_name": "index",
