@@ -173,12 +173,21 @@ enum CompiledExpression {
 }
 
 impl CompiledExpression {
+    pub fn to_date_literal(&self) -> Option<CompiledExpression> {
+        let date = self.to_date();
+        date.map(CompiledExpression::DateLiteral)
+    }
+
     pub fn to_date(&self) -> Option<DateTime<Utc>> {
         match self {
             CompiledExpression::DateLiteral(date) => Some(*date),
             CompiledExpression::StringLiteral(s) => {
                 if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
                     return Some(datetime);
+                };
+
+                if let Ok(datetime) = DateTime::parse_from_rfc3339(s.as_str()) {
+                    return Some(datetime.into());
                 };
 
                 if let Ok(ref date) = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d") {
@@ -586,24 +595,42 @@ fn compile_where_expression(
         } => {
             let compiled_expr = compile_expression(expr, ctx)?;
             let column_for_filter = match &compiled_expr {
-                CompiledExpression::Selection(selection) => match selection {
-                    Selection::TimeDimension(t, _) => Ok(t),
-                    Selection::Dimension(d) => Ok(d),
-                    Selection::Segment(_) | Selection::Measure(_) => {
+                CompiledExpression::Selection(Selection::TimeDimension(t, _)) => Ok(t),
+                CompiledExpression::Selection(Selection::Dimension(d)) => {
+                    if d.is_time() {
+                        Ok(d)
+                    } else {
                         Err(CompilationError::User(format!(
-                            "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
+                            "Column for Between must be a time dimension, actual: {:?}",
                             compiled_expr
                         )))
                     }
-                },
+                }
                 _ => Err(CompilationError::User(format!(
-                    "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
+                    "Column for Between must be a time dimension, actual: {:?}",
                     compiled_expr
                 ))),
             }?;
 
             let low_compiled = compile_expression(low, ctx)?;
+            let low_compiled_date =
+                low_compiled
+                    .to_date_literal()
+                    .ok_or(CompilationError::User(format!(
+                        "Unable to compare time dimension \"{}\" with not a date value: {}",
+                        column_for_filter.get_real_name(),
+                        low_compiled.to_value_as_str()?
+                    )))?;
+
             let high_compiled = compile_expression(high, ctx)?;
+            let high_compiled_date =
+                high_compiled
+                    .to_date_literal()
+                    .ok_or(CompilationError::User(format!(
+                        "Unable to compare time dimension \"{}\" with not a date value: {}",
+                        column_for_filter.get_real_name(),
+                        high_compiled.to_value_as_str()?
+                    )))?;
 
             Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
                 member: column_for_filter.name.clone(),
@@ -613,8 +640,8 @@ fn compile_where_expression(
                     "inDateRange".to_string()
                 },
                 values: Some(vec![
-                    low_compiled.to_value_as_str()?,
-                    high_compiled.to_value_as_str()?,
+                    low_compiled_date.to_value_as_str()?,
+                    high_compiled_date.to_value_as_str()?,
                 ]),
             }))
         }
@@ -2394,7 +2421,10 @@ mod tests {
                 Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("notInDateRange".to_string()),
-                    values: Some(vec!["2021-08-31".to_string(), "2021-09-07".to_string()]),
+                    values: Some(vec![
+                        "2021-08-31T00:00:00+00:00".to_string(),
+                        "2021-09-07T00:00:00+00:00".to_string(),
+                    ]),
                     or: None,
                     and: None,
                 }]),
@@ -2483,12 +2513,22 @@ mod tests {
     #[test]
     fn test_filter_error() {
         let to_check = vec![
+            // Binary expr
             (
                 "order_date >= 'WRONG_DATE'".to_string(),
                 CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date < 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            // Between
+            (
+                "order_date BETWEEN 'WRONG_DATE' AND '2021-01-01'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
+                "order_date BETWEEN '2021-01-01' AND 'WRONG_DATE'".to_string(),
                 CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
         ];
@@ -2778,6 +2818,11 @@ mod tests {
         assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
 
         let d = CompiledExpression::StringLiteral("2021-08-31 00:00:00.000000".to_string())
+            .to_date()
+            .unwrap();
+        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
+
+        let d = CompiledExpression::StringLiteral("2021-08-31T00:00:00+00:00".to_string())
             .to_date()
             .unwrap();
         assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
