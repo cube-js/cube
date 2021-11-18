@@ -2709,6 +2709,15 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
+"@cubejs-infra/node-pre-gyp-github@^1":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@cubejs-infra/node-pre-gyp-github/-/node-pre-gyp-github-1.0.2.tgz#7c52e7f00c74d80a47407d4a80293fbc4acd0fee"
+  integrity sha512-hSwjo95IywfVI6rdp9acR5SmNrvyS4qrekvdOB8HiWN4PHa0yIWMKRoEfHCn+psymjMX3kcABxSdea6xn2eB4Q==
+  dependencies:
+    "@octokit/rest" "^18.1.1"
+    commander "^7.1.0"
+    mime-types "^2.1.28"
+
 "@cypress/listr-verbose-renderer@^0.4.1":
   version "0.4.1"
   resolved "https://registry.yarnpkg.com/@cypress/listr-verbose-renderer/-/listr-verbose-renderer-0.4.1.tgz#a77492f4b11dcc7c446a34b3e28721afd33c642a"
@@ -4468,15 +4477,6 @@
     rimraf "^3.0.2"
     semver "^7.3.5"
     tar "^6.1.11"
-
-"@mathquis/node-pre-gyp-github@^1":
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/@mathquis/node-pre-gyp-github/-/node-pre-gyp-github-1.0.1.tgz#57429d98f8c1169cb6fe138939233c7cb34a6498"
-  integrity sha512-zdUnMiurUPOgV3F1ROcSsVDIshqzdBDEdHg+obVwlV5noswCUeCjg6j966OPO76RrDB0kwFo7yfYLeeHpWeN5w==
-  dependencies:
-    "@octokit/rest" "^18.1.1"
-    commander "^7.1.0"
-    mime-types "^2.1.28"
 
 "@mrmlnc/readdir-enhanced@^2.2.1":
   version "2.2.1"
