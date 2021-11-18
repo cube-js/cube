@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.57",
+  "version": "0.28.58",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -27,7 +27,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "^0.28.57",
+    "@cubejs-backend/native": "^0.28.58",
     "@cubejs-backend/shared": "^0.28.55",
     "@hapi/joi": "^15.1.1",
     "body-parser": "^1.19.0",
@@ -39,8 +39,8 @@
     "jwk-to-pem": "^2.0.4",
     "moment": "^2.24.0",
     "moment-timezone": "^0.5.27",
-    "node-fetch": "^2.6.1",
     "nexus": "^1.1.0",
+    "node-fetch": "^2.6.1",
     "querystring": "^0.2.1",
     "ramda": "^0.27.0",
     "uuid": "^8.3.2"

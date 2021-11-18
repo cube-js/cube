@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.28.57",
+  "version": "0.28.58",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -30,10 +30,10 @@
     "@mapbox/node-pre-gyp"
   ],
   "devDependencies": {
+    "@cubejs-infra/node-pre-gyp-github": "^1",
     "@types/jest": "^26",
     "@types/mysql": "^2.15.19",
     "@types/node": "^10",
-    "@cubejs-infra/node-pre-gyp-github": "^1",
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
     "mysql": "^2.18.1",
