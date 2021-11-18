@@ -246,6 +246,10 @@ export class BaseFilter extends BaseDimension {
     return `${column} @@ phraseto_tsquery(CAST(${this.firstParameter()} AS varchar))`;
   }
 
+  arrayContainsWhere(column) {
+    return `array_agg(${column}) @> '${this.firstParameter()}'`;
+  }
+
   expressionEqualsWhere(column) {
     return `${column} = ${this.values[0]}`;
   }

@@ -58,6 +58,7 @@ const operators = [
   'lte',
   'set',
   'tsQuery',
+  'arrayContains',
   'notSet',
   'inDateRange',
   'notInDateRange',
