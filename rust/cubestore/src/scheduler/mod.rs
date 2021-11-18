@@ -454,14 +454,16 @@ impl SchedulerImpl {
         partition: &IdRow<Partition>,
     ) -> Result<(), CubeError> {
         let partition_id = partition.get_id();
-        let chunk_sizes = self
-            .meta_store
-            .get_partition_chunk_sizes(partition_id)
-            .await?;
         let all_chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id, false)
+            .get_chunks_by_partition_out_of_queue(partition_id, false)
             .await?;
+
+        let chunk_sizes = all_chunks
+            .iter()
+            .map(|r| r.get_row().get_row_count())
+            .sum::<u64>();
+
         let chunks = all_chunks
             .iter()
             .filter(|c| !c.get_row().in_memory())

@@ -895,6 +895,11 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_id: u64,
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn get_chunks_by_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+        include_inactive: bool,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn swap_chunks(
@@ -2936,7 +2941,9 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_partition_chunk_sizes(&self, partition_id: u64) -> Result<u64, CubeError> {
-        let chunks = self.get_chunks_by_partition(partition_id, false).await?;
+        let chunks = self
+            .get_chunks_by_partition_out_of_queue(partition_id, false)
+            .await?;
         Ok(chunks.iter().map(|r| r.get_row().row_count).sum())
     }
 
@@ -3521,6 +3528,17 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_chunks_by_partition(
+        &self,
+        partition_id: u64,
+        include_inactive: bool,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation(move |db| {
+            Self::chunks_by_partition(partition_id, &ChunkRocksTable::new(db), include_inactive)
+        })
+        .await
+    }
+
+    async fn get_chunks_by_partition_out_of_queue(
         &self,
         partition_id: u64,
         include_inactive: bool,
