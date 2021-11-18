@@ -4834,6 +4834,16 @@ mod tests {
                 .create_schema("foo1".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()
@@ -4846,6 +4856,16 @@ mod tests {
                 .create_schema("foo".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()
@@ -4858,6 +4878,16 @@ mod tests {
                 .create_schema("bar".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()
