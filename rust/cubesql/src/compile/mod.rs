@@ -16,13 +16,11 @@ use log::{debug, trace};
 use serde::Serialize;
 use serde_json::json;
 use sqlparser::ast::{self, Ident, ObjectName};
-use sqlparser::parser::Parser;
 
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
-use crate::compile::parser::MySqlDialectWithBackTicks;
 use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
 use crate::schema::V1CubeMetaExt;
@@ -40,6 +38,7 @@ use self::engine::udf::{
     create_connection_id_udf, create_current_user_udf, create_db_udf, create_user_udf,
     create_version_udf,
 };
+use self::parser::parse_sql_to_statement;
 
 pub mod builder;
 pub mod context;
@@ -176,7 +175,7 @@ enum CompiledExpression {
 impl CompiledExpression {
     pub fn to_date(&self) -> Option<DateTime<Utc>> {
         match self {
-            CompiledExpression::DateLiteral(date) => Some(date.clone()),
+            CompiledExpression::DateLiteral(date) => Some(*date),
             CompiledExpression::StringLiteral(s) => {
                 if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
                     return Some(datetime);
@@ -1464,20 +1463,8 @@ pub fn convert_sql_to_cube_query(
     tenant: Arc<ctx::TenantContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
-    let dialect = MySqlDialectWithBackTicks {};
-    let parse_result = Parser::parse_sql(&dialect, query);
-
-    match parse_result {
-        Err(error) => Err(CompilationError::User(format!(
-            "Unable to parse: {:?}",
-            error
-        ))),
-        Ok(stmts) => {
-            let stmt = &stmts[0];
-
-            convert_statement_to_cube_query(stmt, tenant, props)
-        }
-    }
+    let stmt = parse_sql_to_statement(query)?;
+    convert_statement_to_cube_query(&stmt, tenant, props)
 }
 
 #[cfg(test)]
@@ -2739,14 +2726,9 @@ mod tests {
         }
     }
 
-    fn parse_expr_from_projection(query: &str) -> ast::Expr {
-        let dialect = parser::MySqlDialectWithBackTicks {};
-        let replaced_quote = query.replace("\\'", "''");
-        let parse_result = Parser::parse_sql(&dialect, &replaced_quote).unwrap();
-
-        let query = &parse_result[0];
-
-        match query {
+    fn parse_expr_from_projection(query: &String) -> ast::Expr {
+        let stmt = parse_sql_to_statement(&query).unwrap();
+        match stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) => {
                     if select.projection.len() == 1 {
@@ -2773,7 +2755,8 @@ mod tests {
     fn test_str_to_date() {
         let compiled = compile_expression(
             &parse_expr_from_projection(
-                "SELECT STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')",
+                &"SELECT STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')"
+                    .to_string(),
             ),
             &QueryContext::new(&get_test_meta()[0]),
         )
