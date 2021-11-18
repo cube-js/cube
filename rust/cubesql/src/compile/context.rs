@@ -225,10 +225,7 @@ impl QueryContext {
                     )));
                 };
 
-                Ok(Some(Selection::TimeDimension(
-                    time_dimension.clone(),
-                    granularity,
-                )))
+                Ok(Some(Selection::TimeDimension(time_dimension, granularity)))
             } else {
                 Ok(None)
             }
@@ -249,7 +246,7 @@ impl QueryContext {
 
                     if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
                         if r.is_time() {
-                            Ok(Some(Selection::TimeDimension(r.clone(), granularity.clone())))
+                            Ok(Some(Selection::TimeDimension(r, granularity.clone())))
                         } else {
                             Err(CompilationError::User(format!(
                                 "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
@@ -263,9 +260,7 @@ impl QueryContext {
                         )))
                     }
                 }
-                _ => Err(CompilationError::User(format!(
-                    "Unsupported variation of arguments passed to date_trunc, correct date_trunc(string, column)",
-                ))),
+                _ => Err(CompilationError::User("Unsupported variation of arguments passed to date_trunc, correct date_trunc(string, column)".to_string())),
             }
         } else if fn_name.eq("date") {
             match f.args.as_slice() {
@@ -309,7 +304,7 @@ impl QueryContext {
 
                     if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
                         if r.is_time() {
-                            Ok(Some(Selection::TimeDimension(r.clone(), granularity)))
+                            Ok(Some(Selection::TimeDimension(r, granularity)))
                         } else {
                             Err(CompilationError::User(format!(
                                 "Unable to use non time dimension \"{}\" in date manipulations, please specify time dimension",
@@ -327,7 +322,7 @@ impl QueryContext {
                     let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
                     if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
-                        Ok(Some(Selection::TimeDimension(r.clone(), "day".to_string())))
+                        Ok(Some(Selection::TimeDimension(r, "day".to_string())))
                     } else {
                         return Err(CompilationError::User(format!(
                             "Unable to find dimension {} from expression: {}",
