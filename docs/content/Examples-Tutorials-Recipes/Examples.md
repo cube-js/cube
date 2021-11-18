@@ -30,9 +30,6 @@ These tutorials are great places to start learning Cube.js:
   — learn how to use Query Builder components for React and Vue to build
   customizable query interfaces
 
-- [Building an internal dashboard with Retool](https://cube.dev/blog/building-an-internal-dashboard-with-retool-and-cube/) — learn how
-  to use Retool to build custom internal tools with metrics dashboards
-
 The following tutorials cover advanced concepts of Cube.js:
 
 - [Pre-Aggregations Tutorial](https://cube.dev/blog/high-performance-data-analytics-with-cubejs-pre-aggregations/) —
@@ -63,16 +60,17 @@ Learn more about prominent features of Cube.js:
 
 Explore how to integrate Cube.js with data visualization tools:
 
-| Tool                                                                   | Tutorial                                                                                                             | Demo                                                  |
-| :--------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
-| 📈 [D3.js](https://awesome.cube.dev/tools/d3)                          | [D3 dashboard tutorial](https://d3-dashboard.cube.dev)                                                               | [Demo](https://d3-dashboard-demo.cube.dev)            |
-| 📈 [Google Charts](https://awesome.cube.dev/tools/google-charts)       | [Google Charts dashboard](https://cube.dev/blog/google-charts-dashboard)                                             | [Demo](https://google-charts-dashboard-demo.cube.dev) |
-| 📈 [Highcharts](https://awesome.cube.dev/tools/highcharts)             | [React Highcharts example](https://cube.dev/blog/react-highcharts-example/)                                          | [Demo](https://highcharts-demo.cube.dev)              |
-| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [Material UI Dashboard with React](https://material-ui-dashboard.cube.dev)                                           | [Demo](https://material-ui-dashboard-demo.cube.dev)   |
-| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [React data table with Material UI](https://dev.to/cubejs/react-data-table-with-material-ui-and-a-spark-of-joy-50o1) | [Demo](https://react-data-table-demo.cube.dev)        |
-| 📈 [Material](https://material.io)                                     | [Angular dashboard with Material](https://angular-dashboard.cube.dev)                                                | [Demo](https://angular-dashboard-demo.cube.dev)       |
-| 📊 [AG Grid](https://awesome.cube.dev/tools/ag-grid)                   | [React Pivot Table with AG Grid](https://react-pivot-table.cube.dev)                                                 | [Demo](https://react-pivot-table-demo.cube.dev)       |
-| 🗺 [Mapbox](https://awesome.cube.dev/tools/mapbox-gl)                  | [Building map-based data visualizations with Mapbox](https://mapbox-guide.cube.dev)                                  | [Demo](https://mapbox-demo.cube.dev)                  |
+| Tool                                                                   | Tutorial                                                                                                                 | Demo                                                                                    |
+| :--------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| 📈 [D3.js](https://awesome.cube.dev/tools/d3)                          | [D3 dashboard tutorial](https://d3-dashboard.cube.dev)                                                                   | [Demo](https://d3-dashboard-demo.cube.dev)                                              |
+| 📈 [Google Charts](https://awesome.cube.dev/tools/google-charts)       | [Google Charts dashboard](https://cube.dev/blog/google-charts-dashboard)                                                 | [Demo](https://google-charts-dashboard-demo.cube.dev)                                   |
+| 📈 [Highcharts](https://awesome.cube.dev/tools/highcharts)             | [React Highcharts example](https://cube.dev/blog/react-highcharts-example/)                                              | [Demo](https://highcharts-demo.cube.dev)                                                |
+| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [Material UI Dashboard with React](https://material-ui-dashboard.cube.dev)                                               | [Demo](https://material-ui-dashboard-demo.cube.dev)                                     |
+| 📈 [Material UI](https://awesome.cube.dev/tools/material-ui-data-grid) | [React data table with Material UI](https://dev.to/cubejs/react-data-table-with-material-ui-and-a-spark-of-joy-50o1)     | [Demo](https://react-data-table-demo.cube.dev)                                          |
+| 📈 [Material](https://material.io)                                     | [Angular dashboard with Material](https://angular-dashboard.cube.dev)                                                    | [Demo](https://angular-dashboard-demo.cube.dev)                                         |
+| 📊 [AG Grid](https://awesome.cube.dev/tools/ag-grid)                   | [React Pivot Table with AG Grid](https://react-pivot-table.cube.dev)                                                     | [Demo](https://react-pivot-table-demo.cube.dev)                                         |
+| 🗺 [Mapbox](https://awesome.cube.dev/tools/mapbox-gl)                  | [Building map-based data visualizations with Mapbox](https://mapbox-guide.cube.dev)                                      | [Demo](https://mapbox-demo.cube.dev)                                                    |
+| 📊 [Retool](https://retool.com/)                                       | [Building an internal dashboard with Retool](https://cube.dev/blog/building-an-internal-dashboard-with-retool-and-cube/) | [Demo](https://cubedev.retool.com/embedded/public/945c174d-566e-42f6-b33c-73052847e483) |
 
 ### <--{"id" : "Tutorials"}--> Demo applications
 
