@@ -1,5 +1,5 @@
 ---
-title: Using Apache Superset with Cube SQL
+title: Using Apache Superset with Cube SQL API
 permalink: /recipes/using-apache-superset-with-cube-sql
 category: Examples & Tutorials
 subCategory: Queries
@@ -7,84 +7,52 @@ tags: cube-sql,apache-superset
 menuOrder: 4
 ---
 
-## Use case
-
-We want to connect a Cube project to [Apache Superset][superset] using the Cube
-SQL API. [Apache Superset][superset] is an open-source data exploration and
+You can connect a Cube project to [Apache Superset][superset] using the Cube SQL
+API. [Apache Superset][superset] is an open-source data exploration and
 visualization platform, commonly used to visualize business metrics and
 performance.
 
-## Prerequisites
+<LoomVideo url="https://www.loom.com/embed/a682acc3bd1149b68e517ea6976eeed9" />
 
-This recipe assumes you already have set up:
-
-- A Cube project
-- An Apache Superset installation
-
-If you haven't already set up a Cube project, [read
-this][ref-cube-getting-started-docker]. To learn about how to set up Apache
-Superset, follow [this guide][superset-docs-installation-docker].
-
-## Enable Cube SQL connector
-
-We'll assume an existing Cube project is set up with an e-commerce database.
-First, let's enable the SQL connector in Cube by adding the following
-environment variable:
-
-```dotenv
-CUBEJS_SQL_PORT=3306
-```
+## Enable Cube SQL API
 
 <InfoBox>
 
-If you're using Docker Compose, remember to also expose the port from
-`docker-compose.yml`:
-
-```yaml
-services:
-  cube_api:
-    ...
-    ports:
-      - 3306:3306 # Cube SQL API
-```
+Don't have a Cube project yet? [Learn how to get started
+here][ref-getting-started].
 
 </InfoBox>
 
-Once restarted, the Cube project should now have the SQL connector enabled. If
-the Cube project is using Docker Compose, we can run the following command to
-confirm that the port is indeed open:
+### Cube Cloud
 
-```bash
-$ docker-compose ps
-NAME                    COMMAND                  SERVICE             STATUS              PORTS
-hello-cube-sql_cube_1   "docker-entrypoint.s…"   cube                running             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp, 0.0.0.0:3306->3306/tcp, :::3306->3306/tcp, 0.0.0.0:4000->4000/tcp, :::4000->4000/tcp
+Click **How to connect** link on the Overview page, navigate to the SQL API tab
+and enable it. Once enabled, you should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```dotenv
+CUBEJS_SQL_PORT=3306
+CUBE_SQL_USERNAME=myusername
+CUBE_SQL_PASSWORD=mypassword
 ```
 
-## Generate a JWT
+## Connecting from Superset
 
-Before moving onto Apache Superset, we need to generate a JWT first. From the
-terminal inside the Cube project, run the following:
-
-```bash
-$ npx cubejs-cli token
-Warning. Option --user-context was deprecated and payload will be stored inside root instead of u
-Generating Cube.js JWT token
-
------------------------------------------------------------------------------------------
-  Use these manually generated tokens in production with caution.
-  Please refer to https://cube.dev/docs/security for production security best practices.
------------------------------------------------------------------------------------------
-
-Expires in: 30 days
-Payload: {}
-
-Token: eyJhbGc***
-```
-
-## Configure Apache Superset
-
-Moving on to Apache Superset, go to Data > Databases, then click '+ Database' to
-add a new database:
+In Apache Superset, go to Data > Databases, then click '+ Database' to add a new
+database:
 
 <div style="text-align: center">
   <img
@@ -106,10 +74,7 @@ Pick MySQL from the modal:
   />
 </div>
 
-Now set up the database credentials. Remember to use the right host
-(`host.docker.internal` if you're running Cube inside Docker Compose) and port
-as configured earlier (`CUBEJS_SQL_PORT`). For the username field, use the JWT
-generated earlier, and leave the password field blank.
+Now enter the Cube SQL API credentials from earlier:
 
 <div style="text-align: center">
   <img
@@ -120,8 +85,38 @@ generated earlier, and leave the password field blank.
   />
 </div>
 
-Click 'Connect', then 'Finish' and head to SQL Lab > SQL Editor to run a test
-query:
+Click 'Connect' and then 'Finish'. Now, we can create a dataset in Superset and
+explore it. The Cube SQL API exposes cubes as tables where both measures and
+dimensions are columns.
+
+Let's use the following Cube data schema:
+
+```js
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+
+    created: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+Using the SQL API, `Orders` will be exposed as a table. In Superset, we can
+create datasets based on tables. Let's create one from `Orders` table:
 
 <div style="text-align: center">
   <img
@@ -132,6 +127,59 @@ query:
   />
 </div>
 
+## Creating Charts
+
+Now, we can explore this dataset. Let's create a new chart of type line with
+**Orders** dataset.
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: SQL Editor page with successful query"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-5.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+We can select `COUNT(*)` as metric and `created` as time column with time grain
+**month**.
+
+When querying measures in Cube, there is no need to apply aggregate functions to
+them; for example, the following would be a valid query to Cube SQL API:
+
+```sql
+SELECT count FROM Orders;
+```
+
+But because many BI tools generate metrics with aggregate functions, Cube knows
+how to re-write aggregates to measures. The `COUNT(*)` metric is automatically
+generated for every new dataset in Superset. Cube will replace `COUNT(*)` with
+measure of type count in the selected cube:
+
+```sql
+--- For our Orders cube
+--- this query
+SELECT COUNT(*) FROM Orders;
+
+--- is similiar to this
+SELECT count FROM Orders;
+
+--- because Cube replaces COUNT(*) with measure of type count in the given cube
+```
+
+You can customize the list of metrics for a dataset in Settings and map cube
+measures to metrics.
+
+<div style="text-align: center">
+  <img
+    alt="Apache Superset: SQL Editor page with successful query"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-6.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
 [superset]: https://superset.apache.org/
 [ref-cube-getting-started-docker]: https://cube.dev/docs/getting-started/docker
 [superset-docs-installation-docker]:
