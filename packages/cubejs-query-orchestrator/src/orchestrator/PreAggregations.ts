@@ -726,7 +726,7 @@ export class PreAggregationLoader {
     ));
     await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
     await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false);
+    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
     await this.loadCache.fetchTables(this.preAggregation);
   }
 
@@ -775,7 +775,7 @@ export class PreAggregationLoader {
     }
 
     await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false);
+    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
   }
 
   /**
@@ -916,7 +916,7 @@ export class PreAggregationLoader {
     this.logger('Uploading external pre-aggregation completed', queryOptions);
 
     await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true);
+    await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
   protected async createIndexes(driver, newVersionEntry, saveCancelFn, queryOptions) {
@@ -953,7 +953,8 @@ export class PreAggregationLoader {
     client: DriverInterface,
     justCreatedTable: string,
     saveCancelFn: SaveCancelFn,
-    external: boolean
+    external: boolean,
+    queryOptions: any
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
@@ -1001,8 +1002,8 @@ export class PreAggregationLoader {
         .filter(t => tablesToSave.indexOf(t) === -1);
 
       this.logger('Dropping orphaned tables', {
+        ...queryOptions,
         tablesToDrop: JSON.stringify(toDrop),
-        requestId: this.requestId
       });
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
     });
