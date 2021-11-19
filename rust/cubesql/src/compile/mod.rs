@@ -380,11 +380,32 @@ fn compiled_binary_op_expr(
     let compiled_filter = match selection_to_filter {
         // Compile to CompiledFilter::Filter
         Selection::Dimension(dim) => {
+            let filter_expr = if dim.is_time() {
+                let date = filter_expr.to_date();
+                if let Some(dt) = date {
+                    CompiledExpression::DateLiteral(dt)
+                } else {
+                    return Err(CompilationError::User(format!(
+                        "Unable to compare time dimension \"{}\" with not a date value: {}",
+                        dim.get_real_name(),
+                        filter_expr.to_value_as_str()?
+                    )));
+                }
+            } else {
+                filter_expr
+            };
+
             let (value, operator) = match op {
                 ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
                 ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
+                // >=
+                ast::BinaryOperator::GtEq => match filter_expr {
+                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
+                    _ => (filter_expr, "gte".to_string()),
+                },
+                // >
                 ast::BinaryOperator::Gt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt + Duration::milliseconds(1)),
@@ -392,57 +413,22 @@ fn compiled_binary_op_expr(
                     ),
                     _ => (filter_expr, "gt".to_string()),
                 },
-                ast::BinaryOperator::GtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
-                    _ => {
-                        if dim.is_time() {
-                            let casted_filter_expr = filter_expr.to_date();
-                            if let Some(dt) = casted_filter_expr {
-                                (CompiledExpression::DateLiteral(dt), "afterDate".to_string())
-                            } else {
-                                return Err(CompilationError::User(format!(
-                                    "Unable to compare time dimension \"{}\" with not a date value: {}",
-                                    dim.get_real_name(),
-                                    filter_expr.to_value_as_str()?
-                                )));
-                            }
-                        } else {
-                            (filter_expr, "gte".to_string())
-                        }
-                    }
-                },
+                // <
                 ast::BinaryOperator::Lt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
                         "beforeDate".to_string(),
                     ),
-                    _ => {
-                        if dim.is_time() {
-                            let casted_filter_expr = filter_expr.to_date();
-                            if let Some(dt) = casted_filter_expr {
-                                (
-                                    CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
-                                    "beforeDate".to_string(),
-                                )
-                            } else {
-                                return Err(CompilationError::User(format!(
-                                    "Unable to compare time dimension \"{}\" with not a date value: {}",
-                                    dim.get_real_name(),
-                                    filter_expr.to_value_as_str()?
-                                )));
-                            }
-                        } else {
-                            (filter_expr, "lt".to_string())
-                        }
-                    }
+                    _ => (filter_expr, "lt".to_string()),
                 },
+                // <=
                 ast::BinaryOperator::LtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
-                        "Unable to compile operator: {:?}",
+                        "Operator in binary expression: {:?}",
                         op
                     )))
                 }
@@ -2342,6 +2328,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             (
                 "taxful_total_price > 5".to_string(),
@@ -2352,16 +2339,62 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             (
-                "taxful_total_price > -1".to_string(),
+                "taxful_total_price >= 5".to_string(),
                 Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("gt".to_string()),
+                    operator: Some("gte".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "taxful_total_price < 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                    operator: Some("lt".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "taxful_total_price <= 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                    operator: Some("lte".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "taxful_total_price = -1".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                    operator: Some("equals".to_string()),
                     values: Some(vec!["-1".to_string()]),
                     or: None,
                     and: None,
                 }]),
+                None,
+            ),
+            (
+                "taxful_total_price <> -1".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                    operator: Some("notEquals".to_string()),
+                    values: Some(vec!["-1".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
             ),
             // IN
             (
@@ -2373,6 +2406,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             (
                 "customer_gender NOT IN ('FEMALE', 'MALE')".to_string(),
@@ -2383,6 +2417,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             // NULL
             (
@@ -2394,6 +2429,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             (
                 "customer_gender IS NOT NULL".to_string(),
@@ -2404,19 +2440,44 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
+            ),
+            // Date
+            (
+                "order_date = '2021-08-31'".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "order_date <> '2021-08-31'".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("notEquals".to_string()),
+                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
             ),
             // BETWEEN
             (
                 "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
-                None,
                 // This filter will be pushed to time_dimension
-                // V1LoadRequestQueryFilterItem {
-                //     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                //     operator: Some("inDateRange".to_string()),
-                //     values: Some(vec!["2021-08-31".to_string(), "2021-09-07".to_string()]),
-                //     or: None,
-                //     and: None,
-                // },
+                None,
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-07T00:00:00.000Z".to_string(),
+                    ])),
+                }]),
             ),
             (
                 "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
@@ -2430,39 +2491,36 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             // SIMILAR as BETWEEN but manually
             (
                 "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
-                None,
                 // This filter will be pushed to time_dimension
-                // Some(vec![V1LoadRequestQueryFilterItem {
-                //     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                //     operator: Some("inDateRange".to_string()),
-                //     values: Some(vec!["2021-08-31".to_string(), "2021-09-07".to_string()]),
-                //     or: None,
-                //     and: None,
-                // }]),
+                None,
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        // -1 milleseconds hack for cube.js
+                        "2021-09-06T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
             ),
             //  SIMILAR as BETWEEN but without -1 nanosecond because <=
             (
                 "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
-                Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("afterDate".to_string()),
-                        values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("lte".to_string()),
-                        values: Some(vec!["2021-09-07".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                ]),
+                None,
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        // without -1 because <=
+                        "2021-09-07T00:00:00.000Z".to_string(),
+                    ])),
+                }]),
             ),
             // LIKE
             (
@@ -2474,6 +2532,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             (
                 "customer_gender NOT LIKE 'male'".to_string(),
@@ -2484,31 +2543,43 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                None,
             ),
             // Segment
             (
                 "is_male = true".to_string(),
                 // This filter will be pushed to segments
                 None,
+                None,
             ),
             (
                 "is_male = true AND is_female = true".to_string(),
                 // This filters will be pushed to segments
                 None,
+                None,
             ),
         ];
 
-        for (sql, expected_fitler) in to_check.iter() {
+        for (sql, expected_fitler, expected_time_dimensions) in to_check.iter() {
             let query = convert_simple_select(format!(
                 "SELECT 
-                COUNT(*), DATE(order_date) AS __timestamp
+                COUNT(*)
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
                 sql
             ));
 
-            assert_eq!(query.request.filters, *expected_fitler)
+            assert_eq!(
+                query.request.filters, *expected_fitler,
+                "Filters for {}",
+                sql
+            );
+            assert_eq!(
+                query.request.time_dimensions, *expected_time_dimensions,
+                "Time dimensions for {}",
+                sql
+            );
         }
     }
 
@@ -2521,7 +2592,23 @@ mod tests {
                 CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
+                "order_date <= 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
                 "order_date < 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
+                "order_date <= 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
+                "order_date = 'WRONG_DATE'".to_string(),
+                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+            ),
+            (
+                "order_date <> 'WRONG_DATE'".to_string(),
                 CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             // Between
@@ -2555,7 +2642,7 @@ mod tests {
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", sql),
-                Err(e) => assert_eq!(e, expected_error),
+                Err(e) => assert_eq!(e, expected_error, "{}", sql),
             }
         }
     }
