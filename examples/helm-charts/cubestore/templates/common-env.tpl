@@ -2,31 +2,31 @@
 {{- if .Values.config.logLevel }}
 - name: CUBESTORE_LOG_LEVEL
   value: {{ .Values.config.logLevel | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.config.noUpload }}
 - name: CUBESTORE_NO_UPLOAD
   value: {{ .Values.config.noUpload | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.config.jobRunners }}
 - name: CUBESTORE_JOB_RUNNERS
   value: {{ .Values.config.jobRunners | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.config.queryTimeout }}
 - name: CUBESTORE_QUERY_TIMEOUT
   value: {{ .Values.config.queryTimeout | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.config.walSplitThreshold }}
 - name: CUBESTORE_WAL_SPLIT_THRESHOLD
   value: {{ .Values.config.walSplitThreshold | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.gcp.bucket }}
 - name: CUBESTORE_GCS_BUCKET
   value: {{ .Values.cloudStorage.gcp.bucket | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.gcp.subPath }}
 - name: CUBESTORE_GCS_SUB_PATH
   value: {{ .Values.cloudStorage.gcp.subPath | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.gcp.credentials }}
 - name: CUBESTORE_GCP_CREDENTIALS
   value: {{ .Values.cloudStorage.gcp.credentials | quote }}
@@ -36,11 +36,11 @@
     secretKeyRef:
       name: {{ .Values.cloudStorage.gcp.credentialsFromSecret.name | required "cloudStorage.gcp.credentialsFromSecret.name is required" }}
       key: {{ .Values.cloudStorage.gcp.credentialsFromSecret.key | required "cloudStorage.gcp.credentialsFromSecret.key is required" }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.aws.accessKeyID }}
 - name: CUBESTORE_AWS_ACCESS_KEY_ID
   value: {{ .Values.cloudStorage.aws.accessKeyID | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.aws.secretKey }}
 - name: CUBESTORE_AWS_SECRET_ACCESS_KEY
   value: {{ .Values.cloudStorage.aws.secretKey | quote }}
@@ -50,17 +50,17 @@
     secretKeyRef:
       name: {{ .Values.cloudStorage.aws.secretKeyFromSecret.name | required "cloudStorage.aws.secretKeyFromSecret.name is required" }}
       key: {{ .Values.cloudStorage.aws.secretKeyFromSecret.key | required "cloudStorage.aws.secretKeyFromSecret.key is required" }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.aws.bucket }}
 - name: CUBESTORE_S3_BUCKET
   value: {{ .Values.cloudStorage.aws.bucket | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.aws.region }}
 - name: CUBESTORE_S3_REGION
   value: {{ .Values.cloudStorage.aws.region | quote }}
-{{- end}}
+{{- end }}
 {{- if .Values.cloudStorage.aws.subPath }}
 - name: CUBESTORE_S3_SUB_PATH
   value: {{ .Values.cloudStorage.aws.subPath | quote }}
-{{- end}}
-{{- end}}
+{{- end }}
+{{- end }}

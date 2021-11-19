@@ -23,4 +23,4 @@ spec:
   selector:
     app.kubernetes.io/component: workers
     {{- include "cubestore.selectorLabels" . | nindent 4 }}
-{{- end}}
+{{- end }}
