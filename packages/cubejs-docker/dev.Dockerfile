@@ -140,7 +140,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev.js /usr/local/bin/cubejs
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
-RUN ln -s  /cubejs/rust/bin/cubestore-dev /usr/local/bin/cubestore-dev
+RUN ln -s  /cubejs/rust/bin/cubestore-dev.js /usr/local/bin/cubestore-dev
 
 WORKDIR /cube/conf
 
