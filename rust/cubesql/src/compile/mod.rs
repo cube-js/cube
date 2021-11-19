@@ -211,7 +211,9 @@ impl CompiledExpression {
                 "false".to_string()
             }),
             CompiledExpression::StringLiteral(v) => Ok(v.clone()),
-            CompiledExpression::DateLiteral(date) => Ok(date.to_rfc3339()),
+            CompiledExpression::DateLiteral(date) => {
+                Ok(date.to_rfc3339_opts(SecondsFormat::Millis, true))
+            }
             CompiledExpression::NumberLiteral(n, is_negative) => {
                 Ok(format!("{}{}", if *is_negative { "-" } else { "" }, n))
             }
@@ -2230,8 +2232,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00+00:00".to_string(),
-                        "2021-09-06T23:59:59.999+00:00".to_string()
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
                     ])),
                 }])
             ),
@@ -2243,8 +2245,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00+00:00".to_string(),
-                        "2021-09-06T23:59:59.999+00:00".to_string()
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
                     ])),
                 }])
             ),
@@ -2256,8 +2258,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00+00:00".to_string(),
-                        "2021-09-06T23:59:59.999+00:00".to_string()
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
                     ])),
                 }])
             ),
@@ -2269,8 +2271,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00+00:00".to_string(),
-                        "2021-09-06T23:59:59.999+00:00".to_string()
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
                     ])),
                 }])
             ),
@@ -2311,14 +2313,14 @@ mod tests {
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("afterDate".to_string()),
-                        values: Some(vec!["2021-08-31T00:00:00+00:00".to_string()]),
+                        values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
                     }),
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-06T23:59:59.999+00:00".to_string()]),
+                        values: Some(vec!["2021-09-06T23:59:59.999Z".to_string()]),
                         or: None,
                         and: None,
                     })
@@ -2422,8 +2424,8 @@ mod tests {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("notInDateRange".to_string()),
                     values: Some(vec![
-                        "2021-08-31T00:00:00+00:00".to_string(),
-                        "2021-09-07T00:00:00+00:00".to_string(),
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-07T00:00:00.000Z".to_string(),
                     ]),
                     or: None,
                     and: None,
@@ -2449,7 +2451,7 @@ mod tests {
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("afterDate".to_string()),
-                        values: Some(vec!["2021-08-31T00:00:00+00:00".to_string()]),
+                        values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
                     },
@@ -2813,18 +2815,36 @@ mod tests {
     #[test]
     fn test_str_literal_to_date() {
         let d = CompiledExpression::StringLiteral("2021-08-31".to_string())
-            .to_date()
+            .to_date_literal()
             .unwrap();
-        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
+        assert_eq!(
+            d.to_value_as_str().unwrap(),
+            "2021-08-31T00:00:00.000Z".to_string()
+        );
 
         let d = CompiledExpression::StringLiteral("2021-08-31 00:00:00.000000".to_string())
-            .to_date()
+            .to_date_literal()
             .unwrap();
-        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
+        assert_eq!(
+            d.to_value_as_str().unwrap(),
+            "2021-08-31T00:00:00.000Z".to_string()
+        );
 
         let d = CompiledExpression::StringLiteral("2021-08-31T00:00:00+00:00".to_string())
-            .to_date()
+            .to_date_literal()
             .unwrap();
-        assert_eq!(d.to_rfc3339(), "2021-08-31T00:00:00+00:00".to_string());
+        assert_eq!(
+            d.to_value_as_str().unwrap(),
+            "2021-08-31T00:00:00.000Z".to_string()
+        );
+
+        // JS date.toIsoString()
+        let d = CompiledExpression::StringLiteral("2021-08-31T00:00:00.000Z".to_string())
+            .to_date_literal()
+            .unwrap();
+        assert_eq!(
+            d.to_value_as_str().unwrap(),
+            "2021-08-31T00:00:00.000Z".to_string()
+        );
     }
 }
