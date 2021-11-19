@@ -72,6 +72,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("join_with_aliases", join_with_aliases),
         t("group_by_without_aggregates", group_by_without_aggregates),
         t("create_table_with_location", create_table_with_location),
+        t(
+            "create_table_with_location_messed_order",
+            create_table_with_location_messed_order,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -1565,6 +1569,41 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
 
     let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
+}
+
+async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("messed-order.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c6,c11,c10,c5,c9,c4,c2,c8,c1,c3,c7,c12\n".as_bytes())
+            .unwrap();
+        file.write_all(
+            "123,0,0.5,193,0.5,2,2021-11-01,0.5,foo,42,0,2021-01-01 00:00:00\n".as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service.exec_query(
+        &format!(
+            "CREATE TABLE test.main (`c1` varchar(255), `c2` date, `c3` bigint, `c4` bigint, `c5` bigint, `c6` bigint, `c7` double, `c8` double, `c9` double, `c10` double, `c11` double, `c12` timestamp)  LOCATION {}",
+            paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
+        )
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) as cnt from test.main")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {

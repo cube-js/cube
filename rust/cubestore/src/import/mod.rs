@@ -63,7 +63,6 @@ impl ImportFormat {
                     };
 
                 let mut header_mapping = None;
-                let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
@@ -74,7 +73,7 @@ impl ImportFormat {
                         for _ in 0..columns.len() {
                             let next_column_buf = parser.next_value()?;
                             let next_column = next_column_buf.as_ref();
-                            let (i, to_insert) = columns
+                            let (insert_pos, to_insert) = columns
                                 .iter()
                                 .find_position(|c| c.get_name() == &next_column)
                                 .map(|(i, c)| (i, c.clone()))
@@ -82,16 +81,7 @@ impl ImportFormat {
                                     "Column '{}' is not found during import in {:?}",
                                     next_column, columns
                                 )))?;
-                            // This is tricky indices structure: it remembers indices of inserts
-                            // with regards to moving element indices due to these inserts.
-                            // It saves some column resorting trips.
-                            let insert_pos = mapping
-                                .iter()
-                                .find_position(|(col_index, _)| *col_index > i)
-                                .map(|(insert_pos, _)| insert_pos)
-                                .unwrap_or_else(|| mapping.len());
-                            mapping_insert_indices.push(insert_pos);
-                            mapping.push((i, to_insert));
+                            mapping.push((insert_pos, to_insert));
                             parser.advance()?;
                         }
                         header_mapping = Some(mapping);
@@ -102,59 +92,51 @@ impl ImportFormat {
                         "Header is required for CSV import".to_string(),
                     ))?;
 
-                    let mut row = Vec::with_capacity(columns.len());
+                    let mut row = vec![TableValue::Null; columns.len()];
 
-                    for (i, (_, column)) in resolved_mapping.iter().enumerate() {
+                    for (insert_pos, column) in resolved_mapping.iter() {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
                         if value == "" {
-                            row.insert(mapping_insert_indices[i], TableValue::Null);
+                            row[*insert_pos] = TableValue::Null;
                         } else {
-                            row.insert(
-                                mapping_insert_indices[i],
-                                match column.get_column_type() {
-                                    ColumnType::String => {
-                                        TableValue::String(value_buf.take_string())
-                                    }
-                                    ColumnType::Int => value
-                                        .parse()
-                                        .map(|v| TableValue::Int(v))
-                                        .unwrap_or(TableValue::Null),
-                                    t @ ColumnType::Decimal { .. } => {
-                                        TableValue::Decimal(parse_decimal(
-                                            value,
-                                            u8::try_from(t.target_scale()).unwrap(),
-                                        )?)
-                                    }
-                                    ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                    ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                        let hll = HllSketch::read_snowflake(value)?;
-                                        TableValue::Bytes(hll.write())
-                                    }
-                                    ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                                        let data = base64::decode(value)?;
-                                        let hll = HllSketch::read_hll_storage_spec(&data)?;
-                                        TableValue::Bytes(hll.write())
-                                    }
-                                    ColumnType::HyperLogLog(
-                                        f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
-                                    ) => {
-                                        let data = base64::decode(value)?;
-                                        is_valid_plain_binary_hll(&data, *f)?;
-                                        TableValue::Bytes(data)
-                                    }
-                                    ColumnType::Timestamp => {
-                                        TableValue::Timestamp(timestamp_from_string(value)?)
-                                    }
-                                    ColumnType::Float => {
-                                        TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                    }
-                                    ColumnType::Boolean => {
-                                        TableValue::Boolean(value.to_lowercase() == "true")
-                                    }
-                                },
-                            );
+                            row[*insert_pos] = match column.get_column_type() {
+                                ColumnType::String => TableValue::String(value_buf.take_string()),
+                                ColumnType::Int => value
+                                    .parse()
+                                    .map(|v| TableValue::Int(v))
+                                    .unwrap_or(TableValue::Null),
+                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
+                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
+                                ),
+                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                                    let hll = HllSketch::read_snowflake(value)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                                    let data = base64::decode(value)?;
+                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(
+                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
+                                ) => {
+                                    let data = base64::decode(value)?;
+                                    is_valid_plain_binary_hll(&data, *f)?;
+                                    TableValue::Bytes(data)
+                                }
+                                ColumnType::Timestamp => {
+                                    TableValue::Timestamp(timestamp_from_string(value)?)
+                                }
+                                ColumnType::Float => {
+                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
+                                }
+                                ColumnType::Boolean => {
+                                    TableValue::Boolean(value.to_lowercase() == "true")
+                                }
+                            };
                         }
 
                         parser.advance()?;
