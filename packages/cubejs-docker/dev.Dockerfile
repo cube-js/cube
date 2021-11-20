@@ -33,3 +33,4 @@ COPY rollup.config.js .
 # Backend
 COPY rust/package.json rust/package.json
 COPY rust/bin/ rust/bin/
+COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
