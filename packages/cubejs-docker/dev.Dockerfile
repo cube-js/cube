@@ -18,8 +18,3 @@ ENV NODE_ENV development
 WORKDIR /cubejs
 
 COPY package.json .
-COPY lerna.json .
-COPY yarn.lock .
-COPY tsconfig.base.json .
-COPY rollup.config.js .
-COPY packages/cubejs-linter packages/cubejs-linter
