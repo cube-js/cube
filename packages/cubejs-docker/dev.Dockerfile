@@ -29,4 +29,6 @@ COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY rollup.config.js .
-COPY packages/cubejs-linter/ packages/cubejs-linter/
+
+# Backend
+COPY rust/package.json rust/package.json
