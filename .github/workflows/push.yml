@@ -385,7 +385,7 @@ jobs:
         with:
           driver-opts: network=host
       - name: Prune Cache
-        run: /usr/bin/docker buildx prune
+        run: /usr/bin/docker buildx prune -f
       - name: Build image
         uses: docker/build-push-action@v2
         timeout-minutes: 30
