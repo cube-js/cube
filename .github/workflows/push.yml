@@ -377,7 +377,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./
-          file: ./packages/cubejs-docker/dev.Dockerfile
+          file: ./packages/cubejs-docker/latest.Dockerfile
           platforms: linux/amd64
 
 
