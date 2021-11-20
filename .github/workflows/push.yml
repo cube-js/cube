@@ -356,60 +356,44 @@ jobs:
         env:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
-  docker-image-dev:
-    name: Release :dev image
-    runs-on: ubuntu-20.04
-    needs: latest-tag-sha
-    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
-        with:
-          context: ./
-          file: ./packages/cubejs-docker/latest.Dockerfile
-          platforms: linux/amd64
-
-
-  docker-dev-2:
+  docker-dev:
+    needs: [build, unit, lint, latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 60
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     strategy:
       matrix:
         dockerfile:
-          - dev-alpine.Dockerfile
+          - dev.Dockerfile
         include:
-          - dockerfile: dev-alpine.Dockerfile
+          - dockerfile: dev.Dockerfile
             name: Debian
-            tag: tmp-dev-3
+            tag: tmp-dev
       fail-fast: false
     steps:
-      - name: Check out the repo
+      - name: Checkout
         uses: actions/checkout@v2
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Show packages
-        run: cd packages && ls -la
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
         with:
-          context: ./
-          file: ./packages/cubejs-docker/dev.Dockerfile
+          driver-opts: network=host
+      - name: Build image
+        uses: docker/build-push-action@v2
+        timeout-minutes: 30
+        with:
+          context: .
+          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
+          push: true
+          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 15.x
         uses: actions/setup-node@v1
         with:
