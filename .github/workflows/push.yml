@@ -361,11 +361,6 @@ jobs:
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-18.04
     timeout-minutes: 60
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     strategy:
       matrix:
         dockerfile:
