@@ -369,11 +369,11 @@ jobs:
     strategy:
       matrix:
         dockerfile:
-          - dev.Dockerfile
+          - dev-alpine.Dockerfile
         include:
-          - dockerfile: dev.Dockerfile
+          - dockerfile: dev-alpine.Dockerfile
             name: Debian
-            tag: tmp-dev-2
+            tag: tmp-dev-3
       fail-fast: false
     steps:
       - name: Checkout
