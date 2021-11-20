@@ -387,7 +387,7 @@ jobs:
       - name: Prune Cache
         run: /usr/bin/docker buildx prune -f
       - name: Build
-        run: /usr/bin/docker build -f ./packages/cubejs-docker/${{ matrix.dockerfile }} .
+        run: /usr/bin/docker buildx build -f ./packages/cubejs-docker/${{ matrix.dockerfile }} .
 #      - name: Build image
 #        uses: docker/build-push-action@v2
 #        timeout-minutes: 30
