@@ -356,6 +356,26 @@ jobs:
         env:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
+  docker-image-dev:
+    name: Release :dev image
+    runs-on: ubuntu-20.04
+    needs: latest-tag-sha
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v2
+        with:
+          context: ./
+          file: ./packages/cubejs-docker/dev.Dockerfile
+          platforms: linux/amd64
+
+
   docker-dev-2:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
