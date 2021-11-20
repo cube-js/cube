@@ -357,7 +357,6 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-dev:
-    needs: [build, unit, lint, latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
@@ -392,8 +391,6 @@ jobs:
           context: .
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
-          push: true
-          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 15.x
         uses: actions/setup-node@v1
         with:
