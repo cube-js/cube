@@ -393,6 +393,7 @@ jobs:
           context: .
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
+          no-cache: true
       - name: Use Node.js 15.x
         uses: actions/setup-node@v1
         with:
