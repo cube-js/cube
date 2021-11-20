@@ -143,6 +143,8 @@ pub trait V1CubeMetaDimensionExt {
     fn mysql_can_be_null(&self) -> bool;
 
     fn mysql_type_as_str(&self) -> String;
+
+    fn is_time(&self) -> bool;
 }
 
 impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
@@ -150,6 +152,10 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
         let (_, dimension_name) = self.name.split_once('.').unwrap();
 
         dimension_name.to_string()
+    }
+
+    fn is_time(&self) -> bool {
+        self._type.to_lowercase().eq("time")
     }
 
     fn mysql_can_be_null(&self) -> bool {

@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/clickhouse-driver:** clickhouse joins full key query aggregate fails ([#3600](https://github.com/cube-js/cube.js/issues/3600)) Thanks [@antnmxmv](https://github.com/antnmxmv)! ([c6451cd](https://github.com/cube-js/cube.js/commit/c6451cdef8498d4d645167ed3da7cf2f599a2e5b)), closes [#3534](https://github.com/cube-js/cube.js/issues/3534)
+* **cubesql:** Parsing error with single comment line ([a7697c1](https://github.com/cube-js/cube.js/commit/a7697c1751a5e0003fa85ed83be033d6db651d7b))
+* **cubestore:** Error during planning: The field has has qualifier for UNION query with IN ([#3697](https://github.com/cube-js/cube.js/issues/3697)) ([01a6d6f](https://github.com/cube-js/cube.js/commit/01a6d6f121e7800a70c055c0e616eda03b642267)), closes [#3693](https://github.com/cube-js/cube.js/issues/3693)
+
+
+### Features
+
+* **cubesql:** Casting to date on compare with time dimension ([8bc7b26](https://github.com/cube-js/cube.js/commit/8bc7b26833b38d200e4ea6bb9bf717cfec6da9db))
+* **cubesql:** Strict check for dates in BETWEEN operator ([329da03](https://github.com/cube-js/cube.js/commit/329da03e9c17018d1c8356b888f1ade33150eca0))
+* **cubesql:** Support DATE_TRUNC(string, column) ([#3677](https://github.com/cube-js/cube.js/issues/3677)) ([e4e9b4e](https://github.com/cube-js/cube.js/commit/e4e9b4e6de3de6e59322e3a78e1a26573d7b84dd))
+* **gateway:** GraphQL endpoint ([#3555](https://github.com/cube-js/cube.js/issues/3555)) Thanks [@lvauvillier](https://github.com/lvauvillier)! ([ed85192](https://github.com/cube-js/cube.js/commit/ed85192e1af5a35b5e4b05a777e02b140f25b32d)), closes [#3433](https://github.com/cube-js/cube.js/issues/3433)
+
+
+
+
+
 ## [0.28.57](https://github.com/cube-js/cube.js/compare/v0.28.56...v0.28.57) (2021-11-16)
 
 

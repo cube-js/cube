@@ -1,7 +1,7 @@
 ---
 title: Query Format
 permalink: /query-format
-category: Cube.js Backend
+category: API Reference
 menuOrder: 2
 ---
 

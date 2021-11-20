@@ -99,7 +99,7 @@ const config = {
       },
     },
     'gatsby-plugin-meta-redirect',
-    'gatsby-plugin-percy',
+    // 'gatsby-plugin-percy',
   ],
 };
 

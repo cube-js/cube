@@ -16,13 +16,12 @@ use log::trace;
 use msql_srv::*;
 
 use serde_json::json;
-use sqlparser::parser::Parser;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
 use crate::compile::convert_statement_to_cube_query;
-use crate::compile::parser::MySqlDialectWithBackTicks;
+use crate::compile::parser::parse_sql_to_statement;
 use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
@@ -50,8 +49,6 @@ impl Backend {
     ) -> Result<Arc<dataframe::DataFrame>, CubeError> {
         let _start = SystemTime::now();
 
-        trace!("RAW QUERY: {}", query);
-        let query = str::replace(query, "\n", " ");
         let query = query.replace("SELECT FROM", "SELECT * FROM");
         debug!("QUERY: {}", query);
 
@@ -217,12 +214,8 @@ impl Backend {
                 ),
             )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
-            let dialect = MySqlDialectWithBackTicks {};
-            let parse_result = Parser::parse_sql(&dialect, &query)?;
-
-            let query = &parse_result[0];
-
-            match query {
+            let stmt = parse_sql_to_statement(&query)?;
+            match stmt {
                 Statement::ExplainTable { table_name, .. } => {
                     let table_name_filter = if table_name.0.len() == 2 {
                         &table_name.0[1].value
@@ -297,7 +290,7 @@ impl Backend {
                         .get_ctx_for_tenant(auth_ctx)
                     .await?;
 
-                    let plan = convert_statement_to_cube_query(statement, Arc::new(ctx), &self.props)?;
+                    let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
 
                     return Ok(Arc::new(dataframe::DataFrame::new(
                         vec![
@@ -318,13 +311,8 @@ impl Backend {
                 }
             }
         } else if query_lower.starts_with("show create table") {
-            let dialect = MySqlDialectWithBackTicks {};
-            let parse_result = Parser::parse_sql(&dialect, &query)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-
-            let query = &parse_result[0];
-
-            match query {
+            let stmt = parse_sql_to_statement(&query)?;
+            match stmt {
                 Statement::ShowCreate { obj_type, obj_name } => {
                     match obj_type {
                         ShowCreateObject::Table => {

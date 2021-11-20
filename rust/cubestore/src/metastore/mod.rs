@@ -20,7 +20,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
 use tokio::fs;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::{oneshot, Notify, RwLock};
 
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
@@ -39,8 +39,8 @@ use crate::metastore::table::{TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::table::{Row, TableValue};
-use crate::util::lock::acquire_lock;
-use crate::util::time_span::{warn_long, warn_long_fut};
+use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::time_span::warn_long;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use arrow::datatypes::TimeUnit::Microsecond;
@@ -678,7 +678,7 @@ macro_rules! meta_store_table_impl {
 
             async fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
                 self.rocks_meta_store
-                    .read_operation(move |db_ref| Ok(Self::table(db_ref).all_rows()?))
+                    .read_operation_out_of_queue(move |db_ref| Ok(Self::table(db_ref).all_rows()?))
                     .await
             }
 
@@ -895,6 +895,11 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunks_by_partition(
+        &self,
+        partition_id: u64,
+        include_inactive: bool,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn get_chunks_by_partition_out_of_queue(
         &self,
         partition_id: u64,
         include_inactive: bool,
@@ -1126,7 +1131,7 @@ impl MemorySequence {
 
 #[derive(Clone)]
 pub struct RocksMetaStore {
-    pub db: Arc<RwLock<Arc<DB>>>,
+    pub db: Arc<DB>,
     seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
     listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
     remote_fs: Arc<dyn RemoteFs>,
@@ -1138,6 +1143,10 @@ pub struct RocksMetaStore {
     upload_loop: Arc<WorkerLoop>,
     config: Arc<dyn ConfigObj>,
     cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
+    rw_loop_tx: std::sync::mpsc::SyncSender<
+        Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+    >,
+    rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -1723,8 +1732,25 @@ impl RocksMetaStore {
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
 
+        let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
+            Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+        >(16_777_216);
+
+        let join_handle = cube_ext::spawn_blocking(move || loop {
+            match rw_loop_rx.recv() {
+                Ok(fun) => {
+                    if let Err(e) = fun() {
+                        log::error!("Error during read write loop execution: {}", e);
+                    }
+                }
+                Err(_) => {
+                    return;
+                }
+            }
+        });
+
         let meta_store = RocksMetaStore {
-            db: Arc::new(RwLock::new(db_arc.clone())),
+            db: db_arc.clone(),
             seq_store: Arc::new(Mutex::new(HashMap::new())),
             listeners: Arc::new(RwLock::new(listeners)),
             remote_fs,
@@ -1736,6 +1762,8 @@ impl RocksMetaStore {
             upload_loop: Arc::new(WorkerLoop::new("Meta Store Upload")),
             config,
             cached_tables: Arc::new(Mutex::new(None)),
+            rw_loop_tx,
+            rw_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
         };
         meta_store
     }
@@ -1804,9 +1832,7 @@ impl RocksMetaStore {
                         let path_to_log = remote_fs.local_file(log_file).await?;
                         let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
                         if let Ok(batch) = batch {
-                            let db =
-                                acquire_lock("meta store load from remote", meta_store.db.write())
-                                    .await?;
+                            let db = meta_store.db.clone();
                             db.write(batch.write_batch())?;
                         } else if let Err(e) = batch {
                             error!(
@@ -1844,18 +1870,22 @@ impl RocksMetaStore {
     where
         F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
             + Send
+            + Sync
             + 'static,
-        R: Send + 'static,
+        R: Send + Sync + 'static,
     {
-        let db = acquire_lock("meta store write", self.db.write()).await?;
-        let db_span = warn_long("metastore write operation", Duration::from_millis(100));
+        let db = self.db.clone();
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
         };
         let db_to_send = db.clone();
         let cached_tables = self.cached_tables.clone();
-        let (spawn_res, events) =
-            cube_ext::spawn_blocking(move || -> Result<(R, Vec<MetaStoreEvent>), CubeError> {
+        let rw_loop_sender = self.rw_loop_tx.clone();
+        let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
+        cube_ext::spawn_blocking(move || {
+            let res = rw_loop_sender.send(Box::new(move || {
+                let db_span = warn_long("metastore write operation", Duration::from_millis(100));
+
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
                 let res = f(
@@ -1865,17 +1895,38 @@ impl RocksMetaStore {
                         mem_seq,
                     },
                     &mut batch,
-                )?;
-                if batch.invalidate_tables_cache {
-                    *cached_tables.lock().unwrap() = None;
+                );
+                match res {
+                    Ok(res) => {
+                        if batch.invalidate_tables_cache {
+                            *cached_tables.lock().unwrap() = None;
+                        }
+                        let write_result = batch.batch_write_rows()?;
+                        tx.send(Ok((res, write_result))).map_err(|_| {
+                            CubeError::internal(
+                                "Write operation result receiver has been dropped".to_string(),
+                            )
+                        })?;
+                    }
+                    Err(e) => {
+                        tx.send(Err(e)).map_err(|_| {
+                            CubeError::internal(
+                                "Write operation result receiver has been dropped".to_string(),
+                            )
+                        })?;
+                    }
                 }
-                let write_result = batch.batch_write_rows()?;
-                Ok((res, write_result))
-            })
-            .await??;
 
-        mem::drop(db);
-        mem::drop(db_span);
+                mem::drop(db_span);
+
+                Ok(())
+            }));
+            if let Err(e) = res {
+                log::error!("Error during read write loop send: {}", e);
+            }
+        })
+        .await?;
+        let (spawn_res, events) = rx.await??;
 
         self.write_notify.notify_waiters();
 
@@ -1910,18 +1961,14 @@ impl RocksMetaStore {
         let time = SystemTime::now();
         trace!("Persisting meta store snapshot");
         let last_check_seq = self.last_check_seq().await;
-        let last_db_seq = acquire_lock("meta store upload", self.db.read())
-            .await?
-            .latest_sequence_number();
+        let last_db_seq = self.db.latest_sequence_number();
         if last_check_seq == last_db_seq {
             trace!("Persisting meta store snapshot: nothing to update");
             return Ok(());
         }
         let last_upload_seq = self.last_upload_seq().await;
         let (serializer, min, max) = {
-            let updates = acquire_lock("meta store upload", self.db.write())
-                .await?
-                .get_updates_since(last_upload_seq)?;
+            let updates = self.db.get_updates_since(last_upload_seq)?;
             let mut serializer = WriteBatchContainer::new();
 
             let mut seq_numbers = Vec::new();
@@ -1974,9 +2021,7 @@ impl RocksMetaStore {
         let remote_fs = self.remote_fs.clone();
 
         let (remote_path, checkpoint_path) = {
-            let db = acquire_lock("meta store upload checkpoint", self.db.write())
-                .await?
-                .clone();
+            let db = self.db.clone();
             *check_point_time = SystemTime::now();
             RocksMetaStore::prepare_checkpoint(db, &check_point_time).await?
         };
@@ -2105,35 +2150,74 @@ impl RocksMetaStore {
 
     async fn read_operation<F, R>(&self, f: F) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + 'static,
-        R: Send + 'static,
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
     {
-        let db = acquire_lock(
-            "meta store read",
-            warn_long_fut(
-                "metastore acquire read lock",
-                Duration::from_millis(50),
-                self.db.read(),
-            ),
-        )
-        .await?;
         let mem_seq = MemorySequence {
             seq_store: self.seq_store.clone(),
         };
-        let db_to_send = db.clone();
-        let res = cube_ext::spawn_blocking(move || {
-            let snapshot = db_to_send.snapshot();
-            f(DbTableRef {
-                db: db_to_send.as_ref(),
-                snapshot: &snapshot,
-                mem_seq,
-            })
+        let db_to_send = self.db.clone();
+
+        let rw_loop_sender = self.rw_loop_tx.clone();
+        let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
+        cube_ext::spawn_blocking(move || {
+            let res = rw_loop_sender.send(Box::new(move || {
+                let db_span = warn_long("metastore read operation", Duration::from_millis(100));
+
+                let snapshot = db_to_send.snapshot();
+                let res = f(DbTableRef {
+                    db: db_to_send.as_ref(),
+                    snapshot: &snapshot,
+                    mem_seq,
+                });
+
+                tx.send(res).map_err(|_| {
+                    CubeError::internal(
+                        "Read operation result receiver has been dropped".to_string(),
+                    )
+                })?;
+
+                mem::drop(db_span);
+
+                Ok(())
+            }));
+            if let Err(e) = res {
+                log::error!("Error during read write loop send: {}", e);
+            }
         })
         .await?;
 
-        mem::drop(db);
+        rx.await?
+    }
 
-        res
+    async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        let mem_seq = MemorySequence {
+            seq_store: self.seq_store.clone(),
+        };
+        let db_to_send = self.db.clone();
+
+        cube_ext::spawn_blocking(move || {
+            let db_span = warn_long(
+                "metastore read operation out of queue",
+                Duration::from_millis(100),
+            );
+
+            let snapshot = db_to_send.snapshot();
+            let res = f(DbTableRef {
+                db: db_to_send.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+            });
+
+            mem::drop(db_span);
+
+            res
+        })
+        .await?
     }
 
     fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
@@ -2181,7 +2265,7 @@ impl RocksMetaStore {
     }
 
     async fn has_pending_changes(&self) -> Result<bool, CubeError> {
-        let db = acquire_lock("meta store has pending changes", self.db.read()).await?;
+        let db = self.db.clone();
         Ok(db
             .get_updates_since(self.last_upload_seq().await)?
             .next()
@@ -2429,7 +2513,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_schemas(&self) -> Result<Vec<IdRow<Schema>>, CubeError> {
-        self.read_operation(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
+        self.read_operation_out_of_queue(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
             .await
     }
 
@@ -2693,7 +2777,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError> {
-        self.read_operation(|db_ref| TableRocksTable::new(db_ref).all_rows())
+        self.read_operation_out_of_queue(|db_ref| TableRocksTable::new(db_ref).all_rows())
             .await
     }
 
@@ -2701,9 +2785,8 @@ impl MetaStore for RocksMetaStore {
         &self,
         include_non_ready: bool,
     ) -> Result<Arc<Vec<TablePath>>, CubeError> {
-        let cache = self.cached_tables.clone();
-        self.read_operation(move |db_ref| {
-            if include_non_ready {
+        if include_non_ready {
+            self.read_operation_out_of_queue(move |db_ref| {
                 let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
                 let schemas = SchemaRocksTable::new(db_ref);
                 let tables = Arc::new(schemas.build_path_rows(
@@ -2713,12 +2796,19 @@ impl MetaStore for RocksMetaStore {
                 )?);
 
                 Ok(tables)
-            } else {
-                let cached = cache.lock().unwrap().clone();
-                if let Some(t) = cached {
-                    return Ok(t);
-                }
+            })
+            .await
+        } else {
+            let cache = self.cached_tables.clone();
 
+            if let Some(t) = cube_ext::spawn_blocking(move || cache.lock().unwrap().clone()).await?
+            {
+                return Ok(t);
+            }
+
+            let cache = self.cached_tables.clone();
+            // Can't do read_operation_out_of_queue as we need to update cache on the same thread where it's dropped
+            self.read_operation(move |db_ref| {
                 let table_rocks_table = TableRocksTable::new(db_ref.clone());
                 let mut tables = Vec::new();
                 for t in table_rocks_table.scan_all_rows()? {
@@ -2738,16 +2828,16 @@ impl MetaStore for RocksMetaStore {
                 *cache.lock().unwrap() = Some(to_cache);
 
                 Ok(tables)
-            }
-        })
-        .await
+            })
+            .await
+        }
     }
 
     async fn not_ready_tables(
         &self,
         created_seconds_ago: i64,
     ) -> Result<Vec<IdRow<Table>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let table_rocks_table = TableRocksTable::new(db_ref);
             let tables = table_rocks_table.scan_all_rows()?;
             let mut res = Vec::new();
@@ -2855,7 +2945,9 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_partition_chunk_sizes(&self, partition_id: u64) -> Result<u64, CubeError> {
-        let chunks = self.get_chunks_by_partition(partition_id, false).await?;
+        let chunks = self
+            .get_chunks_by_partition_out_of_queue(partition_id, false)
+            .await?;
         Ok(chunks.iter().map(|r| r.get_row().row_count).sum())
     }
 
@@ -3015,7 +3107,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -3066,7 +3158,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_inactive_partitions_to_repartition(
         &self,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -3075,7 +3167,10 @@ impl MetaStore for RocksMetaStore {
             let chunks = chunks_table.scan_all_rows()?;
 
             for chunk in chunks {
-                partitions_with_chunks.insert(chunk?.get_row().get_partition_id());
+                let chunk = chunk?;
+                if chunk.get_row().active() {
+                    partitions_with_chunks.insert(chunk.get_row().get_partition_id());
+                }
             }
 
             let mut to_repartition = Vec::new();
@@ -3093,7 +3188,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -3140,7 +3235,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
             let now = Utc::now();
@@ -3331,7 +3426,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref);
 
@@ -3375,7 +3470,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_warmup_partitions(
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
-        self.read_operation(|db| {
+        self.read_operation_out_of_queue(|db| {
             // Do full scan, likely only a small number chunks and partitions are inactive.
             let mut partition_to_chunks = HashMap::new();
             for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
@@ -3442,6 +3537,17 @@ impl MetaStore for RocksMetaStore {
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         self.read_operation(move |db| {
+            Self::chunks_by_partition(partition_id, &ChunkRocksTable::new(db), include_inactive)
+        })
+        .await
+    }
+
+    async fn get_chunks_by_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+        include_inactive: bool,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation_out_of_queue(move |db| {
             Self::chunks_by_partition(partition_id, &ChunkRocksTable::new(db), include_inactive)
         })
         .await
@@ -3576,7 +3682,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
             let mut res = Vec::new();
             for c in table.scan_all_rows()? {
@@ -3591,7 +3697,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
 
             let mut res = Vec::new();
@@ -3669,7 +3775,7 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        self.read_operation(move |db_ref| Ok(JobRocksTable::new(db_ref).all_rows()?))
+        self.read_operation_out_of_queue(move |db_ref| Ok(JobRocksTable::new(db_ref).all_rows()?))
             .await
     }
 
@@ -3720,7 +3826,7 @@ impl MetaStore for RocksMetaStore {
         orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError> {
         let duration = chrono::Duration::from_std(orphaned_timeout).unwrap();
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
             let time = Utc::now();
             let all_jobs = jobs_table
@@ -3865,7 +3971,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
-        self.read_operation(|db| {
+        self.read_operation_out_of_queue(|db| {
             let mut r = Vec::with_capacity(table_name.len());
             for (schema, table) in table_name {
                 let table = get_table_impl(db.clone(), schema, table)?;
@@ -3916,7 +4022,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         multi_part_ids: Vec<u64>,
     ) -> Result<HashMap<u64, MultiPartition>, CubeError> {
-        self.read_operation(move |db| {
+        self.read_operation_out_of_queue(move |db| {
             let table = MultiPartitionRocksTable::new(db);
             let mut r = HashMap::new();
             for m in multi_part_ids {
@@ -4553,8 +4659,6 @@ mod tests {
 
             meta_store
                 .db
-                .write()
-                .await
                 .delete(RowKey::Table(TableId::Schemas, 1).to_bytes())
                 .unwrap();
 
@@ -4750,6 +4854,16 @@ mod tests {
                 .create_schema("foo1".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()
@@ -4762,6 +4876,16 @@ mod tests {
                 .create_schema("foo".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()
@@ -4774,6 +4898,16 @@ mod tests {
                 .create_schema("bar".to_string(), false)
                 .await
                 .unwrap();
+            while !services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .has_pending_changes()
+                .await
+                .unwrap()
+            {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+            }
             services
                 .rocks_meta_store
                 .as_ref()

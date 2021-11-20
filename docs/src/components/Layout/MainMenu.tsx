@@ -32,7 +32,7 @@ const menuOrder = [
   'Data Schema',
   'Caching',
   'Authentication & Authorization',
-  'Cube.js Backend',
+  'API Reference',
   'Cube.js Frontend',
   'Deployment',
   'Developer Tools',
