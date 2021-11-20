@@ -394,8 +394,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - name: Use Node.js 15.x
         uses: actions/setup-node@v1
         with:
