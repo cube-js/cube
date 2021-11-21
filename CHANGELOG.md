@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
+
+
+### Bug Fixes
+
+* Dropping orphaned tables logging messages don't have necessary t… ([#3710](https://github.com/cube-js/cube.js/issues/3710)) ([1962e0f](https://github.com/cube-js/cube.js/commit/1962e0fe6ce999879d1225cef27a24ea8cb8490a))
+* **cubestore:** Ensure strict meta store consistency with single thre… ([#3696](https://github.com/cube-js/cube.js/issues/3696)) ([135bc3f](https://github.com/cube-js/cube.js/commit/135bc3feeb3db8dc0547954a50d1c3ec27195d40))
+* **cubestore:** unexpected value Int(42) for type String ([e6eab32](https://github.com/cube-js/cube.js/commit/e6eab32495be386bed80d73545a960a75322e0da))
+
+
+### Features
+
+* **cubesql:** Strict check for dates in binary expr ([3919c42](https://github.com/cube-js/cube.js/commit/3919c4229b3983592cc3ae3b7d3c6b7e966ef3ad))
+
+
+
+
+
 ## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
 
 
