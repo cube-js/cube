@@ -73,6 +73,20 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
         'visitors.source': 'asc'
       }
     }
+  ],
+  [
+    { name: 'Empty partitions' },
+    {
+      measures: [
+        'EmptyHourVisitors.checkinsTotal'
+      ],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'EmptyHourVisitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-02', '2022-01-05']
+      }]
+    }
   ]
 ];
 
