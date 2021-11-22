@@ -1226,7 +1226,7 @@ export class PreAggregationPartitionRangeLoader {
       ),
     );
     if (!this.preAggregation.partitionGranularity) {
-      return [startDate, endDate];
+      return this.orNowIfEmpty([startDate, endDate]);
     }
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
@@ -1241,7 +1241,21 @@ export class PreAggregationPartitionRangeLoader {
         ),
       ),
     );
-    return [rangeStart, rangeEnd];
+    return this.orNowIfEmpty([rangeStart, rangeEnd]);
+  }
+
+  private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {
+    if (!dateRange[0] && !dateRange[1]) {
+      const now = utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+      return [now, now];
+    }
+    if (!dateRange[0]) {
+      return [dateRange[1], dateRange[1]];
+    }
+    if (!dateRange[1]) {
+      return [dateRange[0], dateRange[0]];
+    }
+    return dateRange;
   }
 
   private static checkDataRangeType(range: QueryDateRange) {

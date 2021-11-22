@@ -342,6 +342,7 @@ cube('EveryHourVisitors', {
       timeDimensionReference: createdAt,
       granularity: 'day',
       partitionGranularity: 'month',
+      external: true,
       refreshKey: {
         every: '1 hour',
         incremental: true,
