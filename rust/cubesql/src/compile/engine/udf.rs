@@ -1,10 +1,12 @@
+use std::any::type_name;
 use std::sync::Arc;
 
 use datafusion::{
     arrow::{
-        array::{ArrayRef, StringBuilder, UInt32Builder},
+        array::{ArrayRef, GenericStringArray, Int32Builder, StringBuilder, UInt32Builder},
         datatypes::DataType,
     },
+    error::DataFusionError,
     logical_plan::create_udf,
     physical_plan::{
         functions::{make_scalar_function, Volatility},
@@ -116,5 +118,52 @@ pub fn create_connection_id_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
         version,
+    )
+}
+
+macro_rules! downcast_string_arg {
+    ($ARG:expr, $NAME:expr, $T:ident) => {{
+        $ARG.as_any()
+            .downcast_ref::<GenericStringArray<$T>>()
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "could not cast {} to {}",
+                    $NAME,
+                    type_name::<GenericStringArray<$T>>()
+                ))
+            })?
+    }};
+}
+
+// Returns the position of the first occurrence of substring substr in string str.
+// This is the same as the two-argument form of LOCATE(), except that the order of
+// the arguments is reversed.
+pub fn create_instr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let arg1_arr = downcast_string_arg!(args[0], "str", i32);
+        let arg2_arr = downcast_string_arg!(args[1], "substr", i32);
+
+        let input_str = arg1_arr.value(0);
+        let input_substr = arg2_arr.value(0);
+
+        let mut builder = Int32Builder::new(1);
+
+        if let Some(idx) = input_str.to_string().find(input_substr) {
+            builder.append_value((idx as i32) + 1)?;
+        } else {
+            builder.append_value(0)?;
+        };
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "instr",
+        vec![DataType::Utf8, DataType::Utf8],
+        Arc::new(DataType::Int32),
+        Volatility::Immutable,
+        fun,
     )
 }
