@@ -48,7 +48,7 @@ jobs:
     name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
     strategy:
       matrix:
-        node-version: [10, 12, 14, 15, 16]
+        node-version: [10, 12, 14, 15, 16, 17]
         image: ["stretch"]
       fail-fast: false
     container:
@@ -91,7 +91,7 @@ jobs:
     name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
+        node-version: [10.x, 12.x, 14.x, 15.x, 16.x, 17.x]
         os-version: [windows-2019, macos-11]
       fail-fast: false
 
