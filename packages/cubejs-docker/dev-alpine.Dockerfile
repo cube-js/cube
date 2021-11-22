@@ -6,7 +6,7 @@ ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 ENV CI=0
 
-RUN apk add rxvt-unicode curl
+RUN apk add rxvt-unicode curl cmake
 
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
