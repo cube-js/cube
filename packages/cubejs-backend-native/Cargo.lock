@@ -484,6 +484,7 @@ dependencies = [
  "sqlparser",
  "tokio",
  "tokio-stream",
+ "unicode-segmentation",
 ]
 
 [[package]]
