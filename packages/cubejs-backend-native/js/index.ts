@@ -40,7 +40,7 @@ function loadNative() {
     }
 
     throw new Error(
-      `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) is not supported.`
+      `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) with Node.js ${process.version} is not supported.`
     );
 }
 
