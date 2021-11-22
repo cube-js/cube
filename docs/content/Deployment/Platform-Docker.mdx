@@ -138,7 +138,7 @@ You can also use a reverse proxy to enable HTTP 2.0 and GZIP compression
 
 </InfoBox>
 
-First we'll create a new server configuration file called `cube.conf`:
+First we'll create a new server configuration file called `nginx/cube.conf`:
 
 ```
 server {
@@ -159,8 +159,7 @@ server {
   ssl_stapling_verify         on;
 
   location / {
-    # Remember to replace `localhost` with `host.docker.internal` if you're on macOS/Windows
-    proxy_pass http://localhost:4000/;
+    proxy_pass http://cube:4000/;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -173,14 +172,18 @@ Then we'll add a new service to our Docker Compose stack:
 ```yaml
 services:
   ...
-  webserver:
+  nginx:
     image: nginx
     ports:
       - 443:443
     volumes:
-      - ./nginx:/etc/nginx
+      - ./nginx:/etc/nginx/conf.d
       - ./ssl:/etc/ssl/private
 ```
+
+Don't forget to create a `ssl` directory with the `cert.pem` and `key.pem` files inside so the Nginx service can find them.
+
+For automatically provisioning SSL certificates with LetsEncrypt, [this blog post](https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71) may be useful.
 
 ## Security
 
