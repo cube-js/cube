@@ -1384,16 +1384,14 @@ export class ApiGateway {
     this.log({
       type: 'Incoming network usage',
       service: 'api-http',
-      context: req.context,
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
-    });
+    }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
-        context: req.context,
         bytes: Number(res.get('content-length')) || 0,
-      });
+      }, req.context);
     });
     if (next) {
       next();
@@ -1436,7 +1434,7 @@ export class ApiGateway {
     }));
   }
 
-  public log(event: { type: string, [key: string]: any }, context?: RequestContext) {
+  public log(event: { type: string, [key: string]: any }, context?: Partial<RequestContext>) {
     const { type, ...restParams } = event;
 
     this.logger(type, {

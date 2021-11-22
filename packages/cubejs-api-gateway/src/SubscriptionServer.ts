@@ -35,8 +35,7 @@ export class SubscriptionServer {
         type: 'Outgoing network usage',
         service: 'api-ws',
         bytes: calcMessageLength(message),
-        requestId,
-      });
+      }, { requestId });
       return this.sendMessage(connectionId, { messageId, message, status });
     };
   }
@@ -98,9 +97,8 @@ export class SubscriptionServer {
       this.apiGateway.log({
         type: 'Incoming network usage',
         service: 'api-ws',
-        context,
         bytes,
-      });
+      }, context);
 
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
