@@ -159,7 +159,6 @@ server {
   ssl_stapling_verify         on;
 
   location / {
-    # Remember to replace `localhost` with `host.docker.internal` if you're on macOS/Windows
     proxy_pass http://cube:4000/;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
@@ -184,7 +183,7 @@ services:
 
 Don't forget to create a `ssl` directory with the `cert.pem` and `key.pem` files inside so the Nginx service can find them.
 
-For automatically provisioning SSL certificates with LetsEncrypt, [this blog post](https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71) may be useful
+For automatically provisioning SSL certificates with LetsEncrypt, [this blog post](https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71) may be useful.
 
 ## Security
 
