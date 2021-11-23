@@ -82,6 +82,8 @@ jobs:
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
 
   native:
@@ -129,4 +131,6 @@ jobs:
           CUBESTORE_SKIP_POST_INSTALL: true
         run: yarn install --frozen-lockfile
       - name: Build native
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit

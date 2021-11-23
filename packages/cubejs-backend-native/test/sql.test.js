@@ -1,4 +1,4 @@
-const mysql = require('mysql');
+const mysql = require('mysql2/promise');
 const util = require('util');
 
 const native = require('../dist/js/index');
@@ -45,6 +45,7 @@ describe('SQLInteface', () => {
 
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
+      port: 4545,
       checkAuth,
       load,
       meta,
@@ -52,21 +53,20 @@ describe('SQLInteface', () => {
     console.log(instance);
 
     const testConnectionFailed = async (/** input */ { user, password }) =>{
-      const connection = mysql.createConnection({
-        host: 'localhost',
-        user,
-        password,
-      });
-      const pingAsync = util.promisify(connection.ping.bind(connection));
-
       try {
-        await pingAsync();
+        await mysql.createConnection({
+          host: '127.0.0.1',
+          port: 4545,
+          user,
+          password,
+        });;
 
         throw new Error('must throw error');
       } catch (e) {
-        expect(e.message).toContain('ER_PASSWORD_NO_MATCH: Incorrect user name or password');
+        expect(e.message).toContain('Incorrect user name or password');
       }
 
+      console.log(checkAuth.mock.calls)
       expect(checkAuth.mock.calls.length).toEqual(1);
       expect(checkAuth.mock.calls[0][0]).toEqual({
         request: {
@@ -94,14 +94,14 @@ describe('SQLInteface', () => {
     });
     checkAuth.mockClear();
 
-    const connection = mysql.createConnection({
-      host : 'localhost',
+    const connection = await mysql.createConnection({
+      host: '127.0.0.1',
+      port: 4545,
       user: 'allowed_user',
       password: 'password_for_allowed_user'
     });
-    const queryAsync = util.promisify(connection.query.bind(connection));
 
-    const result = await queryAsync('SHOW FULL TABLES FROM `db`');
+    const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
     console.log(result);
 
     expect(result).toEqual([
