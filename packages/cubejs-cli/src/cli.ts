@@ -2,6 +2,7 @@ import program from 'commander';
 
 import { configureServerCommand } from './command/server';
 import { configureDeployCommand } from './command/deploy';
+import { configureDoctorCommand } from './command/doctor';
 import { configureCreateCommand } from './command/create';
 import { configureGenerateCommand } from './command/generate';
 import { configureTokenCommand } from './command/token';
@@ -27,6 +28,7 @@ program
   await configureCreateCommand(program);
   await configureGenerateCommand(program);
   await configureDeployCommand(program);
+  await configureDoctorCommand(program);
   await configureServerCommand(program);
 
   if (!process.argv.slice(2).length) {
