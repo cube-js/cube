@@ -221,7 +221,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    if (this.config.database) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    } else {
+      return super.informationSchemaQuery();
+    }
   }
 
   public quoteIdentifier(identifier: string) {
