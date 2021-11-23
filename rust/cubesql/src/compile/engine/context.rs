@@ -16,6 +16,10 @@ impl SystemVar {
             ScalarValue::Utf8(Some("mysql".to_string())),
         );
         variables.insert(
+            "@@sessiontransaction_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+        );
+        variables.insert(
             "@@sessionauto_increment_increment".to_string(),
             ScalarValue::Int64(Some(1)),
         );
