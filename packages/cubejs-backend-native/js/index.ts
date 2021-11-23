@@ -56,11 +56,22 @@ function wrapNativeFunctionWithChannelCallback(
     return async (extra: any, channel: any) => {
         try {
             const result = await fn(JSON.parse(extra));
+
+            if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                console.debug("[js] channel.resolve", {
+                    result
+                });
+            }
+
             channel.resolve(JSON.stringify(result));
           } catch (e: any) {
             channel.reject(e.message || 'Unknown JS exception');
 
             // throw e;
+
+            console.debug("[js] channel.reject", {
+                e
+            });
           }
     };
 };

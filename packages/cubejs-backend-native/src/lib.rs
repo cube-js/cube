@@ -102,7 +102,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     std::thread::spawn(move || {
         let config = NodeConfig::new(port, nonce);
-
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
@@ -113,12 +112,19 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
             );
 
             let services_arc = services.clone();
-            channel.settle_with(deferred, move |cx| {
-                Ok(cx.boxed(SQLInterface::new(services_arc)))
-            });
 
             track_event("Cube SQL Start".to_string(), HashMap::new()).await;
-            services.wait_processing_loops().await.unwrap();
+
+            let mut loops = services.spawn_processing_loops().await.unwrap();
+            loops.push(tokio::spawn(async move {
+                channel.settle_with(deferred, move |cx| {
+                    Ok(cx.boxed(SQLInterface::new(services_arc)))
+                });
+
+                Ok(())
+            }));
+
+            CubeServices::wait_loops(loops).await.unwrap();
         });
     });
 

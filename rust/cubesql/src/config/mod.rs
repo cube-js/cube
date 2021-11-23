@@ -7,6 +7,7 @@ use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::schema::{SchemaService, SchemaServiceDefaultImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
+use futures::channel::oneshot;
 use futures::future::join_all;
 use log::error;
 
@@ -35,10 +36,11 @@ impl CubeServices {
     }
 
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
-        Self::wait_loops(self.spawn_processing_loops().await?).await
+        let processing_loops = self.spawn_processing_loops().await?;
+        Self::wait_loops(processing_loops).await
     }
 
-    async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
+    pub async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
         join_all(loops)
             .await
             .into_iter()
@@ -46,23 +48,24 @@ impl CubeServices {
         Ok(())
     }
 
-    async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
+    pub async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
         if self.injector.has_service_typed::<MySqlServer>().await {
             let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
             futures.push(tokio::spawn(async move {
-                match mysql_server.processing_loop().await {
-                    Err(e) => println!("{}", e.to_string()),
-                    Ok(_) => {}
-                }
+                if let Err(e) = mysql_server.processing_loop().await {
+                    error!("{}", e.to_string());
+                };
 
                 Ok(())
             }));
         }
+
         futures.push(tokio::spawn(async move {
             start_track_event_loop().await;
             Ok(())
         }));
+
         Ok(futures)
     }
 
