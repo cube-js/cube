@@ -304,6 +304,8 @@ export class ApiGateway {
       })(req, res);
     });
 
+    app.use(this.logNetworkUsage);
+
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
@@ -1378,6 +1380,24 @@ export class ApiGateway {
     }
   };
 
+  protected logNetworkUsage: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    this.log({
+      type: 'Incoming network usage',
+      service: 'api-http',
+      bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+    }, req.context);
+    res.on('finish', () => {
+      this.log({
+        type: 'Outgoing network usage',
+        service: 'api-http',
+        bytes: Number(res.get('content-length')) || 0,
+      }, req.context);
+    });
+    if (next) {
+      next();
+    }
+  };
+
   protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
     let compareDateRangeTDIndex;
@@ -1414,7 +1434,7 @@ export class ApiGateway {
     }));
   }
 
-  protected log(event: { type: string, [key: string]: any }, context?: RequestContext) {
+  public log(event: { type: string, [key: string]: any }, context?: Partial<RequestContext>) {
     const { type, ...restParams } = event;
 
     this.logger(type, {
