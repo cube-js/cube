@@ -54,6 +54,7 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
+use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -99,6 +100,15 @@ pub struct QueryPlans {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
+    pub trace_obj: Option<String>,
+}
+
+impl SqlQueryContext {
+    pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.trace_obj = trace_obj;
+        res
+    }
 }
 
 pub struct SqlServiceImpl {
@@ -164,6 +174,7 @@ impl SqlServiceImpl {
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         partitioned_index: Option<PartitionedIndexRef>,
+        trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
@@ -250,7 +261,7 @@ impl SqlServiceImpl {
 
         let finalize_res = tokio::time::timeout(
             self.create_table_timeout,
-            self.finalize_external_table(&table, listener),
+            self.finalize_external_table(&table, listener, trace_obj),
         )
         .await
         .map_err(|_| {
@@ -290,6 +301,7 @@ impl SqlServiceImpl {
         &self,
         table: &IdRow<Table>,
         listener: JobResultListener,
+        trace_obj: &Option<String>,
     ) -> Result<(), CubeError> {
         let wait_for = table
             .get_row()
@@ -327,7 +339,12 @@ impl SqlServiceImpl {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
-        self.db.table_ready(table.get_id(), true).await?;
+        let ready_table = self.db.table_ready(table.get_id(), true).await?;
+
+        if let Some(trace_obj) = trace_obj.as_ref() {
+            incoming_traffic_agent_event(trace_obj, ready_table.get_row().total_download_size())?;
+        }
+
         Ok(())
     }
 
@@ -484,7 +501,7 @@ impl SqlService for SqlServiceImpl {
     #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
-        _context: SqlQueryContext,
+        context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
@@ -582,6 +599,7 @@ impl SqlService for SqlServiceImpl {
                         indexes,
                         unique_key,
                         partitioned_index,
+                        &context.trace_obj,
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
@@ -1480,6 +1498,7 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
             ]));

@@ -243,6 +243,9 @@ impl<'a> HttpQuery<'a> {
         args: &'args HttpQueryArgs<'args>,
     ) -> flatbuffers::WIPOffset<HttpQuery<'bldr>> {
         let mut builder = HttpQueryBuilder::new(_fbb);
+        if let Some(x) = args.trace_obj {
+            builder.add_trace_obj(x);
+        }
         if let Some(x) = args.query {
             builder.add_query(x);
         }
@@ -250,21 +253,31 @@ impl<'a> HttpQuery<'a> {
     }
 
     pub const VT_QUERY: flatbuffers::VOffsetT = 4;
+    pub const VT_TRACE_OBJ: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub fn query(&self) -> Option<&'a str> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<&str>>(HttpQuery::VT_QUERY, None)
     }
+    #[inline]
+    pub fn trace_obj(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(HttpQuery::VT_TRACE_OBJ, None)
+    }
 }
 
 pub struct HttpQueryArgs<'a> {
     pub query: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub trace_obj: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for HttpQueryArgs<'a> {
     #[inline]
     fn default() -> Self {
-        HttpQueryArgs { query: None }
+        HttpQueryArgs {
+            query: None,
+            trace_obj: None,
+        }
     }
 }
 pub struct HttpQueryBuilder<'a: 'b, 'b> {
@@ -276,6 +289,11 @@ impl<'a: 'b, 'b> HttpQueryBuilder<'a, 'b> {
     pub fn add_query(&mut self, query: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_QUERY, query);
+    }
+    #[inline]
+    pub fn add_trace_obj(&mut self, trace_obj: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_TRACE_OBJ, trace_obj);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpQueryBuilder<'a, 'b> {

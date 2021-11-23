@@ -1,13 +1,14 @@
 use super::{
     BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex, RocksTable, TableId,
 };
-use crate::base_rocks_secondary_index;
 use crate::data_frame_from;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
 use crate::rocks_table_impl;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
+use itertools::Itertools;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
@@ -31,7 +32,9 @@ pub struct Table {
     #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
-    seq_column_index: Option<u64>
+    seq_column_index: Option<u64>,
+    #[serde(default)]
+    location_download_sizes: Option<Vec<u64>>
 }
 }
 
@@ -60,6 +63,7 @@ impl Table {
         unique_key_column_indices: Option<Vec<u64>>,
         seq_column_index: Option<u64>,
     ) -> Table {
+        let location_download_sizes = locations.as_ref().map(|locations| vec![0; locations.len()]);
         Table {
             table_name,
             schema_id,
@@ -71,6 +75,7 @@ impl Table {
             created_at: Some(Utc::now()),
             unique_key_column_indices,
             seq_column_index,
+            location_download_sizes,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -111,6 +116,38 @@ impl Table {
         let mut table = self.clone();
         table.is_ready = is_ready;
         table
+    }
+
+    pub fn update_location_download_size(
+        &self,
+        location: &str,
+        download_size: u64,
+    ) -> Result<Self, CubeError> {
+        let mut table = self.clone();
+        let locations = table.locations.as_ref().ok_or(CubeError::internal(format!(
+            "Can't update location size for table without locations: {:?}",
+            self
+        )))?;
+        let (pos, _) =
+            locations
+                .iter()
+                .find_position(|l| l == &location)
+                .ok_or(CubeError::internal(format!(
+                    "Can't update location size: location '{}' not found in {:?}",
+                    location, locations
+                )))?;
+        if table.location_download_sizes.is_none() {
+            table.location_download_sizes = Some(vec![0; locations.len()]);
+        }
+        table.location_download_sizes.as_mut().unwrap()[pos] = download_size;
+        Ok(table)
+    }
+
+    pub fn total_download_size(&self) -> u64 {
+        self.location_download_sizes
+            .as_ref()
+            .map(|sizes| sizes.iter().sum::<u64>())
+            .unwrap_or(0)
     }
 
     pub fn is_ready_default() -> bool {

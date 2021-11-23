@@ -300,11 +300,11 @@ export class BaseDriver {
   }
 
   async uploadTable(table, columns, tableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, []);
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

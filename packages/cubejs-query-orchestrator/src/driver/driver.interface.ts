@@ -90,7 +90,7 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(
-    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[]
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
