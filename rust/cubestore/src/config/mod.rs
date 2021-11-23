@@ -24,7 +24,9 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
-use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
+use crate::telemetry::{
+    start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
+};
 use crate::CubeError;
 use datafusion::cube_ext;
 use futures::future::join_all;
@@ -138,6 +140,11 @@ impl CubeServices {
             start_track_event_loop().await;
             Ok(())
         }));
+
+        futures.push(cube_ext::spawn(async move {
+            start_agent_event_loop().await;
+            Ok(())
+        }));
         Ok(futures)
     }
 
@@ -165,6 +172,7 @@ impl CubeServices {
         }
         self.scheduler.stop_processing_loops()?;
         stop_track_event_loop().await;
+        stop_agent_event_loop().await;
         Ok(())
     }
 }

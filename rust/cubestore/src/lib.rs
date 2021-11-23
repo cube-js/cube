@@ -429,6 +429,12 @@ impl From<url::ParseError> for CubeError {
     }
 }
 
+impl From<tokio_tungstenite::tungstenite::Error> for CubeError {
+    fn from(v: tokio_tungstenite::tungstenite::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
 impl Into<ArrowError> for CubeError {
     fn into(self) -> ArrowError {
         ArrowError::ExternalError(Box::new(self))

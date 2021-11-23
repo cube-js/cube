@@ -753,6 +753,12 @@ pub trait MetaStore: DIService + Send + Sync {
         unique_key_column_names: Option<Vec<String>>,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
+    async fn update_location_download_size(
+        &self,
+        id: u64,
+        location: String,
+        download_size: u64,
+    ) -> Result<IdRow<Table>, CubeError>;
     async fn get_table(
         &self,
         schema_name: String,
@@ -1374,6 +1380,17 @@ trait RocksTable: Debug + Send + Sync {
     ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         let new_row = update_fn(&row.get_row());
+        self.update(row_id, new_row, &row.get_row(), batch_pipe)
+    }
+
+    fn update_with_res_fn(
+        &self,
+        row_id: u64,
+        update_fn: impl FnOnce(&Self::T) -> Result<Self::T, CubeError>,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Self::T>, CubeError> {
+        let row = self.get_row_or_not_found(row_id)?;
+        let new_row = update_fn(&row.get_row())?;
         self.update(row_id, new_row, &row.get_row(), batch_pipe)
     }
 
@@ -2756,6 +2773,24 @@ impl MetaStore for RocksMetaStore {
             batch_pipe.invalidate_tables_cache();
             let rocks_table = TableRocksTable::new(db_ref.clone());
             Ok(rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn update_location_download_size(
+        &self,
+        id: u64,
+        location: String,
+        download_size: u64,
+    ) -> Result<IdRow<Table>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
+            let rocks_table = TableRocksTable::new(db_ref.clone());
+            Ok(rocks_table.update_with_res_fn(
+                id,
+                |r| r.update_location_download_size(&location, download_size),
+                batch_pipe,
+            )?)
         })
         .await
     }

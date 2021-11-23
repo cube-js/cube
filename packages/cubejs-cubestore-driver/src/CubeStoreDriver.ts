@@ -55,8 +55,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query(query, values) {
-    return this.connection.query(formatSql(query, values || []));
+  public async query(query: string, values: any[], queryTracingObj?: any) {
+    return this.connection.query(formatSql(query, values || []), { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {
@@ -98,29 +98,29 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[]) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any) {
     const indexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
 
     if (tableData.rowStream) {
-      await this.importStream(columns, tableData, table, indexes);
+      await this.importStream(columns, tableData, table, indexes, queryTracingObj);
     } else if (tableData.csvFile) {
-      await this.importCsvFile(tableData, table, columns, indexes);
+      await this.importCsvFile(tableData, table, columns, indexes, queryTracingObj);
     } else if (tableData.streamingSource) {
-      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns);
+      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns, queryTracingObj);
     } else if (tableData.rows) {
-      await this.importRows(table, columns, indexesSql, tableData);
+      await this.importRows(table, columns, indexesSql, tableData, queryTracingObj);
     } else {
       throw new Error(`Unsupported table data passed to ${this.constructor}`);
     }
   }
 
-  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData) {
+  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
     await this.createTable(table, columns);
     try {
       for (let i = 0; i < indexesSql.length; i++) {
         const [query, params] = indexesSql[i].sql;
-        await this.query(query, params);
+        await this.query(query, params, queryTracingObj);
       }
       const batchSize = 2000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
@@ -137,6 +137,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES ${valueParamPlaceholders}`,
           params,
+          queryTracingObj
         );
       }
     } catch (e) {
@@ -145,27 +146,27 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes) {
+  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
 
     if (files.length > 0) {
       // eslint-disable-next-line no-unused-vars
       const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-      return this.query(createTableSqlWithLocation, files).catch(e => {
+      return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
       });
     }
 
     const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;
-    return this.query(createTableSqlWithoutLocation, []).catch(e => {
+    return this.query(createTableSqlWithoutLocation, [], queryTracingObj).catch(e => {
       e.message = `Error during create table: ${createTableSqlWithoutLocation}: ${e.message}`;
       throw e;
     });
   }
 
-  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string) {
+  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, queryTracingObj?: any) {
     const writer = csvWriter({ headers: columns.map(c => c.name) });
     const gzipStream = createGzip();
     const tempFile = tempy.file();
@@ -191,7 +192,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         const err = await res.json();
         throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
       }
-      await this.query(createTableSqlWithLocation, [`temp://${fileName}`]).catch(e => {
+      await this.query(createTableSqlWithLocation, [`temp://${fileName}`], queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
       });
@@ -200,7 +201,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[]) {
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[], queryTracingObj?: any) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
@@ -209,14 +210,15 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       [tableData.streamingSource.type]
         .concat(
           Object.keys(tableData.streamingSource.credentials).map(k => tableData.streamingSource.credentials[k])
-        )
+        ),
+      queryTracingObj
     );
 
     const createTableSql = this.createTableSql(table, columns);
     // eslint-disable-next-line no-unused-vars
     const createTableSqlWithLocation = `${createTableSql} ${indexes} UNIQUE KEY (${uniqueKeyColumns.join(',')}) LOCATION ?`;
 
-    await this.query(createTableSqlWithLocation, [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`]).catch(e => {
+    await this.query(createTableSqlWithLocation, [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`], queryTracingObj).catch(e => {
       e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
       throw e;
     });

@@ -392,10 +392,19 @@ impl ImportServiceImpl {
                 file.write_all(slice).await?;
             }
             log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
             file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
-            Ok((self.download_temp_file(location).await?, None))
+            let temp_file = self.download_temp_file(location).await?;
+            let size = temp_file.metadata().await?.len();
+            log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
+            Ok((temp_file, None))
         } else {
             Ok((File::open(location.clone()).await?, None))
         }

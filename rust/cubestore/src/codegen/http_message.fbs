@@ -11,6 +11,7 @@ table HttpMessage {
 
 table HttpQuery {
     query: string;
+    trace_obj: string;
 }
 
 table HttpError {

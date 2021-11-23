@@ -91,7 +91,10 @@ impl HttpServer {
                 async move {
                     let res = HttpServer::authorize(auth_service, auth_header).await;
                     match res {
-                        Ok(user) => Ok(SqlQueryContext { user }),
+                        Ok(user) => Ok(SqlQueryContext {
+                            user,
+                            trace_obj: None,
+                        }),
                         Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
                     }
                 }
@@ -300,9 +303,9 @@ impl HttpServer {
         command: HttpCommand,
     ) -> Result<HttpCommand, CubeError> {
         match command {
-            HttpCommand::Query { query } => Ok(HttpCommand::ResultSet {
+            HttpCommand::Query { query, trace_obj } => Ok(HttpCommand::ResultSet {
                 data_frame: sql_service
-                    .exec_query_with_context(sql_query_context, &query)
+                    .exec_query_with_context(sql_query_context.with_trace_obj(trace_obj), &query)
                     .await?,
             }),
             x => Err(CubeError::user(format!("Unexpected command: {:?}", x))),
@@ -347,9 +350,16 @@ pub struct HttpMessage {
 
 #[derive(Debug)]
 pub enum HttpCommand {
-    Query { query: String },
-    ResultSet { data_frame: Arc<DataFrame> },
-    Error { error: String },
+    Query {
+        query: String,
+        trace_obj: Option<String>,
+    },
+    ResultSet {
+        data_frame: Arc<DataFrame>,
+    },
+    Error {
+        error: String,
+    },
 }
 
 impl HttpMessage {
@@ -369,13 +379,15 @@ impl HttpMessage {
                 }
             },
             command: match &self.command {
-                HttpCommand::Query { query } => {
+                HttpCommand::Query { query, trace_obj } => {
                     let query_offset = builder.create_string(&query);
+                    let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
                     Some(
                         HttpQuery::create(
                             &mut builder,
                             &HttpQueryArgs {
                                 query: Some(query_offset),
+                                trace_obj: trace_obj_offset,
                             },
                         )
                         .as_union_value(),
@@ -507,6 +519,7 @@ impl HttpMessage {
                     let query = http_message.command_as_http_query().unwrap();
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
+                        trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
                 command => {

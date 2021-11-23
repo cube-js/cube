@@ -68,6 +68,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "adler32"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
+
+[[package]]
 name = "ahash"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1136,6 +1142,7 @@ dependencies = [
  "cubezetasketch",
  "datafusion 4.0.0-SNAPSHOT",
  "deadqueue",
+ "deflate",
  "enum_primitive",
  "flatbuffers 0.7.0",
  "flexbuffers",
@@ -1179,6 +1186,7 @@ dependencies = [
  "tempfile",
  "tokio 1.9.0",
  "tokio-stream",
+ "tokio-tungstenite 0.16.0",
  "tokio-util 0.6.7",
  "tracing",
  "tracing-futures",
@@ -1296,6 +1304,15 @@ checksum = "9f41ebddf24094fe55ed9861f925e8fd88d761e5231ec1dcc844e7fd66179b1b"
 dependencies = [
  "crossbeam-queue 0.2.3",
  "tokio 0.2.25",
+]
+
+[[package]]
+name = "deflate"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c86f7e25f518f4b81808a2cf1c50996a61f5c2eb394b2393bd87f2a4780a432f"
+dependencies = [
+ "adler32",
 ]
 
 [[package]]
@@ -4810,7 +4827,21 @@ dependencies = [
  "log",
  "pin-project",
  "tokio 1.9.0",
- "tungstenite",
+ "tungstenite 0.14.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e057364a4dd37870b33bf8dc1885d29187d90770f488d599d3ee8d9e4916fbd3"
+dependencies = [
+ "futures-util",
+ "log",
+ "native-tls",
+ "tokio 1.9.0",
+ "tokio-native-tls",
+ "tungstenite 0.16.0",
 ]
 
 [[package]]
@@ -5034,6 +5065,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tungstenite"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ad3713a14ae247f22a728a0456a545df14acf3867f905adff84be99e23b3ad1"
+dependencies = [
+ "base64 0.13.0",
+ "byteorder",
+ "bytes 1.0.1",
+ "http",
+ "httparse",
+ "log",
+ "native-tls",
+ "rand 0.8.4",
+ "sha-1",
+ "thiserror",
+ "url",
+ "utf-8",
+]
+
+[[package]]
 name = "twoway"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5049,7 +5100,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.6.5",
+ "rand 0.8.4",
  "static_assertions",
 ]
 
@@ -5195,7 +5246,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio 1.9.0",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.15.0",
  "tokio-util 0.6.7",
  "tower-service",
  "tracing",
