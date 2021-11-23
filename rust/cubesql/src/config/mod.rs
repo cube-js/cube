@@ -7,7 +7,6 @@ use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::schema::{SchemaService, SchemaServiceDefaultImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::CubeError;
-use futures::channel::oneshot;
 use futures::future::join_all;
 use log::error;
 
