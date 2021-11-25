@@ -12,7 +12,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
 use datafusion::{logical_plan::LogicalPlan, prelude::*};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
 use sqlparser::ast::{self, Ident, ObjectName};
@@ -1167,6 +1167,21 @@ impl QueryPlanner {
                     }
                 }
             }
+            ast::Statement::SetNames { charset_name, .. } => {
+                if !(charset_name.eq_ignore_ascii_case("utf8")
+                    || charset_name.eq_ignore_ascii_case("utf8mb4"))
+                {
+                    warn!(
+                        "SET NAME does not support non utf8 charsets, input: {}",
+                        charset_name
+                    );
+                };
+
+                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                    vec![],
+                    vec![],
+                ))));
+            }
             ast::Statement::SetVariable { .. } => {
                 return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
                     vec![],
@@ -1181,9 +1196,10 @@ impl QueryPlanner {
                 return self.create_df_logical_plan(stmt.clone(), props);
             }
             _ => {
-                return Err(CompilationError::Unsupported(
-                    "Unsupported query type".to_string(),
-                ));
+                return Err(CompilationError::Unsupported(format!(
+                    "Unsupported query type: {}",
+                    stmt.to_string()
+                )));
             }
         };
 
