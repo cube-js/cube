@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mongobi-driver:** Show all tables if database isn't set ([6a55438](https://github.com/cube-js/cube.js/commit/6a554385c05371304755037ac17d189477164ffb))
+* **@cubejs-backend/mongobi-driver:** Unsupported mapping for data type: 5 ([9d42c9c](https://github.com/cube-js/cube.js/commit/9d42c9c1b68243c0bce5444b91615fa5907b8ed3))
+
+
+
+
+
 ## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver
