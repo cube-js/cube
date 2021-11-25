@@ -6,7 +6,6 @@ import {
   DriverInterface, StreamOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { Readable } from 'stream';
-import moment from 'moment';
 
 import { getNativeTypeName } from './MySQLType';
 
