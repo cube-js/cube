@@ -309,7 +309,7 @@ impl<T: TelemetryTransport> EventSender<T> {
                 mem::swap(&mut to_send, &mut events);
             }
             if !to_send.is_empty() {
-                if let Err(e) = self.transport.send_events(to_send).await {
+                if let Err(_) = self.transport.send_events(to_send).await {
                     // println!("Send Error: {}", e);
                 }
             }
