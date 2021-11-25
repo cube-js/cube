@@ -807,7 +807,6 @@ impl Config {
                     .await;
             }
             FileStoreProvider::MINIO {
-                region,
                 bucket_name,
                 sub_path,
             } => {
