@@ -47,7 +47,6 @@ impl fmt::Debug for MINIORemoteFs {
 impl MINIORemoteFs {
     pub fn new(
         dir: PathBuf,
-        region: String,
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {

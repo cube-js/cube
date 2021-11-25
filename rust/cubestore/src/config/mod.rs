@@ -232,7 +232,7 @@ pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
     }
 
     let mut remote_vars = vec![
-        "CUBESTORE_MINIO_BUCKET"
+        "CUBESTORE_MINIO_BUCKET",
         "CUBESTORE_S3_BUCKET",
         "CUBESTORE_GCS_BUCKET",
         "CUBESTORE_REMOTE_DIR",
@@ -267,7 +267,6 @@ pub enum FileStoreProvider {
     MINIO {
         region: String,
         bucket_name: String,
-        server_url: String,
         sub_path: Option<String>,
     },
 }
@@ -820,7 +819,7 @@ impl Config {
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                        MINIORemoteFs::new(data_dir, region, bucket_name, sub_path).unwrap();
+                        MINIORemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
                         arc
                     })
                     .await;
