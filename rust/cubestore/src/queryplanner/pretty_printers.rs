@@ -16,7 +16,7 @@ use itertools::{repeat_n, Itertools};
 
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
-use crate::queryplanner::serialized_plan::IndexSnapshot;
+use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
@@ -337,8 +337,17 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "HashJoin";
         } else if let Some(cs) = a.downcast_ref::<ClusterSendExec>() {
             *out += &format!(
-                "ClusterSend, partitions: {:?}",
-                cs.partitions.iter().map(|(_, ids)| ids).collect_vec()
+                "ClusterSend, partitions: [{}]",
+                cs.partitions
+                    .iter()
+                    .map(|(_, ps)| {
+                        let ps = ps
+                            .iter()
+                            .map(|(id, range)| format!("{}{}", id, pp_row_range(range)))
+                            .join(", ");
+                        format!("[{}]", ps)
+                    })
+                    .join(", ")
             );
         } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
             *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
@@ -390,4 +399,19 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         }
     }
+}
+
+fn pp_row_range(r: &RowRange) -> String {
+    if r.matches_all_rows() {
+        return String::new();
+    }
+    let s = match &r.start {
+        None => "-∞".to_string(),
+        Some(s) => format!("{:?}", s.values()),
+    };
+    let e = match &r.end {
+        None => "∞".to_string(),
+        Some(e) => format!("{:?}", e.values()),
+    };
+    format!("[{},{})", s, e)
 }

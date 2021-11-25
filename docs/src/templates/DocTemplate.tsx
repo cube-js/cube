@@ -42,6 +42,8 @@ import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
 
+const MyH4 = (props) => <h4 name={kebabCase(props.id)} {...props} />;
+
 const components = {
   DangerBox,
   InfoBox,
@@ -55,6 +57,7 @@ const components = {
   GitHubFolderLink,
   h2: ScrollSpyH2,
   h3: ScrollSpyH3,
+  h4: MyH4,
 };
 
 const MDX = (props) => (
@@ -120,10 +123,14 @@ class DocTemplate extends Component<Props, State> {
       category: renameCategory(frontmatter.category),
       noscrollmenu: false,
     });
+
+    const hackFixFileAbsPath = this.props.pageContext.fileAbsolutePath
+      .replace('/opt/build/repo/', '')
+
     this.createAnchors(
       <MDXForSideMenu {...this.props} />,
       frontmatter.title,
-      getGithubUrl(this.props.pageContext.fileAbsolutePath)
+      getGithubUrl(hackFixFileAbsPath)
     );
   }
 

@@ -28,6 +28,17 @@ pub enum NetworkMessage {
     WarmupDownload(/*remote_path*/ String),
     WarmupDownloadResult(Result<(), CubeError>),
 
+    AddMemoryChunk {
+        chunk_id: u64,
+        data: SerializedRecordBatchStream,
+    },
+    AddMemoryChunkResult(Result<(), CubeError>),
+
+    FreeMemoryChunk {
+        chunk_id: u64,
+    },
+    FreeMemoryChunkResult(Result<(), CubeError>),
+
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),
 

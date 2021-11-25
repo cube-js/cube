@@ -104,7 +104,7 @@ export class BaseDriver {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -300,10 +300,11 @@ export class BaseDriver {
   }
 
   async uploadTable(table, columns, tableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, []);
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

@@ -12,7 +12,7 @@ const EditPage = ({ githubUrl }: { githubUrl: string }) => {
   return (
     <div className={styles.scrollspyLinkWrapper}>
       <p className={cx(styles.editPage, styles.scrollspyLink)}>
-        <a href={githubUrl}>
+        <a href={githubUrl} rel="noopener" target="_blank">
           {' '}
           <Icon type="github" /> Edit this page{' '}
         </a>

@@ -16,6 +16,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 pub type TestFn = Box<
@@ -43,6 +44,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
+        t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
@@ -70,6 +72,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("join_with_aliases", join_with_aliases),
         t("group_by_without_aggregates", group_by_without_aggregates),
         t("create_table_with_location", create_table_with_location),
+        t(
+            "create_table_with_location_messed_order",
+            create_table_with_location_messed_order,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -85,9 +91,19 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
         t("topk_large_inputs", topk_large_inputs),
+        t("partitioned_index", partitioned_index),
+        t(
+            "partitioned_index_if_not_exists",
+            partitioned_index_if_not_exists,
+        ),
+        t("drop_partitioned_index", drop_partitioned_index),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
+        t(
+            "planning_join_with_partitioned_index",
+            planning_join_with_partitioned_index,
+        ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
@@ -113,12 +129,15 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
+        t("decimal_order", decimal_order),
         t("float_index", float_index),
+        t("float_order", float_order),
         t("date_add", date_add),
         t("now", now),
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
         t("unsorted_data_timestamps", unsorted_data_timestamps),
+        t("ksql_simple", ksql_simple),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -741,6 +760,35 @@ async fn in_list(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn in_list_with_union(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_1 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_2 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_1 (id, city, state) VALUES ('a1', 'San Francisco', 'CA'), ('b1', 'New York', 'NY'), ('c1', 'San Diego', 'CA'), ('d1', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_2 (id, city, state) VALUES ('a2', 'San Francisco', 'CA'), ('b2', 'New York', 'NY'), ('c2', 'San Diego', 'CA'), ('d2', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) from (SELECT * FROM foo.customers_1 UNION ALL SELECT * FROM foo.customers_2) AS `customers` WHERE state in ('CA', 'TX')")
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(6)]));
 }
 
 async fn numeric_cast(service: Box<dyn SqlClient>) {
@@ -1523,6 +1571,41 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
 }
 
+async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("messed-order.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c6,c11,c10,c5,c9,c4,c2,c8,c1,c3,c7,c12\n".as_bytes())
+            .unwrap();
+        file.write_all(
+            "123,0,0.5,193,0.5,2,2021-11-01,0.5,foo,42,0,2021-01-01 00:00:00\n".as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service.exec_query(
+        &format!(
+            "CREATE TABLE test.main (`c1` varchar(255), `c2` date, `c3` bigint, `c4` bigint, `c5` bigint, `c6` bigint, `c7` double, `c8` double, `c9` double, `c10` double, `c11` double, `c12` timestamp)  LOCATION {}",
+            paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
+        )
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) as cnt from test.main")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+}
+
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
     let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
 
@@ -2098,6 +2181,159 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
+async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.ind(id int, url text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.other_ind(id int, url text)")
+        .await
+        .unwrap();
+}
+
+async fn drop_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, some_column int)")
+        .await
+        .unwrap();
+    // DROP without any data.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    // Another drop fails as index does not exist.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap_err();
+    // Note columns are different.
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data3(id3 int, url3 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id3, url3)",
+        )
+        .await
+        .unwrap_err(); // Fails as the index does not exist anymore.
+
+    // Query can still run from the default table data.
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
 async fn topk_large_inputs(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2469,6 +2705,54 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
+}
+
+async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.by_customer(customer_id int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Customers(customer_id int, customer_name text) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT order_id, customer_name \
+                 FROM s.Orders `o`\
+                 JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "ClusterSend, partitions: [[1, 3]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Worker\
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty",
+    );
 }
 
 async fn topk_query(service: Box<dyn SqlClient>) {
@@ -3543,6 +3827,44 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn decimal_order(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(i decimal, j decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(i, j) VALUES (1.0, -1.0), (2.0, 0.5), (0.5, 1.0), (100, -25.5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i FROM s.data ORDER BY 1 DESC")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[dec5(100), dec5(2), dec5(1), dec5f1(0, 5)])
+    );
+
+    // Two and more columns use a different code path, so test these too.
+    let r = service
+        .exec_query("SELECT i, j FROM s.data ORDER BY 2, 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (dec5(100), dec5f1(-25, 5)),
+            (dec5(1), dec5(-1)),
+            (dec5(2), dec5f1(0, 5)),
+            (dec5f1(0, 5), dec5(1))
+        ])
+    );
+}
+
 async fn float_index(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3569,6 +3891,36 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
+
+/// Ensure DataFusion code consistently uses IEEE754 total order for comparing floats.
+async fn float_order(s: Box<dyn SqlClient>) {
+    s.exec_query("CREATE SCHEMA s").await.unwrap();
+    s.exec_query("CREATE TABLE s.data(f float, i int)")
+        .await
+        .unwrap();
+    s.exec_query("INSERT INTO s.data(f, i) VALUES (0., -1), (-0., 1), (-0., 2), (0., -2)")
+        .await
+        .unwrap();
+
+    // Sorting one and multiple columns use different code paths in DataFusion. Test both.
+    let r = s
+        .exec_query("SELECT f FROM s.data ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[-0., -0., 0., 0.]));
+    let r = s
+        .exec_query("SELECT f, i FROM s.data ORDER BY f, i")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1), (-0., 2), (0., -2), (0., -1)]));
+
+    // DataFusion compares grouping keys with a separate code path.
+    let r = s
+        .exec_query("SELECT f, min(i), max(i) FROM s.data GROUP BY f ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1, 2), (0., -2, -1)]));
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {
@@ -3853,6 +4205,38 @@ async fn dump(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn ksql_simple(service: Box<dyn SqlClient>) {
+    let vars = env::var("TEST_KSQL_USER").and_then(|user| {
+        env::var("TEST_KSQL_PASS")
+            .and_then(|pass| env::var("TEST_KSQL_URL").and_then(|url| Ok((user, pass, url))))
+    });
+    if let Ok((user, pass, url)) = vars {
+        service
+            .exec_query(&format!("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = '{}', password = '{}', url = '{}')", user, pass, url))
+            .await
+            .unwrap();
+
+        service.exec_query("CREATE SCHEMA test").await.unwrap();
+        service.exec_query("CREATE TABLE test.events_by_type (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'").await.unwrap();
+        for _ in 0..100 {
+            let res = service
+                .exec_query(
+                    "SELECT * FROM test.events_by_type WHERE `EVENT` = 'load_request_success'",
+                )
+                .await
+                .unwrap();
+            if res.len() == 0 {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+                continue;
+            }
+            if res.len() == 1 {
+                return;
+            }
+        }
+        panic!("Can't load data from ksql");
+    }
+}
+
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
@@ -3862,5 +4246,11 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
 }
 
 fn dec5(i: i64) -> Decimal {
-    Decimal::new(i * 100_000)
+    dec5f1(i, 0)
+}
+
+fn dec5f1(i: i64, f: u64) -> Decimal {
+    assert!(f < 10);
+    let f = if i < 0 { -(f as i64) } else { f as i64 };
+    Decimal::new(i * 100_000 + 10_000 * f)
 }

@@ -11,7 +11,7 @@ permalink: /config/databases/clickhouse
 
 ## Setup
 
-### <--{"id" : "Setup"}-->  Manual
+### <--{"id" : "Setup"}--> Manual
 
 Add the following to a `.env` file in your Cube.js project:
 
@@ -34,6 +34,39 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PASS`                | The password used to connect to the database            | A valid database password |    ✅    |
 | `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not | `true`, `false`           |    ❌    |
 
+## Pre-Aggregation Feature Support
+
+### countDistinctApprox
+
+Measures of type
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can not be
+used in pre-aggregations when using ClickHouse as a source database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, ClickHouse uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for ClickHouse.
+
+### Export Bucket
+
+ClickHouse does not support export buckets.
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube.js and ClickHouse, set the
@@ -52,4 +85,9 @@ You can connect to a ClickHouse database when your user's permissions are
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
 [clickhouse-readonly]:
   https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
+[self-preaggs-batching]: #batching

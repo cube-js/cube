@@ -85,7 +85,11 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
 
 export const extractDate = (data: any): string => {
   data = JSON.parse(JSON.stringify(data));
-  return moment.tz(data[0] && data[0][Object.keys(data[0])[0]], 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  if (!value) {
+    return value;
+  }
+  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {

@@ -1,4 +1,4 @@
-#[cfg(feature = "process-cleanup")]
+#[cfg(all(feature = "process-cleanup", target_os = "linux"))]
 pub fn avoid_child_zombies() {
     unsafe {
         let mut a = libc::sigaction {
@@ -17,12 +17,12 @@ pub fn avoid_child_zombies() {
     }
 }
 
-#[cfg(not(feature = "process-cleanup"))]
+#[cfg(any(not(feature = "process-cleanup"), not(target_os = "linux")))]
 pub fn avoid_child_zombies() {
     // nop
 }
 
-#[cfg(feature = "process-cleanup")]
+#[cfg(all(feature = "process-cleanup", target_os = "linux"))]
 pub fn die_with_parent(parent_pid: u64) {
     unsafe {
         if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGHUP) != 0 {
@@ -37,7 +37,7 @@ pub fn die_with_parent(parent_pid: u64) {
     }
 }
 
-#[cfg(not(feature = "process-cleanup"))]
+#[cfg(any(not(feature = "process-cleanup"), not(target_os = "linux")))]
 pub fn die_with_parent(_parent_pid: u64) {
     // nop
 }

@@ -17,6 +17,7 @@ These recipes will show you the best practices of using Cube.js.
 
 - [Role-Based Access](/recipes/role-based-access)
 - [Column-Based Access](/recipes/column-based-access)
+- [Using Different Schemas for Tenants](/recipes/using-different-schemas-for-tenants)
 
 ### <--{"id" : "Recipes"}--> Data Sources
 
@@ -37,11 +38,14 @@ These recipes will show you the best practices of using Cube.js.
 
 - [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
 - [Pagination](/recipes/pagination)
+- [Using Apache Superset with Cube SQL](/recipes/using-apache-superset-with-cube-sql)
 
 ### <--{"id" : "Recipes"}--> Query acceleration
 
 - [Accelerating Non-Additive Measures](/recipes/non-additivity)
 - [Joining Data from Multiple Data Sources](/recipes/joining-multiple-data-sources)
+- [Using originalSql and rollup pre-aggregations effectively](/recipes/using-originalsql-and-rollups-effectively)
+- [Incrementally building pre-aggregations for a date range](/recipes/incrementally-building-pre-aggregations-for-a-date-range)
 
 ### <--{"id" : "Recipes"}--> Code reusability
 

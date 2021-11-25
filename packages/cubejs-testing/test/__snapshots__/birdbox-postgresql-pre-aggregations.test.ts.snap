@@ -1,5 +1,7 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`postgresql-cubestore HTTP Transport Empty partitions: Empty partitions 1`] = `Array []`;
+
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension: Rolling Mixed With Dimension 1`] = `
 Array [
   Object {

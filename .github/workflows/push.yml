@@ -9,6 +9,8 @@ on:
       - 'rust/js-wrapper/**'
       - 'rust/tsconfig.json'
       - 'rust/package.json'
+      - 'rust/cubesql/**'
+      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -25,6 +27,8 @@ on:
       - 'rust/js-wrapper/**'
       - 'rust/tsconfig.json'
       - 'rust/package.json'
+      - 'rust/cubesql/**'
+      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -55,7 +59,13 @@ jobs:
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -98,7 +108,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -134,7 +150,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -188,7 +210,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -256,7 +284,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -350,6 +384,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
         with:
+          version: v0.6.3
           driver-opts: network=host
       - name: Build image
         uses: docker/build-push-action@v2

@@ -3,13 +3,15 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
+import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
-  Response, NextFunction,
   Application as ExpressApplication,
+  ErrorRequestHandler,
+  NextFunction,
   RequestHandler,
-  ErrorRequestHandler
+  Response,
 } from 'express';
 
 import { getRequestIdFromRequest, requestParser } from './requestParser';
@@ -21,25 +23,28 @@ import {
   getPivotQuery,
   getQueryGranularity,
   normalizeQuery,
-  normalizeQueryPreAggregations,
-  normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
-  QUERY_TYPE
+  normalizeQueryPreAggregationPreview,
+  normalizeQueryPreAggregations,
+  QUERY_TYPE, validatePostRewrite,
 } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
-  QueryRewriteFn,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  Request,
   ExtendedRequestContext,
   JWTOptions,
+  QueryRewriteFn,
+  Request,
+  RequestContext,
+  RequestLoggerMiddlewareFn,
   SecurityContextExtractorFn,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
+import { SQLServer } from './sql-server';
+
+import { makeSchema } from './graphql';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -278,6 +283,29 @@ export class ApiGateway {
     // @todo Should we pass requestLoggerMiddleware?
     const guestMiddlewares = [];
 
+    app.use(`${this.basePath}/graphql`, userMiddlewares, async (req, res) => {
+      const compilerApi = this.getCompilerApi(req.context);
+      let schema = compilerApi.getGraphQLSchema();
+      if (!schema) {
+        const metaConfig = await compilerApi.metaConfig({
+          requestId: req.context.requestId,
+        });
+        schema = makeSchema(metaConfig);
+        compilerApi.setGraphQLSchema(schema);
+      }
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: this
+        },
+        graphiql: getEnv('nodeEnv') !== 'production'
+      })(req, res);
+    });
+
+    app.use(this.logNetworkUsage);
+
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
@@ -356,6 +384,7 @@ export class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregations({
+          cacheOnly: req.query.cacheOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -431,6 +460,10 @@ export class ApiGateway {
     app.use(this.handleErrorMiddleware);
   }
 
+  public initSQLServer() {
+    return new SQLServer(this);
+  }
+
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
@@ -460,7 +493,7 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
-    
+
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
@@ -487,12 +520,28 @@ export class ApiGateway {
     }
   }
 
-  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const preAggregations = await this.getCompilerApi(context).preAggregations();
+      const compilerApi = this.getCompilerApi(context);
+      const preAggregations = await compilerApi.preAggregations();
 
-      res({ preAggregations });
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          compilerApi,
+          normalizeQueryPreAggregations(
+            {
+              timezones: this.scheduledRefreshTimeZones,
+              preAggregations: preAggregations.map(p => ({
+                id: p.id,
+                cacheOnly,
+              }))
+            },
+          )
+        );
+
+      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
@@ -519,10 +568,12 @@ export class ApiGateway {
           query
         );
 
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
-          preAggregationPartitions,
+          preAggregationPartitionsWithoutError,
           compilerApi.preAggregationsSchema
         );
 
@@ -530,8 +581,8 @@ export class ApiGateway {
         ...props,
         preAggregation,
         partitions: partitions.map(partition => {
-          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
-          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition?.tableName];
           return partition;
         }),
       });
@@ -567,12 +618,12 @@ export class ApiGateway {
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition.sql
+          preAggregationPartition
         )
       });
     } catch (e) {
@@ -651,7 +702,7 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map((currentQuery) => this.queryRewrite(normalizeQuery(currentQuery), context))
+      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
@@ -863,6 +914,7 @@ export class ApiGateway {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
           } : null),
           annotation,
           dataSource: response.dataSource,
@@ -1328,6 +1380,24 @@ export class ApiGateway {
     }
   };
 
+  protected logNetworkUsage: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    this.log({
+      type: 'Incoming network usage',
+      service: 'api-http',
+      bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+    }, req.context);
+    res.on('finish', () => {
+      this.log({
+        type: 'Outgoing network usage',
+        service: 'api-http',
+        bytes: Number(res.get('content-length')) || 0,
+      }, req.context);
+    });
+    if (next) {
+      next();
+    }
+  };
+
   protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
     let compareDateRangeTDIndex;
@@ -1364,7 +1434,7 @@ export class ApiGateway {
     }));
   }
 
-  protected log(event: { type: string, [key: string]: any }, context?: RequestContext) {
+  public log(event: { type: string, [key: string]: any }, context?: Partial<RequestContext>) {
     const { type, ...restParams } = event;
 
     this.logger(type, {

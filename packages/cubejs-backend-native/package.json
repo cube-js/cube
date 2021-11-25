@@ -1,0 +1,60 @@
+{
+  "name": "@cubejs-backend/native",
+  "version": "0.28.60",
+  "author": "Cube Dev, Inc.",
+  "description": "Native module for Cube.js (binding to Rust codebase)",
+  "main": "dist/js/index.js",
+  "typings": "dist/js/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cube-js/cube.js.git"
+  },
+  "scripts": {
+    "tsc": "tsc",
+    "build": "tsc",
+    "native:build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "native:build-debug": "npm run native:build --",
+    "native:build-release": "npm run native:build -- --release",
+    "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
+    "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
+    "test:unit": "jest --forceExit test",
+    "test:cargo": "cargo test"
+  },
+  "engines": {
+    "node": ">=10.8.0"
+  },
+  "files": [
+    "dist/js"
+  ],
+  "bundledDependencies": [
+    "@mapbox/node-pre-gyp"
+  ],
+  "devDependencies": {
+    "@cubejs-infra/node-pre-gyp-github": "^1",
+    "@types/jest": "^26",
+    "@types/node": "^10",
+    "cargo-cp-artifact": "^0.1",
+    "jest": "^26",
+    "mysql2": "^2.3.3",
+    "typescript": "~4.1.5"
+  },
+  "dependencies": {
+    "@mapbox/node-pre-gyp": "^1"
+  },
+  "binary": {
+    "module_name": "index",
+    "host": "https://github.com/cube-js/cube.js/releases/download/",
+    "remote_path": "v{version}",
+    "package_name": "native-{node_abi}-{platform}-{arch}-{libc}.tar.gz",
+    "module_path": "native",
+    "pkg_path": "."
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "verbose": true
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -53,6 +53,14 @@ function asPortOrSocket(input: string, envName: string): number | string {
   return input;
 }
 
+function asFalseOrPort(input: string, envName: string): number | false {
+  if (input.toLowerCase() === 'false' || input === '0' || input === undefined) {
+    return false;
+  }
+
+  return asPortNumber(parseInt(input, 10), envName);
+}
+
 function asBoolOrTime(input: string, envName: string): number | boolean {
   if (input.toLowerCase() === 'true') {
     return true;
@@ -279,9 +287,33 @@ const variables: Record<string, (...args: any) => any> = {
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
     .asInt(),
+  instanceId: () => get('CUBEJS_INSTANCE_ID')
+    .asString(),
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
+  // SQL Interface
+  sqlPort: () => {
+    const port = asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
+  sqlNonce: () => {
+    if (process.env.CUBEJS_SQL_NONCE) {
+      if (process.env.CUBEJS_SQL_NONCE.length < 14) {
+        throw new InvalidConfiguration('CUBEJS_SQL_NONCE', process.env.CUBEJS_SQL_NONCE, 'Is too short. It should be 14 chars at least.');
+      }
+
+      return process.env.CUBEJS_SQL_NONCE;
+    }
+
+    return undefined;
+  },
+  sqlUser: () => get('CUBEJS_SQL_USER').asString(),
+  sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')

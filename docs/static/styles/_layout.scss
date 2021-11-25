@@ -927,9 +927,13 @@ section[type=h2] h2 {
   }
 }
 
+.frameworkSwitcherWrapper {
+  max-width: $content-max-width;
+}
+
 .frameworkSwitcher.frameworkSwitcher {
   padding-top: 40px;
-  padding-left: 32px;
+  //padding-left: 32px;
 
   :global {
     .ant-radio-button-wrapper {
@@ -956,6 +960,11 @@ section[type=h2] h2 {
       background: $pink;
       border: 1px solid $pink;
       z-index: initial;
+    }
+
+    .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):first-child {
+      color: white;
+      border-color: $pink;
     }
 
     .ant-radio-button-wrapper-checked:not(:first-child) {

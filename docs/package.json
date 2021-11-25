@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@cubejs-client/core": "^0.27.41",
+    "@percy/cli": "^1.0.0-beta.70",
     "@reach/router": "^1.3.4",
     "antd": "^3.3.3",
     "classnames": "^2.2.6",
@@ -40,7 +41,6 @@
   "devDependencies": {
     "@mdx-js/mdx": "^1.6.22",
     "@mdx-js/react": "^1.6.22",
-    "@percy/agent": "^0.28.5",
     "@types/classnames": "^2.2.11",
     "@types/lockr": "^0.8.6",
     "@types/lodash": "^4.14.165",
@@ -74,9 +74,9 @@
     "lint-staged": "^10.5.2",
     "markdownlint-cli2": "^0.0.11",
     "prettier": "^2.1.2",
+    "remark-custom-blocks": "^2.5.0",
     "remark-html-katex": "3.0.0",
     "remark-math": "3.0.1",
-    "remark-custom-blocks": "^2.5.0",
     "textlint": "^11.7.6",
     "textlint-rule-alex": "^3.0.0",
     "textlint-rule-diacritics": "^1.0.0",

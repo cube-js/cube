@@ -30,14 +30,6 @@ class IndexPage extends Component<Props> {
         <Helmet title="Main | Cube.js Docs" />
         <h1>Documentation</h1>
 
-        <InfoBox >
-
-        The Cube multitenancy workshop is on October 27th at 9-10:30 am PST! If you want to learn why you need multitenancy, how to get started, recipes and more, you will want to attend this event 😀
-        <br />
-        You can register for the workshop at <a href="https://cube.dev/events/multitenancy/">the event page</a>.
-
-        </InfoBox>
-
         <Row>
           <Col span={24}>
             <p>
@@ -64,7 +56,7 @@ class IndexPage extends Component<Props> {
           </Row>
           <Row>
             <MainTab
-              title="Cube.js Backend"
+              title="Connecting to the Database"
               img={imgInsights}
               desc="How to connect to database and deploy Cube.js service."
               to="/connecting-to-the-database"

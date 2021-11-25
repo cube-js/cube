@@ -40,17 +40,21 @@ use crate::config::injection::DIService;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::Ingestion;
 use crate::metastore::job::JobType;
+use crate::metastore::multi_index::MultiIndex;
+use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
+use crate::queryplanner::serialized_plan::RowFilter;
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::CubeStoreParser;
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
+use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -60,6 +64,7 @@ use crate::{
     store::DataFrame,
 };
 use data::create_array_builder;
+use std::mem::take;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -95,6 +100,15 @@ pub struct QueryPlans {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
+    pub trace_obj: Option<String>,
+}
+
+impl SqlQueryContext {
+    pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.trace_obj = trace_obj;
+        res
+    }
 }
 
 pub struct SqlServiceImpl {
@@ -107,6 +121,7 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     rows_per_chunk: usize,
     query_timeout: Duration,
+    create_table_timeout: Duration,
     cache: SqlResultCache,
 }
 
@@ -123,6 +138,7 @@ impl SqlServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
+        create_table_timeout: Duration,
         max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
@@ -134,6 +150,7 @@ impl SqlServiceImpl {
             cluster,
             rows_per_chunk,
             query_timeout,
+            create_table_timeout,
             remote_fs,
             cache: SqlResultCache::new(max_cached_queries),
         })
@@ -155,13 +172,45 @@ impl SqlServiceImpl {
         external: bool,
         locations: Option<Vec<String>>,
         indexes: Vec<Statement>,
+        unique_key: Option<Vec<Ident>>,
+        partitioned_index: Option<PartitionedIndexRef>,
+        trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
+        if let Some(mut p) = partitioned_index {
+            let part_index_name = match p.name.0.as_mut_slice() {
+                &mut [ref schema, ref mut name] => {
+                    if schema.value != schema_name {
+                        return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
+                    }
+                    take(&mut name.value)
+                }
+                &mut [ref mut name] => take(&mut name.value),
+                _ => {
+                    return Err(CubeError::user(format!(
+                        "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
+                        p.name
+                    )))
+                }
+            };
+
+            let mut columns = Vec::new();
+            for mut c in p.columns {
+                columns.push(take(&mut c.value));
+            }
+
+            indexes_to_create.push(IndexDef {
+                name: "#mi0".to_string(),
+                columns,
+                multi_index: Some(part_index_name),
+            });
+        }
         for index in indexes.iter() {
             if let Statement::CreateIndex { name, columns, .. } = index {
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
+                    multi_index: None,
                     columns: columns
                         .iter()
                         .map(|c| {
@@ -190,6 +239,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
+                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 )
                 .await;
         }
@@ -205,10 +255,23 @@ impl SqlServiceImpl {
                 Some(ImportFormat::CSV),
                 indexes_to_create,
                 false,
+                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
             )
             .await?;
 
-        if let Err(e) = self.finalize_external_table(&table, listener).await {
+        let finalize_res = tokio::time::timeout(
+            self.create_table_timeout,
+            self.finalize_external_table(&table, listener, trace_obj),
+        )
+        .await
+        .map_err(|_| {
+            CubeError::internal(format!(
+                "Timeout during create table finalization: {:?}",
+                table
+            ))
+        })
+        .flatten();
+        if let Err(e) = finalize_res {
             if let Err(inner) = self.db.drop_table(table.get_id()).await {
                 log::error!(
                     "Drop table ({}) after error failed: {}",
@@ -221,16 +284,31 @@ impl SqlServiceImpl {
         Ok(table)
     }
 
+    async fn create_partitioned_index(
+        &self,
+        schema: String,
+        name: String,
+        columns: Vec<ColumnDef>,
+        if_not_exists: bool,
+    ) -> Result<IdRow<MultiIndex>, CubeError> {
+        let columns = convert_columns_type(&columns)?;
+        self.db
+            .create_partitioned_index(schema, name, columns, if_not_exists)
+            .await
+    }
+
     async fn finalize_external_table(
         &self,
         table: &IdRow<Table>,
         listener: JobResultListener,
+        trace_obj: &Option<String>,
     ) -> Result<(), CubeError> {
         let wait_for = table
             .get_row()
             .locations()
             .unwrap()
             .iter()
+            .filter(|&l| !Table::is_stream_location(l))
             .map(|&l| {
                 (
                     RowKey::Table(TableId::Tables, table.get_id()),
@@ -261,7 +339,12 @@ impl SqlServiceImpl {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
-        self.db.table_ready(table.get_id(), true).await?;
+        let ready_table = self.db.table_ready(table.get_id(), true).await?;
+
+        if let Some(trace_obj) = trace_obj.as_ref() {
+            incoming_traffic_agent_event(trace_obj, ready_table.get_row().total_download_size())?;
+        }
+
         Ok(())
     }
 
@@ -279,6 +362,7 @@ impl SqlServiceImpl {
                 table_name,
                 IndexDef {
                     name,
+                    multi_index: None,
                     columns: columns.iter().map(|c| c.value.to_string()).collect(),
                 },
             )
@@ -417,10 +501,11 @@ impl SqlService for SqlServiceImpl {
     #[instrument(level = "trace", skip(self))]
     async fn exec_query_with_context(
         &self,
-        _context: SqlQueryContext,
+        context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        if !query.to_lowercase().starts_with("insert") {
+        if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
+        {
             trace!("Query: '{}'", query);
         }
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
@@ -459,6 +544,17 @@ impl SqlService for SqlServiceImpl {
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
+            CubeStoreStatement::System(command) => match command {
+                SystemCommand::KillAllJobs => {
+                    self.db.delete_all_jobs().await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+                SystemCommand::Repartition { partition_id } => {
+                    let partition = self.db.get_partition(partition_id).await?;
+                    self.cluster.schedule_repartition(&partition).await?;
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+            },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
@@ -480,6 +576,8 @@ impl SqlService for SqlServiceImpl {
                     },
                 indexes,
                 locations,
+                unique_key,
+                partitioned_index,
             } => {
                 let nv = &name.0;
                 if nv.len() != 2 {
@@ -499,6 +597,9 @@ impl SqlService for SqlServiceImpl {
                         external,
                         locations,
                         indexes,
+                        unique_key,
+                        partitioned_index,
+                        &context.trace_obj,
                     )
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
@@ -539,6 +640,90 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
+            CubeStoreStatement::CreateSource {
+                name,
+                source_type,
+                credentials,
+                or_update,
+            } => {
+                if or_update {
+                    let creds = match source_type.as_str() {
+                        "ksql" => {
+                            let user = credentials
+                                .iter()
+                                .find(|o| o.name.value == "user")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let password = credentials
+                                .iter()
+                                .find(|o| o.name.value == "password")
+                                .and_then(|x| {
+                                    if let Value::SingleQuotedString(v) = &x.value {
+                                        Some(v.to_string())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            let url =
+                                credentials
+                                    .iter()
+                                    .find(|o| o.name.value == "url")
+                                    .and_then(|x| {
+                                        if let Value::SingleQuotedString(v) = &x.value {
+                                            Some(v.to_string())
+                                        } else {
+                                            None
+                                        }
+                                    });
+                            Ok(SourceCredentials::KSql {
+                                user,
+                                password,
+                                url: url.ok_or(CubeError::user(
+                                    "url is required as credential for ksql source".to_string(),
+                                ))?,
+                            })
+                        }
+                        x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
+                    };
+                    let source = self
+                        .db
+                        .create_or_update_source(name.value.to_string(), creds?)
+                        .await?;
+                    Ok(Arc::new(DataFrame::from(vec![source])))
+                } else {
+                    Err(CubeError::user(
+                        "CREATE SOURCE OR UPDATE should be used instead".to_string(),
+                    ))
+                }
+            }
+            CubeStoreStatement::Statement(Statement::CreatePartitionedIndex {
+                name,
+                columns,
+                if_not_exists,
+            }) => {
+                if name.0.len() != 2 {
+                    return Err(CubeError::user(format!(
+                        "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
+                        name
+                    )));
+                }
+                let schema = &name.0[0].value;
+                let index = &name.0[1].value;
+                let res = self
+                    .create_partitioned_index(
+                        schema.to_string(),
+                        index.to_string(),
+                        columns,
+                        if_not_exists,
+                    )
+                    .await?;
+                Ok(Arc::new(DataFrame::from(vec![res])))
+            }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
             }) => {
@@ -552,6 +737,11 @@ impl SqlService for SqlServiceImpl {
                             .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
                             .await?;
                         self.db.drop_table(table.get_id()).await?;
+                    }
+                    ObjectType::PartitionedIndex => {
+                        let schema = names[0].0[0].value.clone();
+                        let name = names[0].0[1].value.clone();
+                        self.db.drop_partitioned_index(schema, name).await?;
                     }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 }
@@ -594,7 +784,7 @@ impl SqlService for SqlServiceImpl {
                         app_metrics::META_QUERIES.increment();
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
-                    QueryPlan::Select(serialized, partitions) => {
+                    QueryPlan::Select(serialized, workers) => {
                         app_metrics::DATA_QUERIES.increment();
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
@@ -603,15 +793,13 @@ impl SqlService for SqlServiceImpl {
                             self.cache
                                 .get(query, serialized, async move |plan| {
                                     let records;
-                                    if partitions.len() == 0 {
+                                    if workers.len() == 0 {
                                         records =
                                             executor.execute_router_plan(plan, cluster).await?.1;
                                     } else {
                                         // Pick one of the workers to run as main for the request.
-                                        let i =
-                                            thread_rng().sample(Uniform::new(0, partitions.len()));
-                                        let node = cluster.node_name_by_partitions(&partitions[i]);
-                                        let rs = cluster.route_select(&node, plan).await?.1;
+                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
+                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
                                         records = rs
                                             .into_iter()
                                             .map(|r| r.read())
@@ -656,7 +844,11 @@ impl SqlService for SqlServiceImpl {
                             router_plan
                                 .index_snapshots()
                                 .iter()
-                                .flat_map(|i| i.partitions.iter().map(|p| p.partition.get_id()))
+                                .flat_map(|i| {
+                                    i.partitions
+                                        .iter()
+                                        .map(|p| (p.partition.get_id(), RowFilter::default()))
+                                })
                                 .collect(),
                         );
                         let mut mocked_names = HashMap::new();
@@ -664,6 +856,11 @@ impl SqlService for SqlServiceImpl {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
+                        let chunk_ids_to_batches = worker_plan
+                            .in_memory_chunks_to_load()
+                            .into_iter()
+                            .map(|c| (c.get_id(), Vec::new()))
+                            .collect();
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
@@ -672,7 +869,7 @@ impl SqlService for SqlServiceImpl {
                                 .0,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names)
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
                                 .await?
                                 .0,
                         });
@@ -1181,7 +1378,8 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
-    use crate::table::data::{cmp_row_key_heap, cmp_row_markers};
+    use crate::scheduler::SchedulerImpl;
+    use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1201,7 +1399,13 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let store = ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
@@ -1212,6 +1416,7 @@ mod tests {
                 Arc::new(MockCluster::new()),
                 remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
                 query_timeout,
                 10_000, // max_cached_queries
             );
@@ -1246,8 +1451,13 @@ mod tests {
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
-            let chunk_store =
-                ChunkStore::new(meta_store.clone(), remote_fs.clone(), rows_per_chunk);
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                rows_per_chunk,
+            );
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
@@ -1258,6 +1468,7 @@ mod tests {
                 Arc::new(MockCluster::new()),
                 remote_fs.clone(),
                 rows_per_chunk,
+                query_timeout,
                 query_timeout,
                 10_000, // max_cached_queries
             );
@@ -1287,6 +1498,9 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
         let _ = DB::destroy(&Options::default(), path);
@@ -1503,6 +1717,105 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn delete_middle_main() {
+        Config::test("delete_middle_main")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 10;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await
+                    .unwrap();
+
+                for i in 0..100 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+
+                    let partitions = services
+                        .meta_store
+                        .get_partitions_with_chunks_created_seconds_ago(0)
+                        .await
+                        .unwrap();
+                    for p in partitions.into_iter() {
+                        services
+                            .injector
+                            .get_service_typed::<SchedulerImpl>()
+                            .await
+                            .schedule_partition_to_compact(&p)
+                            .await
+                            .unwrap()
+                    }
+                }
+
+                let to_repartition = services
+                    .meta_store
+                    .all_inactive_partitions_to_repartition()
+                    .await
+                    .unwrap();
+
+                for p in to_repartition.into_iter() {
+                    services
+                        .injector
+                        .get_service_typed::<SchedulerImpl>()
+                        .await
+                        .schedule_repartition_if_needed(&p)
+                        .await
+                        .unwrap();
+                }
+
+                let chunks = services.meta_store.chunks_table().all_rows().await.unwrap();
+
+                println!("All chunks: {:?}", chunks);
+
+                for c in chunks.into_iter().filter(|c| !c.get_row().active()) {
+                    let _ = services.meta_store.delete_chunk(c.get_id()).await;
+                }
+
+                let all_inactive_partitions = services
+                    .meta_store
+                    .all_inactive_middle_man_partitions()
+                    .await
+                    .unwrap();
+                println!("Middle man partitions: {:?}", all_inactive_partitions);
+                let mut futures = Vec::new();
+                for p in all_inactive_partitions.into_iter() {
+                    futures.push(services.meta_store.delete_middle_man_partition(p.get_id()))
+                }
+                join_all(futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+
+                println!(
+                    "All partitions: {:?}",
+                    services
+                        .meta_store
+                        .partition_table()
+                        .all_rows()
+                        .await
+                        .unwrap()
+                );
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
             })
             .await;
     }
@@ -1732,7 +2045,11 @@ mod tests {
                     .collect::<Vec<_>>();
                 assert_eq!(
                     files,
-                    vec![format!("{}.parquet", last_active_partition.get_id())]
+                    vec![format!(
+                        "{}-{}.parquet",
+                        last_active_partition.get_id(),
+                        last_active_partition.get_row().suffix().as_ref().unwrap()
+                    )]
                 )
             })
             .await
@@ -1925,14 +2242,13 @@ mod tests {
                 "INSERT INTO foo.table (t) VALUES (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
             ).await.unwrap();
 
-            listener.wait_for_job_results(vec![
+            let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
                 (RowKey::Table(TableId::Partitions, 2), JobType::PartitionCompaction),
                 (RowKey::Table(TableId::Partitions, 3), JobType::PartitionCompaction),
                 (RowKey::Table(TableId::Partitions, 1), JobType::Repartition),
-                (RowKey::Table(TableId::Partitions, 2), JobType::Repartition),
-                (RowKey::Table(TableId::Partitions, 3), JobType::Repartition),
-            ]).await.unwrap();
+            ]);
+            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
             let partitions = services.meta_store.get_active_partitions_by_index_id(1).await.unwrap();
 
@@ -1946,14 +2262,14 @@ mod tests {
             let mut intervals_set = new_partitions.into_iter()
                 .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
                 .collect::<Vec<_>>();
-            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
+            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             let mut expected = vec![
                 (None, Some(Row::new(vec![TableValue::Int(2)]))),
                 (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
                 (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
                 (Some(Row::new(vec![TableValue::Int(27)])), None),
             ].into_iter().collect::<Vec<_>>();
-            expected.sort_by(|(min_a, _), (min_b, _)| cmp_row_markers(1, min_a, min_b));
+            expected.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();

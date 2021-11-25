@@ -5,7 +5,7 @@ import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router';
 import styled from 'styled-components';
 
-import { Button } from '../../atoms';
+import { Button, CubeLoader } from '../../atoms';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
 // import { LightningIcon } from '../../shared/icons/LightningIcon';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
@@ -41,6 +41,7 @@ type QueryBuilderContainerProps = {
   | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -65,6 +66,10 @@ export function QueryBuilderContainer({
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
 
+  if (!cubejsApi) {
+    return <CubeLoader />;
+  }
+
   return (
     <CubeProvider cubejsApi={cubejsApi}>
       <RollupDesignerContext apiUrl={apiUrl!}>
@@ -76,6 +81,7 @@ export function QueryBuilderContainer({
               dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
               onTabChange={props.onTabChange}
+              extra={props.extra}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
@@ -92,7 +98,11 @@ type QueryTabsRendererProps = {
   onSecurityContextModalOpen: () => void;
 } & Pick<
   PlaygroundQueryBuilderProps,
-  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+  | 'schemaVersion'
+  | 'dashboardSource'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -152,6 +162,7 @@ function QueryTabsRenderer({
           }}
           dashboardSource={dashboardSource}
           schemaVersion={schemaVersion}
+          extra={props.extra}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},

@@ -1,7 +1,7 @@
 use cubestore::app_metrics;
 use cubestore::config::{validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
-use cubestore::telemetry::track_event;
+use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
 use cubestore::util::{metrics, spawn_malloc_trim_loop};
@@ -40,6 +40,8 @@ fn main() {
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
     runtime.block_on(async move {
+        init_agent_sender().await;
+
         validate_config(config.config_obj().as_ref()).report_and_abort_on_errors();
 
         config.configure_injector().await;

@@ -1,5 +1,4 @@
 use crate::util::decimal::Decimal;
-use crate::util::ordfloat::OrdF64;
 
 use arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
@@ -9,6 +8,7 @@ use arrow::array::{
 use arrow::datatypes::{DataType, TimeUnit};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
+use datafusion::cube_ext::ordfloat::OrdF64;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -19,7 +19,7 @@ pub mod data;
 pub(crate) mod parquet;
 pub mod redistribute;
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Hash)]
 pub enum TableValue {
     Null,
     String(String),
@@ -166,7 +166,7 @@ impl ToString for TimestampValue {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Row {
     values: Vec<TableValue>,
 }

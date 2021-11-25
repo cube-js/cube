@@ -19,7 +19,3 @@ spec:
             name: cube-api
             port:
               number: 4000
-
-
-
-

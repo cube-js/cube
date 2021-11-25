@@ -34,12 +34,13 @@ use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
+use crate::streaming::StreamingService;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
-use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
+use datafusion::cube_ext::ordfloat::OrdF64;
 
 pub mod limits;
 
@@ -62,7 +63,6 @@ impl ImportFormat {
                     };
 
                 let mut header_mapping = None;
-                let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
@@ -73,7 +73,7 @@ impl ImportFormat {
                         for _ in 0..columns.len() {
                             let next_column_buf = parser.next_value()?;
                             let next_column = next_column_buf.as_ref();
-                            let (i, to_insert) = columns
+                            let (insert_pos, to_insert) = columns
                                 .iter()
                                 .find_position(|c| c.get_name() == &next_column)
                                 .map(|(i, c)| (i, c.clone()))
@@ -81,16 +81,7 @@ impl ImportFormat {
                                     "Column '{}' is not found during import in {:?}",
                                     next_column, columns
                                 )))?;
-                            // This is tricky indices structure: it remembers indices of inserts
-                            // with regards to moving element indices due to these inserts.
-                            // It saves some column resorting trips.
-                            let insert_pos = mapping
-                                .iter()
-                                .find_position(|(col_index, _)| *col_index > i)
-                                .map(|(insert_pos, _)| insert_pos)
-                                .unwrap_or_else(|| mapping.len());
-                            mapping_insert_indices.push(insert_pos);
-                            mapping.push((i, to_insert));
+                            mapping.push((insert_pos, to_insert));
                             parser.advance()?;
                         }
                         header_mapping = Some(mapping);
@@ -101,59 +92,51 @@ impl ImportFormat {
                         "Header is required for CSV import".to_string(),
                     ))?;
 
-                    let mut row = Vec::with_capacity(columns.len());
+                    let mut row = vec![TableValue::Null; columns.len()];
 
-                    for (i, (_, column)) in resolved_mapping.iter().enumerate() {
+                    for (insert_pos, column) in resolved_mapping.iter() {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
                         if value == "" {
-                            row.insert(mapping_insert_indices[i], TableValue::Null);
+                            row[*insert_pos] = TableValue::Null;
                         } else {
-                            row.insert(
-                                mapping_insert_indices[i],
-                                match column.get_column_type() {
-                                    ColumnType::String => {
-                                        TableValue::String(value_buf.take_string())
-                                    }
-                                    ColumnType::Int => value
-                                        .parse()
-                                        .map(|v| TableValue::Int(v))
-                                        .unwrap_or(TableValue::Null),
-                                    t @ ColumnType::Decimal { .. } => {
-                                        TableValue::Decimal(parse_decimal(
-                                            value,
-                                            u8::try_from(t.target_scale()).unwrap(),
-                                        )?)
-                                    }
-                                    ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                    ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                        let hll = HllSketch::read_snowflake(value)?;
-                                        TableValue::Bytes(hll.write())
-                                    }
-                                    ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                                        let data = base64::decode(value)?;
-                                        let hll = HllSketch::read_hll_storage_spec(&data)?;
-                                        TableValue::Bytes(hll.write())
-                                    }
-                                    ColumnType::HyperLogLog(
-                                        f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
-                                    ) => {
-                                        let data = base64::decode(value)?;
-                                        is_valid_plain_binary_hll(&data, *f)?;
-                                        TableValue::Bytes(data)
-                                    }
-                                    ColumnType::Timestamp => {
-                                        TableValue::Timestamp(timestamp_from_string(value)?)
-                                    }
-                                    ColumnType::Float => {
-                                        TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                    }
-                                    ColumnType::Boolean => {
-                                        TableValue::Boolean(value.to_lowercase() == "true")
-                                    }
-                                },
-                            );
+                            row[*insert_pos] = match column.get_column_type() {
+                                ColumnType::String => TableValue::String(value_buf.take_string()),
+                                ColumnType::Int => value
+                                    .parse()
+                                    .map(|v| TableValue::Int(v))
+                                    .unwrap_or(TableValue::Null),
+                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
+                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
+                                ),
+                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                                    let hll = HllSketch::read_snowflake(value)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                                    let data = base64::decode(value)?;
+                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(
+                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
+                                ) => {
+                                    let data = base64::decode(value)?;
+                                    is_valid_plain_binary_hll(&data, *f)?;
+                                    TableValue::Bytes(data)
+                                }
+                                ColumnType::Timestamp => {
+                                    TableValue::Timestamp(timestamp_from_string(value)?)
+                                }
+                                ColumnType::Float => {
+                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
+                                }
+                                ColumnType::Boolean => {
+                                    TableValue::Boolean(value.to_lowercase() == "true")
+                                }
+                            };
                         }
 
                         parser.advance()?;
@@ -360,6 +343,7 @@ crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
+    streaming_service: Arc<dyn StreamingService>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
@@ -371,6 +355,7 @@ crate::di_service!(ImportServiceImpl, [ImportService]);
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
+        streaming_service: Arc<dyn StreamingService>,
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
@@ -378,6 +363,7 @@ impl ImportServiceImpl {
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
+            streaming_service,
             chunk_store,
             remote_fs,
             config_obj,
@@ -398,13 +384,27 @@ impl ImportServiceImpl {
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
+            let mut size = 0;
             while let Some(bytes) = stream.next().await {
-                file.write_all(bytes?.as_ref()).await?;
+                let bytes = bytes?;
+                let slice = bytes.as_ref();
+                size += slice.len();
+                file.write_all(slice).await?;
             }
+            log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
             file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
-            Ok((self.download_temp_file(location).await?, None))
+            let temp_file = self.download_temp_file(location).await?;
+            let size = temp_file.metadata().await?.len();
+            log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
+            Ok((temp_file, None))
         } else {
             Ok((File::open(location.clone()).await?, None))
         }
@@ -540,9 +540,12 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await?;
-
-        self.drop_temp_uploads(&location).await?;
+        if Table::is_stream_location(location) {
+            self.streaming_service.stream_table(table, location).await?;
+        } else {
+            self.do_import(&table, *format, location).await?;
+            self.drop_temp_uploads(&location).await?;
+        }
 
         Ok(())
     }
@@ -582,7 +585,9 @@ impl Ingestion {
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
         self.partition_jobs.push(cube_ext::spawn(async move {
-            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
+            let new_chunks = chunk_store
+                .partition_data(table_id, rows, &columns, false)
+                .await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.

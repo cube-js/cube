@@ -11,6 +11,8 @@
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
 #![feature(arc_new_cyclic)]
+#![feature(is_sorted)]
+#![feature(result_flattening)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
@@ -50,6 +52,7 @@ pub mod remotefs;
 pub mod scheduler;
 pub mod sql;
 pub mod store;
+pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;
@@ -411,6 +414,24 @@ impl From<tokio::sync::AcquireError> for CubeError {
 impl From<warp::Error> for CubeError {
     fn from(v: warp::Error) -> Self {
         return CubeError::from_error(v);
+    }
+}
+
+impl From<json::Error> for CubeError {
+    fn from(v: json::Error) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<url::ParseError> for CubeError {
+    fn from(v: url::ParseError) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
+impl From<tokio_tungstenite::tungstenite::Error> for CubeError {
+    fn from(v: tokio_tungstenite::tungstenite::Error) -> Self {
+        CubeError::from_error(v)
     }
 }
 

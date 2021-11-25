@@ -36,7 +36,7 @@ const MySqlNativeToMySqlType = {
   [mysql.Types.LONG_BLOB]: 'longtext',
   [mysql.Types.BLOB]: 'text',
   [mysql.Types.VAR_STRING]: 'varchar',
-  [mysql.Types.STRING]: 'binary',
+  [mysql.Types.STRING]: 'varchar',
 };
 
 const MySqlToGenericType: Record<string, GenericDataBaseType> = {

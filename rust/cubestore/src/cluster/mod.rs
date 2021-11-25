@@ -10,14 +10,14 @@ use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
-use crate::config::injection::DIService;
+use crate::config::injection::{DIService, Injector};
 use crate::config::is_router;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::partition::partition_file_name;
+use crate::metastore::table::Table;
 use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
@@ -28,6 +28,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
@@ -61,6 +62,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
+use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
@@ -69,6 +71,8 @@ use tracing::{instrument, Instrument};
 #[async_trait]
 pub trait Cluster: DIService + Send + Sync {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError>;
+
+    fn config(&self) -> Arc<dyn ConfigObj>;
 
     /// Send full select to a worker, which will act as the main node for the query.
     async fn route_select(
@@ -104,9 +108,18 @@ pub trait Cluster: DIService + Send + Sync {
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError>;
 
+    async fn add_memory_chunk(
+        &self,
+        node_name: &str,
+        chunk_id: u64,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError>;
+
+    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+
     fn job_result_listener(&self) -> JobResultListener;
 
-    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String;
+    fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String;
 
     async fn node_name_for_import(
         &self,
@@ -117,6 +130,8 @@ pub trait Cluster: DIService + Send + Sync {
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
 
     async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage;
+
+    async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockCluster, [Cluster]);
@@ -130,18 +145,19 @@ pub enum JobEvent {
 
 pub struct ClusterImpl {
     this: Weak<ClusterImpl>,
+    // Used in order to avoid cycle dependencies.
+    // Convention is every service can reference cluster but cluster shouldn't reference services.
+    // TODO revisit cycle dependencies: try to extract cluster transport separately?
+    // Weak to avoid cycle reference counting and memory leaks
+    injector: Weak<Injector>,
     remote_fs: Arc<dyn RemoteFs>,
     meta_store: Arc<dyn MetaStore>,
-    chunk_store: Arc<dyn ChunkDataStore>,
-    compaction_service: Arc<dyn CompactionService>,
-    import_service: Arc<dyn ImportService>,
     cluster_transport: Arc<dyn ClusterTransport>,
     connect_timeout: Duration,
     server_name: String,
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
-    jobs_enabled: Arc<RwLock<bool>>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
         Option<
@@ -165,7 +181,11 @@ crate::di_service!(ClusterImpl, [Cluster]);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
-    Select(SerializedPlan, HashMap<String, String>),
+    Select(
+        SerializedPlan,
+        HashMap<String, String>,
+        HashMap<u64, Vec<SerializedRecordBatchStream>>,
+    ),
 }
 #[cfg(not(target_os = "windows"))]
 pub struct WorkerProcessor;
@@ -179,12 +199,24 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
-            WorkerMessage::Select(plan_node, remote_to_local_names) => {
+            WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
                 debug!("Running select in worker started: {:?}", plan_node);
                 let plan_node_to_send = plan_node.clone();
+                let result = chunk_id_to_record_batches
+                    .into_iter()
+                    .map(|(id, batches)| -> Result<_, CubeError> {
+                        Ok((
+                            id,
+                            batches
+                                .into_iter()
+                                .map(|b| b.read())
+                                .collect::<Result<Vec<_>, _>>()?,
+                        ))
+                    })
+                    .collect::<Result<HashMap<_, _>, _>>()?;
                 let res = Config::current_worker_services()
                     .query_executor
-                    .execute_worker_plan(plan_node_to_send, remote_to_local_names)
+                    .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
                 debug!("Running select in worker completed: {:?}", plan_node);
                 let (schema, records) = res?;
@@ -204,13 +236,14 @@ fn proc_handler() {
 }
 
 struct JobRunner {
+    config_obj: Arc<dyn ConfigObj>,
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
     server_name: String,
     notify: Arc<Notify>,
-    jobs_enabled: Arc<RwLock<bool>>,
+    stop_token: CancellationToken,
 }
 
 lazy_static! {
@@ -221,13 +254,17 @@ lazy_static! {
 #[async_trait]
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
-        if self.server_name == node_name {
+        if self.server_name == node_name || is_self_reference(&node_name) {
             self.job_notify.notify_waiters();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
         }
         Ok(())
+    }
+
+    fn config(&self) -> Arc<dyn ConfigObj> {
+        self.config_obj.clone()
     }
 
     async fn route_select(
@@ -292,23 +329,50 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn add_memory_chunk(
+        &self,
+        node_name: &str,
+        chunk_id: u64,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError> {
+        let record_batch = SerializedRecordBatchStream::write(&batch.schema(), vec![batch])?;
+        let response = self
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::AddMemoryChunk {
+                    chunk_id,
+                    data: record_batch.into_iter().next().unwrap(),
+                },
+            )
+            .await?;
+        match response {
+            NetworkMessage::AddMemoryChunkResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
+    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_id })
+            .await?;
+        match response {
+            NetworkMessage::FreeMemoryChunkResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
         }
     }
 
-    fn node_name_by_partitions(&self, partition_ids: &[u64]) -> String {
-        let workers = self.config_obj.select_workers();
-        if workers.is_empty() {
-            return self.server_name.to_string();
+    fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String {
+        if let Some(id) = p.get_row().multi_partition_id() {
+            pick_worker_by_ids(self.config_obj.as_ref(), [id]).to_string()
+        } else {
+            pick_worker_by_partitions(self.config_obj.as_ref(), [p]).to_string()
         }
-
-        let mut hasher = DefaultHasher::new();
-        for p in partition_ids.iter() {
-            p.hash(&mut hasher);
-        }
-        workers[(hasher.finish() % workers.len() as u64) as usize].clone()
     }
 
     async fn node_name_for_import(
@@ -331,7 +395,7 @@ impl Cluster for ClusterImpl {
         partition: IdRow<Partition>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        let node_name = self.node_name_by_partitions(&[partition.get_id()]);
+        let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
             futures.push(self.warmup_download(&node_name, name));
@@ -372,6 +436,37 @@ impl Cluster for ClusterImpl {
             NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
                 panic!("result sent to worker");
             }
+            NetworkMessage::AddMemoryChunk { chunk_id, data } => {
+                let res = match data.read() {
+                    Ok(batch) => {
+                        let chunk_store = self
+                            .injector
+                            .upgrade()
+                            .unwrap()
+                            .get_service_typed::<dyn ChunkDataStore>()
+                            .await;
+                        chunk_store.add_memory_chunk(chunk_id, batch).await
+                    }
+                    Err(e) => Err(e),
+                };
+                NetworkMessage::AddMemoryChunkResult(res)
+            }
+            NetworkMessage::AddMemoryChunkResult(_) => {
+                panic!("AddChunkResult sent to worker");
+            }
+            NetworkMessage::FreeMemoryChunk { chunk_id } => {
+                let chunk_store = self
+                    .injector
+                    .upgrade()
+                    .unwrap()
+                    .get_service_typed::<dyn ChunkDataStore>()
+                    .await;
+                let res = chunk_store.free_memory_chunk(chunk_id).await;
+                NetworkMessage::FreeMemoryChunkResult(res)
+            }
+            NetworkMessage::FreeMemoryChunkResult(_) => {
+                panic!("AddChunkResult sent to worker");
+            }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
                 panic!("MetaStoreCall sent to worker");
             }
@@ -399,6 +494,22 @@ impl Cluster for ClusterImpl {
             }
             x => panic!("Unexpected message: {:?}", x),
         }
+    }
+
+    async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
+        let node = self.node_name_by_partition(p);
+        let job = self
+            .meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, p.get_id()),
+                JobType::Repartition,
+                node.to_string(),
+            ))
+            .await?;
+        if job.is_some() {
+            self.notify_job_runner(node).await?;
+        }
+        Ok(())
     }
 }
 
@@ -475,10 +586,10 @@ impl JobResultListener {
 impl JobRunner {
     async fn processing_loop(&self) {
         loop {
-            if !*self.jobs_enabled.read().await {
-                return;
-            }
             let res = tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    return;
+                }
                 _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
@@ -503,6 +614,15 @@ impl JobRunner {
         Ok(())
     }
 
+    fn job_timeout(&self, job: &IdRow<Job>) -> Option<Duration> {
+        if let JobType::TableImportCSV(location) = job.get_row().job_type() {
+            if Table::is_stream_location(location) {
+                return None;
+            }
+        }
+        Some(Duration::from_secs(self.config_obj.import_job_timeout()))
+    }
+
     async fn run_local(&self, job: IdRow<Job>) -> Result<(), CubeError> {
         let start = SystemTime::now();
         let job_id = job.get_id();
@@ -521,15 +641,40 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
-        let res = timeout(Duration::from_secs(600), self.route_job(job.get_row())).await;
+        let handle = AbortingJoinHandle::new(self.route_job(job.get_row())?);
+        // TODO cancel job if this worker isn't job owner anymore
+        let res = if let Some(duration) = self.job_timeout(&job) {
+            let future = timeout(duration, handle);
+            // TODO duplicate
+            tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    Err(CubeError::user("shutting down".to_string()))
+                }
+                res = future => {
+                    res.map_err(|_| CubeError::user("timed out".to_string()))
+                }
+            }
+        } else {
+            // TODO duplicate
+            tokio::select! {
+                _ = self.stop_token.cancelled() => {
+                    Err(CubeError::user("shutting down".to_string()))
+                }
+                res = handle => {
+                    Ok(res)
+                }
+            }
+        };
+
         mem::drop(rx);
         heart_beat_timer.await?;
-        if let Err(_) = res {
+        if let Err(e) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Timeout)
                 .await?;
             error!(
-                "Running job timed out ({:?}): {:?}",
+                "Running job {} ({:?}): {:?}",
+                e.message,
                 start.elapsed()?,
                 self.meta_store.get_job(job_id).await?
             );
@@ -537,6 +682,20 @@ impl JobRunner {
             self.meta_store
                 .update_status(job_id, JobStatus::Error(cube_err.to_string()))
                 .await?;
+            error!(
+                "Running job join error ({:?}): {:?}",
+                start.elapsed()?,
+                self.meta_store.get_job(job_id).await?
+            );
+        } else if let Ok(Ok(Err(cube_err))) = res {
+            self.meta_store
+                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+                .await?;
+            error!(
+                "Error while running job {}: {}",
+                job_id,
+                cube_err.display_with_backtrace()
+            );
             error!(
                 "Running job error ({:?}): {:?}",
                 start.elapsed()?,
@@ -554,63 +713,106 @@ impl JobRunner {
         Ok(())
     }
 
-    async fn route_job(&self, job: &Job) -> Result<(), CubeError> {
+    fn route_job(&self, job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
+        // spawn here is required in case there's a panic in a job. If job panics worker process loop will survive it.
         match job.job_type() {
             JobType::WalPartitioning => {
                 if let RowKey::Table(TableId::WALs, wal_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let wal_id = *wal_id;
-                    cube_ext::spawn(async move { chunk_store.partition(wal_id).await }).await??
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.partition(wal_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::Repartition => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let partition_id = *partition_id;
-                    cube_ext::spawn(async move { chunk_store.repartition(partition_id).await })
-                        .await??
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.repartition(partition_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::PartitionCompaction => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
-                    cube_ext::spawn(async move { compaction_service.compact(partition_id).await })
-                        .await??;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service.compact(partition_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::MultiPartitionSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let id = *id;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service.split_multi_partition(id).await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::FinishMultiSplit => {
+                if let RowKey::Table(TableId::MultiPartitions, multi_part_id) = job.row_reference()
+                {
+                    let meta_store = self.meta_store.clone();
+                    let compaction_service = self.compaction_service.clone();
+                    let multi_part_id = *multi_part_id;
+                    Ok(cube_ext::spawn(async move {
+                        for p in meta_store.find_unsplit_partitions(multi_part_id).await? {
+                            compaction_service
+                                .finish_multi_split(multi_part_id, p)
+                                .await?
+                        }
+                        Ok(())
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::TableImport => {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
                     let import_service = self.import_service.clone();
                     let table_id = *table_id;
-                    cube_ext::spawn(async move { import_service.import_table(table_id).await })
-                        .await??
+                    Ok(cube_ext::spawn(async move {
+                        import_service.import_table(table_id).await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
             JobType::TableImportCSV(location) => {
                 if let RowKey::Table(TableId::Tables, table_id) = job.row_reference() {
-                    self.import_service
-                        .clone()
-                        .import_table_part(*table_id, location)
-                        .await?
+                    let table_id = *table_id;
+                    let import_service = self.import_service.clone();
+                    let location = location.to_string();
+                    Ok(cube_ext::spawn(async move {
+                        import_service
+                            .clone()
+                            .import_table_part(table_id, &location)
+                            .await
+                    }))
                 } else {
-                    Self::fail_job_row_key(job);
+                    Self::fail_job_row_key(job)
                 }
             }
         }
-        Ok(())
     }
 
-    fn fail_job_row_key(job: &Job) {
-        panic!("Incorrect row key for {:?}: {:?}", job, job.row_reference());
+    fn fail_job_row_key(job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
+        Err(CubeError::internal(format!(
+            "Incorrect row key for {:?}: {:?}",
+            job,
+            job.row_reference()
+        )))
     }
 }
 
@@ -618,12 +820,10 @@ impl ClusterImpl {
     pub fn new(
         server_name: String,
         server_addresses: Vec<String>,
+        injector: Weak<Injector>,
         remote_fs: Arc<dyn RemoteFs>,
         connect_timeout: Duration,
-        chunk_store: Arc<dyn ChunkDataStore>,
-        compaction_service: Arc<dyn CompactionService>,
         meta_store: Arc<dyn MetaStore>,
-        import_service: Arc<dyn ImportService>,
         config_obj: Arc<dyn ConfigObj>,
         query_executor: Arc<dyn QueryExecutor>,
         meta_store_sender: Sender<MetaStoreEvent>,
@@ -632,18 +832,15 @@ impl ClusterImpl {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new_cyclic(|this| ClusterImpl {
             this: this.clone(),
+            injector,
             server_name,
             server_addresses,
             remote_fs,
             connect_timeout,
-            chunk_store,
-            compaction_service,
-            import_service,
             meta_store,
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
             meta_store_sender,
-            jobs_enabled: Arc::new(RwLock::new(true)),
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
             config_obj,
@@ -688,13 +885,14 @@ impl ClusterImpl {
         for _ in 0..self.config_obj.job_runners_count() {
             // TODO number of job event loops
             let job_runner = JobRunner {
+                config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
-                chunk_store: self.chunk_store.clone(),
-                compaction_service: self.compaction_service.clone(),
-                import_service: self.import_service.clone(),
+                chunk_store: self.injector.upgrade().unwrap().get_service_typed().await,
+                compaction_service: self.injector.upgrade().unwrap().get_service_typed().await,
+                import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
-                jobs_enabled: self.jobs_enabled.clone(),
+                stop_token: self.stop_token.clone(),
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
@@ -708,12 +906,7 @@ impl ClusterImpl {
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        let mut jobs_enabled = self.jobs_enabled.write().await;
-        *jobs_enabled = false;
-        for _ in 0..4 {
-            // TODO number of job event loops
-            self.job_notify.notify_waiters();
-        }
+        self.stop_token.cancel();
 
         #[cfg(not(target_os = "windows"))]
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
@@ -721,7 +914,6 @@ impl ClusterImpl {
         }
 
         self.close_worker_socket_tx.send(true)?;
-        self.stop_token.cancel();
         Ok(())
     }
 
@@ -916,14 +1108,55 @@ impl ClusterImpl {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
+        let chunk_store = self
+            .injector
+            .upgrade()
+            .unwrap()
+            .get_service_typed::<dyn ChunkDataStore>()
+            .await;
+
+        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
+        let in_memory_chunks_futures = in_memory_chunks_to_load
+            .iter()
+            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+            .collect::<Vec<_>>();
+
+        let chunk_id_to_record_batches = in_memory_chunks_to_load
+            .clone()
+            .into_iter()
+            .map(|c| c.get_id())
+            .zip(
+                join_all(in_memory_chunks_futures)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter(),
+            )
+            .collect::<HashMap<_, _>>();
+
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
         {
             if let Some(pool) = self.select_process_pool.read().await.clone() {
+                let chunk_id_to_record_batches = chunk_id_to_record_batches
+                    .iter()
+                    .map(
+                        |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
+                            Ok((
+                                *id,
+                                SerializedRecordBatchStream::write(
+                                    &b.iter().next().unwrap().schema(),
+                                    b.to_vec(),
+                                )?,
+                            ))
+                        },
+                    )
+                    .collect::<Result<HashMap<_, _>, _>>()?;
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
                         remote_to_local_names.clone(),
+                        chunk_id_to_record_batches,
                     ))
                     .instrument(tracing::span!(
                         tracing::Level::TRACE,
@@ -938,7 +1171,11 @@ impl ClusterImpl {
             // TODO optimize for no double conversion
             let (schema, records) = self
                 .query_executor
-                .execute_worker_plan(plan_node.clone(), remote_to_local_names)
+                .execute_worker_plan(
+                    plan_node.clone(),
+                    remote_to_local_names,
+                    chunk_id_to_record_batches,
+                )
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
             res = Some(Ok((schema, records?)))
@@ -1030,7 +1267,7 @@ impl ClusterImpl {
         node_name: &str,
         m: NetworkMessage,
     ) -> Result<NetworkMessage, CubeError> {
-        if self.server_name == node_name {
+        if self.server_name == node_name || is_self_reference(node_name) {
             // TODO: query_timeout currently used for all messages.
             // TODO timeout config
             Ok(timeout(
@@ -1054,7 +1291,7 @@ impl ClusterImpl {
         m: NetworkMessage,
     ) -> Result<Box<dyn WorkerConnection>, CubeError> {
         assert!(m.is_streaming_request());
-        if self.server_name == node_name {
+        if self.server_name == node_name || is_self_reference(node_name) {
             let c: Box<dyn WorkerConnection> = Box::new(LoopbackConnection {
                 stream: ClusterImpl::start_stream_on_worker(self.clone(), m).await,
             });
@@ -1216,10 +1453,10 @@ impl ClusterImpl {
         log::debug!("Got {} partitions, running the warmup", partitions.len());
 
         for (p, chunks) in partitions {
-            if self.node_name_by_partitions(&[p.partition_id]) != self.server_name {
+            if self.node_name_by_partition(&p) != self.server_name {
                 continue;
             }
-            if let Some(file) = partition_file_name(p.parent_partition_id, p.partition_id) {
+            if let Some(file) = p.get_row().get_full_name(p.get_id()) {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
                     return;
@@ -1233,7 +1470,11 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                ack_error!(self.remote_fs.download_file(&chunk_file_name(c)).await);
+                ack_error!(
+                    self.remote_fs
+                        .download_file(&chunk_file_name(c.get_id(), c.get_row().suffix()))
+                        .await
+                );
             }
         }
         log::debug!("Startup warmup finished");
@@ -1317,4 +1558,47 @@ impl MessageStream for QueryStream {
         let finished = batch.is_none();
         (NetworkMessage::SelectResultBatch(Ok(batch)), finished)
     }
+}
+
+fn is_self_reference(name: &str) -> bool {
+    name.starts_with("@loop:")
+}
+
+/// Picks a worker by opaque id for any distributing work in a cluster.
+/// Ids usually come from multi-partitions of the metastore.
+pub fn pick_worker_by_ids(
+    config: &'a dyn ConfigObj,
+    ids: impl IntoIterator<Item = u64>,
+) -> &'a str {
+    let workers = config.select_workers();
+    if workers.is_empty() {
+        return config.server_name().as_str();
+    }
+
+    let mut hasher = DefaultHasher::new();
+    for p in ids {
+        p.hash(&mut hasher);
+    }
+    workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
+}
+
+/// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack
+/// to keep the same node for partitions produced by compaction that merged
+/// chunks into the main table of a single partition.
+pub fn pick_worker_by_partitions(
+    config: &'a dyn ConfigObj,
+    partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
+) -> &'a str {
+    let workers = config.select_workers();
+    if workers.is_empty() {
+        return config.server_name().as_str();
+    }
+
+    let mut hasher = DefaultHasher::new();
+    for partition in partitions {
+        partition.get_row().get_min_val().hash(&mut hasher);
+        partition.get_row().get_max_val().hash(&mut hasher);
+        partition.get_row().get_index_id().hash(&mut hasher);
+    }
+    workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
 }
