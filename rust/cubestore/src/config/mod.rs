@@ -265,7 +265,6 @@ pub enum FileStoreProvider {
         sub_path: Option<String>,
     },
     MINIO {
-        region: String,
         bucket_name: String,
         sub_path: Option<String>,
     },
