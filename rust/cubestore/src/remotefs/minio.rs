@@ -27,7 +27,6 @@ pub struct MINIORemoteFs {
     delete_mut: Mutex<()>,
 }
 
-
 //TODO Not if this needs any changes
 impl fmt::Debug for MINIORemoteFs {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -56,12 +55,15 @@ impl MINIORemoteFs {
 
         let credentials =
             Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
-        let region =  Region::Custom {
+        let region = Region::Custom {
             region: "".to_owned(),
             endpoint: minio_server_endpoint.as_deref(),
-        },
-        let bucket =
-            std::sync::RwLock::new(Bucket::new_with_path_style(&bucket_name, region.clone(), credentials)?);
+        };
+        let bucket = std::sync::RwLock::new(Bucket::new_with_path_style(
+            &bucket_name,
+            region.clone(),
+            credentials,
+        )?);
         let fs = Arc::new(Self {
             dir,
             bucket,
@@ -134,12 +136,10 @@ fn refresh_interval_from_env() -> Duration {
     Duration::from_secs(60 * mins)
 }
 
-
 di_service!(MINIORemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for MINIORemoteFs {
-
     async fn upload_file(
         &self,
         temp_upload_path: &str,
@@ -284,7 +284,7 @@ impl RemoteFs for MINIORemoteFs {
         Ok(buf.to_str().unwrap().to_string())
     }
 }
-//TODO 
+//TODO
 impl MINIORemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
