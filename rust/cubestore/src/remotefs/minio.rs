@@ -20,7 +20,7 @@ use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::sync::Mutex;
 
-pub struct S3RemoteFs {
+pub struct MINIORemoteFs {
     dir: PathBuf,
     bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
@@ -28,11 +28,12 @@ pub struct S3RemoteFs {
 }
 
 
-impl fmt::Debug for S3RemoteFs {
+//TODO Not if this needs any changes
+impl fmt::Debug for MINIORemoteFs {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let mut s = f.debug_struct("S3RemoteFs");
+        let mut s = f.debug_struct("MINIORemoteFs");
         s.field("dir", &self.dir).field("sub_path", &self.sub_path);
-        // Do not expose AWS credentials.
+        // Do not expose MINIO (secret) credentials.
         match self.bucket.try_read() {
             Ok(bucket) => s
                 .field("bucket_name", &bucket.name)
@@ -43,18 +44,23 @@ impl fmt::Debug for S3RemoteFs {
     }
 }
 
-impl S3RemoteFs {
+impl MINIORemoteFs {
     pub fn new(
         dir: PathBuf,
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
-        let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
+        let key_id = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
+        let access_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
+        let minio_server_endpoint = env::var("CUBESTORE_MINIO_SERVER_ENDPOINT").ok();
+
         let credentials =
             Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
-        let region = region.parse::<Region>()?;
+        let region =  Region::Custom {
+            region: "".to_owned(),
+            endpoint: minio_server_endpoint.as_deref(),
+        },
         let bucket =
             std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
         let fs = Arc::new(Self {
@@ -73,7 +79,7 @@ fn spawn_creds_refresh_loop(
     access_key: Option<String>,
     bucket_name: String,
     region: Region,
-    fs: &Arc<S3RemoteFs>,
+    fs: &Arc<MINIORemoteFs>,
 ) {
     // Refresh credentials. TODO: use expiration time.
     let refresh_every = refresh_interval_from_env();
@@ -82,12 +88,12 @@ fn spawn_creds_refresh_loop(
     }
     let fs = Arc::downgrade(fs);
     std::thread::spawn(move || {
-        log::debug!("Started S3 credentials refresh loop");
+        log::debug!("Started MINIO credentials refresh loop");
         loop {
             std::thread::sleep(refresh_every);
             let fs = match fs.upgrade() {
                 None => {
-                    log::debug!("Stopping S3 credentials refresh loop");
+                    log::debug!("Stopping MINIO credentials refresh loop");
                     return;
                 }
                 Some(fs) => fs,
@@ -101,38 +107,40 @@ fn spawn_creds_refresh_loop(
             ) {
                 Ok(c) => c,
                 Err(e) => {
-                    log::error!("Failed to refresh S3 credentials: {}", e);
+                    log::error!("Failed to refresh minIO credentials: {}", e);
                     continue;
                 }
             };
             let b = match Bucket::new(&bucket_name, region.clone(), c) {
                 Ok(b) => b,
                 Err(e) => {
-                    log::error!("Failed to refresh S3 credentials: {}", e);
+                    log::error!("Failed to refresh minIO credentials: {}", e);
                     continue;
                 }
             };
             *fs.bucket.write().unwrap() = b;
-            log::debug!("Successfully refreshed S3 credentials")
+            log::debug!("Successfully refreshed minIO credentials")
         }
     });
 }
 
 fn refresh_interval_from_env() -> Duration {
     let mut mins = 180; // 3 hours by default.
-    if let Ok(s) = std::env::var("CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS") {
+    if let Ok(s) = std::env::var("CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS") {
         match s.parse::<u64>() {
             Ok(i) => mins = i,
-            Err(e) => log::error!("Could not parse CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
+            Err(e) => log::error!("Could not parse CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
         };
     };
     Duration::from_secs(60 * mins)
 }
 
-di_service!(S3RemoteFs, [RemoteFs]);
+
+di_service!(MINIORemoteFs, [RemoteFs]);
 
 #[async_trait]
-impl RemoteFs for S3RemoteFs {
+impl RemoteFs for MINIORemoteFs {
+    //TODO 
     async fn upload_file(
         &self,
         temp_upload_path: &str,
@@ -140,7 +148,9 @@ impl RemoteFs for S3RemoteFs {
     ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
+        info!("remote_path {}", remote_path);
         let path = self.s3_path(remote_path);
+        info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
         let temp_upload_path_copy = temp_upload_path.to_string();
         let status_code = cube_ext::spawn_blocking(move || {
@@ -163,13 +173,13 @@ impl RemoteFs for S3RemoteFs {
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
             return Err(CubeError::user(format!(
-                "S3 upload returned non OK status: {}",
+                "minIO upload returned non OK status: {}",
                 status_code
             )));
         }
         Ok(())
     }
-
+    //TODO 
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
@@ -181,7 +191,9 @@ impl RemoteFs for S3RemoteFs {
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
+            info!("remote_path {}", remote_path);
             let path = self.s3_path(remote_path);
+            info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
             let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
                 let (mut temp_file, temp_path) =
@@ -198,25 +210,27 @@ impl RemoteFs for S3RemoteFs {
             info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
             if status_code != 200 {
                 return Err(CubeError::user(format!(
-                    "S3 download returned non OK status: {}",
+                    "minIO download returned non OK status: {}",
                     status_code
                 )));
             }
         }
         Ok(local_file_str)
     }
-
+    //TODO 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
+        info!("remote_path {}", remote_path);
         let path = self.s3_path(remote_path);
+        info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
         let (_, status_code) =
             cube_ext::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 204 {
             return Err(CubeError::user(format!(
-                "S3 delete returned non OK status: {}",
+                "minIO delete returned non OK status: {}",
                 status_code
             )));
         }
@@ -231,7 +245,7 @@ impl RemoteFs for S3RemoteFs {
 
         Ok(())
     }
-
+    //TODO 
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
         Ok(self
             .list_with_metadata(remote_prefix)
@@ -240,7 +254,7 @@ impl RemoteFs for S3RemoteFs {
             .map(|f| f.remote_path)
             .collect::<Vec<_>>())
     }
-
+    //TODO 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
@@ -262,19 +276,19 @@ impl RemoteFs for S3RemoteFs {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(result)
     }
-
+    //TODO 
     async fn local_path(&self) -> String {
         self.dir.to_str().unwrap().to_owned()
     }
-
+    //TODO 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }
 }
-
-impl S3RemoteFs {
+//TODO 
+impl MINIORemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
             "{}/{}",
