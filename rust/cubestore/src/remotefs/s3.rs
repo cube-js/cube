@@ -27,7 +27,6 @@ pub struct S3RemoteFs {
     delete_mut: Mutex<()>,
 }
 
-
 impl fmt::Debug for S3RemoteFs {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let mut s = f.debug_struct("S3RemoteFs");

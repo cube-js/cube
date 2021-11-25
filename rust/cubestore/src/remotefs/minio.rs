@@ -61,7 +61,7 @@ impl MINIORemoteFs {
             endpoint: minio_server_endpoint.as_deref(),
         },
         let bucket =
-            std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
+            std::sync::RwLock::new(Bucket::new_with_path_style(&bucket_name, region.clone(), credentials)?);
         let fs = Arc::new(Self {
             dir,
             bucket,
@@ -110,7 +110,7 @@ fn spawn_creds_refresh_loop(
                     continue;
                 }
             };
-            let b = match Bucket::new(&bucket_name, region.clone(), c) {
+            let b = match Bucket::new_with_path_style(&bucket_name, region.clone(), c) {
                 Ok(b) => b,
                 Err(e) => {
                     log::error!("Failed to refresh minIO credentials: {}", e);
@@ -139,7 +139,7 @@ di_service!(MINIORemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for MINIORemoteFs {
-    //TODO 
+
     async fn upload_file(
         &self,
         temp_upload_path: &str,
@@ -147,7 +147,6 @@ impl RemoteFs for MINIORemoteFs {
     ) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        info!("remote_path {}", remote_path);
         let path = self.s3_path(remote_path);
         info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
@@ -178,7 +177,7 @@ impl RemoteFs for MINIORemoteFs {
         }
         Ok(())
     }
-    //TODO 
+
     async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
@@ -190,7 +189,6 @@ impl RemoteFs for MINIORemoteFs {
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            info!("remote_path {}", remote_path);
             let path = self.s3_path(remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
@@ -216,7 +214,7 @@ impl RemoteFs for MINIORemoteFs {
         }
         Ok(local_file_str)
     }
-    //TODO 
+
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
@@ -244,7 +242,7 @@ impl RemoteFs for MINIORemoteFs {
 
         Ok(())
     }
-    //TODO 
+
     async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
         Ok(self
             .list_with_metadata(remote_prefix)
@@ -253,7 +251,7 @@ impl RemoteFs for MINIORemoteFs {
             .map(|f| f.remote_path)
             .collect::<Vec<_>>())
     }
-    //TODO 
+
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
@@ -275,11 +273,11 @@ impl RemoteFs for MINIORemoteFs {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(result)
     }
-    //TODO 
+
     async fn local_path(&self) -> String {
         self.dir.to_str().unwrap().to_owned()
     }
-    //TODO 
+
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
         let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;

@@ -16,9 +16,9 @@ use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
+use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
-use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
@@ -819,7 +819,7 @@ impl Config {
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                        MINIORemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                            MINIORemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
                         arc
                     })
                     .await;
