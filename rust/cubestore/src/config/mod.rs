@@ -811,7 +811,6 @@ impl Config {
                 sub_path,
             } => {
                 let data_dir = self.config_obj.data_dir.clone();
-                let region = region.to_string();
                 let bucket_name = bucket_name.to_string();
                 let sub_path = sub_path.clone();
                 self.injector
