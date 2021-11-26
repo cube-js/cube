@@ -31,6 +31,8 @@ ARG WITH_AVX2=1
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
 	 cargo build --release -p cubestore
 
+# Cube Store get version from his own package
+COPY package.json package.json
 COPY cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
 	cargo build --release -p cubestore
