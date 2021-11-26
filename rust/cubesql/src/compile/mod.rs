@@ -1167,6 +1167,12 @@ impl QueryPlanner {
                     }
                 }
             }
+            ast::Statement::SetTransaction { .. } => {
+                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                    vec![],
+                    vec![],
+                ))));
+            }
             ast::Statement::SetNames { charset_name, .. } => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
                     || charset_name.eq_ignore_ascii_case("utf8mb4"))
