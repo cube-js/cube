@@ -42,6 +42,20 @@ projects.forEach(({ name, docsPath, outputDir }) => {
   const project = app.convert(app.expandInputFiles([docsPath]));
 
   console.log(`${name} tmp path`, tmpDir);
+  
+  try {
+    fs.readFileSync('/home/runner/work/cube.js/cube.js/package.json');
+    console.log('>>> 1 done')
+  } catch (ex) {
+    console.log('>>> 1 error', ex);
+  }
+  
+  try {
+    fs.readFileSync('/home/runner/work/cube.js/package.json');
+    console.log('>>> 2 done')
+  } catch (ex) {
+    console.log('>>> 2 error', ex);
+  }
 
   try {
     app.generateDocs(project, tmpDir);
