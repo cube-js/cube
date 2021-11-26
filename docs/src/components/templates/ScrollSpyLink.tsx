@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-scroll';
+// import { Link } from 'react-scroll';
 import * as styles from '../../../static/styles/index.module.scss';
 
 export const SCROLL_OFFSET = -66;
@@ -14,7 +14,8 @@ type Props = {
 const ScrollLink: React.FC<Props> = (props) => {
   return (
     <div className={styles.scrollspyLinkWrapper}>
-      <Link
+      {props.children}
+      {/* <Link
         offset={SCROLL_OFFSET}
         smooth
         {...props}
@@ -23,7 +24,7 @@ const ScrollLink: React.FC<Props> = (props) => {
         onClick={() => window.history.pushState('', '', `#${props.to}`)}
       >
         {props.children}
-      </Link>
+      </Link> */}
     </div>
   )
 };
