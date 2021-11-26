@@ -57,7 +57,10 @@ impl MINIORemoteFs {
             Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
         let region = Region::Custom {
             region: "".to_owned(),
-            endpoint: minio_server_endpoint.as_deref().unwrap_or("localhost:").to_string(),
+            endpoint: minio_server_endpoint
+                .as_deref()
+                .unwrap_or("localhost:")
+                .to_string(),
         };
         let bucket = std::sync::RwLock::new(Bucket::new_with_path_style(
             &bucket_name,
