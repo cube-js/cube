@@ -4,6 +4,8 @@ const fs = require('fs-extra');
 
 const outputDir = '../docs/content/Cube.js-Frontend';
 
+// const outputDir = path.resolve(__dirname, '../docs/content/Cube.js-Frontend');
+
 const app = new TypeDoc.Application();
 
 app.options.addReader(new TypeDoc.TSConfigReader());
@@ -39,7 +41,9 @@ projects.forEach(({ name, docsPath, outputDir }) => {
   const tmpDir = path.join(outputDir, 'tmp');
   const project = app.convert(app.expandInputFiles([docsPath]));
 
-  if (project) {
+  console.log(`${name} tmp path`, tmpDir);
+
+  try {
     app.generateDocs(project, tmpDir);
 
     if (fs.existsSync(tmpDir)) {
@@ -53,7 +57,7 @@ projects.forEach(({ name, docsPath, outputDir }) => {
       fs.copyFileSync(path.join(tmpDir, tmpFileName), currentPath);
       fs.removeSync(tmpDir);
     }
-  } else {
-    console.error(`Error while generating '${name}' docs`);
+  } catch (error) {
+    console.error(`Error generating '${name}' docs`, error);
   }
 });
