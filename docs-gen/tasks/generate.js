@@ -42,20 +42,6 @@ projects.forEach(({ name, docsPath, outputDir }) => {
   const project = app.convert(app.expandInputFiles([docsPath]));
 
   console.log(`${name} tmp path`, tmpDir);
-  
-  try {
-    fs.readFileSync('/home/runner/work/cube.js/cube.js/package.json');
-    console.log('>>> 1 done')
-  } catch (ex) {
-    console.log('>>> 1 error', ex);
-  }
-  
-  try {
-    fs.readFileSync('/home/runner/work/cube.js/package.json');
-    console.log('>>> 2 done')
-  } catch (ex) {
-    console.log('>>> 2 error', ex);
-  }
 
   try {
     app.generateDocs(project, tmpDir);
@@ -67,6 +53,8 @@ projects.forEach(({ name, docsPath, outputDir }) => {
       pathArr.splice(-1, 1);
       const out = path.join(...pathArr);
       const currentPath = path.join(out, `${name}.md`);
+
+      console.log(`>>> copy ${path.join(tmpDir, tmpFileName)} to ${currentPath}`);
 
       fs.copyFileSync(path.join(tmpDir, tmpFileName), currentPath);
       fs.removeSync(tmpDir);
