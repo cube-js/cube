@@ -11,7 +11,7 @@ use datafusion::arrow::{
     record_batch::RecordBatch,
 };
 use log::{error, warn};
-use msql_srv::ColumnType;
+use msql_srv::{ColumnFlags, ColumnType};
 
 use crate::{compile::builder::CompiledQueryFieldMeta, CubeError};
 
@@ -19,11 +19,16 @@ use crate::{compile::builder::CompiledQueryFieldMeta, CubeError};
 pub struct Column {
     name: String,
     column_type: ColumnType,
+    column_flags: ColumnFlags,
 }
 
 impl Column {
-    pub fn new(name: String, column_type: ColumnType) -> Column {
-        Column { name, column_type }
+    pub fn new(name: String, column_type: ColumnType, column_flags: ColumnFlags) -> Column {
+        Column {
+            name,
+            column_type,
+            column_flags,
+        }
     }
 
     pub fn get_name(&self) -> String {
@@ -32,6 +37,10 @@ impl Column {
 
     pub fn get_type(&self) -> ColumnType {
         self.column_type
+    }
+
+    pub fn get_flags(&self) -> ColumnFlags {
+        self.column_flags
     }
 }
 
@@ -293,6 +302,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                 cols.push(Column::new(
                     field.name().clone(),
                     arrow_to_column_type(field.data_type().clone())?,
+                    ColumnFlags::empty(),
                 ));
             }
         }

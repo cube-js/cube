@@ -74,8 +74,13 @@ impl Backend {
                     dataframe::Column::new(
                         "Variable_name".to_string(),
                         ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
                     ),
-                    dataframe::Column::new("Value".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                    dataframe::Column::new(
+                        "Value".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
+                    ),
                 ],
                 vec![],
             )));
@@ -87,9 +92,11 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Value".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("sql_mode".to_string()),
@@ -105,9 +112,11 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Value".to_string(),
                             ColumnType::MYSQL_TYPE_LONGLONG,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("lower_case_table_names".to_string()),
@@ -123,24 +132,31 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "Collation".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Charset".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Id".to_string(),
                             ColumnType::MYSQL_TYPE_LONGLONG,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Default".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Compiled".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Sortlen".to_string(),
                             ColumnType::MYSQL_TYPE_LONGLONG,
+                            ColumnFlags::empty(),
                         ), dataframe::Column::new(
                             "Pad_attribute".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("utf8mb4_bin".to_string()),
@@ -161,6 +177,7 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("test plain returns".to_string())
@@ -175,6 +192,7 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("test plain returns".to_string())
@@ -189,6 +207,7 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("test collated returns".to_string())
@@ -203,6 +222,7 @@ impl Backend {
                         vec![dataframe::Column::new(
                             "@@transaction_isolation".to_string(),
                             ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
                             dataframe::TableValue::String("REPEATABLE-READ".to_string())
@@ -247,27 +267,33 @@ impl Backend {
                             vec![
                                 dataframe::Column::new(
                                     "Field".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 ),
                                 dataframe::Column::new(
                                     "Type".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 ),
                                 dataframe::Column::new(
                                     "Null".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 ),
                                 dataframe::Column::new(
                                     "Key".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 ),
                                 dataframe::Column::new(
                                     "Default".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 ),
                                 dataframe::Column::new(
                                     "Extra".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING
+                                    ColumnType::MYSQL_TYPE_STRING,
+                                    ColumnFlags::empty(),
                                 )
                             ],
                             rows
@@ -293,7 +319,8 @@ impl Backend {
                         vec![
                             dataframe::Column::new(
                                 "Execution Plan".to_string(),
-                                ColumnType::MYSQL_TYPE_STRING
+                                ColumnType::MYSQL_TYPE_STRING,
+                                ColumnFlags::empty(),
                             ),
                         ],
                         vec![dataframe::Row::new(vec![
@@ -345,11 +372,13 @@ impl Backend {
                                     vec![
                                         dataframe::Column::new(
                                             "Table".to_string(),
-                                            ColumnType::MYSQL_TYPE_STRING
+                                            ColumnType::MYSQL_TYPE_STRING,
+                                            ColumnFlags::empty(),
                                         ),
                                         dataframe::Column::new(
                                             "Create Table".to_string(),
-                                            ColumnType::MYSQL_TYPE_STRING
+                                            ColumnType::MYSQL_TYPE_STRING,
+                                            ColumnFlags::empty(),
                                         )
                                     ],
                                     vec![dataframe::Row::new(vec![
@@ -393,11 +422,13 @@ impl Backend {
                 vec![
                     dataframe::Column::new(
                         "Tables_in_db".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
                     ),
                     dataframe::Column::new(
                         "Table_type".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
                     )
                 ],
                 values
@@ -443,7 +474,8 @@ impl Backend {
                     for column_meta in &plan.meta {
                         columns.push(dataframe::Column::new(
                             column_meta.column_to.clone(),
-                            column_meta.column_type
+                            column_meta.column_type,
+                            ColumnFlags::empty(),
                         ));
                     }
 
@@ -541,7 +573,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                         table: "result".to_string(), // TODO
                         column: c.get_name(),
                         coltype: c.get_type(),
-                        colflags: ColumnFlags::empty(),
+                        colflags: c.get_flags(),
                     })
                     .collect::<Vec<_>>();
 

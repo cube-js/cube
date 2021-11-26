@@ -29,7 +29,7 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::ColumnType;
+use msql_srv::{ColumnFlags, ColumnType};
 
 use self::builder::*;
 use self::context::*;
@@ -1322,6 +1322,7 @@ impl QueryPlanner {
                 vec![dataframe::Column::new(
                     "Database".to_string(),
                     ColumnType::MYSQL_TYPE_STRING,
+                    ColumnFlags::empty(),
                 )],
                 vec![
                     dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
@@ -1338,9 +1339,21 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
                 vec![
-                    dataframe::Column::new("Level".to_string(), ColumnType::MYSQL_TYPE_STRING),
-                    dataframe::Column::new("Code".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
-                    dataframe::Column::new("Message".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                    dataframe::Column::new(
+                        "Level".to_string(),
+                        ColumnType::MYSQL_TYPE_VAR_STRING,
+                        ColumnFlags::NOT_NULL_FLAG,
+                    ),
+                    dataframe::Column::new(
+                        "Code".to_string(),
+                        ColumnType::MYSQL_TYPE_LONG,
+                        ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
+                    ),
+                    dataframe::Column::new(
+                        "Message".to_string(),
+                        ColumnType::MYSQL_TYPE_VAR_STRING,
+                        ColumnFlags::NOT_NULL_FLAG,
+                    ),
                 ],
                 vec![],
             ))))
@@ -1350,8 +1363,13 @@ impl QueryPlanner {
                     dataframe::Column::new(
                         "Variable_name".to_string(),
                         ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
                     ),
-                    dataframe::Column::new("Value".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
+                    dataframe::Column::new(
+                        "Value".to_string(),
+                        ColumnType::MYSQL_TYPE_LONGLONG,
+                        ColumnFlags::empty(),
+                    ),
                 ],
                 vec![dataframe::Row::new(vec![])],
             ))))
