@@ -27,5 +27,5 @@ jobs:
           key: ${{ runner.os }}-workspace-docs-${{ matrix.node-version }}
       - name: Generate API documentation
         run: ./docs-gen.sh
-      - name: Build website
-        run: ./build.sh
+      - name: Build and deploy to staging
+        run: ./deploy-staging.sh
