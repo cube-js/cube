@@ -58,9 +58,9 @@ projects.forEach(({ name, docsPath, outputDir }) => {
 
       fs.copyFileSync(path.join(tmpDir, tmpFileName), currentPath);
       
-      if (currentPath === '../docs/content/Cube.js-Frontend/@cubejs-client-core.md') {
-        console.log('>>>', fs.readFileSync(currentPath).toString())
-      }
+      // if (currentPath === '../docs/content/Cube.js-Frontend/@cubejs-client-core.md') {
+      //   console.log('>>>', fs.readFileSync(currentPath).toString())
+      // }
       fs.removeSync(tmpDir);
     }
   } catch (error) {
