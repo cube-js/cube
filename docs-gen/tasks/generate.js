@@ -53,10 +53,14 @@ projects.forEach(({ name, docsPath, outputDir }) => {
       pathArr.splice(-1, 1);
       const out = path.join(...pathArr);
       const currentPath = path.join(out, `${name}.md`);
-
+      
       console.log(`>>> copy ${path.join(tmpDir, tmpFileName)} to ${currentPath}`);
 
       fs.copyFileSync(path.join(tmpDir, tmpFileName), currentPath);
+      
+      if (currentPath === '../docs/content/Cube.js-Frontend/@cubejs-client-core.md') {
+        console.log('>>>', fs.readFileSync(currentPath).toString())
+      }
       fs.removeSync(tmpDir);
     }
   } catch (error) {
