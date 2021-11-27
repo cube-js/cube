@@ -2235,28 +2235,21 @@ mod tests {
             let listener = services.cluster.job_result_listener();
 
             service.exec_query(
-                "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25)"
-            ).await.unwrap();
-
-            service.exec_query(
-                "INSERT INTO foo.table (t) VALUES (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
+                "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25), (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
             ).await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
-                (RowKey::Table(TableId::Partitions, 2), JobType::PartitionCompaction),
-                (RowKey::Table(TableId::Partitions, 3), JobType::PartitionCompaction),
-                (RowKey::Table(TableId::Partitions, 1), JobType::Repartition),
             ]);
             timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
             let partitions = services.meta_store.get_active_partitions_by_index_id(1).await.unwrap();
 
             assert_eq!(partitions.len(), 4);
-            let p_1 = partitions.iter().find(|r| r.get_id() == 5).unwrap();
-            let p_2 = partitions.iter().find(|r| r.get_id() == 6).unwrap();
-            let p_3 = partitions.iter().find(|r| r.get_id() == 7).unwrap();
-            let p_4 = partitions.iter().find(|r| r.get_id() == 8).unwrap();
+            let p_1 = partitions.iter().find(|r| r.get_id() == 2).unwrap();
+            let p_2 = partitions.iter().find(|r| r.get_id() == 3).unwrap();
+            let p_3 = partitions.iter().find(|r| r.get_id() == 4).unwrap();
+            let p_4 = partitions.iter().find(|r| r.get_id() == 5).unwrap();
             let new_partitions = vec![p_1, p_2, p_3, p_4];
             println!("{:?}", new_partitions);
             let mut intervals_set = new_partitions.into_iter()
