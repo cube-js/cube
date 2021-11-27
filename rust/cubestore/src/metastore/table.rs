@@ -170,6 +170,10 @@ impl Table {
             .map(|c| &self.columns[*c as usize])
     }
 
+    pub fn in_memory_ingest(&self) -> bool {
+        self.seq_column_index.is_some()
+    }
+
     pub fn is_stream_location(location: &str) -> bool {
         location.starts_with("stream:")
     }

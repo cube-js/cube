@@ -138,6 +138,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("unsorted_merge_assertion", unsorted_merge_assertion),
         t("unsorted_data_timestamps", unsorted_data_timestamps),
         t("ksql_simple", ksql_simple),
+        t(
+            "dimension_only_queries_for_stream_table",
+            dimension_only_queries_for_stream_table,
+        ),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4235,6 +4239,27 @@ async fn ksql_simple(service: Box<dyn SqlClient>) {
         }
         panic!("Can't load data from ksql");
     }
+}
+
+async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, {})", i, j, i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT `bar_id` `bar_id` FROM test.events_by_type as `events` GROUP BY 1 ORDER BY 1 LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
