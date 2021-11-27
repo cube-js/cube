@@ -16,6 +16,7 @@ use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::gcs::GCSRemoteFs;
+use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
@@ -231,6 +232,7 @@ pub fn validate_config(c: &dyn ConfigObj) -> ValidationMessages {
     }
 
     let mut remote_vars = vec![
+        "CUBESTORE_MINIO_BUCKET",
         "CUBESTORE_S3_BUCKET",
         "CUBESTORE_GCS_BUCKET",
         "CUBESTORE_REMOTE_DIR",
@@ -259,6 +261,10 @@ pub enum FileStoreProvider {
         sub_path: Option<String>,
     },
     GCS {
+        bucket_name: String,
+        sub_path: Option<String>,
+    },
+    MINIO {
         bucket_name: String,
         sub_path: Option<String>,
     },
@@ -540,6 +546,11 @@ impl Config {
                             ),
                             sub_path: env::var("CUBESTORE_S3_SUB_PATH").ok(),
                         }
+                    } else if let Ok(bucket_name) = env::var("CUBESTORE_MINIO_BUCKET") {
+                        FileStoreProvider::MINIO {
+                            bucket_name,
+                            sub_path: env::var("CUBESTORE_MINIO_SUB_PATH").ok(),
+                        }
                     } else if let Ok(bucket_name) = env::var("CUBESTORE_GCS_BUCKET") {
                         FileStoreProvider::GCS {
                             bucket_name,
@@ -791,6 +802,21 @@ impl Config {
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
                             GCSRemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                        arc
+                    })
+                    .await;
+            }
+            FileStoreProvider::MINIO {
+                bucket_name,
+                sub_path,
+            } => {
+                let data_dir = self.config_obj.data_dir.clone();
+                let bucket_name = bucket_name.to_string();
+                let sub_path = sub_path.clone();
+                self.injector
+                    .register("original_remote_fs", async move |_| {
+                        let arc: Arc<dyn DIService> =
+                            MINIORemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
                         arc
                     })
                     .await;

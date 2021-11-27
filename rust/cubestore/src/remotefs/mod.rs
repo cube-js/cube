@@ -1,4 +1,5 @@
 pub mod gcs;
+pub mod minio;
 pub mod queue;
 pub mod s3;
 
