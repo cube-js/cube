@@ -360,6 +360,14 @@ impl CubeTable {
             partition_projection
         });
 
+        let partition_projected_schema = if let Some(p) = partition_projection.as_ref() {
+            Arc::new(Schema::new(
+                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+            ))
+        } else {
+            self.schema.clone()
+        };
+
         let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {
             let partition = partition_snapshot.partition();
@@ -402,14 +410,7 @@ impl CubeTable {
                         )))?;
                     Arc::new(MemoryExec::try_new(
                         &[record_batches.clone()],
-                        record_batches
-                            .iter()
-                            .next()
-                            .ok_or(CubeError::internal(format!(
-                                "Empty Record batch for in memory chunk {:?} is not provided",
-                                chunk
-                            )))?
-                            .schema(),
+                        partition_projected_schema.clone(),
                         partition_projection.clone(),
                     )?)
                 } else {
