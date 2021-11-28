@@ -584,9 +584,11 @@ impl Ingestion {
         let chunk_store = self.chunk_store.clone();
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
+        // TODO In fact it should be only for inserts. Batch imports should still go straight to disk.
+        let in_memory = self.table.get_row().in_memory_ingest();
         self.partition_jobs.push(cube_ext::spawn(async move {
             let new_chunks = chunk_store
-                .partition_data(table_id, rows, &columns, false)
+                .partition_data(table_id, rows, &columns, in_memory)
                 .await?;
             std::mem::drop(active_data_frame);
 

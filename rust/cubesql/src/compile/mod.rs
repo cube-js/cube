@@ -12,7 +12,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
 use datafusion::{logical_plan::LogicalPlan, prelude::*};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
 use sqlparser::ast::{self, Ident, ObjectName};
@@ -29,7 +29,7 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::ColumnType;
+use msql_srv::{ColumnFlags, ColumnType};
 
 use self::builder::*;
 use self::context::*;
@@ -1167,6 +1167,27 @@ impl QueryPlanner {
                     }
                 }
             }
+            ast::Statement::SetTransaction { .. } => {
+                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                    vec![],
+                    vec![],
+                ))));
+            }
+            ast::Statement::SetNames { charset_name, .. } => {
+                if !(charset_name.eq_ignore_ascii_case("utf8")
+                    || charset_name.eq_ignore_ascii_case("utf8mb4"))
+                {
+                    warn!(
+                        "SET NAME does not support non utf8 charsets, input: {}",
+                        charset_name
+                    );
+                };
+
+                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
+                    vec![],
+                    vec![],
+                ))));
+            }
             ast::Statement::SetVariable { .. } => {
                 return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
                     vec![],
@@ -1181,9 +1202,10 @@ impl QueryPlanner {
                 return self.create_df_logical_plan(stmt.clone(), props);
             }
             _ => {
-                return Err(CompilationError::Unsupported(
-                    "Unsupported query type".to_string(),
-                ));
+                return Err(CompilationError::Unsupported(format!(
+                    "Unsupported query type: {}",
+                    stmt.to_string()
+                )));
             }
         };
 
@@ -1306,6 +1328,7 @@ impl QueryPlanner {
                 vec![dataframe::Column::new(
                     "Database".to_string(),
                     ColumnType::MYSQL_TYPE_STRING,
+                    ColumnFlags::empty(),
                 )],
                 vec![
                     dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
@@ -1322,9 +1345,21 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
                 vec![
-                    dataframe::Column::new("Level".to_string(), ColumnType::MYSQL_TYPE_STRING),
-                    dataframe::Column::new("Code".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
-                    dataframe::Column::new("Message".to_string(), ColumnType::MYSQL_TYPE_STRING),
+                    dataframe::Column::new(
+                        "Level".to_string(),
+                        ColumnType::MYSQL_TYPE_VAR_STRING,
+                        ColumnFlags::NOT_NULL_FLAG,
+                    ),
+                    dataframe::Column::new(
+                        "Code".to_string(),
+                        ColumnType::MYSQL_TYPE_LONG,
+                        ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
+                    ),
+                    dataframe::Column::new(
+                        "Message".to_string(),
+                        ColumnType::MYSQL_TYPE_VAR_STRING,
+                        ColumnFlags::NOT_NULL_FLAG,
+                    ),
                 ],
                 vec![],
             ))))
@@ -1334,8 +1369,13 @@ impl QueryPlanner {
                     dataframe::Column::new(
                         "Variable_name".to_string(),
                         ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
                     ),
-                    dataframe::Column::new("Value".to_string(), ColumnType::MYSQL_TYPE_LONGLONG),
+                    dataframe::Column::new(
+                        "Value".to_string(),
+                        ColumnType::MYSQL_TYPE_LONGLONG,
+                        ColumnFlags::empty(),
+                    ),
                 ],
                 vec![dataframe::Row::new(vec![])],
             ))))

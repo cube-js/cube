@@ -105,7 +105,7 @@ export class QueryOrchestrator {
 
     const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-      throw new Error('No pre-aggregation exists for that query');
+      throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
     if (!queryBody.query) {
