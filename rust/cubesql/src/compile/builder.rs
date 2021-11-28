@@ -65,7 +65,7 @@ impl QueryBuilder {
         self.meta.push(meta);
     }
 
-    pub fn push_date_range_for_time_dimenssion(
+    pub fn push_date_range_for_time_dimension(
         &mut self,
         member: &String,
         date_range: serde_json::Value,
