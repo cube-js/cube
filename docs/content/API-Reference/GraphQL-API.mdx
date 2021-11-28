@@ -1,0 +1,289 @@
+---
+title: GraphQL API
+permalink: /backend/graphql
+category: API Reference
+menuOrder: 4
+---
+
+<WarningBox heading={`🐣  Preview`}>
+
+The Cube GraphQL API is currently in Preview, and there may be changes in a
+future version.
+
+</WarningBox>
+
+## Getting started
+
+First, ensure you're running Cube v0.28.58 or later. Then start the project
+locally in development mode, and navigate to
+`http://localhost:4000/cubejs-api/graphql` in your browser. You should see the
+GraphiQL interface:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/API-Reference/GraphQL-API-1.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+If you click the 'Docs' button in the top-right, you can explore the
+introspected schema:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/API-Reference/GraphQL-API-2.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## load
+
+Get the data for a query from Cube.
+
+Let's use an `Orders` cube as an example:
+
+```js
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+
+    createdAt: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+A GraphQL query to return the number of orders by status would look something
+like this:
+
+```graphql
+{
+  load {
+    orders {
+      count
+      status
+      createdAt {
+        day
+      }
+    }
+  }
+}
+```
+
+The equivalent query to the REST API endpoint would look like this:
+
+```json
+{
+  "measures": ["Orders.count"],
+  "dimensions": ["Orders.status", "Orders.createdAt"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "granularity": "day"
+    }
+  ]
+}
+```
+
+### Modifying time dimension granularity
+
+The granularity for a time dimension can easily be changed by specifying it:
+
+```graphql
+{
+  load {
+    orders {
+      createdAt {
+        month
+      }
+    }
+  }
+}
+```
+
+### Specifying filters and ranges
+
+Filters can be set on the load query or on a specific cube. Specifying the
+filter on the load query applies it to all cubes in the query. Filters can be
+added to the query as follows:
+
+```
+query GetOrders {
+  load {
+    orders(orderBy: { createdAt: asc, count: desc }) {
+      count
+      status @include(if: $byCategory)
+      createdAt
+    }
+  }
+}
+```
+
+Some other differences between the JSON query filters and the GraphQL filters to
+note:
+
+- `number` values are used for number types instead of strings
+- The `notSet` filter is replaced by `{ set: false }`
+- New `in` and `notIn` filters to check for multiple values
+- `AND` and `OR` fields for boolean operators
+
+The GraphQL API supports `@skip` and `@include` directives too:
+
+```
+query  {
+  load(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
+    orders(orderBy: { createdAt: asc, count: desc }, where: {status: {equals: "completed"}}) {
+      count
+      status @include(if: $byCategory)
+      createdAt
+    }
+  }
+}
+```
+
+### Querying multiple cubes
+
+Using the same `Orders` cube as before, let's try and get the numbers of
+products for each order status too. We can do this by adding the `Products` cube
+to our query as follows:
+
+```graphql
+{
+  load {
+    orders {
+      status
+      count
+      createdAt {
+        month
+      }
+    }
+    products {
+      count
+    }
+  }
+}
+```
+
+## Known Limitations
+
+- The security context cannot be set in the GraphiQL interface.
+
+## Reference
+
+### load
+
+```
+query {
+  load [([loadOptions])] {
+    <cubeName> [([cubeOptions])] {
+      <cubeMember>
+    }
+  }
+}
+```
+
+| Key           | Schema                         | Description                                |
+| ------------- | ------------------------------ | ------------------------------------------ |
+| `loadOptions` | [`LoadOptions`](#load-options) | Options that apply to the entire query     |
+| `cubeOptions` | [`CubeOptions`](#cube-options) | Options that apply only to a specific cube |
+
+### LoadOptions
+
+| Key          | Schema                                | Description                                                                                                                                         |
+| ------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `where`      | [`RootWhereInput`](#root-where-input) | Represents a SQL `WHERE` clause                                                                                                                     |
+| `limit`      | `Int`                                 | A row limit for your query. The default value is `10000`. The maximum allowed limit is `50000`                                                      |
+| `offset`     | `Int`                                 | The number of initial rows to be skipped for your query. The default value is `0`                                                                   |
+| `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                       |
+| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for queries and query results in the foreground. The default value is `false` |
+
+### RootWhereInput
+
+| Key          | Schema                                   | Description |
+| ------------ | ---------------------------------------- | ----------- |
+| `AND`        | [`[RootWhereInput!]`](#root-where-input) |             |
+| `OR`         | [`[RootWhereInput!]`](#root-where-input) |             |
+| `<cubeName>` | [`CubeWhereInput`](#cube-where-input)    |             |
+
+### CubeOptions
+
+| Key       | Schema                                | Description |
+| --------- | ------------------------------------- | ----------- |
+| `where`   | [`CubeWhereInput`](#cube-where-input) |             |
+| `orderBy` | `CubeOrderByInput`                    |             |
+
+### CubeWhereInput
+
+| Key            | Schema                                   | Description |
+| -------------- | ---------------------------------------- | ----------- |
+| `AND`          | [`[RootWhereInput!]`](#root-where-input) |             |
+| `OR`           | [`[RootWhereInput!]`](#root-where-input) |             |
+| `<cubeMember>` | [`Filter`](#filter)                      |             |
+
+### CubeOrderByInput
+
+| Key            | Schema                 | Description |
+| -------------- | ---------------------- | ----------- |
+| `<cubeMember>` | [`OrderBy`](#order-by) |             |
+
+### Filter
+
+[`DateTimeFilter`](#date-time-filter) | [`FloatFilter`](#float-time-filter) |
+[`StringFilter`](#string-time-filter)
+
+### DateTimeFilter
+
+| Key              | Schema     | Description |
+| ---------------- | ---------- | ----------- |
+| `equals`         | `String`   |             |
+| `notEquals`      | `String`   |             |
+| `in`             | `[String]` |             |
+| `notIn`          | `[String]` |             |
+| `inDateRange`    | `[String]` |             |
+| `notInDateRange` | `[String]` |             |
+| `beforeDate`     | `String`   |             |
+| `afterDate`      | `String`   |             |
+| `set`            | `Boolean`  |             |
+
+### FloatFilter
+
+| Key           | Schema    | Description |
+| ------------- | --------- | ----------- |
+| `equals`      | `Float`   |             |
+| `notEquals`   | `Float`   |             |
+| `in`          | `[Float]` |             |
+| `notIn`       | `[Float]` |             |
+| `contains`    | `Float`   |             |
+| `notContains` | `Float`   |             |
+| `set`         | `Boolean` |             |
+
+### String Filter
+
+| Key           | Schema     | Description |
+| ------------- | ---------- | ----------- |
+| `equals`      | `String`   |             |
+| `notEquals`   | `String`   |             |
+| `in`          | `[String]` |             |
+| `notIn`       | `[String]` |             |
+| `contains`    | `String`   |             |
+| `notContains` | `String`   |             |
+| `set`         | `Boolean`  |             |
+
+### OrderBy
+
+`asc` | `desc`
