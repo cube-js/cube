@@ -512,8 +512,7 @@ impl SqlService for SqlServiceImpl {
             return Ok(Arc::new(data_frame));
         }
         let ast = {
-            let replaced_quote = query.replace("\\'", "''");
-            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            let mut parser = CubeStoreParser::new(query)?;
             parser.parse_statement()?
         };
         // trace!("AST is: {:?}", ast);

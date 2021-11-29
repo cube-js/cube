@@ -144,7 +144,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#ee705f56efa20438b5f0a69d7bc8263bb2b7043a"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
 dependencies = [
  "bitflags",
  "chrono",
@@ -191,7 +191,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#ee705f56efa20438b5f0a69d7bc8263bb2b7043a"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
 dependencies = [
  "arrow 5.0.0",
  "base64 0.13.0",
@@ -1226,7 +1226,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#083aae514daf0c0883b64ee2bdb1c89d18ad7660"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#54abf1a8b06cf5bd002a7edee2c5c12038d3d68e"
 dependencies = [
  "ahash 0.7.4",
  "arrow 5.0.0",
@@ -3167,7 +3167,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#ee705f56efa20438b5f0a69d7bc8263bb2b7043a"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
 dependencies = [
  "arrow 5.0.0",
  "base64 0.13.0",
@@ -4316,7 +4316,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.9.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=dcc51a662fca14772f63f5169a81e6558aa07af9#dcc51a662fca14772f63f5169a81e6558aa07af9"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=a65390c81ffcc34eac2bd35c837c5683d44ec1e0#a65390c81ffcc34eac2bd35c837c5683d44ec1e0"
 dependencies = [
  "log",
 ]
@@ -5100,7 +5100,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.8.4",
+ "rand 0.6.5",
  "static_assertions",
 ]
 
