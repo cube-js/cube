@@ -1150,7 +1150,8 @@ async fn ilike(service: Box<dyn SqlClient>) {
     service
         .exec_query(
             "INSERT INTO s.strings(t, pat) \
-             VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT')",
+             VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT'),\
+             ('some_underscore', '%some\\\\_underscore%')",
         )
         .await
         .unwrap();
@@ -1178,6 +1179,14 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
 
+    let r = service
+        .exec_query(
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', 'some\\\\_underscore', '%') ORDER BY t",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["some_underscore"]));
+
     // Compare constant string with a bunch of patterns.
     // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
     //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
@@ -1200,6 +1209,7 @@ async fn ilike(service: Box<dyn SqlClient>) {
             ("ZABA", "%a%b%a%"),
             ("ZZZ", "zzz"),
             ("aba", "%ABA"),
+            ("some_underscore", "%some\\_underscore%"),
         ])
     );
 
