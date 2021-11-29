@@ -179,7 +179,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_MINIO_ACCESS_KEY_ID`            | The Access Key ID for minIO. Required when using minIO                                                                                  | A valid minIO Access Key ID                                        |
 | `CUBESTORE_MINIO_SECRET_ACCESS_KEY`        | The Secret Access Key for minIO. Required when using minIO                                                                              | A valid minIO Secret Access Key                                     |                                                           |
 | `CUBESTORE_MINIO_BUCKET`                    | The name of the bucket that you want to use minIO. Required when using minIO                                                                             | A valid bucket name in the AWS account                                                  |
-| `CUBESTORE_MINIO_SERVER_ENDPOINT`                    | The minio server endpoint. Required when using minIO                                                                            | A valid minIO endpoint eg: `http://localhost:9000`                                            |
+| `CUBESTORE_MINIO_SERVER_ENDPOINT`                    | The minIO server endpoint. Required when using minIO                                                                            | A valid minIO endpoint e.g. `http://localhost:9000`                                            |
 | `CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS` | The number of minutes after which Cube Store should refresh minIO credentials. Default is `180` | A valid number in minutes        
 
 [link-aws-creds]:
