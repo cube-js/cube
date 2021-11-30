@@ -12,6 +12,14 @@ impl SystemVar {
     pub fn new() -> Self {
         let mut variables = HashMap::new();
         variables.insert(
+            "@@max_allowed_packet".to_string(),
+            ScalarValue::UInt32(Some(67108864)),
+        );
+        variables.insert(
+            "@@auto_increment_increment".to_string(),
+            ScalarValue::UInt32(Some(1)),
+        );
+        variables.insert(
             "@@version_comment".to_string(),
             ScalarValue::Utf8(Some("mysql".to_string())),
         );
