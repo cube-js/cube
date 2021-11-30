@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.61](https://github.com/cube-js/cube.js/compare/v0.28.60...v0.28.61) (2021-11-30)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mongobi-driver:** Create table failed: User: Can't parse timestamp: Invalid date ([1843f28](https://github.com/cube-js/cube.js/commit/1843f2851e61bd4e7f1831a8167db939ec239313))
+
+
+
+
+
 ## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
 
 
