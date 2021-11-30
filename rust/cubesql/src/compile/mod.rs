@@ -29,7 +29,7 @@ use crate::{
     compile::builder::QueryBuilder,
     schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::{ColumnFlags, ColumnType};
+use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 
 use self::builder::*;
 use self::context::*;
@@ -1168,10 +1168,10 @@ impl QueryPlanner {
                 }
             }
             ast::Statement::SetTransaction { .. } => {
-                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                    vec![],
-                    vec![],
-                ))));
+                return Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                ));
             }
             ast::Statement::SetNames { charset_name, .. } => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
@@ -1183,16 +1183,13 @@ impl QueryPlanner {
                     );
                 };
 
-                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                    vec![],
-                    vec![],
-                ))));
+                return Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                ));
             }
             ast::Statement::SetVariable { .. } => {
-                return Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                    vec![],
-                    vec![],
-                ))));
+                return Ok(QueryPlan::MetaOk(StatusFlags::empty()));
             }
             ast::Statement::ShowVariable { variable } => {
                 return self.show_variable_to_plan(variable, props);
@@ -1308,7 +1305,7 @@ impl QueryPlanner {
                 compile_where(selection, &ctx, &mut builder)?;
             }
 
-            Ok(QueryPlan::CubeSelect(builder.build()))
+            Ok(QueryPlan::CubeSelect(StatusFlags::empty(), builder.build()))
         } else {
             return Err(CompilationError::Unknown(format!(
                 "Unknown cube: {}",
@@ -1324,61 +1321,72 @@ impl QueryPlanner {
     ) -> CompilationResult<QueryPlan> {
         let name = ObjectName(variable.to_vec()).to_string();
         if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
-            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                vec![dataframe::Column::new(
-                    "Database".to_string(),
-                    ColumnType::MYSQL_TYPE_STRING,
-                    ColumnFlags::empty(),
-                )],
-                vec![
-                    dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
-                    dataframe::Row::new(vec![dataframe::TableValue::String(
-                        "information_schema".to_string(),
-                    )]),
-                    dataframe::Row::new(vec![dataframe::TableValue::String("mysql".to_string())]),
-                    dataframe::Row::new(vec![dataframe::TableValue::String(
-                        "performance_schema".to_string(),
-                    )]),
-                    dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
-                ],
-            ))))
-        } else if name.eq_ignore_ascii_case("warnings") {
-            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                vec![
-                    dataframe::Column::new(
-                        "Level".to_string(),
-                        ColumnType::MYSQL_TYPE_VAR_STRING,
-                        ColumnFlags::NOT_NULL_FLAG,
-                    ),
-                    dataframe::Column::new(
-                        "Code".to_string(),
-                        ColumnType::MYSQL_TYPE_LONG,
-                        ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
-                    ),
-                    dataframe::Column::new(
-                        "Message".to_string(),
-                        ColumnType::MYSQL_TYPE_VAR_STRING,
-                        ColumnFlags::NOT_NULL_FLAG,
-                    ),
-                ],
-                vec![],
-            ))))
-        } else if name.eq_ignore_ascii_case("variables like 'aurora\\_version'") {
-            Ok(QueryPlan::Meta(Arc::new(dataframe::DataFrame::new(
-                vec![
-                    dataframe::Column::new(
-                        "Variable_name".to_string(),
+            Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![dataframe::Column::new(
+                        "Database".to_string(),
                         ColumnType::MYSQL_TYPE_STRING,
                         ColumnFlags::empty(),
-                    ),
-                    dataframe::Column::new(
-                        "Value".to_string(),
-                        ColumnType::MYSQL_TYPE_LONGLONG,
-                        ColumnFlags::empty(),
-                    ),
-                ],
-                vec![dataframe::Row::new(vec![])],
-            ))))
+                    )],
+                    vec![
+                        dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
+                        dataframe::Row::new(vec![dataframe::TableValue::String(
+                            "information_schema".to_string(),
+                        )]),
+                        dataframe::Row::new(vec![dataframe::TableValue::String(
+                            "mysql".to_string(),
+                        )]),
+                        dataframe::Row::new(vec![dataframe::TableValue::String(
+                            "performance_schema".to_string(),
+                        )]),
+                        dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
+                    ],
+                )),
+            ))
+        } else if name.eq_ignore_ascii_case("warnings") {
+            Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![
+                        dataframe::Column::new(
+                            "Level".to_string(),
+                            ColumnType::MYSQL_TYPE_VAR_STRING,
+                            ColumnFlags::NOT_NULL_FLAG,
+                        ),
+                        dataframe::Column::new(
+                            "Code".to_string(),
+                            ColumnType::MYSQL_TYPE_LONG,
+                            ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
+                        ),
+                        dataframe::Column::new(
+                            "Message".to_string(),
+                            ColumnType::MYSQL_TYPE_VAR_STRING,
+                            ColumnFlags::NOT_NULL_FLAG,
+                        ),
+                    ],
+                    vec![],
+                )),
+            ))
+        } else if name.eq_ignore_ascii_case("variables like 'aurora\\_version'") {
+            Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![
+                        dataframe::Column::new(
+                            "Variable_name".to_string(),
+                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
+                        ),
+                        dataframe::Column::new(
+                            "Value".to_string(),
+                            ColumnType::MYSQL_TYPE_LONGLONG,
+                            ColumnFlags::empty(),
+                        ),
+                    ],
+                    vec![dataframe::Row::new(vec![])],
+                )),
+            ))
         } else {
             self.create_df_logical_plan(
                 ast::Statement::ShowVariable {
@@ -1461,7 +1469,11 @@ impl QueryPlanner {
             CompilationError::Internal(format!("Planning optimization error: {}", err))
         })?;
 
-        Ok(QueryPlan::DataFushionSelect(optimized_plan, ctx))
+        Ok(QueryPlan::DataFushionSelect(
+            StatusFlags::empty(),
+            optimized_plan,
+            ctx,
+        ))
     }
 }
 
@@ -1481,32 +1493,34 @@ pub struct CompiledQuery {
 }
 
 pub enum QueryPlan {
-    // Query will not be executed, we already knows how respond to it
-    Meta(Arc<dataframe::DataFrame>),
+    // Meta will not be executed in DF,
+    // we already knows how respond to it
+    MetaOk(StatusFlags),
+    MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
-    DataFushionSelect(LogicalPlan, ExecutionContext),
+    DataFushionSelect(StatusFlags, LogicalPlan, ExecutionContext),
     // Query will be executed by direct request in Cube.js
-    CubeSelect(CompiledQuery),
+    CubeSelect(StatusFlags, CompiledQuery),
 }
 
 impl QueryPlan {
     pub fn print(&self, pretty: bool) -> Result<String, CubeError> {
         match self {
-            QueryPlan::DataFushionSelect(plan, _) => {
+            QueryPlan::DataFushionSelect(_, plan, _) => {
                 if pretty {
                     Ok(plan.display_indent().to_string())
                 } else {
                     Ok(plan.display().to_string())
                 }
             }
-            QueryPlan::CubeSelect(compiled_query) => {
+            QueryPlan::CubeSelect(_, compiled_query) => {
                 if pretty {
                     Ok(serde_json::to_string_pretty(&compiled_query)?)
                 } else {
                     Ok(serde_json::to_string(&compiled_query)?)
                 }
             }
-            QueryPlan::Meta(_) => Ok(
+            QueryPlan::MetaOk(_) | QueryPlan::MetaTabular(_, _) => Ok(
                 "This query doesnt have a plan, because it already has values for response"
                     .to_string(),
             ),
@@ -1630,7 +1644,7 @@ mod tests {
             },
         );
         match query.unwrap() {
-            QueryPlan::CubeSelect(query) => query,
+            QueryPlan::CubeSelect(_, query) => query,
             _ => panic!("Must return CubeSelect instead of DF plan"),
         }
     }
