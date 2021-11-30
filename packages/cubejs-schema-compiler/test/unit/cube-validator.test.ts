@@ -82,6 +82,30 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
+  it('sql key support in dimensions', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      dimensions: {
+        example: {
+          type: 'string',
+          sql: () => ''
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        // this callback should not be invoked
+        expect(true).toBeFalsy();
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   it('OriginalSqlSchema', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
