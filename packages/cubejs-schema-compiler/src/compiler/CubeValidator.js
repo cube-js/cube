@@ -53,6 +53,7 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
 });
 
 const BaseDimensionWithoutSubQuery = {
+  sql:  Joi.func().required(),
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
   fieldType: Joi.any().valid('string'),
