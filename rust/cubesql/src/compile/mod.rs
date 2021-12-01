@@ -3,11 +3,6 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{prelude::*, Duration};
 
-use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
-use datafusion::catalog::catalog::MemoryCatalogProvider;
-use datafusion::catalog::schema::{MemorySchemaProvider, SchemaProvider};
-
-use datafusion::datasource::MemTable;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -23,7 +18,7 @@ use cubeclient::models::{
 
 use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
-use crate::schema::V1CubeMetaExt;
+
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
@@ -34,6 +29,7 @@ use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
+use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_current_user_udf, create_db_udf, create_instr_udf,
     create_isnull_udf, create_user_udf, create_version_udf,
@@ -1403,7 +1399,7 @@ impl QueryPlanner {
         props: &QueryPlannerExecutionProps,
     ) -> CompilationResult<QueryPlan> {
         let mut ctx =
-            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(true));
+            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(false));
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
@@ -1417,48 +1413,9 @@ impl QueryPlanner {
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_isnull_udf());
 
-        {
-            let schema_provider = MemorySchemaProvider::new();
-
-            for cube in &self.context.cubes {
-                let mut schema_fields = vec![];
-
-                for column in cube.get_columns() {
-                    let data_type = match column.mysql_type_as_str().as_str() {
-                        "int" => DataType::Int64,
-                        "time" => DataType::Timestamp(TimeUnit::Nanosecond, None),
-                        _ => DataType::Utf8,
-                    };
-
-                    schema_fields.push(Field::new(
-                        column.get_name(),
-                        data_type,
-                        column.mysql_can_be_null(),
-                    ));
-                }
-
-                let schema = Arc::new(Schema::new(schema_fields));
-                let provider = MemTable::try_new(schema.clone(), vec![vec![]]).unwrap();
-
-                schema_provider
-                    .register_table(cube.name.clone(), Arc::new(provider))
-                    .map_err(|err| {
-                        CompilationError::Internal(format!(
-                            "Unable to register table provider for {}: {}",
-                            cube.name.clone(),
-                            err
-                        ))
-                    })?;
-            }
-
-            let catalog_provider = MemoryCatalogProvider::new();
-            catalog_provider.register_schema("db", Arc::new(schema_provider));
-
-            ctx.register_catalog("db", Arc::new(catalog_provider));
-        }
-
         let state = ctx.state.lock().unwrap().clone();
-        let df_query_planner = SqlToRel::new(&state);
+        let cube_ctx = CubeContext::new(&state, &self.context.cubes);
+        let df_query_planner = SqlToRel::new(&cube_ctx);
 
         let plan = df_query_planner
             .statement_to_plan(&DFStatement::Statement(stmt))
@@ -1534,7 +1491,14 @@ pub fn convert_sql_to_cube_query(
     tenant: Arc<ctx::TenantContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
-    let stmt = parse_sql_to_statement(query)?;
+    // @todo Support without workarounds
+    // metabase
+    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
+    let query = query
+        .clone()
+        .replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
+
+    let stmt = parse_sql_to_statement(&query)?;
     convert_statement_to_cube_query(&stmt, tenant, props)
 }
 
