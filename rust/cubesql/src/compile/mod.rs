@@ -1267,6 +1267,27 @@ impl QueryPlanner {
             )));
         }
 
+        // @todo Better solution?
+        // Metabase
+        if query.to_string()
+            == format!(
+                "SELECT true AS `_` FROM `{}` WHERE 1 <> 1 LIMIT 0",
+                table_name
+            )
+        {
+            return Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![dataframe::Column::new(
+                        "_".to_string(),
+                        ColumnType::MYSQL_TYPE_TINY,
+                        ColumnFlags::empty(),
+                    )],
+                    vec![],
+                )),
+            ));
+        };
+
         if let Some(cube) = self.context.find_cube_with_name(table_name.clone()) {
             // println!("{:?}", select.projection);
             let mut ctx = QueryContext::new(&cube);
