@@ -24,6 +24,33 @@ impl SystemVar {
             ScalarValue::Utf8(Some("mysql".to_string())),
         );
         variables.insert(
+            "@@system_time_zone".to_string(),
+            ScalarValue::Utf8(Some("UTC".to_string())),
+        );
+        variables.insert(
+            "@@time_zone".to_string(),
+            ScalarValue::Utf8(Some("SYSTEM".to_string())),
+        );
+        // Isolation old variables
+        variables.insert(
+            "@@tx_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+        );
+        variables.insert(
+            "@@tx_read_only".to_string(),
+            ScalarValue::Boolean(Some(false)),
+        );
+        // Isolation new variables after 8.0.3
+        variables.insert(
+            "@@transaction_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+        );
+        variables.insert(
+            "@@transaction_read_only".to_string(),
+            ScalarValue::Boolean(Some(false)),
+        );
+        // Session
+        variables.insert(
             "@@sessiontransaction_isolation".to_string(),
             ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
         );
@@ -31,6 +58,7 @@ impl SystemVar {
             "@@sessionauto_increment_increment".to_string(),
             ScalarValue::Int64(Some(1)),
         );
+        // character
         variables.insert(
             "@@character_set_client".to_string(),
             ScalarValue::Utf8(Some("utf8mb4".to_string())),
@@ -50,14 +78,6 @@ impl SystemVar {
         variables.insert(
             "@@collation_connection".to_string(),
             ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
-        );
-        variables.insert(
-            "@@system_time_zone".to_string(),
-            ScalarValue::Utf8(Some("UTC".to_string())),
-        );
-        variables.insert(
-            "@@time_zone".to_string(),
-            ScalarValue::Utf8(Some("SYSTEM".to_string())),
         );
 
         Self { variables }
