@@ -36,7 +36,7 @@ use self::context::*;
 use self::engine::context::SystemVar;
 use self::engine::udf::{
     create_connection_id_udf, create_current_user_udf, create_db_udf, create_instr_udf,
-    create_user_udf, create_version_udf,
+    create_isnull_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1415,6 +1415,7 @@ impl QueryPlanner {
         ctx.register_udf(create_user_udf(props));
         ctx.register_udf(create_current_user_udf(props));
         ctx.register_udf(create_instr_udf());
+        ctx.register_udf(create_isnull_udf());
 
         {
             let schema_provider = MemorySchemaProvider::new();
