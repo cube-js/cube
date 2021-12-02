@@ -15,6 +15,7 @@ const StyledMenu = styled(Menu)`
   position: relative;
   max-height: 600px;
   overflow-y: scroll;
+  overflow-x: hidden;
 
   li {
     font-size: var(--font-size-base);
