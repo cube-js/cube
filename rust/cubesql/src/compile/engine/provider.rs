@@ -8,7 +8,9 @@ use datafusion::{
     sql::planner::ContextProvider,
 };
 
-use super::information_schema::InfoSchemaTableProvider;
+use super::information_schema::{
+    columns::InfoSchemaColumnsProvider, tables::InfoSchemaTableProvider,
+};
 
 pub struct CubeContext<'a> {
     /// Internal state for the context (default)
@@ -43,6 +45,10 @@ impl<'a> ContextProvider for CubeContext<'a> {
         if let Some(tp) = table_path {
             if tp.eq_ignore_ascii_case("information_schema.tables") {
                 return Some(Arc::new(InfoSchemaTableProvider::new(self.cubes)));
+            }
+
+            if tp.eq_ignore_ascii_case("information_schema.columns") {
+                return Some(Arc::new(InfoSchemaColumnsProvider::new(self.cubes)));
             }
         };
 

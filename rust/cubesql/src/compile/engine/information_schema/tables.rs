@@ -21,7 +21,7 @@ struct InformationSchemaTablesBuilder {
     table_types: StringBuilder,
 }
 
-fn new_string_array_with_placeholder(size: usize, default: String) -> StringArray {
+pub fn new_string_array_with_placeholder(size: usize, default: String) -> StringArray {
     let mut builder = StringBuilder::new(size);
 
     for _ in 0..size {
@@ -31,7 +31,7 @@ fn new_string_array_with_placeholder(size: usize, default: String) -> StringArra
     builder.finish()
 }
 
-fn new_int64_array_with_placeholder(size: usize, default: i64) -> Int64Array {
+pub fn new_int64_array_with_placeholder(size: usize, default: i64) -> Int64Array {
     let mut builder = Int64Builder::new(size);
 
     for _ in 0..size {
@@ -45,14 +45,12 @@ impl InformationSchemaTablesBuilder {
     fn new() -> Self {
         let capacity = 10;
 
-        let builder = Self {
+        Self {
             catalog_names: StringBuilder::new(capacity),
             schema_names: StringBuilder::new(capacity),
             table_names: StringBuilder::new(capacity),
             table_types: StringBuilder::new(capacity),
-        };
-
-        builder
+        }
     }
 
     fn add_table(

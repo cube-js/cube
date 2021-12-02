@@ -1518,6 +1518,7 @@ pub fn convert_sql_to_cube_query(
     let query = query
         .clone()
         .replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
+    let query = query.replace("signed integer", "signed");
 
     let stmt = parse_sql_to_statement(&query)?;
     convert_statement_to_cube_query(&stmt, tenant, props)
