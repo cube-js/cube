@@ -4,10 +4,7 @@ use async_trait::async_trait;
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
-        array::{
-            Array, ArrayRef, StringBuilder,
-            UInt32Builder,
-        },
+        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },

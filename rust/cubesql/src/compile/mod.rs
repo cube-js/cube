@@ -31,8 +31,8 @@ use self::context::*;
 use self::engine::context::SystemVar;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_current_user_udf, create_db_udf, create_instr_udf,
-    create_isnull_udf, create_user_udf, create_version_udf,
+    create_connection_id_udf, create_current_user_udf, create_db_udf, create_if_udf,
+    create_instr_udf, create_isnull_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1433,6 +1433,7 @@ impl QueryPlanner {
         ctx.register_udf(create_current_user_udf(props));
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_isnull_udf());
+        ctx.register_udf(create_if_udf());
 
         let state = ctx.state.lock().unwrap().clone();
         let cube_ctx = CubeContext::new(&state, &self.context.cubes);
@@ -1515,9 +1516,7 @@ pub fn convert_sql_to_cube_query(
     // @todo Support without workarounds
     // metabase
     let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
-    let query = query
-        .clone()
-        .replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
+    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     let query = query.replace("signed integer", "signed");
 
     let stmt = parse_sql_to_statement(&query)?;

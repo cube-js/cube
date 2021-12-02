@@ -4,8 +4,8 @@ use std::sync::Arc;
 use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, GenericStringArray, Int32Builder, StringBuilder,
-            UInt32Builder,
+            ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
+            StringBuilder, UInt32Builder,
         },
         datatypes::DataType,
     },
@@ -124,6 +124,19 @@ pub fn create_connection_id_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF
     )
 }
 
+macro_rules! downcast_boolean_arr {
+    ($ARG:expr) => {{
+        $ARG.as_any()
+            .downcast_ref::<BooleanArray>()
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "could not cast to {}",
+                    type_name::<BooleanArray>()
+                ))
+            })?
+    }};
+}
+
 macro_rules! downcast_string_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
@@ -181,12 +194,58 @@ pub fn create_isnull_udf() -> ScalarUDF {
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Boolean).clone()));
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
 
     ScalarUDF::new(
         "isnull",
         &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_if_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let condition = &args[0];
+        let left = &args[1];
+        let right = &args[2];
+
+        if left.data_type() != right.data_type() {
+            return Err(DataFusionError::Execution(format!(
+                "positive and negative results must be the same type, actual: [{}, {}]",
+                left.data_type(),
+                right.data_type(),
+            )));
+        }
+
+        let is_true: bool = match condition.data_type() {
+            DataType::Boolean => {
+                if condition.is_null(0) {
+                    false
+                } else {
+                    let arr = downcast_boolean_arr!(condition);
+                    arr.value(0)
+                }
+            }
+            _ => false,
+        };
+
+        let result = if is_true { left.clone() } else { right.clone() };
+
+        Ok(result)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |types| {
+        assert!(types.len() == 3);
+
+        Ok(Arc::new(types[1].clone()))
+    });
+
+    ScalarUDF::new(
+        "if",
+        &Signature::any(3, Volatility::Immutable),
         &return_type,
         &fun,
     )
