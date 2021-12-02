@@ -1517,7 +1517,26 @@ pub fn convert_sql_to_cube_query(
     // metabase
     let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
-    let query = query.replace("signed integer", "signed");
+    // @todo Implement LEAST function
+    let query = query.replace(
+        "LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647)",
+        "CHARACTER_MAXIMUM_LENGTH",
+    );
+    let query = query.replace(
+        "LEAST(CHARACTER_OCTET_LENGTH,2147483647)",
+        "CHARACTER_OCTET_LENGTH",
+    );
+    // @todo Implement CONVERT function
+    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
+    // @todo parser
+    let query = query.replace("IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME", "COLUMN_TYPE as TYPE_NAME");
+    // @todo Case intensive mode
+    let query = query.replace("CASE data_type", "CASE DATA_TYPE");
+    // @todo problem with parser, space in types
+    let query = query.replace("signed integer", "bigint");
+    let query = query.replace("SIGNED INTEGER", "bigint");
+    let query = query.replace("unsigned integer", "bigint");
+    let query = query.replace("UNSIGNED INTEGER", "bigint");
 
     let stmt = parse_sql_to_statement(&query)?;
     convert_statement_to_cube_query(&stmt, tenant, props)
