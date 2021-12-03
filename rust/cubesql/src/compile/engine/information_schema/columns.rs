@@ -113,6 +113,11 @@ impl InformationSchemaColumnsBuilder {
         columns.push(Arc::new(self.numeric_precision.finish()));
         columns.push(Arc::new(self.datetime_precision.finish()));
 
+        // COLUMN_KEY
+        columns.push(Arc::new(new_string_array_with_placeholder(
+            total,
+            "".to_string(),
+        )));
         // EXTRA
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
@@ -185,6 +190,7 @@ impl TableProvider for InfoSchemaColumnsProvider {
             Field::new("COLUMN_TYPE", DataType::Utf8, false),
             Field::new("NUMERIC_PRECISION", DataType::UInt32, true),
             Field::new("DATETIME_PRECISION", DataType::UInt32, true),
+            Field::new("COLUMN_KEY", DataType::Utf8, false),
             Field::new("EXTRA", DataType::Utf8, false),
             Field::new("COLUMN_COMMENT", DataType::Utf8, false),
             Field::new("GENERATION_EXPRESSION", DataType::Utf8, false),
