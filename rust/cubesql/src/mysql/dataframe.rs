@@ -1,6 +1,7 @@
 use std::fmt::{self, Debug, Formatter};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
+use comfy_table::{Cell, Table};
 use datafusion::arrow::array::{
     Array, Float64Array, Int32Array, Int64Array, StringArray, TimestampMicrosecondArray,
     UInt32Array,
@@ -185,6 +186,7 @@ pub enum TableValue {
     Timestamp(TimestampValue),
 }
 
+#[derive(Debug)]
 pub struct DataFrame {
     columns: Vec<Column>,
     data: Vec<Row>,
@@ -213,6 +215,36 @@ impl DataFrame {
 
     pub fn into_rows(self) -> Vec<Row> {
         self.data
+    }
+
+    pub fn print(&self) -> String {
+        let mut table = Table::new();
+        table.load_preset("||--+-++|    ++++++");
+
+        let mut header = vec![];
+        for column in self.get_columns() {
+            header.push(Cell::new(&column.get_name()));
+        }
+        table.set_header(header);
+
+        for row in self.get_rows().iter() {
+            let mut table_row = vec![];
+
+            for (_i, value) in row.values().iter().enumerate() {
+                match value {
+                    TableValue::Null => table_row.push("NULL".to_string()),
+                    TableValue::String(s) => table_row.push(s.clone()),
+                    TableValue::Int64(n) => table_row.push(n.to_string()),
+                    TableValue::Boolean(b) => table_row.push(b.to_string()),
+                    TableValue::Float64(n) => table_row.push(n.to_string()),
+                    TableValue::Timestamp(t) => table_row.push(t.to_string()),
+                }
+            }
+
+            table.add_row(table_row);
+        }
+
+        table.trim_fmt()
     }
 }
 

@@ -264,7 +264,7 @@ impl Backend {
                         let rows = cube.get_columns().iter().map(|column| dataframe::Row::new(
                             vec![
                                 dataframe::TableValue::String(column.get_name().clone()),
-                                dataframe::TableValue::String(column.mysql_type_as_str().clone()),
+                                dataframe::TableValue::String(column.get_column_type().clone()),
                                 dataframe::TableValue::String(if column.mysql_can_be_null() { "Yes".to_string() } else { "No".to_string() }),
                                 dataframe::TableValue::String("".to_string()),
                                 dataframe::TableValue::Null,
@@ -373,7 +373,7 @@ impl Backend {
                                     fields.push(format!(
                                         "`{}` {}{}",
                                         column.get_name(),
-                                        column.mysql_type_as_str(),
+                                        column.get_column_type(),
                                         if column.mysql_can_be_null() { " NOT NULL" } else { "" }
                                     ));
                                 }

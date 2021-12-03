@@ -156,6 +156,7 @@ impl InfoSchemaTableProvider {
     pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InformationSchemaTablesBuilder::new();
         builder.add_table("def", "information_schema", "tables");
+        builder.add_table("def", "information_schema", "columns");
 
         for cube in cubes {
             builder.add_table("def", "db", cube.name.clone());

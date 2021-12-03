@@ -83,11 +83,9 @@ impl InformationSchemaColumnsBuilder {
             })
             .unwrap();
 
-        self.data_type
-            .append_value(column.mysql_type_as_str())
-            .unwrap();
+        self.data_type.append_value(column.get_data_type()).unwrap();
         self.column_type
-            .append_value(column.mysql_type_as_str())
+            .append_value(column.get_column_type())
             .unwrap();
 
         self.char_max_length.append_null().unwrap();
