@@ -1,7 +1,7 @@
 ---
 title: '@cubejs-client/ngx'
 permalink: /@cubejs-client-ngx
-category: Cube.js Frontend
+category: Frontend Integrations
 subCategory: Reference
 menuOrder: 4
 ---

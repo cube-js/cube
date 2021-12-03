@@ -1,7 +1,7 @@
 ---
 title: Dashboard App
 permalink: /dashboard-app
-category: Cube.js Frontend
+category: Frontend Integrations
 menuOrder: 6
 ---
 

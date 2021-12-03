@@ -1,7 +1,7 @@
 ---
 title: '@cubejs-client/core'
 permalink: /@cubejs-client-core
-category: Cube.js Frontend
+category: Frontend Integrations
 subCategory: Reference
 menuOrder: 2
 ---

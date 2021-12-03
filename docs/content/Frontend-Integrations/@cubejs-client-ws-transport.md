@@ -1,7 +1,7 @@
 ---
 title: '@cubejs-client/ws-transport'
 permalink: /@cubejs-client-ws-transport
-category: Cube.js Frontend
+category: Frontend Integrations
 subCategory: Reference
 menuOrder: 5
 ---

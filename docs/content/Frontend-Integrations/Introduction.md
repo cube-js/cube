@@ -2,7 +2,7 @@
 title: Introduction
 frameworkOfChoice: vanilla
 permalink: /frontend-introduction
-category: Cube.js Frontend
+category: Frontend Integrations
 ---
 
 Cube.js is an open-source analytical API platform, and it enables you to build internal business intelligence tools or add customer‑facing analytics to existing applications. Cube.js is visualization-agnostic, so you can build any user interface for your application.
