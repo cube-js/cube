@@ -42,6 +42,20 @@ export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
 
+export const getReversedOffset = (parsedTime: number, timezone: string): number => {
+  const zone = moment.tz.zone(timezone);
+  if (zone) {
+    return zone.utcOffset(parsedTime);
+  }
+
+  const offset = moment().utcOffset(timezone);
+  if (!offset.isUtcOffset()) {
+    throw new Error(`Unknown timezone: ${timezone}`);
+  }
+
+  return -offset.utcOffset();
+};
+
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
   if (timestamp.length === 23) {
     const parsedTime = Date.parse(`${timestamp}Z`);
@@ -70,18 +84,4 @@ export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, 
   return moment.tz(timestamp, timezone)
     .add(seconds, 'second')
     .toDate();
-};
-
-export const getReversedOffset = (parsedTime: number, timezone: string): number => {
-  const zone = moment.tz.zone(timezone);
-  if (zone) {
-    return zone.utcOffset(parsedTime);
-  }
-
-  const offset = moment().utcOffset(timezone);
-  if (!offset.isUtcOffset()) {
-    throw new Error(`Unknown timezone: ${timezone}`);
-  }
-
-  return -offset.utcOffset();
 };
