@@ -60,6 +60,7 @@ export interface RedisParsedResult {
    */
   path?: string,
   sentinels?: { host: string, port: number }[],
+  clusterNodes?: { host: string, port: number }[],
   db?: number,
   name?: string,
 }
@@ -79,6 +80,14 @@ function parseHostPartSentinel(addUrl: string, result: RedisParsedResult) {
   const servers = addUrl.split(',');
 
   result.sentinels = servers.map((addr) => parseHostPort(addr));
+
+  return result;
+}
+
+function parseHostPartRedisCluster(addUrl: string, result: RedisParsedResult) {
+  const servers = addUrl.split(',');
+
+  result.clusterNodes = servers.map((addr) => parseHostPort(addr));
 
   return result;
 }
@@ -167,6 +176,10 @@ export function parseRedisUrl(url: Readonly<string>): RedisParsedResult {
 
   if (url.startsWith('redis+sentinel://')) {
     return parseUrl(url.substr('redis+sentinel://'.length), result, parseHostPartSentinel);
+  }
+
+  if (url.startsWith('redis+cluster://')) {
+    return parseUrl(url.substr('redis+cluster://'.length), result, parseHostPartRedisCluster);
   }
 
   if (url.startsWith('unix://')) {

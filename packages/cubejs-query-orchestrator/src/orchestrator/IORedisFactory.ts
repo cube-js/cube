@@ -1,9 +1,9 @@
-import Redis, { Redis as redis, RedisOptions } from 'ioredis';
+import Redis, { ClusterNode, Redis as redis, RedisOptions } from 'ioredis';
 import { getEnv } from '@cubejs-backend/shared';
 import AsyncRedisClient from './AsyncRedisClient';
 import { parseRedisUrl } from './utils';
 
-export type IORedisOptions = RedisOptions;
+export type IORedisOptions = RedisOptions & { isCluster?: boolean };
 
 // @ts-ignore
 Redis.Pipeline.prototype.execAsync = function execAsync() {
@@ -11,7 +11,7 @@ Redis.Pipeline.prototype.execAsync = function execAsync() {
     .then((array) => (array ? array.map((skipFirst) => skipFirst[1]) : array));
 };
 
-function decorateRedisClient(client: redis): AsyncRedisClient {
+function decorateRedisClient(client: redis | Redis.Cluster): AsyncRedisClient {
   [
     'brpop',
     'del',
@@ -39,29 +39,46 @@ function decorateRedisClient(client: redis): AsyncRedisClient {
   return <any>client;
 }
 
-export async function createIORedisClient(url: string, opts: RedisOptions): Promise<AsyncRedisClient> {
+export async function createIORedisClient(url: string, opts: RedisOptions, isCluster?: boolean): Promise<AsyncRedisClient> {
+  const clusterNodes: ClusterNode[] = [];
   const options: RedisOptions = {
     enableReadyCheck: true,
-    lazyConnect: true
+    lazyConnect: true,
   };
 
-  const parsedUrl = parseRedisUrl(url);
-  if (parsedUrl.sentinels) {
-    options.sentinels = parsedUrl.sentinels;
-    options.name = parsedUrl.name;
-    options.db = parsedUrl.db;
-    options.enableOfflineQueue = false;
+  if (!isCluster) {
+    const parsedUrl = parseRedisUrl(url);
+    if (parsedUrl.sentinels) {
+      options.sentinels = parsedUrl.sentinels;
+      options.name = parsedUrl.name;
+      options.db = parsedUrl.db;
+      options.enableOfflineQueue = false;
+    } else {
+      options.username = parsedUrl.username;
+      options.password = parsedUrl.password;
+      options.host = parsedUrl.host;
+      options.port = parsedUrl.port;
+      options.path = parsedUrl.path;
+      options.db = parsedUrl.db;
+
+      if (parsedUrl.ssl) {
+        options.tls = {};
+      }
+    }
   } else {
+    const parsedUrl = parseRedisUrl(url);
     options.username = parsedUrl.username;
     options.password = parsedUrl.password;
     options.host = parsedUrl.host;
     options.port = parsedUrl.port;
     options.path = parsedUrl.path;
     options.db = parsedUrl.db;
-
-    if (parsedUrl.ssl) {
-      options.tls = {};
-    }
+    parsedUrl.clusterNodes?.forEach(clusterNode => {
+      clusterNodes.push({
+        host: clusterNode.host,
+        port: clusterNode.port,
+      });
+    });
   }
 
   if (getEnv('redisTls')) {
@@ -73,7 +90,9 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
     options.password = password;
   }
 
-  const client = new Redis({
+  const client = isCluster ? new Redis.Cluster(clusterNodes, {
+    redisOptions: options,
+  }) : new Redis({
     ...options,
     ...opts,
   });

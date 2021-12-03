@@ -7,7 +7,7 @@ import { createIORedisClient, IORedisOptions } from './IORedisFactory';
 
 function createRedisClient(url: string, opts: RedisOptions | IORedisOptions = {}) {
   if (getEnv('redisUseIORedis')) {
-    return createIORedisClient(url, <IORedisOptions>opts);
+    return createIORedisClient(url, <IORedisOptions>opts, getEnv('redisUseIORedisCluster'));
   }
 
   return createNodeRedisClient(url, <RedisOptions>opts);

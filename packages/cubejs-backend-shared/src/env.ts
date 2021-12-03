@@ -190,6 +190,9 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
+  redisUseIORedisCluster: () => get('CUBEJS_REDIS_USE_IOREDIS_CLUSTER')
+    .default('false')
+    .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')
       .asString();
