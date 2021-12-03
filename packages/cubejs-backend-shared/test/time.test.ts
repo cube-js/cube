@@ -1,4 +1,4 @@
-import { timeSeries } from '../src';
+import { timeSeries, getReversedOffset } from '../src';
 
 describe('timeSeries', () => {
   it('day', () => {
@@ -17,3 +17,17 @@ describe('timeSeries', () => {
     ]);
   });
 });
+
+describe('getReversedOffset', () => {
+  it('Australia/Sydney', () => {
+    const parsedTime = Date.parse(`2013-11-18T19:55:00.000Z`);
+    const timezone = 'Australia/Sydney'
+    expect(getReversedOffset(parsedTime, timezone)).toEqual(-660);
+  });
+
+  it('+11:00', () => {
+    const parsedTime = Date.parse(`2013-11-18T19:55:00.000Z`);
+    const timezone = '+11:00'
+    expect(getReversedOffset(parsedTime, timezone)).toEqual(-660);
+  });
+})
