@@ -80,7 +80,7 @@ export class QueryQueue {
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
       // eslint-disable-next-line no-unused-vars
-      const [added, b, c, queueSize] = await redisClient.addToQueue(
+      const [added, b, c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
@@ -96,6 +96,7 @@ export class QueryQueue {
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild,
           preAggregation: query.preAggregation,
+          addedToQueueTime
         });
       }
 
@@ -224,6 +225,7 @@ export class QueryQueue {
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
           preAggregation: query.query?.preAggregation,
+          addedToQueueTime: query.addedToQueueTime,
         });
         await this.sendCancelMessageFn(query);
       }
@@ -254,6 +256,7 @@ export class QueryQueue {
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
             preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
           await this.sendCancelMessageFn(query);
         }
@@ -416,7 +419,8 @@ export class QueryQueue {
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
-          preAggregation: query.query?.preAggregation
+          preAggregation: query.query?.preAggregation,
+          addedToQueueTime: query.addedToQueueTime,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -441,7 +445,8 @@ export class QueryQueue {
                       metadata: query.query?.metadata,
                       preAggregationId: query.query?.preAggregation?.preAggregationId,
                       newVersionEntry: query.query?.newVersionEntry,
-                      preAggregation: query.query?.preAggregation
+                      preAggregation: query.query?.preAggregation,
+                      addedToQueueTime: query.addedToQueueTime,
                     });
                   }
                   return null;
@@ -460,7 +465,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
-            preAggregation: query.query?.preAggregation
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
         } catch (e) {
           executionResult = {
@@ -478,6 +484,7 @@ export class QueryQueue {
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
             preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -491,7 +498,8 @@ export class QueryQueue {
                 metadata: queryWithCancelHandle.query?.metadata,
                 preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
-                preAggregation: queryWithCancelHandle.query?.preAggregation
+                preAggregation: queryWithCancelHandle.query?.preAggregation,
+                addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -510,7 +518,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
-            preAggregation: query.query?.preAggregation
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
         }
 
