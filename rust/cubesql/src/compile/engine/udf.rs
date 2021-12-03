@@ -3,13 +3,16 @@ use std::sync::Arc;
 
 use datafusion::{
     arrow::{
-        array::{ArrayRef, GenericStringArray, Int32Builder, StringBuilder, UInt32Builder},
+        array::{
+            ArrayRef, BooleanBuilder, GenericStringArray, Int32Builder, StringBuilder,
+            UInt32Builder,
+        },
         datatypes::DataType,
     },
     error::DataFusionError,
     logical_plan::create_udf,
     physical_plan::{
-        functions::{make_scalar_function, Volatility},
+        functions::{make_scalar_function, ReturnTypeFunction, Signature, Volatility},
         udf::ScalarUDF,
     },
 };
@@ -165,5 +168,26 @@ pub fn create_instr_udf() -> ScalarUDF {
         Arc::new(DataType::Int32),
         Volatility::Immutable,
         fun,
+    )
+}
+
+pub fn create_isnull_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let mut builder = BooleanBuilder::new(1);
+        builder.append_value(args[0].is_null(0))?;
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Boolean).clone()));
+
+    ScalarUDF::new(
+        "isnull",
+        &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
     )
 }

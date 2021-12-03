@@ -42,11 +42,13 @@ struct Backend {
     nonce: Arc<Option<Vec<u8>>>,
 }
 
+enum QueryResponse {
+    Ok(StatusFlags),
+    ResultSet(StatusFlags, Arc<dataframe::DataFrame>),
+}
+
 impl Backend {
-    async fn execute_query<'a>(
-        &'a mut self,
-        query: &'a str,
-    ) -> Result<Arc<dataframe::DataFrame>, CubeError> {
+    async fn execute_query<'a>(&'a mut self, query: &'a str) -> Result<QueryResponse, CubeError> {
         let _start = SystemTime::now();
 
         let query = query.replace("SELECT FROM", "SELECT * FROM");
@@ -68,26 +70,34 @@ impl Backend {
             _ => false,
         };
 
-        if query_lower.eq("show variables like 'aurora\\_version'") {
-            return Ok(Arc::new(dataframe::DataFrame::new(
-                vec![
-                    dataframe::Column::new(
-                        "Variable_name".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
-                        ColumnFlags::empty(),
-                    ),
-                    dataframe::Column::new(
-                        "Value".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
-                        ColumnFlags::empty(),
-                    ),
-                ],
-                vec![],
-            )));
+        if query_lower.eq("set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables')")
+        {
+            return Ok(QueryResponse::Ok(
+                StatusFlags::SERVER_STATUS_AUTOCOMMIT | StatusFlags::SERVER_SESSION_STATE_CHANGED,
+            ));
+        } else if query_lower.eq("show variables like 'aurora\\_version'") {
+            return Ok(QueryResponse::ResultSet(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![
+                        dataframe::Column::new(
+                            "Variable_name".to_string(),
+                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
+                        ),
+                        dataframe::Column::new(
+                            "Value".to_string(),
+                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnFlags::empty(),
+                        ),
+                    ],
+                    vec![],
+                )),
+            ));
         }
         if query_lower.eq("show variables like 'sql_mode'") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
@@ -103,11 +113,11 @@ impl Backend {
                             dataframe::TableValue::String("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string())
                         ])]
                     )
-                ),
+                )),
             )
         } else if query_lower.eq("show variables like 'lower_case_table_names'") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Variable_name".to_string(),
@@ -123,11 +133,11 @@ impl Backend {
                             dataframe::TableValue::Int64(0)
                         ])]
                     )
-                ),
+                )),
             )
         } else if query_lower.eq("show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin'") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "Collation".to_string(),
@@ -168,11 +178,11 @@ impl Backend {
                             dataframe::TableValue::String("PAD SPACE".to_string()),
                         ])]
                     )
-                ),
+                )),
             )
         }else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -183,11 +193,11 @@ impl Backend {
                             dataframe::TableValue::String("test plain returns".to_string())
                         ])]
                     )
-                ),
+                ),)
             )
         } else if query_lower.eq("select cast('test unicode returns' as char(60)) as anon_1") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -198,11 +208,11 @@ impl Backend {
                             dataframe::TableValue::String("test plain returns".to_string())
                         ])]
                     )
-                ),
+                ),)
             )
         } else if query_lower.eq("select cast('test collated returns' as char character set utf8mb4) collate utf8mb4_bin as anon_1") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -213,11 +223,11 @@ impl Backend {
                             dataframe::TableValue::String("test collated returns".to_string())
                         ])]
                     )
-                ),
+                ),)
             )
         } else if query_lower.eq("select @@transaction_isolation") {
             return Ok(
-                Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "@@transaction_isolation".to_string(),
@@ -228,7 +238,7 @@ impl Backend {
                             dataframe::TableValue::String("REPEATABLE-READ".to_string())
                         ])]
                     )
-                ),
+                ),)
             )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
             let stmt = parse_sql_to_statement(&query)?;
@@ -263,7 +273,7 @@ impl Backend {
                         )).collect();
 
 
-                        return Ok(Arc::new(dataframe::DataFrame::new(
+                        return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
                             vec![
                                 dataframe::Column::new(
                                     "Field".to_string(),
@@ -297,7 +307,7 @@ impl Backend {
                                 )
                             ],
                             rows
-                        )))
+                        ))))
                     } else {
                         return Err(CubeError::internal("Unknown table".to_string()))
                     }
@@ -315,7 +325,7 @@ impl Backend {
 
                     let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
 
-                    return Ok(Arc::new(dataframe::DataFrame::new(
+                    return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
                         vec![
                             dataframe::Column::new(
                                 "Execution Plan".to_string(),
@@ -328,7 +338,7 @@ impl Backend {
                                 plan.print(true)?
                             )
                         ])]
-                    )))
+                    ))))
                 },
                 _ => {
                     return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
@@ -368,7 +378,7 @@ impl Backend {
                                     ));
                                 }
 
-                                return Ok(Arc::new(dataframe::DataFrame::new(
+                                return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
                                     vec![
                                         dataframe::Column::new(
                                             "Table".to_string(),
@@ -387,7 +397,7 @@ impl Backend {
                                             format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
                                         ),
                                     ])]
-                                )))
+                                ))))
                             } else {
                                 return Err(CubeError::internal("Unknown table".to_string()));
                             }
@@ -418,7 +428,7 @@ impl Backend {
                     dataframe::TableValue::String("BASE TABLE".to_string()),
                 ])).collect();
 
-            return Ok(Arc::new(dataframe::DataFrame::new(
+            return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
                 vec![
                     dataframe::Column::new(
                         "Tables_in_db".to_string(),
@@ -432,7 +442,7 @@ impl Backend {
                     )
                 ],
                 values
-            )))
+            ))))
         } else if !ignore {
             trace!("query was not detected");
 
@@ -448,10 +458,13 @@ impl Backend {
 
             let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
             match plan {
-                crate::compile::QueryPlan::Meta(data_frame) => {
-                    return Ok(data_frame);
+                crate::compile::QueryPlan::MetaOk(status) => {
+                    return Ok(QueryResponse::Ok(status));
                 },
-                crate::compile::QueryPlan::DataFushionSelect(plan, ctx) => {
+                crate::compile::QueryPlan::MetaTabular(status, data_frame) => {
+                    return Ok(QueryResponse::ResultSet(status, data_frame));
+                },
+                crate::compile::QueryPlan::DataFushionSelect(status, plan, ctx) => {
                     let df = DataFrameImpl::new(
                         ctx.state,
                         &plan,
@@ -459,9 +472,9 @@ impl Backend {
                     let batches = df.collect().await?;
                     let response =  batch_to_dataframe(&batches)?;
 
-                    return Ok(Arc::new(response))
+                    return Ok(QueryResponse::ResultSet(status, Arc::new(response)))
                 },
-                crate::compile::QueryPlan::CubeSelect(plan) => {
+                crate::compile::QueryPlan::CubeSelect(status, plan) => {
                     debug!("Request {}", json!(plan.request).to_string());
                     debug!("Meta {:?}", plan.meta);
 
@@ -499,19 +512,22 @@ impl Backend {
                             }
                         }
 
-                        return Ok(Arc::new(dataframe::DataFrame::new(
+                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(
                             columns,
                             rows
-                        )));
+                        ))));
                     } else {
-                        return Ok(Arc::new(dataframe::DataFrame::new(vec![], vec![])));
+                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(vec![], vec![]))));
                     }
                 }
             }
         }
 
         if ignore {
-            Ok(Arc::new(dataframe::DataFrame::new(vec![], vec![])))
+            Ok(QueryResponse::ResultSet(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+            ))
         } else {
             Err(CubeError::internal("Unsupported query".to_string()))
         }
@@ -544,7 +560,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
         _params: ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        results.completed(0, 0)
+        results.completed(0, 0, StatusFlags::empty())
     }
 
     async fn on_close<'a>(&'a mut self, _stmt: u32)
@@ -565,7 +581,11 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
                 Ok(())
             }
-            Ok(data_frame) => {
+            Ok(QueryResponse::Ok(status)) => {
+                results.completed(0, 0, status)?;
+                Ok(())
+            }
+            Ok(QueryResponse::ResultSet(_, data_frame)) => {
                 let columns = data_frame
                     .get_columns()
                     .iter()

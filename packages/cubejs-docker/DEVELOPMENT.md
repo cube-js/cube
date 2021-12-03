@@ -4,7 +4,7 @@
 
 Release version
 
-Buster:
+Debian:
 
 ```sh
 docker build -t cubejs/cube:latest -f latest.Dockerfile .

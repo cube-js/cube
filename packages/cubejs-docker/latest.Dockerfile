@@ -1,4 +1,4 @@
-FROM node:12.22.6
+FROM node:12.22.7
 
 ARG IMAGE_VERSION=unknown
 
