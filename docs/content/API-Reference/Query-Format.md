@@ -60,11 +60,9 @@ A Query has the following properties:
   added to the query. Instead, the raw results after filtering and joining will
   be returned without grouping. By default `ungrouped` queries require a primary
   key as a dimension of every cube involved in the query for security purposes.
-  To disable this behavior please see the
-  [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#allow-ungrouped-without-primary-key)
-  server option. In case of `ungrouped` query measures will be rendered as
-  underlying `sql` of measures without aggregation and time dimensions will be
-  truncated as usual however not grouped by.
+  In case of `ungrouped` query measures will be rendered as underlying `sql` of
+  measures without aggregation and time dimensions will be truncated as usual
+  however not grouped by.
 
 ```js
 {

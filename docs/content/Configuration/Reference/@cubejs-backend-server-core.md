@@ -1,13 +1,15 @@
 ---
 title: cubejs-backend-server-core
-permalink: /@cubejs-backend-server-core
-category: API Reference
+permalink: /config/reference/@cubejs-backend-server-core
+category: Configuration
 subCategory: Reference
 menuOrder: 6
+redirect_from:
+  - /@cubejs-backend-server-core
 ---
 
 This package provides wiring of all essential Cube.js components and is used by
-[@cubejs-backend/server](@cubejs-backend-server).
+[@cubejs-backend/server][ref-config-ref-backend-server].
 
 ## API Reference
 
@@ -37,10 +39,13 @@ const core = CubejsServerCore.create(options);
 core.initApp(expressApp);
 ```
 
-`CubejsServerCore.create` method accepts an object with the
-[Cube.js configuration options](/config).
+`CubejsServerCore.create` method accepts an object with the [Cube.js
+configuration options][ref-config].
 
 ### <--{"id" : "API Reference"}--> CubejsServerCore.version()
 
 `CubejsServerCore.version` is a method that returns the semantic package version
 of `@cubejs-backend/server`.
+
+[ref-config-ref-backend-server]: /config/reference/@cubejs-backend-server
+[ref-config]: /config
