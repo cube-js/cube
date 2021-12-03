@@ -1548,6 +1548,9 @@ mod tests {
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment,
     };
 
+    use crate::mysql::dataframe::batch_to_dataframe;
+    use datafusion::execution::dataframe_impl::DataFrameImpl;
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -2993,5 +2996,68 @@ mod tests {
             d.to_value_as_str().unwrap(),
             "2021-08-31T00:00:00.000Z".to_string()
         );
+    }
+
+    async fn execute_df_query(query: String) -> Result<String, CubeError> {
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            &QueryPlannerExecutionProps {
+                connection_id: 8,
+                user: Some("ovr".to_string()),
+                database: None,
+            },
+        );
+        match query.unwrap() {
+            QueryPlan::DataFushionSelect(_, plan, ctx) => {
+                let df = DataFrameImpl::new(ctx.state, &plan);
+                let batches = df.collect().await?;
+                let response = batch_to_dataframe(&batches)?;
+
+                return Ok(response.print());
+            }
+            _ => panic!("Must return DF plan"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_tables() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM information_schema.tables".to_string()).await?,
+            "+---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
+            | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |\n\
+            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
+            | def           | information_schema | tables                    | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | information_schema | columns                   | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | db                 | KibanaSampleDataEcommerce | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | db                 | Logs                      | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_columns() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
+            "+---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+-------+----------------+-----------------------+--------+\n\
+            | TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME                | COLUMN_NAME        | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE | CHARACTER_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | COLUMN_TYPE  | NUMERIC_PRECISION | DATETIME_PRECISION | EXTRA | COLUMN_COMMENT | GENERATION_EXPRESSION | SRS_ID |\n\
+            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+-------+----------------+-----------------------+--------+\n\
+            | def           | db           | KibanaSampleDataEcommerce | count              | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | maxPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | minPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | avgPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | order_date         | 0                |                | YES         | datetime  | NULL                     | NULL                   | datetime     | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | customer_gender    | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | taxful_total_price | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | is_male            | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | is_female          | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | Logs                      | agentCount         | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            | def           | db           | Logs                      | agentCountApprox   | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |       |                |                       |        |\n\
+            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+-------+----------------+-----------------------+--------+"
+        );
+
+        Ok(())
     }
 }
