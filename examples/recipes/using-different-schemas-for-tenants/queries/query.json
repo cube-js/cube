@@ -1,0 +1,10 @@
+{
+    "dimensions": [
+        "Products.id",
+        "Products.name"
+    ],
+    "order": {
+        "Orders.id": "asc"
+    },
+    "limit": 3
+}

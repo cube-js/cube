@@ -186,10 +186,21 @@ query(optionalEncoding?:any):string|Uint8Array|null {
 };
 
 /**
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array|null
+ */
+traceObj():string|null
+traceObj(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+traceObj(optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+};
+
+/**
  * @param flatbuffers.Builder builder
  */
 static startHttpQuery(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 };
 
 /**
@@ -202,6 +213,14 @@ static addQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset) {
 
 /**
  * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset traceObjOffset
+ */
+static addTraceObj(builder:flatbuffers.Builder, traceObjOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, traceObjOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
  * @returns flatbuffers.Offset
  */
 static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -209,9 +228,10 @@ static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 };
 
-static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset):flatbuffers.Offset {
   HttpQuery.startHttpQuery(builder);
   HttpQuery.addQuery(builder, queryOffset);
+  HttpQuery.addTraceObj(builder, traceObjOffset);
   return HttpQuery.endHttpQuery(builder);
 }
 }

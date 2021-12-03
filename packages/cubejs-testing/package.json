@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.28.28",
+  "version": "0.28.63",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -22,10 +22,16 @@
     "birdbox:start": "node dist/test/bin/start-birdbox.js",
     "birdbox:postgresql": "jest --verbose -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql.test.js",
+    "birdbox:postgresql-pre-aggregations": "jest --verbose -i dist/test/birdbox-postgresql-pre-aggregations.test.js",
+    "birdbox:postgresql-pre-aggregations:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-pre-aggregations.test.js",
     "birdbox:postgresql-cubestore": "jest --verbose -i dist/test/birdbox-postgresql-cubestore.test.js",
     "birdbox:postgresql-cubestore:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-cubestore.test.js",
     "birdbox:cli:postgresql": "jest --forceExit --verbose -i dist/test/cli-postgresql.test.js",
     "birdbox:cli:postgresql:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
+    "birdbox:local:postgresql": "USE_LOCAL_CUBEJS_BINARY=true jest --forceExit --verbose -i dist/test/cli-postgresql.test.js",
+    "birdbox:local:postgresql:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
+    "birdbox:local:postgresql-pre-aggregations": "jest --forceExit --verbose -i dist/test/cli-postgresql-pre-aggregations.test.js",
+    "birdbox:local:postgresql-pre-aggregations:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js"
   },
@@ -34,10 +40,10 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.28.27",
-    "@cubejs-backend/schema-compiler": "^0.28.28",
-    "@cubejs-backend/shared": "^0.28.24",
-    "@cubejs-client/ws-transport": "^0.28.25",
+    "@cubejs-backend/query-orchestrator": "^0.28.63",
+    "@cubejs-backend/schema-compiler": "^0.28.63",
+    "@cubejs-backend/shared": "^0.28.55",
+    "@cubejs-client/ws-transport": "^0.28.52",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
@@ -46,7 +52,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.28.22",
-    "@cubejs-client/core": "^0.28.25",
+    "@cubejs-client/core": "^0.28.52",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",
@@ -56,6 +62,7 @@
     "cypress-localstorage-commands": "^1.4.5",
     "cypress-plugin-snapshots": "^1.4.4",
     "cypress-wait-until": "^1.7.1",
+    "eslint-plugin-cypress": "^2.12.1",
     "jest": "^26.6.3",
     "jwt-decode": "^3.1.2",
     "typescript": "~4.1.5"

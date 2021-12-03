@@ -350,6 +350,17 @@ span.group-header {
   padding-bottom: 4px;
 }
 
+.menuWrapperHack {
+
+  margin-top: -40px;
+  padding-top: 56px !important;
+
+  @media screen and (max-width: 767px) {
+    margin-top: -118px;
+    padding-top: 118px !important;
+  }
+}
+
 .menuWrapper {
   height: 100%;
   width: inherit;
@@ -916,12 +927,17 @@ section[type=h2] h2 {
   }
 }
 
+.frameworkSwitcherWrapper {
+  max-width: $content-max-width;
+}
+
 .frameworkSwitcher.frameworkSwitcher {
   padding-top: 40px;
-  padding-left: 32px;
+  //padding-left: 32px;
 
   :global {
     .ant-radio-button-wrapper {
+      border-radius: none;
       color: $pink-hover;
       border: 1px solid $pink-04;
       outline: none;
@@ -935,11 +951,20 @@ section[type=h2] h2 {
       }
     }
 
+    .ant-radio-button-wrapper:first-child:last-child {
+      border-radius: 0;
+    }
+
     .ant-radio-button-wrapper-checked {
       color: white;
       background: $pink;
       border: 1px solid $pink;
       z-index: initial;
+    }
+
+    .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):first-child {
+      color: white;
+      border-color: $pink;
     }
 
     .ant-radio-button-wrapper-checked:not(:first-child) {
@@ -978,7 +1003,7 @@ section[type=h2] h2 {
         width: calc(100% / 3);
       }
 
-      &.gettingStartedItemAdjacent {
+      &:nth-child(even) {
         @include card-grid-item-adjacent;
       }
 

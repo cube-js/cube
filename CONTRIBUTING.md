@@ -173,6 +173,10 @@ Now your project will be using the local packages.
 
 **NOTE:** You might need to restart your project after linking the packages.
 
+### Rust Packages
+
+Please use `cargo test` to test packages and `cargo fmt` to format code before commit.
+
 ## Style guides
 
 We're passionate about what code can do rather how it's formatted.

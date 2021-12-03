@@ -240,6 +240,33 @@ describe('SQL Generation', () => {
       }
     })
 
+    cube('visitor_checkins_sources', {
+      sql: \`
+      select id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
+      \`,
+
+      rewriteQueries: true,
+
+      joins: {
+        cards: {
+          relationship: 'hasMany',
+          sql: \`\${CUBE}.id = \${cards}.visitor_checkin_id\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          type: 'number',
+          sql: 'id',
+          primaryKey: true
+        },
+        source: {
+          type: 'string',
+          sql: 'source'
+        }
+      }
+    })
+
     cube('cards', {
       sql: \`
       select * from cards
@@ -1337,6 +1364,32 @@ describe('SQL Generation', () => {
       }]
     }, [
       { visitors__source: 'some' }
+    ])
+  );
+
+  it(
+    'contains multiple value filter',
+    () => runQueryTest({
+      measures: [],
+      dimensions: [
+        'visitor_checkins_sources.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'contains',
+        values: ['goo']
+      }, {
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'contains',
+        values: ['gle']
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.source'
+      }]
+    }, [
+      { visitor_checkins_sources__source: 'google' }
     ])
   );
 

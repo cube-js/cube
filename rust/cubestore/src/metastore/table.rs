@@ -1,17 +1,14 @@
 use super::{
     BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex, RocksTable, TableId,
 };
-use super::{DataFrameValue, TableValue};
-use crate::base_rocks_secondary_index;
 use crate::data_frame_from;
-use crate::format_table_value;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
 use crate::rocks_table_impl;
-use crate::store::DataFrame;
-use crate::table::Row;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
+use itertools::Itertools;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
@@ -31,7 +28,13 @@ pub struct Table {
     #[serde(default="Table::is_ready_default")]
     is_ready: bool,
     #[serde(default)]
-    created_at: Option<DateTime<Utc>>
+    created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    unique_key_column_indices: Option<Vec<u64>>,
+    #[serde(default)]
+    seq_column_index: Option<u64>,
+    #[serde(default)]
+    location_download_sizes: Option<Vec<u64>>
 }
 }
 
@@ -57,7 +60,10 @@ impl Table {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         is_ready: bool,
+        unique_key_column_indices: Option<Vec<u64>>,
+        seq_column_index: Option<u64>,
     ) -> Table {
+        let location_download_sizes = locations.as_ref().map(|locations| vec![0; locations.len()]);
         Table {
             table_name,
             schema_id,
@@ -67,6 +73,9 @@ impl Table {
             has_data: false,
             is_ready,
             created_at: Some(Utc::now()),
+            unique_key_column_indices,
+            seq_column_index,
+            location_download_sizes,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -109,12 +118,64 @@ impl Table {
         table
     }
 
+    pub fn update_location_download_size(
+        &self,
+        location: &str,
+        download_size: u64,
+    ) -> Result<Self, CubeError> {
+        let mut table = self.clone();
+        let locations = table.locations.as_ref().ok_or(CubeError::internal(format!(
+            "Can't update location size for table without locations: {:?}",
+            self
+        )))?;
+        let (pos, _) =
+            locations
+                .iter()
+                .find_position(|l| l == &location)
+                .ok_or(CubeError::internal(format!(
+                    "Can't update location size: location '{}' not found in {:?}",
+                    location, locations
+                )))?;
+        if table.location_download_sizes.is_none() {
+            table.location_download_sizes = Some(vec![0; locations.len()]);
+        }
+        table.location_download_sizes.as_mut().unwrap()[pos] = download_size;
+        Ok(table)
+    }
+
+    pub fn total_download_size(&self) -> u64 {
+        self.location_download_sizes
+            .as_ref()
+            .map(|sizes| sizes.iter().sum::<u64>())
+            .unwrap_or(0)
+    }
+
     pub fn is_ready_default() -> bool {
         true
     }
 
     pub fn created_at(&self) -> &Option<DateTime<Utc>> {
         &self.created_at
+    }
+
+    pub fn unique_key_columns(&self) -> Option<Vec<&Column>> {
+        self.unique_key_column_indices
+            .as_ref()
+            .map(|indices| indices.iter().map(|i| &self.columns[*i as usize]).collect())
+    }
+
+    pub fn seq_column(&self) -> Option<&Column> {
+        self.seq_column_index
+            .as_ref()
+            .map(|c| &self.columns[*c as usize])
+    }
+
+    pub fn in_memory_ingest(&self) -> bool {
+        self.seq_column_index.is_some()
+    }
+
+    pub fn is_stream_location(location: &str) -> bool {
+        location.starts_with("stream:")
     }
 }
 

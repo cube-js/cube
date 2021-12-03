@@ -3,6 +3,186 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.62](https://github.com/cube-js/cube.js/compare/v0.28.61...v0.28.62) (2021-12-02)
+
+
+### Bug Fixes
+
+* **playground:** rollup designer overflow ([60ce358](https://github.com/cube-js/cube.js/commit/60ce35887bad0614cc38b0e1d41725f283699a08))
+
+
+
+
+
+## [0.28.57](https://github.com/cube-js/cube.js/compare/v0.28.56...v0.28.57) (2021-11-16)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.53](https://github.com/cube-js/cube.js/compare/v0.28.52...v0.28.53) (2021-11-04)
+
+
+### Bug Fixes
+
+* **playground:** displaying boolean values ([76396ea](https://github.com/cube-js/cube.js/commit/76396ea4b28b4c7f72f11a51857955730d2f421f))
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+
+### Features
+
+* **playground:** placeholder for BI (refers to documentation) ([#3563](https://github.com/cube-js/cube.js/issues/3563)) ([6b7da77](https://github.com/cube-js/cube.js/commit/6b7da77639e58d129e3c31b466e877406edd6a2c))
+
+
+
+
+
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+
+### Features
+
+* **playground:** Support react chartjs charts drilldowns ([#3500](https://github.com/cube-js/cube.js/issues/3500)) ([499e37e](https://github.com/cube-js/cube.js/commit/499e37ed1b19bec83e408dbca73a30dc60a93b71))
+
+
+
+
+
+## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+
+### Bug Fixes
+
+* **playground:** member visibility filter ([958fad1](https://github.com/cube-js/cube.js/commit/958fad1661d75fa7f387d837c209e5494ca94af4))
+
+
+### Features
+
+* **playground:** time zone for cron expressions ([#3441](https://github.com/cube-js/cube.js/issues/3441)) ([b27f509](https://github.com/cube-js/cube.js/commit/b27f509c690c7970ea5443650a141a1bbfcc947b))
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+
+### Features
+
+* **playground:** add rollup button ([#3424](https://github.com/cube-js/cube.js/issues/3424)) ([a5db7f1](https://github.com/cube-js/cube.js/commit/a5db7f1905d1eb50bb6e78b4c6c54e03ba7499c9))
+
+
+
+
+
+## [0.28.36](https://github.com/cube-js/cube.js/compare/v0.28.35...v0.28.36) (2021-09-14)
+
+
+### Features
+
+* **@cubejs-client/react:** useCubeMeta hook ([#3050](https://github.com/cube-js/cube.js/issues/3050)) ([e86b3fa](https://github.com/cube-js/cube.js/commit/e86b3fab76f1fa947262c1a54b18f5c7143f0306))
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+
+### Features
+
+* **playground:** rollup designer member search ([#3374](https://github.com/cube-js/cube.js/issues/3374)) ([7f6a877](https://github.com/cube-js/cube.js/commit/7f6a87708cad6e41fa71c307d1f371ee069bf907))
+
+
+
+
+
+## [0.28.31](https://github.com/cube-js/cube.js/compare/v0.28.30...v0.28.31) (2021-09-02)
+
+
+### Bug Fixes
+
+* **playground:** unsupported regex in safari ([308cc10](https://github.com/cube-js/cube.js/commit/308cc10b999348be6e46d1a9c270be9921086da3))
+
+
+
+
+
+## [0.28.30](https://github.com/cube-js/cube.js/compare/v0.28.29...v0.28.30) (2021-09-01)
+
+
+### Bug Fixes
+
+* **playground:** sql formatting ([081b725](https://github.com/cube-js/cube.js/commit/081b72569ee9dc1dfb3c791711946acd795af98a))
+* **playground:** warn when a query can't be rolled up ([be576ba](https://github.com/cube-js/cube.js/commit/be576baebded11dc5528a2974ee3a4da5028ed85))
+
+
+
+
+
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+
+### Bug Fixes
+
+* **playground:** allow both sql and every, info tooltips ([#3344](https://github.com/cube-js/cube.js/issues/3344)) ([a2177e6](https://github.com/cube-js/cube.js/commit/a2177e6e79fc0269be59a8ed20a7f23b9d55b83c))
+
+
+### Features
+
+* **playground:** support refresh key cron expression ([#3332](https://github.com/cube-js/cube.js/issues/3332)) ([8def69c](https://github.com/cube-js/cube.js/commit/8def69c89b736f83f9d694abf78bd53eca18f0a2))
+
+
+
+
+
 ## [0.28.28](https://github.com/cube-js/cube.js/compare/v0.28.27...v0.28.28) (2021-08-26)
 
 

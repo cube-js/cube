@@ -128,9 +128,12 @@ impl MetaStoreTransport for MetaStoreTransportImpl {
             .to_string();
         let mut stream = tokio::time::timeout(
             Duration::from_secs(self.config.connection_timeout()),
-            TcpStream::connect(meta_remote_addr),
+            TcpStream::connect(&meta_remote_addr),
         )
-        .await??;
+        .await?
+        .map_err(|e| {
+            CubeError::internal(format!("Can't connect to {}: {}", meta_remote_addr, e))
+        })?;
         m.send(&mut stream).await?;
         let message = NetworkMessage::receive(&mut stream).await?;
         Ok(message)

@@ -147,6 +147,18 @@ const checkQueryFilters = (filter) => {
   return true;
 };
 
+export const validatePostRewrite = (query) => {
+  const validQuery = query.measures && query.measures.length ||
+    query.dimensions && query.dimensions.length ||
+    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  if (!validQuery) {
+    throw new UserError(
+      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
+    );
+  }
+  return query;
+};
+
 export const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
@@ -220,6 +232,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
   timezones: Joi.array().items(Joi.string()),
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
+    cacheOnly: Joi.boolean(),
     partitions: Joi.array().items(Joi.string()),
     refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))
@@ -233,7 +246,7 @@ export const normalizeQueryPreAggregations = (query, defaultValues) => {
 
   return {
     metadata: query.metadata,
-    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues.timezones,
+    timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
     preAggregations: query.preAggregations
   };
 };

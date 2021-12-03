@@ -318,6 +318,7 @@ declare module '@cubejs-client/react' {
     timeDimensions: AvailableCube<TCubeDimension>[];
   };
 
+  // todo: CubeMember
   export type AvailableCube<T = any> = {
     cubeName: string;
     cubeTitle: string;
@@ -459,6 +460,8 @@ declare module '@cubejs-client/react' {
    */
   type CubeFetchOptions = {
     skip?: boolean;
+    cubejsApi?: CubejsApi;
+    query?: Query;
   };
 
   /**
@@ -501,6 +504,8 @@ declare module '@cubejs-client/react' {
   type UseCubeSqlResponse = {
     sql: string;
   };
+
+  export function useCubeMeta(options?: Omit<CubeFetchOptions, 'query'>): CubeFetchResult<Meta>;
 
   /**
    * @hidden

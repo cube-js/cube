@@ -52,6 +52,9 @@ jobs:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
           CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
+          TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
+          TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
         with:
           command: test
           args: --manifest-path rust/Cargo.toml -j 1
@@ -110,6 +113,8 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+        with:
+          version: v0.6.3
       - name: Cache Docker layers
         uses: actions/cache@v2
         with:
@@ -152,7 +157,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-          - x86_64-pc-windows-gnu
           - x86_64-apple-darwin
         include:
           - os: ubuntu-20.04
@@ -167,13 +171,6 @@ jobs:
             cross: true
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
-            compress: false
-          - os: ubuntu-20.04
-            target: x86_64-pc-windows-gnu
-            executable_name: cubestored.exe
-            cross: true
-            strip: true
-            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
           - os: macos-latest
             target: x86_64-apple-darwin

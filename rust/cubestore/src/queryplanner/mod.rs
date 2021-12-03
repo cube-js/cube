@@ -2,19 +2,30 @@ pub mod hll;
 mod optimizations;
 mod partition_filter;
 mod planning;
+pub use planning::PlanningMeta;
 pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
+mod filter_by_key_range;
+pub mod info_schema;
 mod now;
 pub mod udfs;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{IdRow, MetaStore, MetaStoreTable};
+use crate::metastore::{IdRow, MetaStore};
+use crate::queryplanner::info_schema::info_schema_schemata::SchemataInfoSchemaTableDef;
+use crate::queryplanner::info_schema::info_schema_tables::TablesInfoSchemaTableDef;
+use crate::queryplanner::info_schema::system_chunks::SystemChunksTableDef;
+use crate::queryplanner::info_schema::system_indexes::SystemIndexesTableDef;
+use crate::queryplanner::info_schema::system_jobs::SystemJobsTableDef;
+use crate::queryplanner::info_schema::system_partitions::SystemPartitionsTableDef;
+use crate::queryplanner::info_schema::system_tables::SystemTablesTableDef;
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
@@ -24,10 +35,10 @@ use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
-use arrow::array::StringArray;
+use arrow::array::ArrayRef;
 use arrow::datatypes::Field;
-use arrow::{array::Array, datatypes::Schema, datatypes::SchemaRef};
-use arrow::{datatypes::DataType, record_batch::RecordBatch};
+use arrow::record_batch::RecordBatch;
+use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::catalog::TableReference;
@@ -42,13 +53,12 @@ use datafusion::prelude::ExecutionConfig;
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{cube_ext, datasource::TableProvider, prelude::ExecutionContext};
-use itertools::Itertools;
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
 use std::any::Any;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -71,7 +81,7 @@ crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
-    Select(SerializedPlan, /*partitions*/ Vec<Vec<u64>>),
+    Select(SerializedPlan, /*workers*/ Vec<String>),
 }
 
 #[async_trait]
@@ -80,7 +90,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let ctx = self.execution_context().await?;
 
         let schema_provider = MetaStoreSchemaProvider::new(
-            self.meta_store.get_tables_with_path().await?,
+            self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
         );
 
@@ -91,17 +101,18 @@ impl QueryPlanner for QueryPlannerImpl {
         trace!("Logical Plan: {:#?}", &logical_plan);
 
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
-            let (logical_plan, index_snapshots) = choose_index_ext(
+            let (logical_plan, meta) = choose_index_ext(
                 &logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
             )
             .await?;
-            let partitions = extract_partitions(&logical_plan)?;
-            QueryPlan::Select(
-                SerializedPlan::try_new(logical_plan, index_snapshots).await?,
-                partitions,
-            )
+            let workers = compute_workers(
+                self.config.as_ref(),
+                &logical_plan,
+                &meta.multi_part_subtree,
+            )?;
+            QueryPlan::Select(SerializedPlan::try_new(logical_plan, meta).await?, workers)
         } else {
             QueryPlan::Meta(logical_plan)
         };
@@ -200,7 +211,16 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let name = TablePath {
             table: IdRow::new(
                 u64::MAX,
-                Table::new(table.to_string(), u64::MAX, Vec::new(), None, None, false),
+                Table::new(
+                    table.to_string(),
+                    u64::MAX,
+                    Vec::new(),
+                    None,
+                    None,
+                    false,
+                    None,
+                    None,
+                ),
             ),
             schema: Arc::new(IdRow::new(0, metastore::Schema::new(schema.to_string()))),
         };
@@ -232,6 +252,26 @@ impl ContextProvider for MetaStoreSchemaProvider {
             ("information_schema", "schemata") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 InfoSchemaTable::Schemata,
+            ))),
+            ("system", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemTables,
+            ))),
+            ("system", "indexes") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemIndexes,
+            ))),
+            ("system", "partitions") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemPartitions,
+            ))),
+            ("system", "chunks") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemChunks,
+            ))),
+            ("system", "jobs") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemJobs,
             ))),
             _ => None,
         })
@@ -265,56 +305,79 @@ impl ContextProvider for MetaStoreSchemaProvider {
 pub enum InfoSchemaTable {
     Tables,
     Schemata,
+    SystemJobs,
+    SystemTables,
+    SystemIndexes,
+    SystemPartitions,
+    SystemChunks,
+}
+
+#[async_trait]
+pub trait InfoSchemaTableDef {
+    type T: Send + Sync;
+
+    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError>;
+
+    fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)>;
+}
+
+#[async_trait]
+pub trait BaseInfoSchemaTableDef {
+    fn schema(&self) -> SchemaRef;
+
+    async fn scan(&self, meta_store: Arc<dyn MetaStore>) -> Result<RecordBatch, CubeError>;
+}
+
+#[macro_export]
+macro_rules! base_info_schema_table_def {
+    ($table: ty) => {
+        #[async_trait]
+        impl crate::queryplanner::BaseInfoSchemaTableDef for $table {
+            fn schema(&self) -> arrow::datatypes::SchemaRef {
+                Arc::new(arrow::datatypes::Schema::new(
+                    self.columns()
+                        .into_iter()
+                        .map(|(f, _)| f)
+                        .collect::<Vec<_>>(),
+                ))
+            }
+
+            async fn scan(
+                &self,
+                meta_store: Arc<dyn crate::metastore::MetaStore>,
+            ) -> Result<arrow::record_batch::RecordBatch, crate::CubeError> {
+                let rows = self.rows(meta_store).await?;
+                let schema = self.schema();
+                let columns = self.columns();
+                let columns = columns
+                    .into_iter()
+                    .map(|(_, c)| c(rows.clone()))
+                    .collect::<Vec<_>>();
+                Ok(arrow::record_batch::RecordBatch::try_new(schema, columns)?)
+            }
+        }
+    };
 }
 
 impl InfoSchemaTable {
-    fn schema(&self) -> SchemaRef {
+    fn table_def(&self) -> Box<dyn BaseInfoSchemaTableDef + Send + Sync> {
         match self {
-            InfoSchemaTable::Tables => Arc::new(Schema::new(vec![
-                Field::new("table_schema", DataType::Utf8, false),
-                Field::new("table_name", DataType::Utf8, false),
-            ])),
-            InfoSchemaTable::Schemata => Arc::new(Schema::new(vec![Field::new(
-                "schema_name",
-                DataType::Utf8,
-                false,
-            )])),
+            InfoSchemaTable::Tables => Box::new(TablesInfoSchemaTableDef),
+            InfoSchemaTable::Schemata => Box::new(SchemataInfoSchemaTableDef),
+            InfoSchemaTable::SystemTables => Box::new(SystemTablesTableDef),
+            InfoSchemaTable::SystemIndexes => Box::new(SystemIndexesTableDef),
+            InfoSchemaTable::SystemChunks => Box::new(SystemChunksTableDef),
+            InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
+            InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),
         }
     }
 
+    fn schema(&self) -> SchemaRef {
+        self.table_def().schema()
+    }
+
     async fn scan(&self, meta_store: Arc<dyn MetaStore>) -> Result<RecordBatch, CubeError> {
-        match self {
-            InfoSchemaTable::Tables => {
-                let tables = meta_store.get_tables_with_path().await?;
-                let schema = self.schema();
-                let columns: Vec<Arc<dyn Array>> = vec![
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|row| row.schema.get_row().get_name().as_str())
-                            .collect::<Vec<_>>(),
-                    )),
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|row| row.table.get_row().get_table_name().as_str())
-                            .collect::<Vec<_>>(),
-                    )),
-                ];
-                Ok(RecordBatch::try_new(schema, columns)?)
-            }
-            InfoSchemaTable::Schemata => {
-                let schemas = meta_store.schemas_table().all_rows().await?;
-                let schema = self.schema();
-                let columns: Vec<Arc<dyn Array>> = vec![Arc::new(StringArray::from(
-                    schemas
-                        .iter()
-                        .map(|row| row.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
-                ))];
-                Ok(RecordBatch::try_new(schema, columns)?)
-            }
-        }
+        self.table_def().scan(meta_store).await
     }
 }
 
@@ -467,11 +530,17 @@ impl TableProvider for CubeTableLogical {
     }
 }
 
-fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
-    struct Visitor {
-        snapshots: Vec<Vec<u64>>,
+fn compute_workers(
+    config: &dyn ConfigObj,
+    p: &LogicalPlan,
+    tree: &HashMap<u64, MultiPartition>,
+) -> Result<Vec<String>, CubeError> {
+    struct Visitor<'a> {
+        config: &'a dyn ConfigObj,
+        tree: &'a HashMap<u64, MultiPartition>,
+        workers: Vec<String>,
     }
-    impl PlanVisitor for Visitor {
+    impl<'a> PlanVisitor for Visitor<'a> {
         type Error = ();
 
         fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, ()> {
@@ -485,11 +554,12 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
                     } else {
                         return Ok(true);
                     }
-
-                    self.snapshots = ClusterSendExec::logical_partitions(&snapshots)
-                        .into_iter()
-                        .map(|ps| ps.iter().map(|p| p.get_id()).collect_vec())
-                        .collect_vec();
+                    let workers = ClusterSendExec::distribute_to_workers(
+                        self.config,
+                        snapshots.as_slice(),
+                        self.tree,
+                    );
+                    self.workers = workers.into_iter().map(|w| w.0).collect();
                     Ok(false)
                 }
                 _ => Ok(true),
@@ -498,10 +568,12 @@ fn extract_partitions(p: &LogicalPlan) -> Result<Vec<Vec<u64>>, CubeError> {
     }
 
     let mut v = Visitor {
-        snapshots: Vec::new(),
+        config,
+        tree,
+        workers: Vec::new(),
     };
     match p.accept(&mut v) {
-        Ok(false) => Ok(v.snapshots),
+        Ok(false) => Ok(v.workers),
         Ok(true) => Err(CubeError::internal(
             "no cluster send node found in plan".to_string(),
         )),

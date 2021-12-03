@@ -3,6 +3,215 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.63](https://github.com/cube-js/cube.js/compare/v0.28.62...v0.28.63) (2021-12-03)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.61](https://github.com/cube-js/cube.js/compare/v0.28.60...v0.28.61) (2021-11-30)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
+
+
+### Bug Fixes
+
+* Empty pre-aggregation with partitionGranularity throws ParserError("Expected identifier, found: )") ([#3714](https://github.com/cube-js/cube.js/issues/3714)) ([86c6aaf](https://github.com/cube-js/cube.js/commit/86c6aaf8001d16b78f3a3029903affae4a82f41d))
+
+
+
+
+
+## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.53](https://github.com/cube-js/cube.js/compare/v0.28.52...v0.28.53) (2021-11-04)
+
+
+### Bug Fixes
+
+* `TypeError: Cannot read property 'joins' of null` in case of queryRewrite returns empty query ([#3627](https://github.com/cube-js/cube.js/issues/3627)) ([d880d0c](https://github.com/cube-js/cube.js/commit/d880d0ca434e754858cad18815ba34a132950ce2))
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.48](https://github.com/cube-js/cube.js/compare/v0.28.47...v0.28.48) (2021-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.40](https://github.com/cube-js/cube.js/compare/v0.28.39...v0.28.40) (2021-09-30)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.39](https://github.com/cube-js/cube.js/compare/v0.28.38...v0.28.39) (2021-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.34](https://github.com/cube-js/cube.js/compare/v0.28.33...v0.28.34) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+
+### Bug Fixes
+
+* `updateWindow` validation isn't consistent with `refreshKey` interval parsing -- allow `s` at the end of time interval ([#3403](https://github.com/cube-js/cube.js/issues/3403)) ([57559e7](https://github.com/cube-js/cube.js/commit/57559e7841657e1900a30522ce5a178d091b6474))
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
 ## [0.28.28](https://github.com/cube-js/cube.js/compare/v0.28.27...v0.28.28) (2021-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/testing

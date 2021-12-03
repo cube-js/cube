@@ -20,13 +20,14 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: 'month',
-  quarter: 'month',
-  month: 'day',
-  week: 'day',
-  day: 'hour',
-  hour: 'minute',
-  minute: 'second'
+  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+  month: ['month', 'day', 'hour', 'minute', 'second'],
+  week: ['week', 'day', 'hour', 'minute', 'second'],
+  day: ['day', 'hour', 'minute', 'second'],
+  hour: ['hour', 'minute', 'second'],
+  minute: ['minute', 'second'],
+  second: ['second']
 };
 
 const SecondsDurations = {
@@ -48,8 +49,6 @@ export class BaseQuery {
     this.defaultOrder = this.defaultOrder.bind(this);
 
     this.initFromOptions();
-
-    this.granularityParentHierarchyCache = {};
   }
 
   extractDimensionsAndMeasures(filters = []) {
@@ -256,7 +255,7 @@ export class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`To join across data sources use rollupJoin with external pre-aggregations. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with Cube Store. Note: this is an experimental feature for different data source types. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -406,28 +405,32 @@ export class BaseQuery {
           return this.preAggregations.rollupPreAggregation(preAggregationForQuery, this.measures, true);
         }
 
-        const regularAndMultiplied = regularMeasures.concat(multipliedMeasures);
-        const toJoin =
-          (regularAndMultiplied.length ? [
-            this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false))
-          ] : []).concat(
-            R.map(
-              ([multiplied, measure]) => this.withCubeAliasPrefix(
-                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
-                () => this.overTimeSeriesQuery(
-                  (measures, filters) => this.preAggregations.rollupPreAggregation(
-                    preAggregationForQuery, measures, false, filters
-                  ),
-                  measure,
-                  true
-                )
-              )
-            )(cumulativeMeasures)
-          );
-        return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
+        return this.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
       }
     }
     return this.fullKeyQueryAggregate();
+  }
+
+  regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
+    const regularAndMultiplied = regularMeasures.concat(multipliedMeasures);
+    const toJoin =
+      (regularAndMultiplied.length ? [
+        this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false)),
+      ] : []).concat(
+        R.map(
+          ([multiplied, measure]) => this.withCubeAliasPrefix(
+            `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+            () => this.overTimeSeriesQuery(
+              (measures, filters) => this.preAggregations.rollupPreAggregation(
+                preAggregationForQuery, measures, false, filters,
+              ),
+              measure,
+              true,
+            ),
+          ),
+        )(cumulativeMeasures),
+      );
+    return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
   }
 
   externalPreAggregationQuery() {
@@ -702,17 +705,8 @@ export class BaseQuery {
     return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
   }
 
-  granularityParent(granularity) {
-    return standardGranularitiesParents[granularity];
-  }
-
   granularityParentHierarchy(granularity) {
-    if (!this.granularityParentHierarchyCache[granularity]) {
-      this.granularityParentHierarchyCache[granularity] = [granularity].concat(
-        this.granularityParent(granularity) ? this.granularityParentHierarchy(this.granularityParent(granularity)) : []
-      );
-    }
-    return this.granularityParentHierarchyCache[granularity];
+    return standardGranularitiesParents[granularity];
   }
 
   minGranularity(granularityA, granularityB) {
@@ -743,34 +737,12 @@ export class BaseQuery {
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure, fromRollup) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
     const cumulativeMeasures = [cumulativeMeasure];
-    const dateFromStartToEndConditionSql =
-      (isFromStartToEnd) => dateJoinCondition.map(
-        // TODO these weird conversions to be strict typed for big query.
-        // TODO Consider adding strict definitions of local and UTC time type
-        ([d, f]) => ({
-          filterToWhere: () => {
-            const timeSeries = d.timeSeries();
-            return f(
-              isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
-                `${this.timeStampInClientTz(d.dateFromParam())}`,
-              isFromStartToEnd ?
-                this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
-                `${this.timeStampInClientTz(d.dateToParam())}`,
-              `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
-              `${this.timeStampInClientTz(d.dateFromParam())}`,
-              `${this.timeStampInClientTz(d.dateToParam())}`,
-              isFromStartToEnd
-            );
-          }
-        })
-      );
     if (!this.timeDimensions.find(d => d.granularity)) {
-      const filters = this.segments.concat(this.filters).concat(dateFromStartToEndConditionSql(false));
+      const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, false));
       return baseQueryFn(cumulativeMeasures, filters, false);
     }
     const dateSeriesSql = this.timeDimensions.map(d => this.dateSeriesSql(d)).join(', ');
-    const filters = this.segments.concat(this.filters).concat(dateFromStartToEndConditionSql(true));
+    const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, true));
     const baseQuery = this.groupedUngroupedSelect(
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
@@ -796,6 +768,30 @@ export class BaseQuery {
       baseQuery,
       dateJoinConditionSql,
       baseQueryAlias
+    );
+  }
+
+  dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+    return dateJoinCondition.map(
+      // TODO these weird conversions to be strict typed for big query.
+      // TODO Consider adding strict definitions of local and UTC time type
+      ([d, f]) => ({
+        filterToWhere: () => {
+          const timeSeries = d.timeSeries();
+          return f(
+            isFromStartToEnd ?
+              this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
+              `${this.timeStampInClientTz(d.dateFromParam())}`,
+            isFromStartToEnd ?
+              this.dateTimeCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
+              `${this.timeStampInClientTz(d.dateToParam())}`,
+            `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
+            `${this.timeStampInClientTz(d.dateFromParam())}`,
+            `${this.timeStampInClientTz(d.dateToParam())}`,
+            isFromStartToEnd
+          );
+        }
+      })
     );
   }
 
@@ -825,7 +821,7 @@ export class BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
     );
-    return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
+    return `SELECT ${this.dateTimeCast('date_from')} as ${this.escapeColumnName('date_from')}, ${this.dateTimeCast('date_to')} as ${this.escapeColumnName('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
   /**
@@ -1357,6 +1353,8 @@ export class BaseQuery {
     const context = this.safeEvaluateSymbolContext();
     if (context.rollupQuery) {
       return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
+    } else if (context.wrapQuery) {
+      return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
     }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
@@ -1619,7 +1617,10 @@ export class BaseQuery {
     }
     if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath];
-      const onGroupedColumn = this.aggregateOnGroupedColumn(symbol, evaluateSql, true);
+      const { topLevelMerge } = this.safeEvaluateSymbolContext();
+      const onGroupedColumn = this.aggregateOnGroupedColumn(
+        symbol, evaluateSql, topLevelMerge != null ? topLevelMerge : true, measurePath
+      );
       if (onGroupedColumn) {
         return onGroupedColumn;
       }
@@ -1644,7 +1645,14 @@ export class BaseQuery {
     return `${symbol.type}(${evaluateSql})`;
   }
 
-  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge) {
+  aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
+    const cumulativeMeasureFilters = (this.safeEvaluateSymbolContext().cumulativeMeasureFilters || {})[measurePath];
+    if (cumulativeMeasureFilters) {
+      const sql = cumulativeMeasureFilters.filterToWhere();
+      if (sql) {
+        evaluateSql = this.caseWhenStatement([{ sql, label: evaluateSql }]);
+      }
+    }
     if (symbol.type === 'count' || symbol.type === 'sum') {
       return `sum(${evaluateSql})`;
     } else if (symbol.type === 'countDistinctApprox') {
@@ -1655,11 +1663,22 @@ export class BaseQuery {
     return undefined;
   }
 
+  topAggregateWrap(symbol, evaluateSql) {
+    if (symbol.type === 'countDistinctApprox') {
+      return this.hllCardinality(evaluateSql);
+    }
+    return evaluateSql;
+  }
+
   hllInit(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
   hllMerge(sql) {
+    throw new UserError('Distributed approximate distinct count is not supported by this DB');
+  }
+
+  hllCardinality(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
@@ -2390,26 +2409,32 @@ export class BaseQuery {
         const cubeName = this.cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => {
-            const filter =
-              allFilters.find(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
+            const filters =
+              allFilters.filter(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                const filterParams = filter && filter.filterParams();
-                if (
-                  filterParams && filterParams.length
-                ) {
-                  if (typeof column === 'function') {
-                    // eslint-disable-next-line prefer-spread
-                    return column.apply(
-                      null,
-                      filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
-                    );
-                  } else {
-                    return filter.conditionSql(column);
-                  }
-                } else {
+                if (!filters.length) {
                   return '1 = 1';
                 }
+
+                return filters.map(filter => {
+                  const filterParams = filter && filter.filterParams();
+                  if (
+                    filterParams && filterParams.length
+                  ) {
+                    if (typeof column === 'function') {
+                      // eslint-disable-next-line prefer-spread
+                      return column.apply(
+                        null,
+                        filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
+                      );
+                    } else {
+                      return filter.conditionSql(column);
+                    }
+                  } else {
+                    return '1 = 1';
+                  }
+                }).join(' AND ');
               }
             };
           }

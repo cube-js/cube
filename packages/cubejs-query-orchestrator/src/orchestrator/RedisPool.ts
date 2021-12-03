@@ -18,8 +18,9 @@ export type CreateRedisClientFn = () => Promise<AsyncRedisClient>;
 export interface RedisPoolOptions {
   poolMin?: number;
   poolMax?: number;
-  idleTimeoutSeconds?: number;
-  softIdleTimeoutSeconds?: number;
+  idleTimeoutSeconds?: number; // @deprecated
+  softIdleTimeoutSeconds?: number; // @deprecated
+  poolOptions?: Omit<PoolOptions, 'max' | 'min'>;
   createClient?: CreateRedisClientFn;
   destroyClient?: (client: AsyncRedisClient) => Promise<void>;
 }
@@ -41,8 +42,11 @@ export class RedisPool {
       min,
       max,
       acquireTimeoutMillis: 5000,
-      idleTimeoutMillis: 5000,
-      evictionRunIntervalMillis: 5000
+      evictionRunIntervalMillis: 5000,
+      // idleTimeoutSeconds and softIdleTimeoutSeconds should be deprecated in favour of options.poolOptions.idleTimeoutMillis
+      idleTimeoutMillis: options.idleTimeoutSeconds ? options.idleTimeoutSeconds * 1000 : 5000,
+      softIdleTimeoutMillis: options.softIdleTimeoutSeconds ? options.softIdleTimeoutSeconds * 1000 : 5000,
+      ...(options.poolOptions || {})
     };
 
     const create = options.createClient || (async () => createRedisClient(getEnv('redisUrl')));

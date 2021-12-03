@@ -1,0 +1,27 @@
+{
+  "dimensions": [
+    "UsersStatuses_Joins.name",
+    "UsersStatuses_Joins.completedCreatedAt",
+    "UsersStatuses_Joins.processingCreatedAt",
+    "UsersStatuses_Joins.shippedCreatedAt"
+  ],
+  "filters": [
+    {
+      "or": [
+        {
+          "member": "UsersStatuses_Joins.completedCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_Joins.processingCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_Joins.shippedCreatedAt",
+          "operator": "notSet"
+        }
+      ]
+    }
+  ],
+  "limit": 3
+}

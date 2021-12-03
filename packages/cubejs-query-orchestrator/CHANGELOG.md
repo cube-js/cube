@@ -3,6 +3,182 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.63](https://github.com/cube-js/cube.js/compare/v0.28.62...v0.28.63) (2021-12-03)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.61](https://github.com/cube-js/cube.js/compare/v0.28.60...v0.28.61) (2021-11-30)
+
+
+### Bug Fixes
+
+* Clarify pre-aggregation build error messages ([cf17f64](https://github.com/cube-js/cube.js/commit/cf17f64406d4068385ed611d102c4bc6ea979552)), closes [#3469](https://github.com/cube-js/cube.js/issues/3469)
+
+
+
+
+
+## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/mongobi-driver:** Show all tables if database isn't set ([6a55438](https://github.com/cube-js/cube.js/commit/6a554385c05371304755037ac17d189477164ffb))
+* Empty pre-aggregation with partitionGranularity throws ParserError("Expected identifier, found: )") ([#3714](https://github.com/cube-js/cube.js/issues/3714)) ([86c6aaf](https://github.com/cube-js/cube.js/commit/86c6aaf8001d16b78f3a3029903affae4a82f41d))
+
+
+
+
+
+## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
+
+
+### Bug Fixes
+
+* Dropping orphaned tables logging messages don't have necessary t… ([#3710](https://github.com/cube-js/cube.js/issues/3710)) ([1962e0f](https://github.com/cube-js/cube.js/commit/1962e0fe6ce999879d1225cef27a24ea8cb8490a))
+
+
+
+
+
+## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+
+### Bug Fixes
+
+* Empty data partitioned pre-aggregations are incorrectly handled -- value provided is not in a recognized RFC2822 or ISO format ([9f3acd5](https://github.com/cube-js/cube.js/commit/9f3acd572bcd2421bf8d3581c4c6287b62e77313))
+* packages/cubejs-query-orchestrator/package.json to reduce vulnerabilities ([#3281](https://github.com/cube-js/cube.js/issues/3281)) ([a6a62ea](https://github.com/cube-js/cube.js/commit/a6a62ea5832a13b519ca4455af1f317cf7af64d9))
+
+
+
+
+
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+
+### Features
+
+* ksql support ([#3507](https://github.com/cube-js/cube.js/issues/3507)) ([b7128d4](https://github.com/cube-js/cube.js/commit/b7128d43d2aaffdd7273555779176b3efe4e2aa6))
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/query-orchestrator:** rollup only mode error message update ([c9c5ac0](https://github.com/cube-js/cube.js/commit/c9c5ac0ac33ce26f9505ce6683a41a9aaf742d63))
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Wrong passing data source for partition range loader, debug API ([#3426](https://github.com/cube-js/cube.js/issues/3426)) ([dfaba5c](https://github.com/cube-js/cube.js/commit/dfaba5ca5a3f6fbb0f0e27e1133500b3e33a44b9))
+
+
+
+
+
+## [0.28.34](https://github.com/cube-js/cube.js/compare/v0.28.33...v0.28.34) (2021-09-13)
+
+
+### Features
+
+* **bigquery-driver:** Use INFORMATION_SCHEMA.COLUMNS for introspection ([ef22c6c](https://github.com/cube-js/cube.js/commit/ef22c6c7ae6ebe28e7d9683a1d7eef0f0b426b3c))
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+
+### Bug Fixes
+
+* Handle "rollup only" mode for pre-aggregation preview data query, Debug API ([#3402](https://github.com/cube-js/cube.js/issues/3402)) ([f45626a](https://github.com/cube-js/cube.js/commit/f45626a72a49004f0d348310e3e05ee068f5079a))
+
+
+### Features
+
+* Add ability to pass through generic-pool options ([#3364](https://github.com/cube-js/cube.js/issues/3364)) Thanks to @TRManderson! ([582a3e8](https://github.com/cube-js/cube.js/commit/582a3e82be8d2d676a45b1183eb35b5215fc78a9)), closes [#3340](https://github.com/cube-js/cube.js/issues/3340)
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+
+### Bug Fixes
+
+* HLL Rolling window query fails ([#3380](https://github.com/cube-js/cube.js/issues/3380)) ([581a52a](https://github.com/cube-js/cube.js/commit/581a52a856aeee067bac9a680e22694bf507af04))
+
+
+
+
+
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+
+### Features
+
+* Mixed rolling window and regular measure queries from rollup support ([#3326](https://github.com/cube-js/cube.js/issues/3326)) ([3147e33](https://github.com/cube-js/cube.js/commit/3147e339f14ede73e5b0d14d05b9dd1f8b79e7b8))
+
+
+
+
+
 ## [0.28.27](https://github.com/cube-js/cube.js/compare/v0.28.26...v0.28.27) (2021-08-25)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

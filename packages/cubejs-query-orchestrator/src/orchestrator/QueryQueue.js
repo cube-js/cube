@@ -95,6 +95,7 @@ export class QueryQueue {
           preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild,
+          preAggregation: query.preAggregation,
         });
       }
 
@@ -222,6 +223,7 @@ export class QueryQueue {
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
+          preAggregation: query.query?.preAggregation,
         });
         await this.sendCancelMessageFn(query);
       }
@@ -251,6 +253,7 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
           });
           await this.sendCancelMessageFn(query);
         }
@@ -413,6 +416,7 @@ export class QueryQueue {
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
+          preAggregation: query.query?.preAggregation
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -437,6 +441,7 @@ export class QueryQueue {
                       metadata: query.query?.metadata,
                       preAggregationId: query.query?.preAggregation?.preAggregationId,
                       newVersionEntry: query.query?.newVersionEntry,
+                      preAggregation: query.query?.preAggregation
                     });
                   }
                   return null;
@@ -455,6 +460,7 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation
           });
         } catch (e) {
           executionResult = {
@@ -471,6 +477,7 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -484,6 +491,7 @@ export class QueryQueue {
                 metadata: queryWithCancelHandle.query?.metadata,
                 preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
+                preAggregation: queryWithCancelHandle.query?.preAggregation
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -502,6 +510,7 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation
           });
         }
 

@@ -3,18 +3,28 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::{DateTime, Utc};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
 
 impl Chunk {
-    pub fn new(partition_id: u64, row_count: usize) -> Chunk {
+    pub fn new(partition_id: u64, row_count: usize, in_memory: bool) -> Chunk {
         Chunk {
             partition_id,
             row_count: row_count as u64,
             uploaded: false,
             active: false,
             last_used: None,
+            in_memory,
+            created_at: Some(Utc::now()),
+            suffix: Some(
+                String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
+                    .unwrap()
+                    .to_lowercase(),
+            ),
         }
     }
 
@@ -23,7 +33,7 @@ impl Chunk {
     }
 
     pub fn get_full_name(&self, chunk_id: u64) -> String {
-        chunk_file_name(chunk_id)
+        chunk_file_name(chunk_id, self.suffix())
     }
 
     pub fn get_partition_id(&self) -> u64 {
@@ -31,23 +41,16 @@ impl Chunk {
     }
 
     pub fn set_uploaded(&self, uploaded: bool) -> Chunk {
-        Chunk {
-            partition_id: self.partition_id,
-            row_count: self.row_count,
-            uploaded,
-            active: uploaded,
-            last_used: self.last_used.clone(),
-        }
+        let mut to_update = self.clone();
+        to_update.uploaded = uploaded;
+        to_update.active = uploaded;
+        to_update
     }
 
     pub fn deactivate(&self) -> Chunk {
-        Chunk {
-            partition_id: self.partition_id,
-            row_count: self.row_count,
-            uploaded: self.uploaded,
-            active: false,
-            last_used: self.last_used.clone(),
-        }
+        let mut to_update = self.clone();
+        to_update.active = false;
+        to_update
     }
 
     pub fn uploaded(&self) -> bool {
@@ -57,10 +60,29 @@ impl Chunk {
     pub fn active(&self) -> bool {
         self.active
     }
+
+    pub fn in_memory(&self) -> bool {
+        self.in_memory
+    }
+
+    pub fn created_at(&self) -> &Option<DateTime<Utc>> {
+        &self.created_at
+    }
+
+    pub fn suffix(&self) -> &Option<String> {
+        &self.suffix
+    }
 }
 
-pub fn chunk_file_name(chunk_id: u64) -> String {
-    format!("{}.chunk.parquet", chunk_id)
+pub fn chunk_file_name(chunk_id: u64, suffix: &Option<String>) -> String {
+    format!(
+        "{}{}.chunk.parquet",
+        chunk_id,
+        suffix
+            .as_ref()
+            .map(|h| format!("-{}", h))
+            .unwrap_or("".to_string())
+    )
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -104,7 +104,7 @@ export class BaseDriver {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -199,8 +199,7 @@ export class BaseDriver {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
-        'Unable to detect column types for pre-aggregation on empty values in readOnly mode. \n' +
-        'https://cube.dev/docs/caching/using-pre-aggregations#read-only-data-source'
+        'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
       );
     }
 
@@ -224,24 +223,27 @@ export class BaseDriver {
     return false;
   }
 
+  /**
+   * @protected
+   */
+  informationColumnsSchemaReducer(result, i) {
+    let schema = (result[i.table_schema] || {});
+    const tables = (schema[i.table_name] || []);
+
+    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+
+    tables.sort();
+    schema[i.table_name] = tables;
+    schema = sortByKeys(schema);
+    result[i.table_schema] = schema;
+
+    return sortByKeys(result);
+  }
+
   tablesSchema() {
     const query = this.informationSchemaQuery();
 
-    const reduceCb = (result, i) => {
-      let schema = (result[i.table_schema] || {});
-      const tables = (schema[i.table_name] || []);
-
-      tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
-
-      tables.sort();
-      schema[i.table_name] = tables;
-      schema = sortByKeys(schema);
-      result[i.table_schema] = schema;
-
-      return sortByKeys(result);
-    };
-
-    return this.query(query).then(data => reduce(reduceCb, {}, data));
+    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
   /**
@@ -298,10 +300,11 @@ export class BaseDriver {
   }
 
   async uploadTable(table, columns, tableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, []);
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

@@ -53,7 +53,7 @@ export function ExplorePage() {
     }
   }, [basePath, livePreviewContext, cubejsToken, securityContextToken]);
 
-  function setQueryParam({ query }: { query?: Object}) {
+  function setQueryParam({ query }: { query?: Object }) {
     if (query) {
       push({ search: `?query=${JSON.stringify(query)}` });
     }

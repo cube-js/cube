@@ -42,6 +42,10 @@ export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
 
+export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
+
+export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
+
 export const getReversedOffset = (parsedTime: number, timezone: string): number => {
   const zone = moment.tz.zone(timezone);
   if (zone) {
@@ -70,9 +74,28 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+  if (timestamp.length === 23) {
+    const parsedTime = Date.parse(`${timestamp}Z`);
+    // TODO parsedTime might be incorrect offset for conversion
+    const offset = getReversedOffset(parsedTime, timezone);
+    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
+      return inDbTimeZoneDate.toJSON();
+    } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
+      return inDbTimeZoneDate.toJSON().replace('Z', '');
+    }
+  }
+  return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
+};
+
 export const extractDate = (data: any): string => {
   data = JSON.parse(JSON.stringify(data));
-  return moment.tz(data[0] && data[0][Object.keys(data[0])[0]], 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  if (!value) {
+    return value;
+  }
+  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {

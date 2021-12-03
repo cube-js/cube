@@ -1,10 +1,13 @@
-use crate::cluster::Cluster;
+use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster};
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
+use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
+use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::get_worker_plan;
-use crate::queryplanner::serialized_plan::{IndexSnapshot, SerializedPlan};
+use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
@@ -30,7 +33,7 @@ use datafusion::logical_plan::{Expr, LogicalPlan};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
+use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
@@ -45,7 +48,7 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
-use std::iter::FromIterator;
+use std::mem::take;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
@@ -63,6 +66,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     async fn router_plan(
@@ -74,6 +78,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 }
 
@@ -125,8 +130,11 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
-        let (physical_plan, logical_plan) = self.worker_plan(plan, remote_to_local_names).await?;
+        let (physical_plan, logical_plan) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
 
         let worker_plan;
         let max_batch_rows;
@@ -187,7 +195,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&HashMap::new())?;
+        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new())?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -200,8 +208,9 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(&remote_to_local_names)?;
+        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches)?;
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -242,19 +251,31 @@ impl QueryExecutorImpl {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
     remote_to_local_names: HashMap<String, String>,
-    worker_partition_ids: HashSet<u64>,
+    worker_partition_ids: Vec<(u64, RowFilter)>,
+    #[serde(skip, default)]
+    chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     schema: SchemaRef,
+}
+
+impl Debug for CubeTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CubeTable")
+            .field("index", self.index_snapshot.index())
+            .field("schema", &self.schema)
+            .field("worker_partition_ids", &self.worker_partition_ids)
+            .finish()
+    }
 }
 
 impl CubeTable {
     pub fn try_new(
         index_snapshot: IndexSnapshot,
         remote_to_local_names: HashMap<String, String>,
-        worker_partition_ids: HashSet<u64>,
+        worker_partition_ids: Vec<(u64, RowFilter)>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             index_snapshot
@@ -271,6 +292,7 @@ impl CubeTable {
             schema,
             remote_to_local_names,
             worker_partition_ids,
+            chunk_id_to_record_batches: HashMap::new(),
         })
     }
 
@@ -278,11 +300,14 @@ impl CubeTable {
     pub fn to_worker_table(
         &self,
         remote_to_local_names: HashMap<String, String>,
-        worker_partition_ids: HashSet<u64>,
+        worker_partition_ids: Vec<(u64, RowFilter)>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> CubeTable {
+        debug_assert!(worker_partition_ids.iter().is_sorted_by_key(|(id, _)| id));
         let mut t = self.clone();
         t.remote_to_local_names = remote_to_local_names;
         t.worker_partition_ids = worker_partition_ids;
+        t.chunk_id_to_record_batches = chunk_id_to_record_batches;
         t
     }
 
@@ -301,7 +326,25 @@ impl CubeTable {
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
-        let partition_projection = projection.as_ref().map(|p| {
+        let projection_with_seq_column = projection.as_ref().map(|p| {
+            let table = self.index_snapshot.table_path.table.get_row();
+            if let Some(mut key_columns) = table.unique_key_columns() {
+                key_columns.push(table.seq_column().expect(&format!(
+                    "Seq column is undefined for table: {}",
+                    table.get_table_name()
+                )));
+                let mut with_seq = p.clone();
+                for column in key_columns {
+                    if !with_seq.iter().any(|s| *s == column.get_index()) {
+                        with_seq.push(column.get_index());
+                    }
+                }
+                with_seq
+            } else {
+                p.clone()
+            }
+        });
+        let partition_projection = projection_with_seq_column.as_ref().map(|p| {
             let mut partition_projection = Vec::with_capacity(p.len());
             for table_col_i in p {
                 let name = table_cols[*table_col_i].get_name();
@@ -317,15 +360,26 @@ impl CubeTable {
             partition_projection
         });
 
+        let partition_projected_schema = if let Some(p) = partition_projection.as_ref() {
+            Arc::new(Schema::new(
+                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+            ))
+        } else {
+            self.schema.clone()
+        };
+
         let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {
-            if !self
-                .worker_partition_ids
-                .contains(&partition_snapshot.partition().get_id())
-            {
-                continue;
-            }
             let partition = partition_snapshot.partition();
+            let filter = self
+                .worker_partition_ids
+                .binary_search_by_key(&partition.get_id(), |(id, _)| *id);
+            let filter = match filter {
+                Ok(i) => Arc::new(self.worker_partition_ids[i].1.clone()),
+                Err(_) => continue,
+            };
+
+            let key_len = self.index_snapshot.index.get_row().sort_key_size() as usize;
 
             if let Some(remote_path) = partition.get_row().get_full_name(partition.get_id()) {
                 let local_path = self
@@ -340,30 +394,48 @@ impl CubeTable {
                     1,
                     None, // TODO: propagate limit
                 )?);
+                let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
                 partition_execs.push(arc);
             }
 
             let chunks = partition_snapshot.chunks();
             for chunk in chunks {
-                let remote_path = chunk.get_row().get_full_name(chunk.get_id());
-                let local_path = self
-                    .remote_to_local_names
-                    .get(&remote_path)
-                    .expect(format!("Missing remote path {}", remote_path).as_str());
-                let node = Arc::new(ParquetExec::try_from_path(
-                    local_path,
-                    partition_projection.clone(),
-                    predicate.clone(),
-                    batch_size,
-                    1,
-                    None, // TODO: propagate limit
-                )?);
+                let node: Arc<dyn ExecutionPlan> = if chunk.get_row().in_memory() {
+                    let record_batches = self
+                        .chunk_id_to_record_batches
+                        .get(&chunk.get_id())
+                        .ok_or(CubeError::internal(format!(
+                            "Record batch for in memory chunk {:?} is not provided",
+                            chunk
+                        )))?;
+                    Arc::new(MemoryExec::try_new(
+                        &[record_batches.clone()],
+                        partition_projected_schema.clone(),
+                        partition_projection.clone(),
+                    )?)
+                } else {
+                    let remote_path = chunk.get_row().get_full_name(chunk.get_id());
+                    let local_path = self
+                        .remote_to_local_names
+                        .get(&remote_path)
+                        .expect(format!("Missing remote path {}", remote_path).as_str());
+                    Arc::new(ParquetExec::try_from_path(
+                        local_path,
+                        partition_projection.clone(),
+                        predicate.clone(),
+                        batch_size,
+                        1,
+                        None, // TODO: propagate limit
+                    )?)
+                };
+
+                let node = FilterByKeyRangeExec::issue_filters(node, filter.clone(), key_len);
                 partition_execs.push(node);
             }
         }
 
         // We might need extra projection to re-order data.
-        if let Some(projection) = projection {
+        if let Some(projection) = projection_with_seq_column.as_ref() {
             let partition_projection = partition_projection.unwrap();
             let mut final_reorder = Vec::with_capacity(projection.len());
             for table_col_i in projection {
@@ -397,7 +469,7 @@ impl CubeTable {
             }
         }
 
-        let projected_schema = if let Some(p) = projection {
+        let projected_schema = if let Some(p) = projection_with_seq_column.as_ref() {
             Arc::new(Schema::new(
                 p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
@@ -420,9 +492,60 @@ impl CubeTable {
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
         });
+        let unique_key_columns = self
+            .index_snapshot()
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
 
-        let plan: Arc<dyn ExecutionPlan> = if let Some(join_columns) = self.index_snapshot.sort_on()
-        {
+        let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
+            let sort_columns = self
+                .index_snapshot()
+                .index
+                .get_row()
+                .columns()
+                .iter()
+                .take(self.index_snapshot.index.get_row().sort_key_size() as usize)
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(
+                        c.get_name(),
+                        &schema,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut exec: Arc<dyn ExecutionPlan> =
+                Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
+            exec = Arc::new(LastRowByUniqueKeyExec::try_new(
+                exec,
+                key_columns
+                    .iter()
+                    .map(|c| {
+                        datafusion::physical_plan::expressions::Column::new_with_schema(
+                            c.get_name().as_str(),
+                            &schema,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?);
+            if let Some(projection) = projection.as_ref() {
+                let s = exec.schema();
+                let proj_exprs = projection
+                    .iter()
+                    .map(|c| {
+                        let name = table_cols[*c].get_name();
+                        let col = datafusion::physical_plan::expressions::Column::new(
+                            name,
+                            s.index_of(name)?,
+                        );
+                        let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                        Ok((col, name.clone()))
+                    })
+                    .collect::<Result<Vec<_>, CubeError>>()?;
+                exec = Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
+            }
+            exec
+        } else if let Some(join_columns) = self.index_snapshot.sort_on() {
             let join_columns = join_columns
                 .iter()
                 .map(|c| {
@@ -552,7 +675,10 @@ impl ExecutionPlan for CubeTableExec {
 
 pub struct ClusterSendExec {
     schema: SchemaRef,
-    pub partitions: Vec<(/*node*/ String, /*partition_id*/ Vec<u64>)>,
+    pub partitions: Vec<(
+        /*node*/ String,
+        /*partition_id*/ Vec<(u64, RowRange)>,
+    )>,
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
     pub cluster: Arc<dyn Cluster>,
@@ -565,12 +691,15 @@ impl ClusterSendExec {
         schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        union_snapshots: Vec<Vec<IndexSnapshot>>,
+        union_snapshots: &[Vec<IndexSnapshot>],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
-        let partitions = Self::logical_partitions(&union_snapshots);
-        let partitions = Self::assign_nodes(cluster.as_ref(), partitions);
+        let partitions = Self::distribute_to_workers(
+            cluster.config().as_ref(),
+            union_snapshots,
+            &serialized_plan.planning_meta().multi_part_subtree,
+        );
         Self {
             schema,
             partitions,
@@ -581,16 +710,46 @@ impl ClusterSendExec {
         }
     }
 
-    pub fn logical_partitions(snapshots: &[Vec<IndexSnapshot>]) -> Vec<Vec<IdRow<Partition>>> {
-        let to_multiply = snapshots
-            .iter()
-            .map(|union| {
-                union
-                    .iter()
-                    .flat_map(|index| index.partitions().iter().map(|p| p.partition().clone()))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+    pub(crate) fn distribute_to_workers(
+        config: &dyn ConfigObj,
+        snapshots: &[Vec<IndexSnapshot>],
+        tree: &HashMap<u64, MultiPartition>,
+    ) -> Vec<(String, Vec<(u64, RowRange)>)> {
+        let partitions = Self::logical_partitions(snapshots, tree);
+        Self::assign_nodes(config, partitions)
+    }
+
+    fn logical_partitions(
+        snapshots: &[Vec<IndexSnapshot>],
+        tree: &HashMap<u64, MultiPartition>,
+    ) -> Vec<Vec<IdRow<Partition>>> {
+        let mut to_multiply = Vec::new();
+        let mut multi_partitions = HashMap::<u64, Vec<_>>::new();
+        for union in snapshots.iter() {
+            let mut ordinary_partitions = Vec::new();
+            for index in union {
+                for p in &index.partitions {
+                    match p.partition.get_row().multi_partition_id() {
+                        Some(id) => multi_partitions
+                            .entry(id)
+                            .or_default()
+                            .push(p.partition.clone()),
+                        None => ordinary_partitions.push(p.partition.clone()),
+                    }
+                }
+            }
+            if !ordinary_partitions.is_empty() {
+                to_multiply.push(ordinary_partitions);
+            }
+        }
+        assert!(to_multiply.is_empty() || multi_partitions.is_empty(),
+                "invalid state during partition selection. to_multiply: {:?}, multi_partitions: {:?}, snapshots: {:?}",
+                to_multiply, multi_partitions, snapshots);
+        // Multi partitions define how we distribute joins. They may not be present, though.
+        if !multi_partitions.is_empty() {
+            return Self::distribute_multi_partitions(multi_partitions, tree);
+        }
+        // Ordinary partitions need to be duplicated on multiple machines.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
@@ -598,16 +757,88 @@ impl ClusterSendExec {
         partitions
     }
 
+    fn distribute_multi_partitions(
+        mut multi_partitions: HashMap<u64, Vec<IdRow<Partition>>>,
+        tree: &HashMap<u64, MultiPartition>,
+    ) -> Vec<Vec<IdRow<Partition>>> {
+        let mut has_children = HashSet::new();
+        for m in tree.values() {
+            if let Some(p) = m.parent_multi_partition_id() {
+                has_children.insert(p);
+            }
+        }
+        // Ensure stable output order.
+        for parts in multi_partitions.values_mut() {
+            parts.sort_unstable_by_key(|p| p.get_id());
+        }
+
+        // Append partitions from ancestors to leaves.
+        let mut leaves = HashMap::new();
+        for (m, parts) in multi_partitions.iter_mut() {
+            if !has_children.contains(m) {
+                leaves.insert(*m, take(parts));
+            }
+        }
+
+        for (m, parts) in leaves.iter_mut() {
+            let mut curr = tree[m].parent_multi_partition_id();
+            while let Some(p) = curr {
+                if let Some(ps) = multi_partitions.get(&p) {
+                    parts.extend_from_slice(ps)
+                }
+                curr = tree[&p].parent_multi_partition_id();
+            }
+        }
+
+        // Ensure stable output order.
+        let mut ps: Vec<_> = leaves.into_values().collect();
+        ps.sort_unstable_by_key(|ps| ps[0].get_id());
+        ps
+    }
+
+    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
+        if ps.is_empty() {
+            return Vec::new();
+        }
+        // [distribute_to_workers] guarantees [ps] starts with a leaf inside a multi-partition,
+        // any other multi-partition is from ancestors and we should issue filters for those.
+        let multi_id = ps[0].get_row().multi_partition_id();
+        if multi_id.is_none() {
+            return ps
+                .iter()
+                .map(|p| (p.get_id(), RowRange::default()))
+                .collect();
+        }
+        let filter = RowRange {
+            start: ps[0].get_row().get_min_val().clone(),
+            end: ps[0].get_row().get_max_val().clone(),
+        };
+
+        let mut r = Vec::with_capacity(ps.len());
+        for p in ps {
+            let pf = if multi_id == p.get_row().multi_partition_id() {
+                RowRange::default()
+            } else {
+                filter.clone()
+            };
+            r.push((p.get_id(), pf))
+        }
+        r
+    }
+
     fn assign_nodes(
-        c: &dyn Cluster,
+        c: &dyn ConfigObj,
         logical: Vec<Vec<IdRow<Partition>>>,
-    ) -> Vec<(String, Vec<u64>)> {
-        let mut m: HashMap<String, Vec<u64>> = HashMap::new();
+    ) -> Vec<(String, Vec<(u64, RowRange)>)> {
+        let mut m: HashMap<_, Vec<(u64, RowRange)>> = HashMap::new();
         for ps in &logical {
-            let ids = ps.iter().map(|p| p.get_id()).collect_vec();
-            m.entry(c.node_name_by_partitions(&ids))
+            let node = match ps[0].get_row().multi_partition_id() {
+                Some(multi_id) => pick_worker_by_ids(c, [multi_id]),
+                None => pick_worker_by_partitions(c, ps.as_slice()),
+            };
+            m.entry(node.to_string())
                 .or_default()
-                .extend(ids)
+                .extend(Self::issue_filters(ps))
         }
 
         let mut r = m.into_iter().collect_vec();
@@ -676,10 +907,16 @@ impl ExecutionPlan for ClusterSendExec {
         &self,
         partition: usize,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        let (node_name, ids) = &self.partitions[partition];
-        let plan = self
-            .serialized_plan
-            .with_partition_id_to_execute(HashSet::from_iter(ids.iter().cloned()));
+        let (node_name, partitions) = &self.partitions[partition];
+
+        let mut ps = HashMap::<_, RowFilter>::new();
+        for (id, range) in partitions {
+            ps.entry(*id).or_default().append_or(range.clone())
+        }
+        let mut ps = ps.into_iter().collect_vec();
+        ps.sort_unstable_by_key(|(id, _)| *id);
+
+        let plan = self.serialized_plan.with_partition_id_to_execute(ps);
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)
         } else {

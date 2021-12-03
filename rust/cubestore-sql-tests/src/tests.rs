@@ -16,6 +16,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 pub type TestFn = Box<
@@ -43,21 +44,25 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
+        t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
+        t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
         t("coalesce", coalesce),
+        t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
         t(
             "count_distinct_group_by_crash",
             count_distinct_group_by_crash,
         ),
+        t("count_distinct_take_crash", count_distinct_take_crash),
         t("create_schema_if_not_exists", create_schema_if_not_exists),
         t(
             "create_index_before_ingestion",
@@ -67,6 +72,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("join_with_aliases", join_with_aliases),
         t("group_by_without_aggregates", group_by_without_aggregates),
         t("create_table_with_location", create_table_with_location),
+        t(
+            "create_table_with_location_messed_order",
+            create_table_with_location_messed_order,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -76,14 +85,25 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
+        t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
         t("topk_large_inputs", topk_large_inputs),
+        t("partitioned_index", partitioned_index),
+        t(
+            "partitioned_index_if_not_exists",
+            partitioned_index_if_not_exists,
+        ),
+        t("drop_partitioned_index", drop_partitioned_index),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
+        t(
+            "planning_join_with_partitioned_index",
+            planning_join_with_partitioned_index,
+        ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
         t("offset", offset),
@@ -95,13 +115,33 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
         ),
+        t(
+            "rolling_window_extra_aggregate",
+            rolling_window_extra_aggregate,
+        ),
+        t(
+            "rolling_window_extra_aggregate_timestamps",
+            rolling_window_extra_aggregate_timestamps,
+        ),
+        t(
+            "rolling_window_one_week_interval",
+            rolling_window_one_week_interval,
+        ),
+        t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
+        t("decimal_order", decimal_order),
         t("float_index", float_index),
+        t("float_order", float_order),
         t("date_add", date_add),
         t("now", now),
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
         t("unsorted_data_timestamps", unsorted_data_timestamps),
+        t("ksql_simple", ksql_simple),
+        t(
+            "dimension_only_queries_for_stream_table",
+            dimension_only_queries_for_stream_table,
+        ),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -726,6 +766,35 @@ async fn in_list(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
 }
 
+async fn in_list_with_union(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_1 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.customers_2 (id text, city text, state text)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_1 (id, city, state) VALUES ('a1', 'San Francisco', 'CA'), ('b1', 'New York', 'NY'), ('c1', 'San Diego', 'CA'), ('d1', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.customers_2 (id, city, state) VALUES ('a2', 'San Francisco', 'CA'), ('b2', 'New York', 'NY'), ('c2', 'San Diego', 'CA'), ('d2', 'Austin', 'TX')"
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) from (SELECT * FROM foo.customers_1 UNION ALL SELECT * FROM foo.customers_2) AS `customers` WHERE state in ('CA', 'TX')")
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(6)]));
+}
+
 async fn numeric_cast(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
@@ -875,6 +944,31 @@ async fn timestamp_select(service: Box<dyn SqlClient>) {
     let result = service.exec_query("SELECT count(*) from foo.timestamps WHERE t >= to_timestamp('2020-01-02T00:00:00.000Z')").await.unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(4)]));
+}
+
+async fn timestamp_seconds_frac(service: Box<dyn SqlClient>) {
+    for s in &[
+        "1970-01-01T00:00:00.123Z",
+        "1970-01-01T00:00:00.123",
+        "1970-01-01 00:00:00.123Z",
+        "1970-01-01 00:00:00.123 UTC",
+    ] {
+        assert_eq!(
+            timestamp_from_string(s).expect(s).get_time_stamp(),
+            123000000,
+            "input {}",
+            s
+        );
+        if s.ends_with("UTC") {
+            // Currently accepted only on ingestion.
+            continue;
+        }
+        let r = service
+            .exec_query(&format!("SELECT to_timestamp('{}')", s))
+            .await
+            .unwrap();
+        assert_eq!(to_rows(&r), rows(&[TimestampValue::new(123000000)]));
+    }
 }
 
 async fn column_escaping(service: Box<dyn SqlClient>) {
@@ -1047,6 +1141,86 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn ilike(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.strings(t text, pat text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.strings(t, pat) \
+             VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT'),\
+             ('some_underscore', '%some\\\\_underscore%')",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA%' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE '%aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "CABA", "ZABA", "aba"]));
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE 'aBA' ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["ABa", "aba"]));
+
+    let r = service
+        .exec_query(
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', 'some\\\\_underscore', '%') ORDER BY t",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["some_underscore"]));
+
+    // Compare constant string with a bunch of patterns.
+    // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
+    //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
+    let r = service
+        .exec_query("SELECT pat FROM s.strings WHERE 'aba' ILIKE pat ORDER BY pat")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["%ABA", "%a%b%a%", "%aba%", "aba%"]));
+
+    // Compare array against array.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            ("ABa", "%aba%"),
+            ("TTT", "TTT"),
+            ("ZABA", "%a%b%a%"),
+            ("ZZZ", "zzz"),
+            ("aba", "%ABA"),
+            ("some_underscore", "%some\\_underscore%"),
+        ])
+    );
+
+    // Check NOT ILIKE also works.
+    let r = service
+        .exec_query("SELECT t, pat FROM s.strings WHERE t NOT ILIKE pat ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("CABA", "aba%")]));
+}
+
 async fn coalesce(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
 
@@ -1201,6 +1375,25 @@ async fn count_distinct_group_by_crash(service: Box<dyn SqlClient>) {
             ],
         ]
     );
+}
+
+async fn count_distinct_take_crash(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(id int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.data(id, n) VALUES (1, 1)")
+        .await
+        .unwrap();
+    // This used to crash because `take` on empty list returned null. The implementation can easily
+    // change with time, though, so test is not robust.
+    let r = service
+        .exec_query("SELECT n, COUNT(DISTINCT CASE WHEN id = 2 THEN 2 END) FROM s.data GROUP BY n")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 0)]));
 }
 
 async fn create_schema_if_not_exists(service: Box<dyn SqlClient>) {
@@ -1390,6 +1583,41 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
 
     let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
+}
+
+async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("messed-order.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c6,c11,c10,c5,c9,c4,c2,c8,c1,c3,c7,c12\n".as_bytes())
+            .unwrap();
+        file.write_all(
+            "123,0,0.5,193,0.5,2,2021-11-01,0.5,foo,42,0,2021-01-01 00:00:00\n".as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service.exec_query(
+        &format!(
+            "CREATE TABLE test.main (`c1` varchar(255), `c2` date, `c3` bigint, `c4` bigint, `c5` bigint, `c6` bigint, `c7` double, `c8` double, `c9` double, `c10` double, `c11` double, `c12` timestamp)  LOCATION {}",
+            paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
+        )
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT count(*) as cnt from test.main")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
@@ -1697,6 +1925,26 @@ async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     )
 }
 
+async fn hyperloglog_postgres(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.hlls(id int, hll HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service.exec_query("INSERT INTO s.hlls(id, hll) VALUES \
+        (1, X'118b7f'),\
+        (2, X'128b7fee22c470691a8134'),\
+        (3, X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'),\
+        (4, X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, cardinality(hll) FROM s.hlls ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 0), (2, 1), (3, 164), (4, 9722)]));
+}
+
 async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -1944,6 +2192,159 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
            \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
            \n                    Empty"
+    );
+}
+
+async fn partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
+async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.ind(id int, url text)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.other_ind(id int, url text)")
+        .await
+        .unwrap();
+}
+
+async fn drop_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, some_column int)")
+        .await
+        .unwrap();
+    // DROP without any data.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    // Another drop fails as index does not exist.
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap_err();
+    // Note columns are different.
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data1(id int, url text, hits int) \
+                     ADD TO PARTITIONED INDEX s.ind(id, url)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data2(id2 int, url2 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id2, url2)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data1(id, url, hits) VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.Data2(id2, url2, location) VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+
+    service
+        .exec_query("DROP PARTITIONED INDEX s.ind")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data3(id3 int, url3 text, location text) \
+                     ADD TO PARTITIONED INDEX s.ind(id3, url3)",
+        )
+        .await
+        .unwrap_err(); // Fails as the index does not exist anymore.
+
+    // Query can still run from the default table data.
+    let r = service
+        .exec_query(
+            "SELECT id, url, hits, location \
+                     FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2 \
+                     ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
     );
 }
 
@@ -2318,6 +2719,54 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
+}
+
+async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.by_customer(customer_id int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(order_id int, customer_id int, product_id int, amount int) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Customers(customer_id int, customer_name text) \
+             ADD TO PARTITIONED INDEX s.by_customer(customer_id)",
+        )
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT order_id, customer_name \
+                 FROM s.Orders `o`\
+                 JOIN s.Customers `c` ON o.customer_id = c.customer_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "ClusterSend, partitions: [[1, 3]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Worker\
+           \n  Projection, [order_id, customer_name]\
+           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+           \n          Empty\
+           \n      MergeSort\
+           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+           \n          Empty",
+    );
 }
 
 async fn topk_query(service: Box<dyn SqlClient>) {
@@ -3093,6 +3542,270 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(17)),
+            (2, 17, None),
+            (3, 23, Some(23)),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // We could also distribute differently.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION CASE WHEN day <= 3 THEN 1 ELSE 5 END \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, Some(40)),
+            (2, 17, None),
+            (3, 23, None),
+            (4, 23, None),
+            (5, 5, Some(5))
+        ])
+    );
+
+    // Putting everything into an out-of-range dimension.
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 6 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1, 17, NULL),
+            (2, 17, NULL),
+            (3, 23, NULL),
+            (4, 23, NULL),
+            (5, 5, NULL)
+        ])
+    );
+
+    // Check errors.
+    // Mismatched types.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 'aaa' \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // Aggregate without GROUP BY DIMENSION.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+    // GROUP BY DIMENSION without aggregates.
+    service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION 0 \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap_err();
+}
+
+async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=5)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE INTERVAL '1 day' PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM date_trunc('day', to_timestamp('2021-01-01T00:00:00Z')) \
+             TO date_trunc('day', to_timestamp('2021-01-05T00:00:00Z')) \
+             EVERY INTERVAL '1 day' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17, Some(17)),
+            (jan[2], 17, None),
+            (jan[3], 23, Some(23)),
+            (jan[4], 23, None),
+            (jan[5], 5, Some(5))
+        ])
+    );
+}
+
+async fn rolling_window_one_week_interval(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let mut jan = (1..=11)
+        .map(|d| timestamp_from_string(&format!("2021-01-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    jan.insert(0, jan[1]); // jan[i] will correspond to i-th day of the month.
+
+    let r = service
+        .exec_query(
+            "SELECT w, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET START), SUM(CASE WHEN w >= to_timestamp('2021-01-04T00:00:00Z') AND w < to_timestamp('2021-01-11T00:00:00Z') THEN n END) \
+             FROM (SELECT date_trunc('day', day) w, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION w \
+             GROUP BY DIMENSION date_trunc('week', w) \
+             FROM date_trunc('week', to_timestamp('2021-01-04T00:00:00Z')) \
+             TO date_trunc('week', to_timestamp('2021-01-11T00:00:00Z')) \
+             EVERY INTERVAL '1 week' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(jan[4], 40, Some(5)), (jan[11], 45, None),])
+    );
+}
+
+async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO s.data(day, n) VALUES (1, 1), (2, 2), (3, 3), (5, 5), (9, 9)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(0, 1), (2, 6), (4, 11), (6, 11), (8, 20), (10, 20)])
+    );
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING OFFSET END) \
+             FROM s.data \
+             ROLLING_WINDOW DIMENSION day FROM 0 TO 10 EVERY 2 \
+             ORDER BY day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (0, Some(3)),
+            (2, Some(5)),
+            (4, Some(5)),
+            (6, None),
+            (8, Some(9)),
+            (10, None)
+        ])
+    );
+}
+
 async fn decimal_index(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3128,6 +3841,44 @@ async fn decimal_index(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn decimal_order(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(i decimal, j decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(i, j) VALUES (1.0, -1.0), (2.0, 0.5), (0.5, 1.0), (100, -25.5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT i FROM s.data ORDER BY 1 DESC")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[dec5(100), dec5(2), dec5(1), dec5f1(0, 5)])
+    );
+
+    // Two and more columns use a different code path, so test these too.
+    let r = service
+        .exec_query("SELECT i, j FROM s.data ORDER BY 2, 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (dec5(100), dec5f1(-25, 5)),
+            (dec5(1), dec5(-1)),
+            (dec5(2), dec5f1(0, 5)),
+            (dec5f1(0, 5), dec5(1))
+        ])
+    );
+}
+
 async fn float_index(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3154,6 +3905,36 @@ async fn float_index(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(3., 4.), (2., 3.), (1., 2.)]));
+}
+
+/// Ensure DataFusion code consistently uses IEEE754 total order for comparing floats.
+async fn float_order(s: Box<dyn SqlClient>) {
+    s.exec_query("CREATE SCHEMA s").await.unwrap();
+    s.exec_query("CREATE TABLE s.data(f float, i int)")
+        .await
+        .unwrap();
+    s.exec_query("INSERT INTO s.data(f, i) VALUES (0., -1), (-0., 1), (-0., 2), (0., -2)")
+        .await
+        .unwrap();
+
+    // Sorting one and multiple columns use different code paths in DataFusion. Test both.
+    let r = s
+        .exec_query("SELECT f FROM s.data ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[-0., -0., 0., 0.]));
+    let r = s
+        .exec_query("SELECT f, i FROM s.data ORDER BY f, i")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1), (-0., 2), (0., -2), (0., -1)]));
+
+    // DataFusion compares grouping keys with a separate code path.
+    let r = s
+        .exec_query("SELECT f, min(i), max(i) FROM s.data GROUP BY f ORDER BY f")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(-0., 1, 2), (0., -2, -1)]));
 }
 
 async fn date_add(service: Box<dyn SqlClient>) {
@@ -3438,6 +4219,59 @@ async fn dump(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn ksql_simple(service: Box<dyn SqlClient>) {
+    let vars = env::var("TEST_KSQL_USER").and_then(|user| {
+        env::var("TEST_KSQL_PASS")
+            .and_then(|pass| env::var("TEST_KSQL_URL").and_then(|url| Ok((user, pass, url))))
+    });
+    if let Ok((user, pass, url)) = vars {
+        service
+            .exec_query(&format!("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = '{}', password = '{}', url = '{}')", user, pass, url))
+            .await
+            .unwrap();
+
+        service.exec_query("CREATE SCHEMA test").await.unwrap();
+        service.exec_query("CREATE TABLE test.events_by_type (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'").await.unwrap();
+        for _ in 0..100 {
+            let res = service
+                .exec_query(
+                    "SELECT * FROM test.events_by_type WHERE `EVENT` = 'load_request_success'",
+                )
+                .await
+                .unwrap();
+            if res.len() == 0 {
+                futures_timer::Delay::new(Duration::from_millis(100)).await;
+                continue;
+            }
+            if res.len() == 1 {
+                return;
+            }
+        }
+        panic!("Can't load data from ksql");
+    }
+}
+
+async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, {})", i, j, i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT `bar_id` `bar_id` FROM test.events_by_type as `events` GROUP BY 1 ORDER BY 1 LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
+}
+
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
@@ -3447,5 +4281,11 @@ fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
 }
 
 fn dec5(i: i64) -> Decimal {
-    Decimal::new(i * 100_000)
+    dec5f1(i, 0)
+}
+
+fn dec5f1(i: i64, f: u64) -> Decimal {
+    assert!(f < 10);
+    let f = if i < 0 { -(f as i64) } else { f as i64 };
+    Decimal::new(i * 100_000 + 10_000 * f)
 }

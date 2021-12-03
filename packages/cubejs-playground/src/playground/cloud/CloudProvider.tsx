@@ -4,7 +4,7 @@ import { PreAggregationDefinition } from '../../components/RollupDesigner/utils'
 
 type AddPreAggregationToSchemaResult = {
   error?: string;
-}
+};
 
 type CloudProviderContext = {
   isCloud: boolean;

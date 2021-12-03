@@ -2,7 +2,6 @@
 import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
-import { fetch } from 'whatwg-fetch';
 import { RouteComponentProps, withRouter } from 'react-router';
 import styled from 'styled-components';
 

@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.28",
+  "version": "0.28.62",
   "engines": {},
   "repository": {
     "type": "git",
@@ -33,16 +33,18 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.28.25",
-    "@cubejs-client/react": "^0.28.25",
+    "@cubejs-client/core": "^0.28.52",
+    "@cubejs-client/react": "^0.28.52",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
+    "cron-validator": "^1.2.1",
     "customize-cra": "^1.0.0",
     "fast-deep-equal": "^3.1.3",
     "fetch-retry": "^4.0.1",
     "flexsearch": "^0.6.32",
     "history": "^4.9.0",
     "js-cookie": "^2.2.1",
+    "js-object-pretty-print": "^0.3.0",
     "jwt-decode": "^3.1.2",
     "less": "^4.1.1",
     "mitt": "^2.1.0",
@@ -58,10 +60,9 @@
     "react-router-dom": "^5.1.2",
     "react-scripts": "4.0.1",
     "react-source-render": "4.0.0-1",
-    "sql-formatter": "^4.0.2",
+    "sql-formatter": "^3.1.0",
     "throttle-debounce": "^3.0.1",
-    "uuid": "^8.3.2",
-    "whatwg-fetch": "^3.0.0"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@ant-design/compatible": "^1.0.2",

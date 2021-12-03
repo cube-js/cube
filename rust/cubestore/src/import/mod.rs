@@ -1,43 +1,46 @@
 use core::mem;
 use core::slice::memchr;
+use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
+use num::ToPrimitive;
 use pin_project_lite::pin_project;
+use tempfile::TempPath;
 use tokio::fs::File;
 use tokio::io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::task::JoinHandle;
+
+use cubehll::HllSketch;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
-use crate::metastore::{is_valid_binary_hll_input, HllFlavour, IdRow};
+use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
-use crate::table::data::{MutRows, Rows};
+use crate::streaming::StreamingService;
+use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
-use crate::util::ordfloat::OrdF64;
 use crate::CubeError;
-use cubehll::HllSketch;
-use datafusion::cube_ext;
-use num::ToPrimitive;
-use std::convert::TryFrom;
-use tempfile::TempPath;
+use datafusion::cube_ext::ordfloat::OrdF64;
 
 pub mod limits;
 
@@ -60,7 +63,6 @@ impl ImportFormat {
                     };
 
                 let mut header_mapping = None;
-                let mut mapping_insert_indices = Vec::with_capacity(columns.len());
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
@@ -71,7 +73,7 @@ impl ImportFormat {
                         for _ in 0..columns.len() {
                             let next_column_buf = parser.next_value()?;
                             let next_column = next_column_buf.as_ref();
-                            let (i, to_insert) = columns
+                            let (insert_pos, to_insert) = columns
                                 .iter()
                                 .find_position(|c| c.get_name() == &next_column)
                                 .map(|(i, c)| (i, c.clone()))
@@ -79,16 +81,7 @@ impl ImportFormat {
                                     "Column '{}' is not found during import in {:?}",
                                     next_column, columns
                                 )))?;
-                            // This is tricky indices structure: it remembers indices of inserts
-                            // with regards to moving element indices due to these inserts.
-                            // It saves some column resorting trips.
-                            let insert_pos = mapping
-                                .iter()
-                                .find_position(|(col_index, _)| *col_index > i)
-                                .map(|(insert_pos, _)| insert_pos)
-                                .unwrap_or_else(|| mapping.len());
-                            mapping_insert_indices.push(insert_pos);
-                            mapping.push((i, to_insert));
+                            mapping.push((insert_pos, to_insert));
                             parser.advance()?;
                         }
                         header_mapping = Some(mapping);
@@ -99,53 +92,51 @@ impl ImportFormat {
                         "Header is required for CSV import".to_string(),
                     ))?;
 
-                    let mut row = Vec::with_capacity(columns.len());
+                    let mut row = vec![TableValue::Null; columns.len()];
 
-                    for (i, (_, column)) in resolved_mapping.iter().enumerate() {
+                    for (insert_pos, column) in resolved_mapping.iter() {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
                         if value == "" {
-                            row.insert(mapping_insert_indices[i], TableValue::Null);
+                            row[*insert_pos] = TableValue::Null;
                         } else {
-                            row.insert(
-                                mapping_insert_indices[i],
-                                match column.get_column_type() {
-                                    ColumnType::String => {
-                                        TableValue::String(value_buf.take_string())
-                                    }
-                                    ColumnType::Int => value
-                                        .parse()
-                                        .map(|v| TableValue::Int(v))
-                                        .unwrap_or(TableValue::Null),
-                                    t @ ColumnType::Decimal { .. } => {
-                                        TableValue::Decimal(parse_decimal(
-                                            value,
-                                            u8::try_from(t.target_scale()).unwrap(),
-                                        )?)
-                                    }
-                                    ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                    ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                        let hll = HllSketch::read_snowflake(value)?;
-                                        TableValue::Bytes(hll.write())
-                                    }
-                                    ColumnType::HyperLogLog(f) => {
-                                        assert!(f.imports_from_binary());
-                                        let data = base64::decode(value)?;
-                                        is_valid_binary_hll_input(&data, *f)?;
-                                        TableValue::Bytes(data)
-                                    }
-                                    ColumnType::Timestamp => {
-                                        TableValue::Timestamp(timestamp_from_string(value)?)
-                                    }
-                                    ColumnType::Float => {
-                                        TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                    }
-                                    ColumnType::Boolean => {
-                                        TableValue::Boolean(value.to_lowercase() == "true")
-                                    }
-                                },
-                            );
+                            row[*insert_pos] = match column.get_column_type() {
+                                ColumnType::String => TableValue::String(value_buf.take_string()),
+                                ColumnType::Int => value
+                                    .parse()
+                                    .map(|v| TableValue::Int(v))
+                                    .unwrap_or(TableValue::Null),
+                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
+                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
+                                ),
+                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                                    let hll = HllSketch::read_snowflake(value)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                                    let data = base64::decode(value)?;
+                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
+                                    TableValue::Bytes(hll.write())
+                                }
+                                ColumnType::HyperLogLog(
+                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
+                                ) => {
+                                    let data = base64::decode(value)?;
+                                    is_valid_plain_binary_hll(&data, *f)?;
+                                    TableValue::Bytes(data)
+                                }
+                                ColumnType::Timestamp => {
+                                    TableValue::Timestamp(timestamp_from_string(value)?)
+                                }
+                                ColumnType::Float => {
+                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
+                                }
+                                ColumnType::Boolean => {
+                                    TableValue::Boolean(value.to_lowercase() == "true")
+                                }
+                            };
                         }
 
                         parser.advance()?;
@@ -352,6 +343,7 @@ crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
+    streaming_service: Arc<dyn StreamingService>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
@@ -363,6 +355,7 @@ crate::di_service!(ImportServiceImpl, [ImportService]);
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
+        streaming_service: Arc<dyn StreamingService>,
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
@@ -370,6 +363,7 @@ impl ImportServiceImpl {
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
+            streaming_service,
             chunk_store,
             remote_fs,
             config_obj,
@@ -390,13 +384,27 @@ impl ImportServiceImpl {
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
+            let mut size = 0;
             while let Some(bytes) = stream.next().await {
-                file.write_all(bytes?.as_ref()).await?;
+                let bytes = bytes?;
+                let slice = bytes.as_ref();
+                size += slice.len();
+                file.write_all(slice).await?;
             }
+            log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
             file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
-            Ok((self.download_temp_file(location).await?, None))
+            let temp_file = self.download_temp_file(location).await?;
+            let size = temp_file.metadata().await?.len();
+            log::info!("Import downloaded {} ({} bytes)", location, size);
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size as u64)
+                .await?;
+            Ok((temp_file, None))
         } else {
             Ok((File::open(location.clone()).await?, None))
         }
@@ -448,21 +456,32 @@ impl ImportServiceImpl {
             self.limits.clone(),
             table.clone(),
         );
-        let mut rows = MutRows::new(table.get_row().get_columns().len());
+
+        let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
+            builders.into_iter().map(|mut b| b.finish()).collect_vec()
+        };
+
+        let table_cols = table.get_row().get_columns().as_slice();
+        let mut builders = create_array_builders(table_cols);
+        let mut num_rows = 0;
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row? {
-                rows.add_row_heap_allocated(&row);
-                if rows.num_rows() >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = MutRows::new(table.get_row().get_columns().len());
-                    mem::swap(&mut rows, &mut to_add);
-                    ingestion.queue_data_frame(to_add.freeze()).await?;
+                append_row(&mut builders, table_cols, &row);
+                num_rows += 1;
+
+                if num_rows >= self.config_obj.wal_split_threshold() as usize {
+                    let mut to_add = create_array_builders(table_cols);
+                    mem::swap(&mut builders, &mut to_add);
+                    num_rows = 0;
+
+                    ingestion.queue_data_frame(finish(to_add)).await?;
                 }
             }
         }
 
         mem::drop(tmp_path);
 
-        ingestion.queue_data_frame(rows.freeze()).await?;
+        ingestion.queue_data_frame(finish(builders)).await?;
         ingestion.wait_completion().await
     }
 }
@@ -521,9 +540,12 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        self.do_import(&table, *format, location).await?;
-
-        self.drop_temp_uploads(&location).await?;
+        if Table::is_stream_location(location) {
+            self.streaming_service.stream_table(table, location).await?;
+        } else {
+            self.do_import(&table, *format, location).await?;
+            self.drop_temp_uploads(&location).await?;
+        }
 
         Ok(())
     }
@@ -555,15 +577,19 @@ impl Ingestion {
         }
     }
 
-    pub async fn queue_data_frame(&mut self, rows: Rows) -> Result<(), CubeError> {
+    pub async fn queue_data_frame(&mut self, rows: Vec<ArrayRef>) -> Result<(), CubeError> {
         let active_data_frame = self.limits.acquire_data_frame().await?;
 
         let meta_store = self.meta_store.clone();
         let chunk_store = self.chunk_store.clone();
         let columns = self.table.get_row().get_columns().clone().clone();
         let table_id = self.table.get_id();
+        // TODO In fact it should be only for inserts. Batch imports should still go straight to disk.
+        let in_memory = self.table.get_row().in_memory_ingest();
         self.partition_jobs.push(cube_ext::spawn(async move {
-            let new_chunks = chunk_store.partition_data(table_id, rows, &columns).await?;
+            let new_chunks = chunk_store
+                .partition_data(table_id, rows, &columns, in_memory)
+                .await?;
             std::mem::drop(active_data_frame);
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.

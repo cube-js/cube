@@ -2,7 +2,7 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
-import { PreAggregations } from './PreAggregations';
+import { PreAggregations, PreAggregationDescription } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
@@ -94,11 +94,18 @@ export class QueryOrchestrator {
   }
 
   public async fetchQuery(queryBody: any): Promise<any> {
-    const preAggregationsTablesToTempTables = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+    const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+
+    if (values) {
+      queryBody = {
+        ...queryBody,
+        values
+      };
+    }
 
     const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-      throw new Error('No pre-aggregation exists for that query');
+      throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
     if (!queryBody.query) {
@@ -199,8 +206,8 @@ export class QueryOrchestrator {
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        if (partition && partition.sql) {
-          obj[partition.sql.tableName] = PreAggregations.structureVersion(partition.sql);
+        if (partition) {
+          obj[partition.tableName] = PreAggregations.structureVersion(partition);
         }
         return obj;
       }, {});
@@ -221,20 +228,19 @@ export class QueryOrchestrator {
     };
   }
 
-  public async getPreAggregationPreview(requestId, preAggregation, versionEntry) {
-    if (!preAggregation.sql) return [];
+  public async getPreAggregationPreview(requestId: string, preAggregation: PreAggregationDescription) {
+    if (!preAggregation) return [];
+    const [query] = preAggregation.previewSql;
+    const { external } = preAggregation;
 
-    const { previewSql, tableName, external, dataSource } = preAggregation.sql;
-    const targetTableName = PreAggregations.targetTableName(versionEntry);
-    const querySql = QueryCache.replacePreAggregationTableNames(previewSql, [[tableName, { targetTableName }]]);
-    const query = querySql && querySql[0];
-
-    const data = query && await this.fetchQuery({
+    const data = await this.fetchQuery({
       continueWait: true,
-      external,
-      dataSource,
       query,
-      requestId
+      external,
+      preAggregations: [
+        preAggregation
+      ],
+      requestId,
     });
 
     return data || [];
@@ -242,6 +248,10 @@ export class QueryOrchestrator {
 
   public async expandPartitionsInPreAggregations(queryBody) {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
+  }
+
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
   }
 
   public async getPreAggregationQueueStates(dataSource = 'default') {

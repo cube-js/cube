@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import Helmet from 'react-helmet';
 import { Row, Col } from 'antd';
 
+import { InfoBox } from '../components/AlertBox/AlertBox';
 import MainTab from '../components/templates/MainTab';
 
 import imgGettingStarted from './images/getting-started.svg';
@@ -28,6 +29,7 @@ class IndexPage extends Component<Props> {
       <div className={styles.docContent}>
         <Helmet title="Main | Cube.js Docs" />
         <h1>Documentation</h1>
+
         <Row>
           <Col span={24}>
             <p>
@@ -54,7 +56,7 @@ class IndexPage extends Component<Props> {
           </Row>
           <Row>
             <MainTab
-              title="Cube.js Backend"
+              title="Connecting to the Database"
               img={imgInsights}
               desc="How to connect to database and deploy Cube.js service."
               to="/connecting-to-the-database"

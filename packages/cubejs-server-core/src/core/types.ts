@@ -5,6 +5,7 @@ import {
   JWTOptions,
   UserBackgroundContext,
   QueryRewriteFn,
+  CheckSQLAuthFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -112,12 +113,13 @@ export interface CreateOptions {
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
+  checkSqlAuth?: CheckSQLAuthFn;
   jwt?: JWTOptions;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  schemaVersion?: (context: RequestContext) => string;
+  schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];

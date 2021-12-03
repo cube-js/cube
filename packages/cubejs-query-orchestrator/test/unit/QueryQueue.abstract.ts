@@ -101,14 +101,16 @@ export const QueryQueueTest = (name: string, options?: any) => {
     test('negative priority', async () => {
       delayCount = 0;
       const results = [];
+
+      queue.executeInQueue('delay', '31', { delay: 400, result: '4' }, -10);
+
+      await delayFn(null, 200);
+
       await Promise.all([
-        queue.executeInQueue('delay', '31', { delay: 400, result: '4' }, -10).then(r => results.push(r)),
         queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
         queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
         queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
       ]);
-
-      results.splice(0, 1);
 
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });

@@ -3,7 +3,7 @@ title: Calculating Average and Percentiles
 permalink: /recipes/percentiles
 category: Examples & Tutorials
 subCategory: Data schema
-menuOrder: 1
+menuOrder: 4
 ---
 
 ## Use case

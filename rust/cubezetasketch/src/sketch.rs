@@ -103,12 +103,20 @@ impl HyperLogLogPlusPlus {
     }
 
     pub fn write(&self) -> Vec<u8> {
+        if let Representation::Sparse(r) = &self.representation {
+            if r.requires_compaction() {
+                let mut state = self.state.clone();
+                let mut r = r.clone();
+                r.compact(&mut state).expect("HLL compaction failed");
+                return state.to_byte_array();
+            }
+        }
         return self.state.to_byte_array();
     }
 
-    pub fn cardinality(&self) -> u64 {
-        match &self.representation {
-            Representation::Sparse(r) => return r.cardinality(&self.state),
+    pub fn cardinality(&mut self) -> u64 {
+        match &mut self.representation {
+            Representation::Sparse(r) => return r.cardinality(&mut self.state),
             Representation::Normal(r) => return r.cardinality(&self.state),
         }
     }

@@ -430,8 +430,14 @@ export class QueryCache {
           renewalKey
         };
         return this.cacheDriver.set(redisKey, result, expiration)
-          .then(() => {
+          .then(({ bytes }) => {
             this.logger('Renewed', { cacheKey, requestId: options.requestId });
+            this.logger('Outgoing network usage', {
+              service: 'cache',
+              requestId: options.requestId,
+              bytes,
+              cacheKey,
+            });
             return res;
           });
       }).catch(e => {

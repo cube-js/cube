@@ -746,12 +746,10 @@ describe('QueryOrchestrator', () => {
           },
           partitions: [
             {
-              sql: {
-                preAggregationsSchema: 'stb_pre_aggregations',
-                tableName: 'stb_pre_aggregations.orders',
-                loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
-                invalidateKeyQueries: [['SELECT 2', []]]
-              }
+              preAggregationsSchema: 'stb_pre_aggregations',
+              tableName: 'stb_pre_aggregations.orders',
+              loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
+              invalidateKeyQueries: [['SELECT 2', []]]
             }
           ]
         }

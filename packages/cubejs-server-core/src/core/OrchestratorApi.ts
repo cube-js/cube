@@ -176,8 +176,8 @@ export class OrchestratorApi {
     );
   }
 
-  public getPreAggregationPreview(context: RequestContext, preAggregation, versionEntry) {
-    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
+  public getPreAggregationPreview(context: RequestContext, preAggregation) {
+    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
   }
 
   public async expandPartitionsInPreAggregations(queryBody) {
@@ -191,6 +191,10 @@ export class OrchestratorApi {
       }
       throw err;
     }
+  }
+
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 
   public async getPreAggregationQueueStates() {

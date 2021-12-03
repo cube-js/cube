@@ -15,6 +15,8 @@ pub enum JobType {
     TableImport,
     Repartition,
     TableImportCSV(/*location*/ String),
+    MultiPartitionSplit,
+    FinishMultiSplit,
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -24,6 +26,8 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::TableImport => 3,
         JobType::Repartition => 4,
         JobType::TableImportCSV(_) => 5,
+        JobType::MultiPartitionSplit => 6,
+        JobType::FinishMultiSplit => 7,
     }
 }
 

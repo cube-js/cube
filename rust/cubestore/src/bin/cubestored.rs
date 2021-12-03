@@ -1,17 +1,27 @@
 use cubestore::app_metrics;
-use cubestore::config::{Config, CubeServices};
+use cubestore::config::{validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
-use cubestore::telemetry::track_event;
+use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
 use cubestore::util::{metrics, spawn_malloc_trim_loop};
 use datafusion::cube_ext;
 use log::debug;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
+const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");
+
 fn main() {
+    let package_json: Value = serde_json::from_str(PACKAGE_JSON).unwrap();
+    let version = package_json
+        .get("version")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
     let metrics_mode = match std::env::var("CUBESTORE_METRICS") {
         Ok(s) if s == "statsd" => metrics::Compatibility::StatsD,
         Ok(s) if s == "dogstatsd" => metrics::Compatibility::DogStatsD,
@@ -23,6 +33,8 @@ fn main() {
     };
     init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
     init_cube_logger(true);
+
+    log::info!("Cube Store version {}", version);
 
     let config = Config::default();
     Config::configure_worker_services();
@@ -40,6 +52,10 @@ fn main() {
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
     runtime.block_on(async move {
+        init_agent_sender().await;
+
+        validate_config(config.config_obj().as_ref()).report_and_abort_on_errors();
+
         config.configure_injector().await;
 
         serve_status_probes(&config);
