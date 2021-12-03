@@ -9,7 +9,8 @@ use datafusion::{
 };
 
 use super::information_schema::{
-    columns::InfoSchemaColumnsProvider, tables::InfoSchemaTableProvider,
+    columns::InfoSchemaColumnsProvider, statistics::InfoSchemaStatisticsProvider,
+    tables::InfoSchemaTableProvider,
 };
 
 pub struct CubeContext<'a> {
@@ -49,6 +50,10 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
             if tp.eq_ignore_ascii_case("information_schema.columns") {
                 return Some(Arc::new(InfoSchemaColumnsProvider::new(self.cubes)));
+            }
+
+            if tp.eq_ignore_ascii_case("information_schema.statistics") {
+                return Some(Arc::new(InfoSchemaStatisticsProvider::new()));
             }
         };
 
