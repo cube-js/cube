@@ -116,12 +116,23 @@ impl QueryContext {
         match expr {
             ast::Expr::BinaryOp { .. } => self.find_selection_for_binary_op(&expr.to_string()),
             ast::Expr::Function(f) => self.find_selection_for_function(f),
+            ast::Expr::CompoundIdentifier(i) => {
+                // @todo We need a context with main table rel
+                if i.len() == 2 {
+                    Ok(self.find_selection_for_identifier(&i[1].value.to_string(), false))
+                } else {
+                    Err(CompilationError::Unsupported(format!(
+                        "Unsupported compound identifier: {:?}",
+                        expr
+                    )))
+                }
+            }
             ast::Expr::Identifier(i) => {
                 Ok(self.find_selection_for_identifier(&i.value.to_string(), false))
             }
             _ => {
                 return Err(CompilationError::Unsupported(format!(
-                    "Expression in selection: {:?}",
+                    "Unable to find selection in selection: {:?}",
                     expr
                 )));
             }
@@ -137,6 +148,17 @@ impl QueryContext {
         let identifier = match argument {
             ast::Expr::Wildcard => "*".to_string(),
             ast::Expr::Identifier(i) => i.value.to_string().to_lowercase(),
+            ast::Expr::CompoundIdentifier(i) => {
+                // @todo We need a context with main table rel
+                if i.len() == 2 {
+                    i[1].value.to_string()
+                } else {
+                    return Err(CompilationError::Unsupported(format!(
+                        "Unsupported compound identifier in argument: {:?}",
+                        argument
+                    )));
+                }
+            }
             _ => {
                 return Err(CompilationError::Unsupported(format!(
                     "type of argument {:?}",
@@ -352,6 +374,17 @@ impl QueryContext {
             let measure_name = match argument {
                 ast::Expr::Wildcard => "*".to_string(),
                 ast::Expr::Identifier(i) => i.value.to_string(),
+                ast::Expr::CompoundIdentifier(i) => {
+                    // @todo We need a context with main table rel
+                    if i.len() == 2 {
+                        i[1].value.to_string()
+                    } else {
+                        return Err(CompilationError::Unsupported(format!(
+                            "Unsupported compound identifier in argument: {:?}",
+                            argument
+                        )));
+                    }
+                }
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
                         "type of argument {:?}",
@@ -432,8 +465,7 @@ impl QueryContext {
                 if let Some(r) = self.meta.measures.iter().find(|measure| {
                     measure
                         .get_real_name()
-                        .to_lowercase()
-                        .eq(&possible_measure_name)
+                        .eq_ignore_ascii_case(&possible_measure_name)
                 }) {
                     Ok(Some(Selection::Measure(r.clone())))
                 } else {
