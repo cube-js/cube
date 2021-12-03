@@ -1702,6 +1702,44 @@ mod tests {
     }
 
     #[test]
+    fn test_select_compound_identifiers() {
+        let query = convert_simple_select(
+            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(),
+        );
+
+        assert_eq!(
+            query,
+            CompiledQuery {
+                request: V1LoadRequestQuery {
+                    measures: Some(vec![
+                        "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                        "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    ]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                },
+                meta: vec![
+                    CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                        column_to: "maxPrice".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
+                    },
+                    CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                        column_to: "minPrice".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
+                    }
+                ]
+            }
+        )
+    }
+
+    #[test]
     fn test_select_measure_aggregate_functions() {
         let query = convert_simple_select(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
