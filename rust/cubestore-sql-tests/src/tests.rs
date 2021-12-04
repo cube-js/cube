@@ -1553,6 +1553,9 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
+        file.write_all("6,New York,\"\",\"\\N\"\n".as_bytes())
+            .await
+            .unwrap();
 
         file.shutdown().await.unwrap();
 
@@ -1579,10 +1582,10 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         .exec_query("SELECT count(*) as cnt from Foo.Persons")
         .await
         .unwrap();
-    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8)])]);
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(9)])]);
 
     let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
-    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(6)])]);
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(7)])]);
 }
 
 async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {

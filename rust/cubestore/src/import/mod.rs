@@ -98,7 +98,7 @@ impl ImportFormat {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
-                        if value == "" {
+                        if value == "" || value == "\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
                             row[*insert_pos] = match column.get_column_type() {
