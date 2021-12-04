@@ -137,7 +137,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
         t("unsorted_data_timestamps", unsorted_data_timestamps),
-        t("ksql_simple", ksql_simple),
+        // t("ksql_simple", ksql_simple),
         t(
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
