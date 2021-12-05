@@ -482,6 +482,14 @@ The function should return an object which gets appended to the
 [`contextToAppId`][self-opts-ctx-to-appid] to use cache context for all possible
 values that your extendContext object key can have.
 
+<WarningBox>
+
+`extendContext` is applied only to requests that go through API.
+It isn't applied to refresh worker execution.
+If you're looking for a way to provide global environment variables for your schema please see [Execution environment docs][ref-exec-environment-globals].
+
+</WarningBox>
+
 ```javascript
 module.exports = {
   contextToAppId: (context) => `CUBEJS_APP_${context.activeOrganization}`,
@@ -751,3 +759,4 @@ the additional transpiler for check duplicates.
 [self-repofactory]: #repositoryFactory
 [self-schemafilerepo]: #SchemaFileRepository
 [self-schemapath]: #schemaPath
+[ref-exec-environment-globals]: /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
