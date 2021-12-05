@@ -77,7 +77,11 @@ pub trait V1CubeMetaMeasureExt {
 
     fn get_mysql_type(&self) -> ColumnType;
 
-    fn mysql_type_as_str(&self) -> String;
+    /// varchar(128)
+    fn get_column_type(&self) -> String;
+
+    /// varchar
+    fn get_data_type(&self) -> String;
 }
 
 impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
@@ -118,7 +122,13 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
         }
     }
 
-    fn mysql_type_as_str(&self) -> String {
+    fn get_column_type(&self) -> String {
+        match self._type.to_lowercase().as_str() {
+            _ => "int".to_string(),
+        }
+    }
+
+    fn get_data_type(&self) -> String {
         match self._type.to_lowercase().as_str() {
             _ => "int".to_string(),
         }
@@ -142,7 +152,9 @@ pub trait V1CubeMetaDimensionExt {
 
     fn mysql_can_be_null(&self) -> bool;
 
-    fn mysql_type_as_str(&self) -> String;
+    fn get_column_type(&self) -> String;
+
+    fn get_data_type(&self) -> String;
 
     fn is_time(&self) -> bool;
 }
@@ -163,10 +175,17 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
         true
     }
 
-    fn mysql_type_as_str(&self) -> String {
+    fn get_column_type(&self) -> String {
         match self._type.to_lowercase().as_str() {
             "time" => "datetime".to_string(),
             _ => "varchar(255)".to_string(),
+        }
+    }
+
+    fn get_data_type(&self) -> String {
+        match self._type.to_lowercase().as_str() {
+            "time" => "datetime".to_string(),
+            _ => "varchar".to_string(),
         }
     }
 }
@@ -174,7 +193,8 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
 #[derive(Debug)]
 pub struct CubeColumn {
     name: String,
-    ty: String,
+    data_type: String,
+    column_type: String,
     can_be_null: bool,
 }
 
@@ -183,8 +203,14 @@ impl CubeColumn {
         &self.name
     }
 
-    pub fn mysql_type_as_str(&self) -> &String {
-        &self.ty
+    /// varchar
+    pub fn get_data_type(&self) -> &String {
+        &self.data_type
+    }
+
+    /// varchar(97)
+    pub fn get_column_type(&self) -> &String {
+        &self.column_type
     }
 
     pub fn mysql_can_be_null(&self) -> bool {
@@ -203,7 +229,8 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
-                ty: measure.mysql_type_as_str(),
+                data_type: measure.get_data_type(),
+                column_type: measure.get_column_type(),
                 can_be_null: false,
             });
         }
@@ -211,7 +238,8 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
-                ty: dimension.mysql_type_as_str(),
+                data_type: dimension.get_data_type(),
+                column_type: dimension.get_column_type(),
                 can_be_null: dimension.mysql_can_be_null(),
             });
         }
@@ -219,7 +247,8 @@ impl V1CubeMetaExt for V1CubeMeta {
         for segment in &self.segments {
             columns.push(CubeColumn {
                 name: segment.get_real_name(),
-                ty: "boolean".to_string(),
+                column_type: "boolean".to_string(),
+                data_type: "boolean".to_string(),
                 can_be_null: false,
             });
         }

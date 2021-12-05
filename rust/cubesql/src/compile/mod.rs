@@ -3,11 +3,6 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{prelude::*, Duration};
 
-use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
-use datafusion::catalog::catalog::MemoryCatalogProvider;
-use datafusion::catalog::schema::{MemorySchemaProvider, SchemaProvider};
-
-use datafusion::datasource::MemTable;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -23,7 +18,7 @@ use cubeclient::models::{
 
 use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
-use crate::schema::V1CubeMetaExt;
+
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
@@ -34,9 +29,10 @@ use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
+use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_current_user_udf, create_db_udf, create_instr_udf,
-    create_isnull_udf, create_user_udf, create_version_udf,
+    create_connection_id_udf, create_current_user_udf, create_db_udf, create_if_udf,
+    create_instr_udf, create_isnull_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1271,6 +1267,27 @@ impl QueryPlanner {
             )));
         }
 
+        // @todo Better solution?
+        // Metabase
+        if query.to_string()
+            == format!(
+                "SELECT true AS `_` FROM `{}` WHERE 1 <> 1 LIMIT 0",
+                table_name
+            )
+        {
+            return Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(
+                    vec![dataframe::Column::new(
+                        "_".to_string(),
+                        ColumnType::MYSQL_TYPE_TINY,
+                        ColumnFlags::empty(),
+                    )],
+                    vec![],
+                )),
+            ));
+        };
+
         if let Some(cube) = self.context.find_cube_with_name(table_name.clone()) {
             // println!("{:?}", select.projection);
             let mut ctx = QueryContext::new(&cube);
@@ -1403,7 +1420,7 @@ impl QueryPlanner {
         props: &QueryPlannerExecutionProps,
     ) -> CompilationResult<QueryPlan> {
         let mut ctx =
-            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(true));
+            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(false));
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
@@ -1416,49 +1433,11 @@ impl QueryPlanner {
         ctx.register_udf(create_current_user_udf(props));
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_isnull_udf());
-
-        {
-            let schema_provider = MemorySchemaProvider::new();
-
-            for cube in &self.context.cubes {
-                let mut schema_fields = vec![];
-
-                for column in cube.get_columns() {
-                    let data_type = match column.mysql_type_as_str().as_str() {
-                        "int" => DataType::Int64,
-                        "time" => DataType::Timestamp(TimeUnit::Nanosecond, None),
-                        _ => DataType::Utf8,
-                    };
-
-                    schema_fields.push(Field::new(
-                        column.get_name(),
-                        data_type,
-                        column.mysql_can_be_null(),
-                    ));
-                }
-
-                let schema = Arc::new(Schema::new(schema_fields));
-                let provider = MemTable::try_new(schema.clone(), vec![vec![]]).unwrap();
-
-                schema_provider
-                    .register_table(cube.name.clone(), Arc::new(provider))
-                    .map_err(|err| {
-                        CompilationError::Internal(format!(
-                            "Unable to register table provider for {}: {}",
-                            cube.name.clone(),
-                            err
-                        ))
-                    })?;
-            }
-
-            let catalog_provider = MemoryCatalogProvider::new();
-            catalog_provider.register_schema("db", Arc::new(schema_provider));
-
-            ctx.register_catalog("db", Arc::new(catalog_provider));
-        }
+        ctx.register_udf(create_if_udf());
 
         let state = ctx.state.lock().unwrap().clone();
-        let df_query_planner = SqlToRel::new(&state);
+        let cube_ctx = CubeContext::new(&state, &self.context.cubes);
+        let df_query_planner = SqlToRel::new(&cube_ctx);
 
         let plan = df_query_planner
             .statement_to_plan(&DFStatement::Statement(stmt))
@@ -1534,7 +1513,32 @@ pub fn convert_sql_to_cube_query(
     tenant: Arc<ctx::TenantContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
-    let stmt = parse_sql_to_statement(query)?;
+    // @todo Support without workarounds
+    // metabase
+    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
+    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
+    // @todo Implement LEAST function
+    let query = query.replace(
+        "LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647)",
+        "CHARACTER_MAXIMUM_LENGTH",
+    );
+    let query = query.replace(
+        "LEAST(CHARACTER_OCTET_LENGTH,2147483647)",
+        "CHARACTER_OCTET_LENGTH",
+    );
+    // @todo Implement CONVERT function
+    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
+    // @todo parser
+    let query = query.replace("IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME", "COLUMN_TYPE as TYPE_NAME");
+    // @todo Case intensive mode
+    let query = query.replace("CASE data_type", "CASE DATA_TYPE");
+    // @todo problem with parser, space in types
+    let query = query.replace("signed integer", "bigint");
+    let query = query.replace("SIGNED INTEGER", "bigint");
+    let query = query.replace("unsigned integer", "bigint");
+    let query = query.replace("UNSIGNED INTEGER", "bigint");
+
+    let stmt = parse_sql_to_statement(&query)?;
     convert_statement_to_cube_query(&stmt, tenant, props)
 }
 
@@ -1543,6 +1547,9 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment,
     };
+
+    use crate::mysql::dataframe::batch_to_dataframe;
+    use datafusion::execution::dataframe_impl::DataFrameImpl;
 
     use super::*;
     use pretty_assertions::assert_eq;
@@ -1689,6 +1696,44 @@ mod tests {
                         column_to: "avgPrice".to_string(),
                         column_type: ColumnType::MYSQL_TYPE_DOUBLE,
                     },
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn test_select_compound_identifiers() {
+        let query = convert_simple_select(
+            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(),
+        );
+
+        assert_eq!(
+            query,
+            CompiledQuery {
+                request: V1LoadRequestQuery {
+                    measures: Some(vec![
+                        "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                        "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    ]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                },
+                meta: vec![
+                    CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                        column_to: "maxPrice".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
+                    },
+                    CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                        column_to: "minPrice".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
+                    }
                 ]
             }
         )
@@ -2989,5 +3034,79 @@ mod tests {
             d.to_value_as_str().unwrap(),
             "2021-08-31T00:00:00.000Z".to_string()
         );
+    }
+
+    async fn execute_df_query(query: String) -> Result<String, CubeError> {
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            &QueryPlannerExecutionProps {
+                connection_id: 8,
+                user: Some("ovr".to_string()),
+                database: None,
+            },
+        );
+        match query.unwrap() {
+            QueryPlan::DataFushionSelect(_, plan, ctx) => {
+                let df = DataFrameImpl::new(ctx.state, &plan);
+                let batches = df.collect().await?;
+                let response = batch_to_dataframe(&batches)?;
+
+                return Ok(response.print());
+            }
+            _ => panic!("Must return DF plan"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_tables() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM information_schema.tables".to_string()).await?,
+            "+---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
+            | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |\n\
+            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
+            | def           | information_schema | tables                    | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | information_schema | columns                   | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | db                 | KibanaSampleDataEcommerce | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | db                 | Logs                      | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_columns() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
+            "+---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
+            | TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME                | COLUMN_NAME        | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE | CHARACTER_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | COLUMN_TYPE  | NUMERIC_PRECISION | DATETIME_PRECISION | COLUMN_KEY | EXTRA | COLUMN_COMMENT | GENERATION_EXPRESSION | SRS_ID |\n\
+            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
+            | def           | db           | KibanaSampleDataEcommerce | count              | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | maxPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | minPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | avgPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | order_date         | 0                |                | YES         | datetime  | NULL                     | NULL                   | datetime     | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | customer_gender    | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | taxful_total_price | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | is_male            | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | KibanaSampleDataEcommerce | is_female          | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | Logs                      | agentCount         | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            | def           | db           | Logs                      | agentCountApprox   | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
+            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
+        // This query is used by metabase for introspection
+        assert_eq!(
+            execute_df_query("SELECT A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME  FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME  ORDER BY A.COLUMN_NAME".to_string()).await?,
+            "++\n++\n++"
+        );
+
+        Ok(())
     }
 }

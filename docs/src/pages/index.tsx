@@ -43,28 +43,43 @@ class IndexPage extends Component<Props> {
             <MainTab
               title="Getting Started"
               img={imgGettingStarted}
-              desc="It is a good place to start, if you are new to Cube.js."
+              desc="Start here if you're new to Cube"
               to="/getting-started"
             />
             <MainTab
-              title="Data Schema"
-              img={imgForDevs}
-              desc="Learn how to build Cube.js Data Schema."
-              to="/getting-started-cubejs-schema"
+              title="Connecting to the Database"
+              img={imgInsights}
+              desc="How to connect to your database"
+              to="/config/databases"
               right
             />
           </Row>
           <Row>
             <MainTab
-              title="Connecting to the Database"
-              img={imgInsights}
-              desc="How to connect to database and deploy Cube.js service."
-              to="/connecting-to-the-database"
+              title="Data Schema"
+              img={imgForDevs}
+              desc="Learn how to build Data Schemas for"
+              to="/schema/getting-started"
             />
             <MainTab
-              title="Cube.js Frontend"
+              title="Caching"
               img={imgDashboards}
-              desc="Frontend libraries tutorials and API reference."
+              desc="Find out how to get the best performance from Cube"
+              to="/caching"
+              right
+            />
+          </Row>
+          <Row>
+            <MainTab
+              title="Deployment"
+              img={imgInsights}
+              desc="How to deploy your application"
+              to="/deployment"
+            />
+            <MainTab
+              title="Frontend"
+              img={imgDashboards}
+              desc="Frontend libraries tutorials and API reference"
               to="/frontend-introduction"
               right
             />
