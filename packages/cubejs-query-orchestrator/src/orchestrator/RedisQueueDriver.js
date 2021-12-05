@@ -63,7 +63,7 @@ export class RedisQueueDriverConnection {
         })
       );
     }
-    return tx.execAsync();
+    return tx.execAsync().then(result => [...result, data.addedToQueueTime]);
   }
 
   getToProcessQueries() {
