@@ -43,6 +43,10 @@ const FloatFilter = inputObjectType({
     t.float('contains');
     t.float('notContains');
     t.boolean('set');
+    t.float('gt');
+    t.float('lt');
+    t.float('gte');
+    t.float('lte');
   }
 });
 
@@ -229,41 +233,98 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   ));
 }
 
-function whereArgToQueryFilters(whereArg: any, prefix?: string) {
+function whereArgToQueryFilters(
+  whereArg: Record<string, any>,
+  prefix?: string
+) {
   const queryFilters: any[] = [];
-  Object.keys(whereArg).forEach(member => {
-    if (member === 'OR') {
+
+  Object.keys(whereArg).forEach((key) => {
+    if (key === 'OR') {
       queryFilters.push({
-        or: whereArg[member].reduce((filters, whereBooleanArg) => (
-          [...filters, ...whereArgToQueryFilters(whereBooleanArg, prefix)]
-        ), [] as any[])
+        or: whereArg[key].reduce(
+          (filters, whereBooleanArg) => [
+            ...filters,
+            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+          ],
+          []
+        ),
       });
-    } else if (member === 'AND') {
+    } else if (key === 'AND') {
       queryFilters.push({
-        and: whereArg[member].reduce((filters, whereBooleanArg) => (
-          [...filters, ...whereArgToQueryFilters(whereBooleanArg, prefix)]
-        ), [] as any[])
+        and: whereArg[key].reduce(
+          (filters, whereBooleanArg) => [
+            ...filters,
+            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+          ],
+          []
+        ),
       });
-    } else {
-      Object.keys(whereArg[member]).forEach(operator => {
-        const value = whereArg[member][operator];
+    } else if (whereArg[key].OR || whereArg[key].AND) {
+      // users: {
+      //   OR: {
+      //     name: { equals: "Alex" }
+      //     country: { equals: "US" }
+      //   } # <-- a single boolean filter can be passed in directly
+      //   age: { equals: 28 } # <-- will require AND
+      // }
+      if (Object.keys(whereArg[key]).length > 1) {
+        queryFilters.push(
+          ...whereArgToQueryFilters(
+            {
+              AND: Object.entries(whereArg[key]).reduce<any>(
+                (memo, [k, v]) => [...memo, { [k]: v }],
+                []
+              ),
+            },
+            capitalize(key)
+          )
+        );
+      } else {
+        const res = whereArgToQueryFilters(whereArg[key], capitalize(key));
+
+        queryFilters.push(...res);
+      }
+    } else if (prefix) {
+      // handle a subfilter
+      // { country: { in: ["US"] }
+      Object.entries(whereArg[key]).forEach(([operator, value]) => {
         queryFilters.push({
-          member: prefix ? `${prefix}.${member}` : member,
+          member: `${prefix}.${key}`,
           operator: mapWhereOperator(operator, value),
           ...(mapWhereValue(operator, value) && {
-            values: mapWhereValue(operator, value)
-          })
+            values: mapWhereValue(operator, value),
+          }),
+        });
+      });
+    } else {
+      // handle a root filter
+      // where {
+      //   { users: { country: { in: ["US"] } } }
+      // }
+      Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
+        // {
+        //   users: {
+        //     OR: [{ country: { in: ["US"] } }, { country: { in: ["Australia"] } }]
+        //     name: { equals: "Alex" }
+        //   }
+        // }
+        Object.entries(filters).forEach(([operator, value]) => {
+          queryFilters.push({
+            member: prefix
+              ? `${prefix}.${key}`
+              : `${capitalize(key)}.${member}`,
+            operator: mapWhereOperator(operator, value),
+            ...(mapWhereValue(operator, value) && {
+              values: mapWhereValue(operator, value),
+            }),
+          });
         });
       });
     }
   });
-  return queryFilters;
-}
 
-function rootWhereArgToQueryFilters(whereArg: any) {
-  return Object.keys(whereArg).reduce((filters, cubeName) => (
-    [...filters, ...whereArgToQueryFilters(whereArg[cubeName], capitalize(cubeName))]
-  ), [] as any[]);
+  return queryFilters;
 }
 
 function parseDates(result: any) {
@@ -407,15 +468,15 @@ export function makeSchema(metaConfig: any) {
           timezone: stringArg(),
           renewQuery: booleanArg(),
         },
-        resolve: async (parent, { where, limit, offset, timezone, renewQuery }, { req, apiGateway }, infos) => {
+        resolve: async (_, { where, limit, offset, timezone, renewQuery }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: Record<string, string> = {};
-
+          
           if (where) {
-            filters = [...filters, ...rootWhereArgToQueryFilters(where)];
+            filters = whereArgToQueryFilters(where);
           }
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
@@ -429,7 +490,7 @@ export function makeSchema(metaConfig: any) {
 
             const whereArg = getArgumentValue(cubeNode, 'where');
             if (whereArg) {
-              filters = [...filters, ...whereArgToQueryFilters(whereArg, cubeName)];
+              filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
@@ -470,7 +531,7 @@ export function makeSchema(metaConfig: any) {
             ...(filters.length && { filters }),
             ...(renewQuery && { renewQuery }),
           };
-
+          
           // eslint-disable-next-line no-async-promise-executor
           const results = await (new Promise<any>(async (resolve, reject) => {
             try {
