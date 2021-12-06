@@ -240,19 +240,9 @@ function whereArgToQueryFilters(
   const queryFilters: any[] = [];
 
   Object.keys(whereArg).forEach((key) => {
-    if (key === 'OR') {
+    if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
-        or: whereArg[key].reduce(
-          (filters, whereBooleanArg) => [
-            ...filters,
-            ...whereArgToQueryFilters(whereBooleanArg, prefix),
-          ],
-          []
-        ),
-      });
-    } else if (key === 'AND') {
-      queryFilters.push({
-        and: whereArg[key].reduce(
+        [key.toLowerCase()]: whereArg[key].reduce(
           (filters, whereBooleanArg) => [
             ...filters,
             ...whereArgToQueryFilters(whereBooleanArg, prefix),
@@ -298,17 +288,7 @@ function whereArgToQueryFilters(
         });
       });
     } else {
-      // handle a root filter
-      // where {
-      //   { users: { country: { in: ["US"] } } }
-      // }
       Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
-        // {
-        //   users: {
-        //     OR: [{ country: { in: ["US"] } }, { country: { in: ["Australia"] } }]
-        //     name: { equals: "Alex" }
-        //   }
-        // }
         Object.entries(filters).forEach(([operator, value]) => {
           queryFilters.push({
             member: prefix
