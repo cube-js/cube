@@ -36,6 +36,7 @@ These recipes will show you the best practices of using Cube.js.
 
 ### <--{"id" : "Recipes"}--> Queries
 
+- [Using Apache Superset with Cube SQL API](/recipes/using-apache-superset-with-cube-sql)
 - [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
 - [Pagination](/recipes/pagination)
 - [Using Apache Superset with Cube SQL](/recipes/using-apache-superset-with-cube-sql)
