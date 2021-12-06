@@ -4222,6 +4222,7 @@ async fn dump(service: Box<dyn SqlClient>) {
     );
 }
 
+#[allow(dead_code)]
 async fn ksql_simple(service: Box<dyn SqlClient>) {
     let vars = env::var("TEST_KSQL_USER").and_then(|user| {
         env::var("TEST_KSQL_PASS")
