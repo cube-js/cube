@@ -520,7 +520,10 @@ where
 {
     env::var(name).ok().map(|x| match x.parse::<T>() {
         Ok(v) => v,
-        Err(e) => panic!("could not parse environment variable '{}': {}", name, e),
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, x, e
+        ),
     })
 }
 
