@@ -157,6 +157,8 @@ impl InfoSchemaTableProvider {
         let mut builder = InformationSchemaTablesBuilder::new();
         builder.add_table("def", "information_schema", "tables");
         builder.add_table("def", "information_schema", "columns");
+        builder.add_table("def", "performance_schema", "session_variables");
+        builder.add_table("def", "performance_schema", "global_variables");
 
         for cube in cubes {
             builder.add_table("def", "db", cube.name.clone());

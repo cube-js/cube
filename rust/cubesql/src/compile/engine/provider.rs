@@ -10,7 +10,7 @@ use datafusion::{
 
 use super::information_schema::{
     columns::InfoSchemaColumnsProvider, statistics::InfoSchemaStatisticsProvider,
-    tables::InfoSchemaTableProvider,
+    tables::InfoSchemaTableProvider, variables::PerfSchemaVariablesProvider,
 };
 
 pub struct CubeContext<'a> {
@@ -54,6 +54,14 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
             if tp.eq_ignore_ascii_case("information_schema.statistics") {
                 return Some(Arc::new(InfoSchemaStatisticsProvider::new()));
+            }
+
+            if tp.eq_ignore_ascii_case("performance_schema.global_variables") {
+                return Some(Arc::new(PerfSchemaVariablesProvider::new()));
+            }
+
+            if tp.eq_ignore_ascii_case("performance_schema.session_variables") {
+                return Some(Arc::new(PerfSchemaVariablesProvider::new()));
             }
         };
 

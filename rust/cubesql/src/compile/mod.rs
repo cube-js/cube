@@ -1256,7 +1256,9 @@ impl QueryPlanner {
             }
         };
 
-        if schema_name.to_lowercase() == "information_schema" {
+        if schema_name.to_lowercase() == "information_schema"
+            || schema_name.to_lowercase() == "performance_schema"
+        {
             return self.create_df_logical_plan(stmt.clone(), props);
         }
 
@@ -3067,6 +3069,8 @@ mod tests {
             +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
             | def           | information_schema | tables                    | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
             | def           | information_schema | columns                   | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | performance_schema | session_variables         | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
+            | def           | performance_schema | global_variables          | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
             | def           | db                 | KibanaSampleDataEcommerce | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
             | def           | db                 | Logs                      | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
             +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+"
@@ -3105,6 +3109,29 @@ mod tests {
         assert_eq!(
             execute_df_query("SELECT A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME  FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME  ORDER BY A.COLUMN_NAME".to_string()).await?,
             "++\n++\n++"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_performance_schema_variables() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            "+--------------------+----------------+\n\
+            | VARIABLE_NAME      | VARIABLE_VALUE |\n\
+            +--------------------+----------------+\n\
+            | max_allowed_packet | 67108864       |\n\
+            +--------------------+----------------+"
+        );
+
+        assert_eq!(
+            execute_df_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            "+--------------------+----------------+\n\
+            | VARIABLE_NAME      | VARIABLE_VALUE |\n\
+            +--------------------+----------------+\n\
+            | max_allowed_packet | 67108864       |\n\
+            +--------------------+----------------+"
         );
 
         Ok(())
