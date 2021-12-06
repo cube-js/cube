@@ -38,8 +38,8 @@ These recipes will show you the best practices of using Cube.js.
 
 - [Using Apache Superset with Cube SQL API](/recipes/using-apache-superset-with-cube-sql)
 - [Enforcing Mandatory Filters](/recipes/enforcing-mandatory-filters)
+- [Getting Unique Values for a Field](/recipes/getting-unique-values-for-a-field)
 - [Pagination](/recipes/pagination)
-- [Using Apache Superset with Cube SQL](/recipes/using-apache-superset-with-cube-sql)
 
 ### <--{"id" : "Recipes"}--> Query acceleration
 
