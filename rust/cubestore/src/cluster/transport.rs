@@ -94,7 +94,8 @@ impl ClusterTransport for ClusterTransportImpl {
             Duration::from_secs(self.config.connection_timeout()),
             TcpStream::connect(worker_node.to_string()),
         )
-        .await?
+        .await
+        .map_err(|_| CubeError::internal(format!("Connection timeout to {}. Please check your worker connection env variables (CUBESTORE_WORKERS, CUBESTORE_WORKER_PORT, etc.).", worker_node)))?
         .map_err(|e| CubeError::internal(format!("Can't connect to {}: {}", worker_node, e)))?;
         Ok(Box::new(Connection { stream }))
     }
@@ -130,7 +131,13 @@ impl MetaStoreTransport for MetaStoreTransportImpl {
             Duration::from_secs(self.config.connection_timeout()),
             TcpStream::connect(&meta_remote_addr),
         )
-        .await?
+        .await
+        .map_err(|_| {
+            CubeError::internal(format!(
+                "Connection timeout to {}. Please check your meta connection env variables (CUBESTORE_META_ADDR, CUBESTORE_META_PORT, etc.).",
+                meta_remote_addr
+            ))
+        })?
         .map_err(|e| {
             CubeError::internal(format!("Can't connect to {}: {}", meta_remote_addr, e))
         })?;
