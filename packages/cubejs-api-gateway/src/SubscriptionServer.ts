@@ -111,6 +111,7 @@ export class SubscriptionServer {
         context,
         signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
         isSubscription,
+        apiType: 'ws',
         res: this.resultFn(connectionId, message.messageId, requestId),
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);

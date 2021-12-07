@@ -484,6 +484,7 @@ export function makeSchema(metaConfig: any) {
                   }
                   resolve(message);
                 },
+                apiType: 'graphql',
               });
             } catch (e) {
               reject(e);
