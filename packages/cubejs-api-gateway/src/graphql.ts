@@ -40,8 +40,6 @@ const FloatFilter = inputObjectType({
     t.float('notEquals');
     t.list.float('in');
     t.list.float('notIn');
-    t.float('contains');
-    t.float('notContains');
     t.boolean('set');
     t.float('gt');
     t.float('lt');
