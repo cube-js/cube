@@ -176,6 +176,11 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_GCP_KEY_FILE`                 | The path to a JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage                                    | [A valid Google Cloud JSON key file][link-gcp-creds-json]                               |
 | `CUBESTORE_GCS_BUCKET`                   | The name of a bucket in GCS. Required when using GCS                                                                                    | A valid bucket name in the Google Cloud account                                         |
 | `CUBESTORE_GCS_SUB_PATH`                 | The path in a GCS bucket to store pre-aggregations. Optional                                                                            | -                                                                                       |
+| `CUBESTORE_MINIO_ACCESS_KEY_ID`            | The Access Key ID for minIO. Required when using minIO                                                                                  | A valid minIO Access Key ID                                        |
+| `CUBESTORE_MINIO_SECRET_ACCESS_KEY`        | The Secret Access Key for minIO. Required when using minIO                                                                              | A valid minIO Secret Access Key                                     |                                                           |
+| `CUBESTORE_MINIO_BUCKET`                    | The name of the bucket that you want to use minIO. Required when using minIO                                                                             | A valid bucket name in the AWS account                                                  |
+| `CUBESTORE_MINIO_SERVER_ENDPOINT`                    | The minIO server endpoint. Required when using minIO                                                                            | A valid minIO endpoint e.g. `http://localhost:9000`                                            |
+| `CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS` | The number of minutes after which Cube Store should refresh minIO credentials. Default is `180` | A valid number in minutes        
 
 [link-aws-creds]:
   https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys
