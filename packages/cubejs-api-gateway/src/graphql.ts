@@ -437,7 +437,7 @@ export function makeSchema(metaConfig: any) {
   types.push(extendType({
     type: 'Query',
     definition(t) {
-      t.nonNull.field('load', {
+      t.nonNull.field('cube', {
         type: list(nonNull('Result')),
         args: {
           where: arg({
