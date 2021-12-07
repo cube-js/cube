@@ -1,4 +1,4 @@
-import { setLogLevel, registerInterface, SqlInterfaceInstance, SQLInterfaceOptions } from '@cubejs-backend/native';
+import { setLogLevel, registerInterface, SqlInterfaceInstance } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
