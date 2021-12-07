@@ -32,7 +32,7 @@ class IndexPage extends Component<Props> {
 
         <InfoBox >
 
-        The Cube data modeling workshop is on January 19 at 9-10:30 am PST! If you want to learn why you need multitenancy, how to get started, recipes and more, you will want to attend this event 😀
+        The Cube data modeling workshop is on January 19 at 9-10:30 am PST! If you want to learn how to get started with data schema, key data modeling concepts, advanced use cases in Cube, you will want to attend this event 😀
         <br />
         You can register for the workshop at <a href="https://cube.dev/events/data-modeling/">the event page</a>.
 
