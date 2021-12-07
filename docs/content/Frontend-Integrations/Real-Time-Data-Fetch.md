@@ -1,7 +1,7 @@
 ---
 title: Real-Time Data Fetch
 permalink: /real-time-data-fetch
-category: Cube.js Frontend
+category: Frontend Integrations
 menuOrder: 3
 ---
 
@@ -104,7 +104,7 @@ const Chart = ({ query }) => {
 
 As in the case of a regular data fetch, real-time data fetch obeys
 [refreshKey refresh rules](caching#refresh-keys). In order to provide a desired
-refresh rate `refreshKey` should reflect the rate of change of the underlying data set; the 
+refresh rate `refreshKey` should reflect the rate of change of the underlying data set; the
 querying time should also be much less than the desired refresh rate.
 Please use the [refreshKey every](/schema/reference/cube#refresh-key)
 parameter to adjust the refresh interval.
