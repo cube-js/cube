@@ -6,6 +6,13 @@ subCategory: Data schema
 menuOrder: 4
 ---
 
+<InfoBox>
+
+The Cube data modeling workshop is on January 19th at 9-10:30 am PST! If you want to learn how to get started with data schema, key data modeling concepts, advanced use cases in Cube, please join us at the event 😀 
+
+You can register for the workshop at [the event page](https://cube.dev/events/data-modeling/). 👈
+
+</InfoBox>
 ## Use case
 
 We want to create a cube for a dataset which uses the
