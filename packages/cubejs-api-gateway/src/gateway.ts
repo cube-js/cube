@@ -300,7 +300,7 @@ export class ApiGateway {
           req,
           apiGateway: this
         },
-        graphiql: getEnv('nodeEnv') !== 'production'
+        graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
       })(req, res);
     });
 
