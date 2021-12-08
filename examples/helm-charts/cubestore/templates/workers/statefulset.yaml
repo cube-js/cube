@@ -27,7 +27,11 @@ spec:
     spec:
       containers:
         - name: cubestore
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: worker
@@ -59,7 +63,7 @@ spec:
             {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
-            {{- end}}
+            {{- end }}
           {{- if .Values.workers.resources }}
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}
@@ -112,5 +116,5 @@ spec:
         resources:
           requests:
             storage: {{ .Values.workers.persistence.size | quote }}
-  {{- end}}
-{{- end}}
+  {{- end }}
+{{- end }}

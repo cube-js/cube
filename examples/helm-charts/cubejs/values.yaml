@@ -33,6 +33,10 @@ config:
   ##
   apiPort: 4000
 
+  ## The port for a Cube.js deployment to listen to SQL connections on
+  ##
+  sqlPort:
+
   ## If true, enables development mode.
   ##
   devMode: false
