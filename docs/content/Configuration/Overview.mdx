@@ -121,12 +121,6 @@ const server = new CubejsServer({
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
   },
-  checkAuth: async (req, auth) => {
-    const decoded = jwt.decode(auth, { complete: true });
-    const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
-    const pem = jwkToPem(jwk);
-    req.securityContext = jwt.verify(auth, pem);
-  },
 });
 
 server
@@ -146,16 +140,6 @@ It should be renamed to `cube.js` and its' contents should look like:
 module.exports = {
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
-  },
-  queryRewrite: async (query, { securityContext }) => {
-    if (securityContext.accountId) {
-      query.filters.push({
-        member: 'Accounts.id',
-        operator: 'equals',
-        values: [securityContext.accountId],
-      });
-    }
-    return query;
   },
 };
 ```
