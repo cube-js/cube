@@ -149,12 +149,10 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      - 4000:4000 # Cube.js API and Developer Playground
+      - 4000:4000
     env_file: .env
     volumes:
       - .:/cube/conf
-      # Prevent dev dependencies leaking
-      - .empty:/cube/conf/node_modules/@cubejs-backend/
 ```
 
 [link-config] /config [link-config-cors-opts] /config#http [link-dev-playground]
