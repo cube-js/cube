@@ -160,11 +160,11 @@ note:
 The GraphQL API supports `@skip` and `@include` directives too:
 
 ```
-query GetOrders($byCategory: Boolean) {
+query GetOrders($byStatus: Boolean) {
   cube(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
     orders(orderBy: { createdAt: asc, count: desc }, where: {status: {equals: "completed"}}) {
       count
-      status @include(if: $byCategory)
+      status @include(if: $byStatus)
       createdAt
     }
   }
@@ -200,18 +200,18 @@ to our query as follows:
 
 ```
 query {
-  cube [([loadOptions])] {
-    <cubeName> [([cubeOptions])] {
+  cube [([cubeQueryArgs])] {
+    <cubeName> [([cubeArgs])] {
       <cubeMember>
     }
   }
 }
 ```
 
-| Key           | Schema                              | Description                                |
-| ------------- | ----------------------------------- | ------------------------------------------ |
-| `loadOptions` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
-| `cubeOptions` | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
+| Key             | Schema                              | Description                                |
+| --------------- | ----------------------------------- | ------------------------------------------ |
+| `cubeQueryArgs` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
+| `cubeArgs`      | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
 
 ### CubeQueryArgs
 
