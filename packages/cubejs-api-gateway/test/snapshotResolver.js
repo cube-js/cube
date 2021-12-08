@@ -10,7 +10,7 @@ function resolveSnapshotPath(testPath, snapshotExtension) {
 
 function resolveTestPath(snapshotFilePath, snapshotExtension) {
   const testSourceFile = snapshotFilePath
-    .replace('test/__snapshots__', 'dist/test')
+    .replace(`test/__snapshots__`, 'dist/test')
     .replace('.ts', '.js')
     .replace(snapshotExtension, '');
 
@@ -21,5 +21,5 @@ module.exports = {
   resolveSnapshotPath,
   resolveTestPath,
 
-  // testPathForConsistencyCheck: 'dist/test/Test.spec.js'
+  testPathForConsistencyCheck: 'dist/test/Test.spec.js'
 };

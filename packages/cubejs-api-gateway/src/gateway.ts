@@ -5,6 +5,7 @@ import moment from 'moment';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
+import { format } from 'prettier';
 
 import type {
   Application as ExpressApplication,
@@ -43,8 +44,10 @@ import {
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
+import { CubeGraphQLConverter } from './CubeGraphQLConverter';
 
 import { makeSchema } from './graphql';
+import { metaConfigToTypes } from './utils';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -341,6 +344,22 @@ export class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+    
+    app.get(`${this.basePath}/v1/gql`, userMiddlewares, (async (req, res) => {
+      await this.gql({
+        query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+    
+    app.post(`${this.basePath}/v1/gql`, userMiddlewares, (async (req, res) => {
+      await this.gql({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
@@ -520,6 +539,31 @@ export class ApiGateway {
     }
   }
 
+  public async gql({ query, context, res }: QueryRequest) {
+    const metaConfig = await this.getCompilerApi(context).metaConfig({
+      requestId: context.requestId,
+    });
+    
+    try {
+      const converter = new CubeGraphQLConverter(query, metaConfigToTypes(metaConfig));
+      const graphQLQuery = format(converter.convert(), {
+        parser: 'graphql'
+      });
+      
+      res({ graphQLQuery });
+    } catch (error) {
+      res({
+        graphQLQuery: '',
+        error: error.message
+      }, { status: 400 });
+      
+      this.log({
+        type: 'Error converting Cube query to GraphQL query',
+        error: error.stack || error.toString(),
+      });
+    }
+  }
+  
   public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {

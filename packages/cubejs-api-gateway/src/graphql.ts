@@ -30,6 +30,7 @@ import {
 } from 'graphql-scalars';
 
 import { QUERY_TYPE } from './query';
+import { unCapitalize } from './utils';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -158,10 +159,6 @@ function safeName(name: string) {
 
 function capitalize(name: string) {
   return `${name[0].toUpperCase()}${name.slice(1)}`;
-}
-
-function unCapitalize(name: string) {
-  return `${name[0].toLowerCase()}${name.slice(1)}`;
 }
 
 function applyDirectives(
