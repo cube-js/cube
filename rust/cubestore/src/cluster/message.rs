@@ -46,6 +46,10 @@ pub enum NetworkMessage {
     NotifyJobListenersSuccess,
 }
 
+const MAGIC: u32 = 94107;
+
+const NETWORK_MESSAGE_VERSION: u32 = 1;
+
 impl NetworkMessage {
     pub fn is_streaming_request(&self) -> bool {
         match self {
@@ -78,6 +82,9 @@ impl NetworkMessage {
                 format!("network message too large, {} bytes", len),
             ));
         }
+        // magic number
+        socket.write_u32(MAGIC).await?;
+        socket.write_u32(NETWORK_MESSAGE_VERSION).await?;
         socket.write_u64(len).await?;
         socket.write_all(message_buffer.as_slice()).await?;
         Ok(())
@@ -86,20 +93,28 @@ impl NetworkMessage {
     pub async fn receive(socket: &mut TcpStream) -> Result<Self, CubeError> {
         match Self::maybe_receive(socket).await? {
             Some(m) => Ok(m),
-            None => Err(CubeError::internal("connection closed".to_string())),
+            None => Err(CubeError::user("Connection closed unexpectedly. Please check your worker and meta connection environment variables.".to_string())),
         }
     }
 
     /// Either receives a message or waits for the connection to close.
     pub async fn maybe_receive(socket: &mut TcpStream) -> Result<Option<Self>, CubeError> {
-        let len = socket.read_u64().await;
-        if let Err(e) = &len {
+        let magic = socket.read_u32().await;
+        if let Err(e) = &magic {
             // TODO: corner case with `0 < n < 8` read bytes.
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
                 return Ok(None);
             }
         };
-        let len = len?;
+        let magic = magic?;
+        if magic != MAGIC {
+            return Err(CubeError::user("Corrupted message received. Please check your worker and meta connection environment variables.".to_string()));
+        }
+        let ver = socket.read_u32().await?;
+        if ver != NETWORK_MESSAGE_VERSION {
+            return Err(CubeError::user(format!("Network protocol version mismatch. Expected {} but received {}. It seems multiple versions of Cube Store images running within the same cluster.", NETWORK_MESSAGE_VERSION, ver)));
+        }
+        let len = socket.read_u64().await?;
 
         if MAX_NETWORK_MSG_LEN < len {
             // Common misconfig of CubeJS can cause it to send HTTP message to the metastore port.
