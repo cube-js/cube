@@ -372,28 +372,25 @@ property is required when using [`timeDimension`][self-timedimension].
 The `segments` property is an array of [segments from the
 cube][ref-schema-segments] that can target the pre-aggregation:
 
-<WarningBox>
-
-The relevant measures/dimensions that make up the segment **must** be included
-in the pre-aggregation definition.
-
-</WarningBox>
-
 ```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  ...,
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
 
   segments: {
     onlyComplete: {
-      sql: `${CUBE}.status = 'complete'`,
+      sql: `${CUBE}.status = 'completed'`,
     },
   },
 
   preAggregations: {
     main: {
-      dimensions: [CUBE.status],
+      measures: [CUBE.count],
       segments: [CUBE.onlyComplete],
     },
   },
