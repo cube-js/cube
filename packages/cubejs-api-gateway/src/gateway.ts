@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax */
+import { Buffer } from 'buffer';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';

@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 import { RedisPool } from './RedisPool';
