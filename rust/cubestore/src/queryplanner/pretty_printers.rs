@@ -234,7 +234,7 @@ fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
                     r += " desc";
                 }
                 if !c.nulls_first {
-                    r += "null last";
+                    r += " null last";
                 }
                 r
             })

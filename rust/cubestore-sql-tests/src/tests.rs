@@ -384,7 +384,7 @@ async fn group_by_nulls(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         to_rows(&result),
-        rows(&[(None, 6), (Some(1), 1), (Some(2), 2)])
+        rows(&[(Some(1), 1), (Some(2), 2), (None, 6)])
     );
 }
 
@@ -1263,10 +1263,10 @@ async fn coalesce(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         vec![
-            vec![TableValue::Null],
-            vec![TableValue::Null],
             vec![TableValue::Int(1)],
-            vec![TableValue::Int(3)]
+            vec![TableValue::Int(3)],
+            vec![TableValue::Null],
+            vec![TableValue::Null],
         ]
     );
     // Coerces all args to text.
@@ -1277,10 +1277,10 @@ async fn coalesce(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         vec![
-            vec![TableValue::Null],
             vec![TableValue::String("1".to_string())],
             vec![TableValue::String("3".to_string())],
-            vec![TableValue::String("baz".to_string())]
+            vec![TableValue::String("baz".to_string())],
+            vec![TableValue::Null],
         ]
     );
 
@@ -2175,15 +2175,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, SUM(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
+           \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
            \n    ClusterSend, partitions: [[1, 2]]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
         "Projection, [url, SUM(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc]\
+           \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
            \n    Worker\
-           \n      Sort, by: [SUM(hits)@1 desc]\
+           \n      Sort, by: [SUM(hits)@1 desc nulls last]\
            \n        FullInplaceAggregate, sort_order: [0]\
            \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
            \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
@@ -4065,9 +4065,9 @@ async fn date_add(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[
-            None,
             Some(timestamp_from_string("2021-01-01T00:00:00Z").unwrap()),
-            Some(timestamp_from_string("2021-02-01T00:00:00Z").unwrap())
+            Some(timestamp_from_string("2021-02-01T00:00:00Z").unwrap()),
+            None,
         ]),
     );
     let r = service
@@ -4077,9 +4077,9 @@ async fn date_add(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[
-            None,
             Some(timestamp_from_string("2020-01-01T01:00:00Z").unwrap()),
-            Some(timestamp_from_string("2020-02-01T01:00:00Z").unwrap())
+            Some(timestamp_from_string("2020-02-01T01:00:00Z").unwrap()),
+            None,
         ]),
     );
 }
