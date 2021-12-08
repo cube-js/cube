@@ -7,6 +7,7 @@ use datafusion::{
             ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
             PrimitiveArray, StringBuilder, UInt32Builder,
         },
+        compute::cast,
         datatypes::{DataType, Int64Type},
     },
     error::DataFusionError,
@@ -17,7 +18,7 @@ use datafusion::{
     },
 };
 
-use crate::compile::QueryPlannerExecutionProps;
+use crate::compile::{engine::df::coerce::if_coercion, QueryPlannerExecutionProps};
 
 pub fn create_version_udf() -> ScalarUDF {
     let version = make_scalar_function(|_args: &[ArrayRef]| {
@@ -226,13 +227,16 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = &args[1];
         let right = &args[2];
 
-        if left.data_type() != right.data_type() {
-            return Err(DataFusionError::Execution(format!(
+        let base_type = if_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
+            DataFusionError::Execution(format!(
                 "positive and negative results must be the same type, actual: [{}, {}]",
                 left.data_type(),
                 right.data_type(),
-            )));
-        }
+            ))
+        })?;
+
+        let left = cast(&left, &base_type)?;
+        let right = cast(&right, &base_type)?;
 
         let is_true: bool = match condition.data_type() {
             DataType::Boolean => {
@@ -254,7 +258,14 @@ pub fn create_if_udf() -> ScalarUDF {
     let return_type: ReturnTypeFunction = Arc::new(move |types| {
         assert!(types.len() == 3);
 
-        Ok(Arc::new(types[1].clone()))
+        let base_type = if_coercion(&types[1], &types[2]).ok_or_else(|| {
+            DataFusionError::Execution(format!(
+                "positive and negative results must be the same type, actual: [{}, {}]",
+                &types[1], &types[2],
+            ))
+        })?;
+
+        Ok(Arc::new(base_type))
     });
 
     ScalarUDF::new(

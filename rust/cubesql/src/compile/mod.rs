@@ -3170,6 +3170,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_if() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                r#"select 
+                if(null, true, false) as r1,
+                if(true, false, true) as r2,
+                if(true, 'true', 'false') as r3,
+                if(true, CAST(1 as int), CAST(2 as bigint)) as c1,
+                if(false, CAST(1 as int), CAST(2 as bigint)) as c2,
+                if(true, CAST(1 as bigint), CAST(2 as int)) as c3
+            "#
+                .to_string()
+            )
+            .await?,
+            "+-------+-------+------+----+----+----+\n\
+            | r1    | r2    | r3   | c1 | c2 | c3 |\n\
+            +-------+-------+------+----+----+----+\n\
+            | false | false | true | 1  | 2  | 1  |\n\
+            +-------+-------+------+----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_least_tz() -> Result<(), CubeError> {
         assert_eq!(
             execute_df_query("select least(1, 2) as r1, least(2, 1) as r2;".to_string()).await?,
@@ -3195,6 +3220,35 @@ mod tests {
             +--------------------------+\n\
             | 2021-12-08T15:50:14.337Z |\n\
             +--------------------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "SELECT \
+                TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, \
+                CASE data_type WHEN 'bit' THEN -7 WHEN 'tinyblob' THEN -3 WHEN 'mediumblob' THEN -4 WHEN 'longblob' THEN -4 WHEN 'blob' THEN -4 WHEN 'tinytext' THEN 12 WHEN 'mediumtext' THEN -1 WHEN 'longtext' THEN -1 WHEN 'text' THEN -1 WHEN 'date' THEN 91 WHEN 'datetime' THEN 93 WHEN 'decimal' THEN 3 WHEN 'double' THEN 8 WHEN 'enum' THEN 12 WHEN 'float' THEN 7 WHEN 'int' THEN IF( COLUMN_TYPE like '%unsigned%', 4,4) WHEN 'bigint' THEN -5 WHEN 'mediumint' THEN 4 WHEN 'null' THEN 0 WHEN 'set' THEN 12 WHEN 'smallint' THEN IF( COLUMN_TYPE like '%unsigned%', 5,5) WHEN 'varchar' THEN 12 WHEN 'varbinary' THEN -3 WHEN 'char' THEN 1 WHEN 'binary' THEN -2 WHEN 'time' THEN 92 WHEN 'timestamp' THEN 93 WHEN 'tinyint' THEN IF(COLUMN_TYPE like 'tinyint(1)%',-7,-6)  WHEN 'year' THEN 91 ELSE 1111 END  DATA_TYPE, IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME,  CASE DATA_TYPE  WHEN 'time' THEN IF(DATETIME_PRECISION = 0, 10, CAST(11 + DATETIME_PRECISION as signed integer))  WHEN 'date' THEN 10  WHEN 'datetime' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  WHEN 'timestamp' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  ELSE   IF(NUMERIC_PRECISION IS NULL, LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647), NUMERIC_PRECISION)  END COLUMN_SIZE, 65535 BUFFER_LENGTH,  CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER) DECIMAL_DIGITS, 10 NUM_PREC_RADIX, IF(IS_NULLABLE = 'yes',1,0) NULLABLE,COLUMN_COMMENT REMARKS, COLUMN_DEFAULT COLUMN_DEF, 0 SQL_DATA_TYPE, 0 SQL_DATETIME_SUB,   LEAST(CHARACTER_OCTET_LENGTH,2147483647) CHAR_OCTET_LENGTH, ORDINAL_POSITION, IS_NULLABLE, NULL SCOPE_CATALOG, NULL SCOPE_SCHEMA, NULL SCOPE_TABLE, NULL SOURCE_DATA_TYPE, IF(EXTRA = 'auto_increment','YES','NO') IS_AUTOINCREMENT,  IF(EXTRA in ('VIRTUAL', 'PERSISTENT', 'VIRTUAL GENERATED', 'STORED GENERATED') ,'YES','NO') IS_GENERATEDCOLUMN \
+                FROM INFORMATION_SCHEMA.COLUMNS  WHERE (ISNULL(database()) OR (TABLE_SCHEMA = database())) AND TABLE_NAME = 'KibanaSampleDataEcommerce' \
+                ORDER BY TABLE_CAT, TABLE_SCHEM, TABLE_NAME, ORDINAL_POSITION;".to_string()
+            )
+            .await?,
+            "+-----------+-------------+---------------------------+--------------------+-----------+--------------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+\n\
+            | TABLE_CAT | TABLE_SCHEM | TABLE_NAME                | COLUMN_NAME        | DATA_TYPE | TYPE_NAME    | COLUMN_SIZE | BUFFER_LENGTH | DECIMAL_DIGITS | NUM_PREC_RADIX | NULLABLE | REMARKS | COLUMN_DEF | SQL_DATA_TYPE | SQL_DATETIME_SUB | CHAR_OCTET_LENGTH | ORDINAL_POSITION | IS_NULLABLE | SCOPE_CATALOG | SCOPE_SCHEMA | SCOPE_TABLE | SOURCE_DATA_TYPE | IS_AUTOINCREMENT | IS_GENERATEDCOLUMN |\n\
+            +-----------+-------------+---------------------------+--------------------+-----------+--------------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | count              | 4         | int          | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | maxPrice           | 4         | int          | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | minPrice           | 4         | int          | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | avgPrice           | 4         | int          | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | order_date         | 93        | datetime     | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | customer_gender    | 12        | varchar(255) | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | taxful_total_price | 12        | varchar(255) | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | is_male            | 1111      | boolean      | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            | db        | NULL        | KibanaSampleDataEcommerce | is_female          | 1111      | boolean      | 2147483647  | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | 2147483647        | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
+            +-----------+-------------+---------------------------+--------------------+-----------+--------------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+"
         );
 
         Ok(())
