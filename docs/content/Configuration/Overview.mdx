@@ -111,11 +111,6 @@ For an `index.js` like the following:
 
 ```javascript
 const CubejsServer = require('@cubejs-backend/server');
-const fs = require('fs');
-const jwt = require('jsonwebtoken');
-const jwkToPem = require('jwk-to-pem');
-const jwks = JSON.parse(fs.readFileSync('jwks.json'));
-const _ = require('lodash');
 
 const server = new CubejsServer({
   logger: (msg, params) => {
