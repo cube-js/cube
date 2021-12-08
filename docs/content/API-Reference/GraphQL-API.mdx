@@ -38,11 +38,7 @@ introspected schema:
   />
 </div>
 
-## load
-
-Get the data for a query from Cube.
-
-Let's use an `Orders` cube as an example:
+As an example, let's use the `Orders` cube from the example eCommerce database:
 
 ```js
 cube(`Orders`, {
@@ -73,7 +69,7 @@ like this:
 
 ```graphql
 {
-  load {
+  cube {
     orders {
       count
       status
@@ -102,11 +98,12 @@ The equivalent query to the REST API endpoint would look like this:
 
 ### Modifying time dimension granularity
 
-The granularity for a time dimension can easily be changed by specifying it:
+The granularity for a time dimension can easily be changed by specifying it in
+the query:
 
 ```graphql
 {
-  load {
+  cube {
     orders {
       createdAt {
         month
@@ -116,6 +113,24 @@ The granularity for a time dimension can easily be changed by specifying it:
 }
 ```
 
+[Any supported granularity][ref-schema-ref-preagg-granularity] can be used. If
+you prefer to not specify a granularity, then use `value`:
+
+```graphql
+{
+  cube {
+    orders {
+      createdAt {
+        value
+      }
+    }
+  }
+}
+```
+
+[ref-schema-ref-preagg-granularity]:
+  /schema/reference/pre-aggregations#granularity
+
 ### Specifying filters and ranges
 
 Filters can be set on the load query or on a specific cube. Specifying the
@@ -123,11 +138,11 @@ filter on the load query applies it to all cubes in the query. Filters can be
 added to the query as follows:
 
 ```
-query GetOrders {
-  load {
-    orders(orderBy: { createdAt: asc, count: desc }) {
+query {
+  cube(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
+    orders(orderBy: { createdAt: asc, count: desc }, where: {status: {equals: "completed"}}) {
       count
-      status @include(if: $byCategory)
+      status
       createdAt
     }
   }
@@ -145,8 +160,8 @@ note:
 The GraphQL API supports `@skip` and `@include` directives too:
 
 ```
-query  {
-  load(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
+query GetOrders($byCategory: Boolean) {
+  cube(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
     orders(orderBy: { createdAt: asc, count: desc }, where: {status: {equals: "completed"}}) {
       count
       status @include(if: $byCategory)
@@ -164,7 +179,7 @@ to our query as follows:
 
 ```graphql
 {
-  load {
+  cube {
     orders {
       status
       count
@@ -179,17 +194,13 @@ to our query as follows:
 }
 ```
 
-## Known Limitations
-
-- The security context cannot be set in the GraphiQL interface.
-
 ## Reference
 
-### load
+### cube
 
 ```
 query {
-  load [([loadOptions])] {
+  cube [([loadOptions])] {
     <cubeName> [([cubeOptions])] {
       <cubeMember>
     }
@@ -197,12 +208,12 @@ query {
 }
 ```
 
-| Key           | Schema                         | Description                                |
-| ------------- | ------------------------------ | ------------------------------------------ |
-| `loadOptions` | [`LoadOptions`](#load-options) | Options that apply to the entire query     |
-| `cubeOptions` | [`CubeOptions`](#cube-options) | Options that apply only to a specific cube |
+| Key           | Schema                              | Description                                |
+| ------------- | ----------------------------------- | ------------------------------------------ |
+| `loadOptions` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
+| `cubeOptions` | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
 
-### LoadOptions
+### CubeQueryArgs
 
 | Key          | Schema                                | Description                                                                                                                                         |
 | ------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -220,7 +231,7 @@ query {
 | `OR`         | [`[RootWhereInput!]`](#root-where-input) |             |
 | `<cubeName>` | [`CubeWhereInput`](#cube-where-input)    |             |
 
-### CubeOptions
+### CubeArgs
 
 | Key       | Schema                                | Description |
 | --------- | ------------------------------------- | ----------- |
@@ -262,17 +273,15 @@ query {
 
 ### FloatFilter
 
-| Key           | Schema    | Description |
-| ------------- | --------- | ----------- |
-| `equals`      | `Float`   |             |
-| `notEquals`   | `Float`   |             |
-| `in`          | `[Float]` |             |
-| `notIn`       | `[Float]` |             |
-| `contains`    | `Float`   |             |
-| `notContains` | `Float`   |             |
-| `set`         | `Boolean` |             |
+| Key         | Schema    | Description |
+| ----------- | --------- | ----------- |
+| `equals`    | `Float`   |             |
+| `notEquals` | `Float`   |             |
+| `in`        | `[Float]` |             |
+| `notIn`     | `[Float]` |             |
+| `set`       | `Boolean` |             |
 
-### String Filter
+### StringFilter
 
 | Key           | Schema     | Description |
 | ------------- | ---------- | ----------- |
