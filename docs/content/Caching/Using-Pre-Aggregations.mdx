@@ -177,13 +177,123 @@ folder in the project root during development.
 The default pre-aggregations storage in Cube is its own purpose-built storage
 layer: Cube Store.
 
-Alternatively, you can store pre-aggregations **internally** in the
-source database. To store a pre-aggregation internally, set `external: false` in
+Alternatively, you can store pre-aggregations **internally** in the source
+database. To store a pre-aggregation internally, set `external: false` in
 pre-aggregation definition.
 
-Please note, that [originalSql][ref-original-sql] pre-aggregations are stored **internally** by
-default. It is not recommended to store `originalSql` pre-aggregations in Cube
-Store.
+Please note, that [originalSql][ref-original-sql] pre-aggregations are stored
+**internally** by default. It is not recommended to store `originalSql`
+pre-aggregations in Cube Store.
+
+## Joins between pre-aggregations
+
+<WarningBox>
+
+This feature is in Preview and the API may change in a future release. Joining
+pre-aggregations **only** works with databases of the same type, support for
+joining pre-aggregations from different databases is coming soon.
+
+</WarningBox>
+
+When making a query that joins data from two different cubes, Cube can use
+pre-aggregations instead of running the base SQL queries. To get started, first
+ensure both cubes have valid pre-aggregations:
+
+```javascript
+// Orders
+cube(`Orders`, {
+  sql: `SELECT * FROM public.orders`,
+
+  ...,
+
+  preAggregations: {
+    ordersRollup: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.userId, CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+    },
+  },
+
+  joins: {
+    Users: {
+      sql: `${CUBE.userId} = ${Users.id}`,
+      relationship: `belongsTo`
+    },
+  },
+});
+
+// Users
+cube(`Users`, {
+  sql: `SELECT * FROM public.users`,
+
+  ...,
+
+  preAggregations: {
+    usersRollup: {
+      dimensions: [CUBE.id, CUBE.name],
+    },
+  },
+});
+```
+
+Before we continue, let's add an index to the `ordersRollup` pre-aggregation so
+that the `rollupJoin` pre-aggregation can work correctly:
+
+```javascript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    ordersRollup: {
+      ...,
+      indexes: {
+        userIndex: {
+          columns: [CUBE.userId],
+        },
+      },
+    },
+  },
+});
+```
+
+Now we can add a new pre-aggregation of type `rollupJoin` to the `Orders` cube:
+
+```javascript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    ordersWithUsersRollup: {
+      type: `rollupJoin`,
+      measures: [CUBE.count],
+      dimensions: [Users.name],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      rollups: [Users.usersRollup, CUBE.ordersRollup],
+    },
+  },
+});
+```
+
+With all of the above set up, making a query such as the following will now use
+`Orders.ordersRollup` and `Users.usersRollup`, avoiding a database request:
+
+```json
+{
+  "dimensions": ["Users.name"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "dateRange": "This month"
+    }
+  ],
+  "order": {
+    "Orders.count": "desc"
+  },
+  "measures": ["Orders.count"]
+}
+```
 
 ## Pre-Aggregation Build Strategies
 
@@ -292,9 +402,8 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-schema-ref-preaggs-sched-refresh]:
   /schema/reference/pre-aggregations#scheduled-refresh
 [ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
-[ref-original-sql]: /schema/reference/pre-aggregations#parameters-type-originalsql
-
+[ref-original-sql]:
+  /schema/reference/pre-aggregations#parameters-type-originalsql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
-
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
