@@ -32,7 +32,8 @@ use self::engine::context::SystemVar;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_user_udf, create_version_udf,
+    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_user_udf,
+    create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1447,6 +1448,7 @@ impl QueryPlanner {
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_isnull_udf());
         ctx.register_udf(create_if_udf());
+        ctx.register_udf(create_least_udf());
         ctx.register_udf(create_convert_tz_udf());
 
         let state = ctx.state.lock().unwrap().clone();
@@ -1531,15 +1533,6 @@ pub fn convert_sql_to_cube_query(
     // metabase
     let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
-    // @todo Implement LEAST function
-    let query = query.replace(
-        "LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647)",
-        "CHARACTER_MAXIMUM_LENGTH",
-    );
-    let query = query.replace(
-        "LEAST(CHARACTER_OCTET_LENGTH,2147483647)",
-        "CHARACTER_OCTET_LENGTH",
-    );
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
     // @todo parser
@@ -3171,6 +3164,20 @@ mod tests {
             +--------------------+----------------+\n\
             | max_allowed_packet | 67108864       |\n\
             +--------------------+----------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_least_tz() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("select least(1, 2) as r1, least(2, 1) as r2;".to_string()).await?,
+            "+----+----+\n\
+            | r1 | r2 |\n\
+            +----+----+\n\
+            | 1  | 1  |\n\
+            +----+----+"
         );
 
         Ok(())
