@@ -1010,54 +1010,65 @@ fn compile_order(
     ctx: &QueryContext,
     builder: &mut QueryBuilder,
 ) -> CompilationResult<()> {
-    if !order_by.is_empty() {
-        for order_expr in order_by.iter() {
-            match &order_expr.expr {
-                ast::Expr::Identifier(i) => {
-                    if let Some(selection) = ctx.find_selection_for_identifier(&i.to_string(), true)
-                    {
-                        let direction_as_str = if let Some(direction) = order_expr.asc {
-                            if direction {
-                                "asc".to_string()
-                            } else {
-                                "desc".to_string()
-                            }
-                        } else {
-                            "asc".to_string()
-                        };
+    if order_by.is_empty() {
+        return Ok(());
+    };
 
-                        match selection {
-                            Selection::Dimension(d) => {
-                                builder.with_order(vec![d.name.clone(), direction_as_str])
-                            }
-                            Selection::Measure(m) => {
-                                builder.with_order(vec![m.name.clone(), direction_as_str])
-                            }
-                            Selection::TimeDimension(t, _) => {
-                                builder.with_order(vec![t.name.clone(), direction_as_str])
-                            }
-                            Selection::Segment(s) => {
-                                return Err(CompilationError::User(format!(
-                                    "Unable to use segment {} in ORDER BY",
-                                    s.get_real_name()
-                                )));
-                            }
-                        };
+    for order_expr in order_by.iter() {
+        let order_selection = {
+            let selection_identifier = match &order_expr.expr {
+                ast::Expr::CompoundIdentifier(i) => {
+                    // @todo We need a context with main table rel
+                    if i.len() == 2 {
+                        i[1].value.to_string()
                     } else {
-                        return Err(CompilationError::Unknown(format!(
-                            "Unknown dimension: {}",
-                            i.to_string()
+                        return Err(CompilationError::Unsupported(format!(
+                            "Unsupported compound identifier in argument: {:?}",
+                            order_expr.expr
                         )));
                     }
                 }
+                ast::Expr::Identifier(i) => i.to_string(),
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
                         "Unsupported projection: {:?}",
                         order_expr.expr
                     )));
                 }
+            };
+
+            ctx.find_selection_for_identifier(&selection_identifier, true)
+                .ok_or_else(|| {
+                    CompilationError::Unknown(format!(
+                        "Unknown dimension: {}",
+                        selection_identifier
+                    ))
+                })
+        }?;
+
+        let direction_as_str = if let Some(direction) = order_expr.asc {
+            if direction {
+                "asc".to_string()
+            } else {
+                "desc".to_string()
             }
-        }
+        } else {
+            "asc".to_string()
+        };
+
+        match order_selection {
+            Selection::Dimension(d) => builder.with_order(vec![d.name.clone(), direction_as_str]),
+            Selection::Measure(m) => builder.with_order(vec![m.name.clone(), direction_as_str]),
+            Selection::TimeDimension(t, _) => {
+                builder.with_order(vec![t.name.clone(), direction_as_str])
+            }
+            Selection::Segment(s) => {
+                return Err(CompilationError::User(format!(
+                    "Unable to use segment {} in ORDER BY",
+                    s.get_real_name()
+                )));
+            }
+        };
     }
 
     Ok(())
@@ -1841,6 +1852,33 @@ mod tests {
     fn test_order_indentifier_default() {
         let query = convert_simple_select(
             "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price"
+                .to_string(),
+        );
+
+        assert_eq!(
+            query.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                ]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[test]
+    fn test_order_compound_identifier_default() {
+        let query = convert_simple_select(
+            "SELECT taxful_total_price FROM `KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`"
                 .to_string(),
         );
 
