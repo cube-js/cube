@@ -5,9 +5,9 @@ use datafusion::{
     arrow::{
         array::{
             ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
-            StringBuilder, UInt32Builder,
+            PrimitiveArray, StringBuilder, UInt32Builder,
         },
-        datatypes::DataType,
+        datatypes::{DataType, Int64Type},
     },
     error::DataFusionError,
     logical_plan::create_udf,
@@ -137,6 +137,20 @@ macro_rules! downcast_boolean_arr {
     }};
 }
 
+macro_rules! downcast_primitive_arg {
+    ($ARG:expr, $NAME:expr, $T:ident) => {{
+        $ARG.as_any()
+            .downcast_ref::<PrimitiveArray<$T>>()
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "could not cast {} to {}",
+                    $NAME,
+                    type_name::<PrimitiveArray<$T>>()
+                ))
+            })?
+    }};
+}
+
 macro_rules! downcast_string_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
@@ -246,6 +260,65 @@ pub fn create_if_udf() -> ScalarUDF {
     ScalarUDF::new(
         "if",
         &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// LEAST() function in MySQL is used to find smallest values from given arguments respectively. If any given value is NULL, it return NULLs. Otherwise it returns the smallest value.
+pub fn create_least_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let left = &args[0];
+        let right = &args[1];
+
+        let result = if left.is_null(0) {
+            right.clone()
+        } else if right.is_null(0) {
+            left.clone()
+        } else {
+            match &left.data_type() {
+                DataType::Int64 => {
+                    let l = downcast_primitive_arg!(left, "left", Int64Type);
+                    let r = downcast_primitive_arg!(right, "right", Int64Type);
+
+                    if l.value(0) < r.value(0) {
+                        left.clone()
+                    } else {
+                        right.clone()
+                    }
+                }
+                _ => {
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "unsupported type in least function, actual: {}",
+                        left.data_type()
+                    )));
+                }
+            }
+        };
+
+        Ok(result)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |types| {
+        assert!(types.len() == 2);
+
+        Ok(Arc::new(types[0].clone()))
+    });
+
+    ScalarUDF::new(
+        "least",
+        &Signature::uniform(
+            2,
+            vec![
+                DataType::Int32,
+                DataType::UInt32,
+                DataType::UInt64,
+                DataType::Int64,
+            ],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
