@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use datafusion::error::Result;
 use datafusion::{scalar::ScalarValue, variable::VarProvider};
+use log::warn;
 
 pub struct SystemVar {
     variables: HashMap<String, ScalarValue>,
@@ -26,6 +27,10 @@ impl SystemVar {
         variables.insert(
             "@@system_time_zone".to_string(),
             ScalarValue::Utf8(Some("UTC".to_string())),
+        );
+        variables.insert(
+            "@@globaltime_zone".to_string(),
+            ScalarValue::Utf8(Some("SYSTEM".to_string())),
         );
         variables.insert(
             "@@time_zone".to_string(),
@@ -87,11 +92,13 @@ impl SystemVar {
 impl VarProvider for SystemVar {
     /// get system variable value
     fn get_value(&self, var_names: Vec<String>) -> Result<ScalarValue> {
-        let key = var_names.concat();
+        let key = var_names.concat().to_lowercase();
 
         if let Some(value) = self.variables.get(&key) {
             Ok(value.clone())
         } else {
+            warn!("Unknown system variable: {}", key);
+
             Ok(ScalarValue::Utf8(None))
         }
     }

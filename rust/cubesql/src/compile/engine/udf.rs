@@ -250,3 +250,68 @@ pub fn create_if_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+// CONVERT_TZ() converts a datetime value dt from the time zone given by from_tz to the time zone given by to_tz and returns the resulting value.
+pub fn create_convert_tz_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let input_dt = &args[0];
+        let from_tz = &args[1];
+        let to_tz = &args[2];
+
+        let (_, input_tz) = match input_dt.data_type() {
+            DataType::Timestamp(unit, tz) => (unit, tz),
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "dt argument must be a Timestamp, actual: {}",
+                    from_tz.data_type()
+                )));
+            }
+        };
+
+        if from_tz.data_type() == &DataType::UInt8 {
+            return Err(DataFusionError::Execution(format!(
+                "from_tz argument must be a Utf8, actual: {}",
+                from_tz.data_type()
+            )));
+        };
+
+        if to_tz.data_type() == &DataType::UInt8 {
+            return Err(DataFusionError::Execution(format!(
+                "to_tz argument must be a Utf8, actual: {}",
+                to_tz.data_type()
+            )));
+        };
+
+        let from_tz = downcast_string_arg!(&from_tz, "from_tz", i32);
+        let to_tz = downcast_string_arg!(&to_tz, "to_tz", i32);
+
+        if from_tz.value(0) != "SYSTEM" || to_tz.value(0) != "+00:00" {
+            return Err(DataFusionError::NotImplemented(format!(
+                "convert_tz is not implemented, it's stub"
+            )));
+        }
+
+        if input_tz.is_some() {
+            return Err(DataFusionError::NotImplemented(format!(
+                "convert_tz is not implemented, it's stub"
+            )));
+        };
+
+        Ok(input_dt.clone())
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |types| {
+        assert!(types.len() == 3);
+
+        Ok(Arc::new(types[0].clone()))
+    });
+
+    ScalarUDF::new(
+        "convert_tz",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
