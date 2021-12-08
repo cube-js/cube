@@ -69,10 +69,6 @@ interface CubejsConfiguration {
     subject?: string;
     claimsNamespace?: string;
   };
-  externalDbType: string | ((context: RequestContext) => string);
-  externalDriverFactory: (
-    context: RequestContext
-  ) => BaseDriver | Promise<BaseDriver>;
   cacheAndQueueDriver: 'memory' | 'redis';
   orchestratorOptions:
     | OrchestratorOptions
@@ -590,43 +586,6 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
-
-### <--{"id" : "Options Reference"}--> externalDbType
-
-Should be used in conjunction with
-[`externalDriverFactory`](#external-driver-factory) option. Either `String` or
-`Function` could be passed. Providing a `Function` allows you to dynamically
-select a database type depending on the user's context. It is usually used in
-[Multitenancy Setup][ref-multitenancy].
-
-Called only once per [`appId`][self-opts-ctx-to-appid].
-
-### <--{"id" : "Options Reference"}--> externalDriverFactory
-
-Set database driver for external rollup database. Please refer to the [`rollup`
-reference][ref-schema-ref-preaggs-rollup] documentation for more guidance. The
-function accepts a context object as an argument to allow dynamically loading
-database drivers, which is usually used for [Multitenant
-deployments][ref-multitenancy].
-
-Called once per [`appId`][self-opts-ctx-to-appid]. Can return a `Promise` that
-resolves to a driver.
-
-```javascript
-const MySQLDriver = require('@cubejs-backend/mysql-driver');
-
-module.exports = {
-  externalDbType: 'mysql',
-  externalDriverFactory: () =>
-    new MySQLDriver({
-      host: process.env.CUBEJS_EXT_DB_HOST,
-      database: process.env.CUBEJS_EXT_DB_NAME,
-      port: process.env.CUBEJS_EXT_DB_PORT,
-      user: process.env.CUBEJS_EXT_DB_USER,
-      password: process.env.CUBEJS_EXT_DB_PASS,
-    }),
-};
-```
 
 ### <--{"id" : "Options Reference"}--> cacheAndQueueDriver
 

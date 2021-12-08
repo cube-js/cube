@@ -174,89 +174,16 @@ folder in the project root during development.
 
 ## Pre-Aggregations Storage
 
-The default pre-aggregations storage in Cube.js is its own purpose-built storage
+The default pre-aggregations storage in Cube is its own purpose-built storage
 layer: Cube Store.
 
-Alternatively, you can store pre-aggregations either **internally** in the
-source database, or **externally** in databases such as MySQL or Postgres.
+Alternatively, you can store pre-aggregations **internally** in the
+source database. To store a pre-aggregation internally, set `external: false` in
+pre-aggregation definition.
 
-In order to make external pre-aggregations work outside of Cube Store, you
-should set the [`externalDriverFactory`][ref-config-extdriverfactory] and
-[`externalDbType`][ref-config-extdbtype] properties in your `cube.js`
-configuration file. These properties can also be set through the environment
-variables.
-
-```bash
-CUBEJS_EXT_DB_HOST=<YOUR_DB_HOST_HERE>
-CUBEJS_EXT_DB_PORT=<YOUR_DB_PORT_HERE>
-CUBEJS_EXT_DB_NAME=<YOUR_DB_NAME_HERE>
-CUBEJS_EXT_DB_USER=<YOUR_DB_USER_HERE>
-CUBEJS_EXT_DB_PASS=<YOUR_DB_PASS_HERE>
-CUBEJS_EXT_DB_TYPE=<SUPPORTED_DB_TYPE_HERE>
-```
-
-<WarningBox>
-
-Please be aware of the limitations when using internal and external (outside of
-Cube Store) pre-aggregations.
-
-</WarningBox>
-
-<div style="text-align: center">
-  <img
-    alt="Internal vs External vs External with Cube Store diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-aggregations.png"
-    style="border: none"
-    width="100%"
-  />
-</div>
-
-#### Some known limitations when using Postgres/MySQL as a storage layer listed below.
-
-**Performance issues with high cardinality rollups:** Queries over billions of
-datapoints or higher start exhibiting severe latency issues, negatively
-impacting end-user experience.
-
-**Lack of HyperLogLog support:** The HyperLogLog algorithm makes fast work of
-distinct counts in queries, a common analytical operation. Unfortunately,
-support between database vendors varies greatly, and therefore cannot be
-guaranteed.
-
-**Degraded performance for big `UNION ALL` queries:** A practical example of
-this would be when querying over a date range using a pre-aggregation with a
-`partitionGranularity`. The query would use several partitioned tables to
-deliver the result set, and therefore needs to join all valid partitions.
-
-**Poor JOIN performance across rolled up tables:** This often affects workloads
-which require cross database joins.
-
-**Table/schema name length mismatches:** A common issue when working across
-different database types is that different databases have different length
-limits on table names. Cube.js allows working around the issue with `sqlAlias`
-but this becomes cumbersome with lots of pre-aggregations.
-
-**SQL type differences between source and external database:** Different
-databases often specify types differently, which can cause type mismatch issues.
-This is also a common issue and source of frustration which Cube Store resolves.
-
-#### Internal pre-aggregations
-
-Internal pre-aggregations are not considered production-ready due to several
-shortcomings, as noted below.
-
-**Concurrency:** Databases (especially RDBMs) generally cannot handle high
-concurrency without special configuration. Application databases such as MySQL
-and Postgres do support concurrency, but often cannot cope with the demands of
-analytical queries without significant tuning. On the other hand, data
-warehousing solutions such as Athena and BigQuery often limit the number of
-concurrent connections too.
-
-**Latency:** Data warehousing solutions (such as BigQuery or Redshift) are often
-slow to return results.
-
-**Cost:** Some databases charge by the amount of data scanned for each query
-(such as AWS Athena and BigQuery). Repeatedly querying for this data can easily
-rack up costs.
+Please note, that [originalSql][ref-original-sql] pre-aggregations are stored **internally** by
+default. It is not recommended to store `originalSql` pre-aggregations in Cube
+Store.
 
 ## Pre-Aggregation Build Strategies
 
@@ -365,6 +292,7 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-schema-ref-preaggs-sched-refresh]:
   /schema/reference/pre-aggregations#scheduled-refresh
 [ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
+[ref-original-sql]: /schema/reference/pre-aggregations#parameters-type-originalsql
 
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
