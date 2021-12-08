@@ -58,13 +58,13 @@ query with.
 
 ### <--{"id" : "Parameters"}--> type
 
-Cube.js supports three types of pre-aggregations:
+Cube supports three types of pre-aggregations:
 
 - [`rollup`][self-rollup]
 - [`originalSql`][self-originalsql]
 - [`rollupJoin`][self-rollupjoin]
 
-Default type is `rollup`.
+The default type is `rollup`.
 
 <h4 id="parameters-type-rollup">rollup</h4>
 
@@ -544,6 +544,13 @@ cube(`Orders`, {
 ```
 
 <h4 id="parameters-refresh-key-updatewindow">updateWindow</h4>
+
+<WarningBox>
+
+Incremental refreshes without a defined `updateWindow` will only update the last
+partition as determined by the pre-aggregation's `partitionGranularity`.
+
+</WarningBox>
 
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
