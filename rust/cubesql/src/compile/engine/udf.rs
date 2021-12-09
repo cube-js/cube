@@ -1,14 +1,19 @@
 use std::any::type_name;
 use std::sync::Arc;
 
+
 use datafusion::{
     arrow::{
         array::{
             ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
-            PrimitiveArray, StringBuilder, UInt32Builder,
+            IntervalDayTimeBuilder, PrimitiveArray, StringBuilder,
+            UInt32Builder,
         },
         compute::cast,
-        datatypes::{DataType, Int64Type},
+        datatypes::{
+            DataType, Int64Type, IntervalUnit, TimeUnit,
+            TimestampNanosecondType,
+        },
     },
     error::DataFusionError,
     logical_plan::create_udf,
@@ -395,6 +400,66 @@ pub fn create_convert_tz_udf() -> ScalarUDF {
     ScalarUDF::new(
         "convert_tz",
         &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_timediff_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let left_dt = &args[0];
+        let right_dt = &args[1];
+
+        let left_date = match left_dt.data_type() {
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                let arr = downcast_primitive_arg!(left_dt, "left_dt", TimestampNanosecondType);
+                let ts = arr.value(0);
+
+                // NaiveDateTime::from_timestamp(ts, 0)
+                ts
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "left_dt argument must be a Timestamp, actual: {}",
+                    left_dt.data_type()
+                )));
+            }
+        };
+
+        let right_date = match right_dt.data_type() {
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                let arr = downcast_primitive_arg!(right_dt, "right_dt", TimestampNanosecondType);
+                arr.value(0)
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "right_dt argument must be a Timestamp, actual: {}",
+                    right_dt.data_type()
+                )));
+            }
+        };
+
+        let diff = right_date - left_date;
+        if diff != 0 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "timediff is not implemented, it's stub"
+            )));
+        }
+
+        let mut interal_arr = IntervalDayTimeBuilder::new(1);
+        interal_arr.append_value(diff)?;
+
+        Ok(Arc::new(interal_arr.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Interval(IntervalUnit::DayTime))));
+
+    ScalarUDF::new(
+        "timediff",
+        &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
     )

@@ -32,8 +32,8 @@ use self::engine::context::SystemVar;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_user_udf,
-    create_version_udf,
+    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_timediff_udf,
+    create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1450,6 +1450,7 @@ impl QueryPlanner {
         ctx.register_udf(create_if_udf());
         ctx.register_udf(create_least_udf());
         ctx.register_udf(create_convert_tz_udf());
+        ctx.register_udf(create_timediff_udf());
 
         let state = ctx.state.lock().unwrap().clone();
         let cube_ctx = CubeContext::new(&state, &self.context.cubes);
@@ -3220,6 +3221,25 @@ mod tests {
             +--------------------------+\n\
             | 2021-12-08T15:50:14.337Z |\n\
             +--------------------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_timediff() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "select \
+                    timediff('1994-11-26T13:25:00.000Z'::timestamp, '1994-11-26T13:25:00.000Z'::timestamp) as r1
+                ".to_string()
+            )
+            .await?,
+            "+------------------------------------------------+\n\
+            | r1                                             |\n\
+            +------------------------------------------------+\n\
+            | 0 years 0 mons 0 days 0 hours 0 mins 0.00 secs |\n\
+            +------------------------------------------------+"
         );
 
         Ok(())

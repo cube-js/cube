@@ -3,9 +3,10 @@ use std::fmt::{self, Debug, Formatter};
 use chrono::{SecondsFormat, TimeZone, Utc};
 use comfy_table::{Cell, Table};
 use datafusion::arrow::array::{
-    Array, Float64Array, Int32Array, Int64Array, StringArray, TimestampMicrosecondArray,
-    UInt32Array,
+    Array, Float64Array, Int32Array, Int64Array, IntervalDayTimeArray, IntervalYearMonthArray,
+    StringArray, TimestampMicrosecondArray, UInt32Array,
 };
+use datafusion::arrow::datatypes::IntervalUnit;
 use datafusion::arrow::{
     array::{BooleanArray, TimestampNanosecondArray, UInt64Array},
     datatypes::{DataType, TimeUnit},
@@ -15,6 +16,7 @@ use log::{error, warn};
 use msql_srv::{ColumnFlags, ColumnType};
 
 use crate::{compile::builder::CompiledQueryFieldMeta, CubeError};
+use crate::{make_string_interval_day_time, make_string_interval_year_month};
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -309,6 +311,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Binary => Ok(ColumnType::MYSQL_TYPE_BLOB),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::MYSQL_TYPE_STRING),
         DataType::Timestamp(_, _) => Ok(ColumnType::MYSQL_TYPE_STRING),
+        DataType::Interval(_) => Ok(ColumnType::MYSQL_TYPE_STRING),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::MYSQL_TYPE_DOUBLE),
         DataType::Boolean => Ok(ColumnType::MYSQL_TYPE_TINY),
         DataType::Int8
@@ -400,6 +403,24 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         } else {
                             TableValue::Timestamp(TimestampValue::new(a.value(i)))
                         });
+                    }
+                }
+                DataType::Interval(IntervalUnit::DayTime) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<IntervalDayTimeArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::String(make_string_interval_day_time!(a, i)));
+                    }
+                }
+                DataType::Interval(IntervalUnit::YearMonth) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<IntervalYearMonthArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::String(make_string_interval_year_month!(a, i)));
                     }
                 }
                 DataType::Boolean => {
