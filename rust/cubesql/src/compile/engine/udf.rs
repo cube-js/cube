@@ -1,17 +1,15 @@
 use std::any::type_name;
 use std::sync::Arc;
 
-
 use datafusion::{
     arrow::{
         array::{
             ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
-            IntervalDayTimeBuilder, PrimitiveArray, StringBuilder,
-            UInt32Builder,
+            IntervalDayTimeBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
         },
         compute::cast,
         datatypes::{
-            DataType, Int64Type, IntervalUnit, TimeUnit,
+            DataType, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
             TimestampNanosecondType,
         },
     },
@@ -459,6 +457,68 @@ pub fn create_timediff_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "timediff",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_time_format_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let input_dt = &args[0];
+        let format = &args[1];
+
+        let input_date = match input_dt.data_type() {
+            DataType::Interval(IntervalUnit::DayTime) => {
+                let arr = downcast_primitive_arg!(input_dt, "left_dt", IntervalDayTimeType);
+                arr.value(0)
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "left_dt argument must be a Timestamp, actual: {}",
+                    input_dt.data_type()
+                )));
+            }
+        };
+
+        let format = match format.data_type() {
+            DataType::Utf8 => {
+                let arr = downcast_string_arg!(format, "format", i32);
+                arr.value(0)
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "format argument must be a Timestamp, actual: {}",
+                    format.data_type()
+                )));
+            }
+        };
+
+        if format != "%H:%i" {
+            return Err(DataFusionError::Plan(format!(
+                "unsupported format, actual: {}",
+                format
+            )));
+        }
+
+        if input_date != 0 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "time_format is not implemented, it's stub"
+            )));
+        }
+
+        let mut result = StringBuilder::new(1);
+        result.append_value("00:00".to_string())?;
+
+        Ok(Arc::new(result.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "time_format",
         &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
