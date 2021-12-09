@@ -32,8 +32,8 @@ use self::engine::context::SystemVar;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_timediff_udf,
-    create_user_udf, create_version_udf,
+    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_time_format_udf,
+    create_timediff_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1451,6 +1451,7 @@ impl QueryPlanner {
         ctx.register_udf(create_least_udf());
         ctx.register_udf(create_convert_tz_udf());
         ctx.register_udf(create_timediff_udf());
+        ctx.register_udf(create_time_format_udf());
 
         let state = ctx.state.lock().unwrap().clone();
         let cube_ctx = CubeContext::new(&state, &self.context.cubes);
@@ -3247,6 +3248,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_metabase() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "SELECT \
+                    @@GLOBAL.time_zone AS global_tz, \
+                    @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'
+                ".to_string()
+            )
+            .await?,
+            "+-----------+-----------+--------+\n\
+            | global_tz | system_tz | offset |\n\
+            +-----------+-----------+--------+\n\
+            | SYSTEM    | UTC       | 00:00  |\n\
+            +-----------+-----------+--------+"
+        );
+
         assert_eq!(
             execute_df_query(
                 "SELECT \
