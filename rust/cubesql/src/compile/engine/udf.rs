@@ -10,7 +10,7 @@ use datafusion::{
         compute::cast,
         datatypes::{
             DataType, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
-            TimestampNanosecondType,
+            TimestampNanosecondType, UInt64Type,
         },
     },
     error::DataFusionError,
@@ -21,7 +21,10 @@ use datafusion::{
     },
 };
 
-use crate::compile::{engine::df::coerce::if_coercion, QueryPlannerExecutionProps};
+use crate::compile::{
+    engine::df::coerce::{if_coercion, least_coercion},
+    QueryPlannerExecutionProps,
+};
 
 pub fn create_version_udf() -> ScalarUDF {
     let version = make_scalar_function(|_args: &[ArrayRef]| {
@@ -287,21 +290,34 @@ pub fn create_least_udf() -> ScalarUDF {
         let left = &args[0];
         let right = &args[1];
 
-        let result = if left.is_null(0) {
-            right.clone()
-        } else if right.is_null(0) {
-            left.clone()
-        } else {
-            match &left.data_type() {
-                DataType::Int64 => {
-                    let l = downcast_primitive_arg!(left, "left", Int64Type);
-                    let r = downcast_primitive_arg!(right, "right", Int64Type);
+        let base_type = least_coercion(&left.data_type(), &right.data_type()).ok_or_else(|| {
+            DataFusionError::Execution(format!(
+                "Unable to coercion types, actual: [{}, {}]",
+                &left.data_type(),
+                &right.data_type(),
+            ))
+        })?;
 
-                    if l.value(0) < r.value(0) {
-                        left.clone()
-                    } else {
-                        right.clone()
-                    }
+        let result = if left.is_null(0) {
+            cast(&left, &base_type)?
+        } else if right.is_null(0) {
+            cast(&right, &base_type)?
+        } else {
+            let l = cast(&left, &base_type)?;
+            let r = cast(&right, &base_type)?;
+
+            let is_less = match &left.data_type() {
+                DataType::UInt64 => {
+                    let l = downcast_primitive_arg!(l, "left", UInt64Type);
+                    let r = downcast_primitive_arg!(r, "right", UInt64Type);
+
+                    l.value(0) < r.value(0)
+                }
+                DataType::Int64 => {
+                    let l = downcast_primitive_arg!(l, "left", Int64Type);
+                    let r = downcast_primitive_arg!(r, "right", Int64Type);
+
+                    l.value(0) < r.value(0)
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
@@ -309,6 +325,12 @@ pub fn create_least_udf() -> ScalarUDF {
                         left.data_type()
                     )));
                 }
+            };
+
+            if is_less {
+                l
+            } else {
+                r
             }
         };
 
@@ -318,21 +340,23 @@ pub fn create_least_udf() -> ScalarUDF {
     let return_type: ReturnTypeFunction = Arc::new(move |types| {
         assert!(types.len() == 2);
 
-        Ok(Arc::new(types[0].clone()))
+        if types[0] == DataType::Null || types[1] == DataType::Null {
+            return Ok(Arc::new(DataType::Null));
+        }
+
+        let base_type = least_coercion(&types[0], &types[1]).ok_or_else(|| {
+            DataFusionError::Execution(format!(
+                "Unable to coercion types, actual: [{}, {}]",
+                &types[0], &types[1],
+            ))
+        })?;
+
+        Ok(Arc::new(base_type))
     });
 
     ScalarUDF::new(
         "least",
-        &Signature::uniform(
-            2,
-            vec![
-                DataType::Int32,
-                DataType::UInt32,
-                DataType::UInt64,
-                DataType::Int64,
-            ],
-            Volatility::Immutable,
-        ),
+        &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
     )

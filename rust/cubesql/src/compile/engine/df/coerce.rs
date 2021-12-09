@@ -51,3 +51,22 @@ pub fn if_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<DataType>
 
     numerical_coercion(lhs_type, rhs_type)
 }
+
+pub fn least_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<DataType> {
+    // same type => all good
+    if lhs_type == rhs_type {
+        return Some(lhs_type.clone());
+    }
+
+    let hack_ty = match (lhs_type, rhs_type) {
+        (DataType::Utf8, DataType::UInt64) => Some(DataType::Utf8),
+        (DataType::Utf8, DataType::Int64) => Some(DataType::Utf8),
+        //
+        (DataType::UInt64, DataType::Utf8) => Some(DataType::Utf8),
+        (DataType::Int64, DataType::Utf8) => Some(DataType::Utf8),
+        //
+        _ => None,
+    };
+
+    hack_ty.or_else(|| numerical_coercion(lhs_type, rhs_type))
+}
