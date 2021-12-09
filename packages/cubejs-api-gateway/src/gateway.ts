@@ -519,7 +519,7 @@ export class ApiGateway {
       });
     }
   }
-  
+
   public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
