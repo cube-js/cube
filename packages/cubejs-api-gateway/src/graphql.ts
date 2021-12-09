@@ -161,6 +161,10 @@ function capitalize(name: string) {
   return `${name[0].toUpperCase()}${name.slice(1)}`;
 }
 
+function unCapitalize(name: string) {
+  return `${name[0].toLowerCase()}${name.slice(1)}`;
+}
+
 function applyDirectives(
   directives: readonly DirectiveNode[] | undefined,
   values: Record<string, any>
