@@ -475,9 +475,9 @@ export function makeSchema(metaConfig: any) {
           if (orderBy) {
             Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
               Object.entries<any>(members).forEach(([member, value]) => {
-                order.push([`${capitalize(cubeName)}.${member}`, value])
-              })
-            })
+                order.push([`${capitalize(cubeName)}.${member}`, value]);
+              });
+            });
           }
           console.log('order', JSON.stringify(order, null, 2));
 
