@@ -43,10 +43,8 @@ import {
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
-import { CubeGraphQLConverter } from './CubeGraphQLConverter';
 
 import { makeSchema } from './graphql';
-import { metaConfigToTypes } from './utils';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
