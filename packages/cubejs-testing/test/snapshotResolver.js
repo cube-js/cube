@@ -21,5 +21,5 @@ module.exports = {
   resolveSnapshotPath,
   resolveTestPath,
 
-  // testPathForConsistencyCheck: 'dist/test/Test.spec.js'
+  testPathForConsistencyCheck: 'dist/test/Test.spec.js'
 };
