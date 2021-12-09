@@ -478,7 +478,6 @@ export function makeSchema(metaConfig: any) {
               });
             });
           }
-          console.log('order', JSON.stringify(order, null, 2));
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeName = capitalize(cubeNode.name.value);
