@@ -5,7 +5,6 @@ import moment from 'moment';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
-import { format } from 'prettier';
 
 import type {
   Application as ExpressApplication,
@@ -344,22 +343,6 @@ export class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
-    
-    app.get(`${this.basePath}/graphql-query`, userMiddlewares, (async (req, res) => {
-      await this.gql({
-        query: req.query.query,
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
-    }));
-    
-    app.post(`${this.basePath}/graphql-query`, userMiddlewares, (async (req, res) => {
-      await this.gql({
-        query: req.body.query,
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
-    }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
@@ -535,31 +518,6 @@ export class ApiGateway {
         context,
         res,
         requestStarted,
-      });
-    }
-  }
-
-  public async gql({ query, context, res }: QueryRequest) {
-    const metaConfig = await this.getCompilerApi(context).metaConfig({
-      requestId: context.requestId,
-    });
-    
-    try {
-      const converter = new CubeGraphQLConverter(query, metaConfigToTypes(metaConfig));
-      const graphQLQuery = format(converter.convert(), {
-        parser: 'graphql'
-      });
-      
-      res({ graphQLQuery });
-    } catch (error) {
-      res({
-        graphQLQuery: '',
-        error: error.message
-      }, { status: 400 });
-      
-      this.log({
-        type: 'Error converting Cube query to GraphQL query',
-        error: error.stack || error.toString(),
       });
     }
   }
