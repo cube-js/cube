@@ -30,7 +30,6 @@ import {
 } from 'graphql-scalars';
 
 import { QUERY_TYPE } from './query';
-import { unCapitalize } from './utils';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
