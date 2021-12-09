@@ -16,6 +16,24 @@ const queries = [
   },
   {
     measures: ['Orders.count'],
+    dimensions: ['Orders.status', 'Users.country', 'Orders.createdAt'],
+    order: {
+      'Orders.count': 'desc',
+      'Orders.status': 'asc',
+      'Users.country': 'desc'
+    }
+  },
+  {
+    measures: ['Orders.count'],
+    dimensions: ['Orders.status', 'Users.country', 'Orders.createdAt'],
+    order: [
+      ['Orders.count', 'desc'],
+      ['Orders.status', 'asc'],
+      ['Users.country', 'desc']
+    ]
+  },
+  {
+    measures: ['Orders.count'],
     dimensions: ['Orders.status'],
     timeDimensions: [
       {

@@ -345,7 +345,7 @@ export class ApiGateway {
       });
     }));
     
-    app.get(`${this.basePath}/v1/gql`, userMiddlewares, (async (req, res) => {
+    app.get(`${this.basePath}/graphql-query`, userMiddlewares, (async (req, res) => {
       await this.gql({
         query: req.query.query,
         context: req.context,
@@ -353,7 +353,7 @@ export class ApiGateway {
       });
     }));
     
-    app.post(`${this.basePath}/v1/gql`, userMiddlewares, (async (req, res) => {
+    app.post(`${this.basePath}/graphql-query`, userMiddlewares, (async (req, res) => {
       await this.gql({
         query: req.body.query,
         context: req.context,

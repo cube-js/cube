@@ -55,9 +55,12 @@ type CubeField = {
   granularities?: string[];
 };
 
+type OrderBy = [string, 'asc' | 'desc'][];
+
 type Cube = {
   fields: CubeField[];
   filters: any;
+  orderBy: OrderBy;
 };
 
 type Cubes = {
@@ -284,17 +287,42 @@ export class CubeGraphQLConverter {
       },
     };
   }
+  
+  private orderByArg(orderBy: OrderBy): t.ArgumentNode {
+    return {
+      kind: t.Kind.ARGUMENT,
+      name: {
+        kind: t.Kind.NAME,
+        value: 'orderBy',
+      },
+      value: {
+        kind: t.Kind.OBJECT,
+        fields: orderBy.map(([field, value]) => ({
+          kind: t.Kind.OBJECT_FIELD,
+          name: {
+            kind: t.Kind.NAME,
+            value: field
+          },
+          value: {
+            kind: t.Kind.ENUM, 
+            value
+          }
+        }))
+      },
+    };
+  }
 
   private getFieldsSelections() {
     const selections: t.FieldNode[] = [];
 
-    Object.entries(this.cubes).forEach(([cubeName, { fields }]) => {
+    Object.entries(this.cubes).forEach(([cubeName, { fields, orderBy }]) => {
       selections.push({
         kind: t.Kind.FIELD,
         name: {
           kind: t.Kind.NAME,
           value: cubeName,
         },
+        arguments: orderBy.length ? [this.orderByArg(orderBy)] : [],
         selectionSet: {
           kind: t.Kind.SELECTION_SET,
           selections: fields.map((field) => {
@@ -391,6 +419,7 @@ export class CubeGraphQLConverter {
         this.cubes[cubeName] = {
           fields: [],
           filters: [],
+          orderBy: [],
         };
       }
     };
@@ -418,8 +447,8 @@ export class CubeGraphQLConverter {
           name: field,
           ...(gqlGranularity
             ? {
-              granularities: [...(currentField?.granularities || []), gqlGranularity],
-            }
+                granularities: [...(currentField?.granularities || []), gqlGranularity],
+              }
             : null),
         });
       });
@@ -444,5 +473,25 @@ export class CubeGraphQLConverter {
         granularities,
       });
     });
+
+    if (this.cubeQuery.order) {
+      const orderBy = Array.isArray(this.cubeQuery.order) ? this.cubeQuery.order : Object.entries(this.cubeQuery.order);
+
+      orderBy.forEach(([key, order]) => {
+        const [cubeName, member] = key.split('.');
+        const gqlCubeName = unCapitalize(cubeName);
+        
+        if (!this.cubes[gqlCubeName]) {
+          throw new Error(`Order without selecting the cube is not allowed. Did you forget to include the "${cubeName}" cube?`);
+        }
+        
+        const exists = this.cubes[gqlCubeName].fields.find(({ name }) => name === member);
+        
+        if (!exists) {
+          throw new Error(`Order without selecting the member is not allowed. Did you forget to include the "${member}" member?`);
+        }
+        this.cubes[gqlCubeName].orderBy.push([member, order]);
+      });
+    }
   }
 }

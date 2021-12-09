@@ -409,6 +409,17 @@ export function makeSchema(metaConfig: any) {
       });
     }
   }));
+  
+  types.push(inputObjectType({
+    name: 'RootOrderByInput',
+    definition(t) {
+      metaConfig.forEach(cube => {
+        t.field(unCapitalize(cube.config.name), {
+          type: `${cube.config.name}OrderByInput`
+        });
+      });
+    }
+  }));
 
   types.push(objectType({
     name: 'Result',
@@ -442,24 +453,37 @@ export function makeSchema(metaConfig: any) {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          orderBy: arg({
+            type: 'RootOrderByInput'
+          }),
         },
-        resolve: async (_, { where, limit, offset, timezone, renewQuery }, { req, apiGateway }, infos) => {
+        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
           let filters: any[] = [];
-          const order: Record<string, string> = {};
+          const order: [string, 'asc' | 'desc'][] = [];
           
           if (where) {
             filters = whereArgToQueryFilters(where);
           }
+          
+          if (orderBy) {
+            Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
+              Object.entries<any>(members).forEach(([member, value]) => {
+                order.push([`${capitalize(cubeName)}.${member}`, value])
+              })
+            })
+          }
+          console.log('order', JSON.stringify(order, null, 2));
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeName = capitalize(cubeNode.name.value);
             const orderByArg = getArgumentValue(cubeNode, 'orderBy');
+            // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
               Object.keys(orderByArg).forEach(key => {
-                order[`${cubeName}.${key}`] = orderByArg[key];
+                order.push([`${cubeName}.${key}`, orderByArg[key]]);
               });
             }
 
