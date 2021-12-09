@@ -283,6 +283,7 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        meta,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -487,6 +488,7 @@ export function PlaygroundQueryBuilder({
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
+                    meta={meta}
                     iframeRef={iframeRef}
                     isChartRendererReady={isChartRendererReady}
                     query={query}
