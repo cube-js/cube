@@ -1,7 +1,32 @@
+import { Meta } from '@cubejs-client/core';
 import { notification } from 'antd';
 import { pretty } from 'js-object-pretty-print';
 
 import { PlaygroundEvent } from './types';
+
+export type MemberTypeMap = Record<string, 'time' | 'number' | 'string'>;
+
+export function metaToTypes(meta: Meta) {
+  const types: MemberTypeMap = {};
+
+  Object.values(meta.cubesMap).forEach((membersByType) => {
+    Object.values(membersByType).forEach((members) => {
+      Object.values<any>(members).forEach(({ name, type }) => {
+        types[name] = type;
+      });
+    });
+  });
+
+  return types;
+}
+
+export function unCapitalize(name: string) {
+  return `${name[0].toLowerCase()}${name.slice(1)}`;
+}
+
+export function uniqArray<T = any>(array: T[]) {
+  return Array.from(new Set(array));
+}
 
 const bootstrapDefinition = {
   'angular-cli': {
