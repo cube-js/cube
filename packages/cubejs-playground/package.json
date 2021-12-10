@@ -11,7 +11,7 @@
   "module": "lib/index.js",
   "types": "lib/playground/index.d.ts",
   "scripts": {
-    "test": "react-scripts test",
+    "unit": "react-scripts test",
     "dev": "kill-port 3080 && yarn start",
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",

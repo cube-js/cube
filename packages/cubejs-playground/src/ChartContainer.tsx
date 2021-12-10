@@ -534,7 +534,7 @@ class ChartContainer extends Component<
       } else if (showCode === 'cache') {
         return <CachePane query={query} />;
       } else if (showCode === 'graphiql' && meta) {
-        return <GraphiQLSandbox query={query} meta={meta} />;
+        return <GraphiQLSandbox apiUrl={this.props.apiUrl} query={query} meta={meta} />;
       }
 
       return render({ framework, error });

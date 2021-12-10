@@ -10,6 +10,7 @@ import useDeepMemo from '../../hooks/deep-memo';
 import { metaToTypes } from '../../utils';
 import { CubeGraphQLConverter } from './CubeGraphQLConverter';
 import styled from 'styled-components';
+import { useToken } from '../../hooks';
 
 const Wrapper = styled.div`
   margin-top: -15px;
@@ -35,15 +36,22 @@ const Wrapper = styled.div`
 `;
 
 type GraphiQLSandboxProps = {
+  apiUrl: string;
   query: Query;
   meta: Meta;
 };
 
-const fetcher = createGraphiQLFetcher({
-  url: 'http://localhost:4000/cubejs-api/graphql',
-});
-
-export default function GraphiQLSandbox({ query, meta }: GraphiQLSandboxProps) {
+export default function GraphiQLSandbox({ apiUrl, query, meta }: GraphiQLSandboxProps) {
+  const token = useToken();
+  const fetcher = useMemo(() => {    
+    return createGraphiQLFetcher({
+      url: apiUrl.replace('/v1', '/graphql'),
+      headers: token ? {
+        authorization: token
+      } : {}
+    });
+  }, [apiUrl, token])
+  
   const types = useMemo(() => {
     return metaToTypes(meta);
   }, [meta]);
