@@ -604,6 +604,8 @@ class ChartContainer extends Component<
       );
     } else if (showCode === 'cache') {
       title = 'Cache';
+    } else if (showCode === 'graphiql') {
+      title = 'GraphQL API';
     } else {
       title = 'Chart';
     }

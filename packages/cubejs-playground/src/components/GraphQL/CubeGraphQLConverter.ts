@@ -272,17 +272,20 @@ export class CubeGraphQLConverter {
         value: {
           kind: t.Kind.OBJECT,
           fields:
-            f.values === undefined
+            f.values === undefined && !['set', 'notSet'].includes(f.operator)
               ? []
               : [
                   {
                     kind: t.Kind.OBJECT_FIELD,
                     name: {
                       kind: t.Kind.NAME,
+                      // A single value maps to "equals"
+                      // Whereas multiple values for "equals" operator maps to "in"
+                      // value: operatorsMap[f.operator] || f.operator,
                       value:
-                        !f.values || (f.values || []).length > 1
-                          ? operatorsMap[f.operator] || f.operator
-                          : f.operator,
+                        f.operator === 'equals' && (f.values || []).length <= 1
+                          ? f.operator
+                          : operatorsMap[f.operator] || f.operator,
                     },
                     value: value(f),
                   },
@@ -533,10 +536,21 @@ export class CubeGraphQLConverter {
       const cubeName = unCapitalize(name);
       initCube(cubeName);
 
-      this.cubes[cubeName].fields.push({
-        name: field,
-        granularities,
-      });
+      const existingField = this.cubes[cubeName].fields.find(
+        (f) => f.name === field
+      );
+
+      if (existingField) {
+        existingField.granularities = uniqArray([
+          ...(existingField.granularities || []),
+          ...granularities,
+        ]);
+      } else {
+        this.cubes[cubeName].fields.push({
+          name: field,
+          granularities,
+        });
+      }
     });
 
     if (this.cubeQuery.order) {

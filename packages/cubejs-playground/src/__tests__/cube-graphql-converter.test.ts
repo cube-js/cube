@@ -1,3 +1,4 @@
+import { CubeGraphQLConverter } from '../components/GraphQL/CubeGraphQLConverter';
 
 const types = {
   'Orders.count': 'number',
@@ -19,8 +20,8 @@ const queries = [
     order: {
       'Orders.count': 'desc',
       'Orders.status': 'asc',
-      'Users.country': 'desc'
-    }
+      'Users.country': 'desc',
+    },
   },
   {
     measures: ['Orders.count'],
@@ -28,8 +29,8 @@ const queries = [
     order: [
       ['Orders.count', 'desc'],
       ['Orders.status', 'asc'],
-      ['Users.country', 'desc']
-    ]
+      ['Users.country', 'desc'],
+    ],
   },
   {
     measures: ['Orders.count'],
@@ -63,6 +64,19 @@ const queries = [
         operator: 'equals',
         values: ['canceled', 'active'],
       },
+      {
+        or: [
+          {
+            member: 'Users.country',
+            operator: 'notSet',
+          },
+          {
+            member: 'Users.country',
+            operator: 'equals',
+            values: ['US']
+          },
+        ]
+      }
     ],
   },
   {
@@ -130,6 +144,20 @@ const queries = [
         ],
       },
     ],
+  },
+  {
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+        granularity: 'quarter',
+      },
+    ],
+    order: [
+      ['Orders.count', 'asc'],
+      ['Users.country', 'asc'],
+    ],
+    dimensions: ['Users.country', 'Orders.createdAt'],
   },
 ];
 
