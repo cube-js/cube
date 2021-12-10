@@ -26,7 +26,6 @@ import {
   useDeepEffect,
   useIsMounted,
   useSecurityContext,
-  useServerCoreVersionGte,
 } from '../../../hooks';
 import FilterGroup from '../../../QueryBuilder/FilterGroup';
 import MemberGroup from '../../../QueryBuilder/MemberGroup';
@@ -199,8 +198,6 @@ export function PlaygroundQueryBuilder({
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const isGraphQLSupported = useServerCoreVersionGte('0.28.58');
-  
   const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
@@ -286,7 +283,6 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
-        meta,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -491,8 +487,6 @@ export function PlaygroundQueryBuilder({
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
-                    meta={meta}
-                    isGraphQLSupported={isGraphQLSupported}
                     iframeRef={iframeRef}
                     isChartRendererReady={isChartRendererReady}
                     query={query}

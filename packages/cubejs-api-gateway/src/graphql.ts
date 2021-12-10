@@ -147,17 +147,8 @@ function mapWhereValue(operator: string, value: any) {
   switch (operator) {
     case 'set':
       return undefined;
-    case 'inDateRange':
-    case 'notInDateRange':
-      // This is a hack for named date ranges (e.g. "This year", "Today")
-      // We should use enums in the future
-      if (value.length === 1 && !/^[0-9]/.test(value[0])) {
-        return value[0].toString();
-      }
-      
-      return value.map(v => v.toString());
     default:
-      return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
+      return Array.isArray(value) ? value.map(v => `${v}`) : [`${value}`];
   }
 }
 
@@ -245,7 +236,7 @@ function whereArgToQueryFilters(
   prefix?: string
 ) {
   const queryFilters: any[] = [];
-  
+
   Object.keys(whereArg).forEach((key) => {
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
@@ -502,38 +493,24 @@ export function makeSchema(metaConfig: any) {
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
-            
-            const inDateRangeFilters = {};
-            filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange') {
-                inDateRangeFilters[f.member] = f.values;
-                return false;
-              }
-              
-              return true;
-            });
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
               const memberType = getMemberType(metaConfig, cubeName, memberName);
-              const key = `${cubeName}.${memberName}`;
 
               if (memberType === 'measure') {
-                measures.push(key);
+                measures.push(`${cubeName}.${memberName}`);
               } else if (memberType === 'dimension') {
                 const granularityNodes = getFieldNodeChildren(memberNode, infos);
                 if (granularityNodes.length > 0) {
                   granularityNodes.forEach(granularityNode => {
                     const granularityName = granularityNode.name.value;
                     if (granularityName === 'value') {
-                      dimensions.push(key);
+                      dimensions.push(`${cubeName}.${memberName}`);
                     } else {
                       timeDimensions.push({
-                        dimension: key,
-                        granularity: granularityName,
-                        ...(inDateRangeFilters[key] ? {
-                          dateRange: inDateRangeFilters[key],
-                        } : null)
+                        dimension: `${cubeName}.${memberName}`,
+                        granularity: granularityName
                       });
                     }
                   });

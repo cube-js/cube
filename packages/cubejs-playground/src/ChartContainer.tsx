@@ -1,4 +1,4 @@
-import { Component, useEffect, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, useEffect, FunctionComponent } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -13,21 +13,16 @@ import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
+import { ChartType, Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
-import { Button, Card, CubeLoader, FatalError } from './atoms';
+import { Button, Card, FatalError } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
-import { GraphQLIcon } from './shared/icons/GraphQLIcon';
-
-const GraphiQLSandbox = lazy(
-  () => import('./components/GraphQL/GraphiQLSandbox')
-);
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -36,8 +31,6 @@ const frameworkToTemplate = {
 };
 
 const StyledCard: any = styled(Card)`
-  min-height: 420px;
-  
   .ant-card-head {
     position: sticky;
     top: 0;
@@ -61,11 +54,11 @@ type FrameworkDescriptor = {
   scaffoldingSupported?: boolean;
 };
 
-const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
-  framework,
-}) => (
+const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({ framework }) => (
   <h2 style={{ padding: 24, textAlign: 'center' }}>
-    We do not support&nbsp; Vanilla JavaScript &nbsp;code generation here yet.
+    We do not support&nbsp;
+    Vanilla JavaScript
+    &nbsp;code generation here yet.
     <br />
     Please refer to&nbsp;
     <a
@@ -76,7 +69,8 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
         playgroundAction('Unsupported Framework Docs', { framework })
       }
     >
-      Vanilla JavaScript &nbsp;docs
+      Vanilla JavaScript
+      &nbsp;docs
     </a>
     &nbsp;to see on how to use it with Cube.js.
   </h2>
@@ -84,17 +78,19 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
 
 const BIPlaceholder: UnsupportedPlaceholder = () => (
   <h2 style={{ padding: 24, textAlign: 'center' }}>
-    You can connect Cube to any Business Intelligence tool through the Cube SQL
-    API.
+    You can connect Cube to any Business Intelligence tool through the Cube SQL API.
     <br />
     Please refer to&nbsp;
     <a
       href="https://cube.dev/docs/backend/sql"
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() => playgroundAction('BI Docs')}
+      onClick={() =>
+        playgroundAction('BI Docs' )
+      }
     >
-      Cube SQL &nbsp;docs
+      Cube SQL
+      &nbsp;docs
     </a>
     &nbsp;to learn more.
   </h2>
@@ -130,10 +126,8 @@ export const frameworks: FrameworkDescriptor[] = [
 
 type ChartContainerProps = {
   query: Query;
-  meta: Meta;
   hideActions: boolean;
   chartType: ChartType;
-  isGraphQLSupported: boolean;
   dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;
@@ -243,7 +237,6 @@ class ChartContainer extends Component<
       history,
       framework,
       setFramework,
-      meta,
       isFetchingMeta,
       onChartRendererReadyChange,
     } = this.props;
@@ -366,20 +359,6 @@ class ChartContainer extends Component<
               }}
             >
               JSON Query
-            </Button>
-
-            <Button
-              data-testid="graphiql-btn"
-              icon={<GraphQLIcon />}
-              size="small"
-              type={showCode === 'graphiql' ? 'primary' : 'default'}
-              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
-              onClick={() => {
-                playgroundAction('Show GraphiQL');
-                this.setState({ showCode: 'graphiql' });
-              }}
-            >
-              GraphiQL
             </Button>
 
             <Button
@@ -537,22 +516,7 @@ class ChartContainer extends Component<
         );
       } else if (showCode === 'cache') {
         return <CachePane query={query} />;
-      } else if (showCode === 'graphiql' && meta) {
-        if (!this.props.isGraphQLSupported) {
-          return <div>GraphQL API is supported since version 0.28.56</div>
-        }
-        
-        return (
-          <Suspense fallback={<div style={{ height: 363 }}><CubeLoader /></div>}>
-            <GraphiQLSandbox
-              apiUrl={this.props.apiUrl}
-              query={query}
-              meta={meta}
-            />
-          </Suspense>
-        );
       }
-
       return render({ framework, error });
     };
 
@@ -620,8 +584,6 @@ class ChartContainer extends Component<
       );
     } else if (showCode === 'cache') {
       title = 'Cache';
-    } else if (showCode === 'graphiql') {
-      title = 'GraphQL API';
     } else {
       title = 'Chart';
     }
@@ -629,7 +591,7 @@ class ChartContainer extends Component<
     return hideActions ? (
       render({ resultSet, error })
     ) : (
-      <StyledCard title={title} extra={extra}>
+      <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
         {renderChart()}
       </StyledCard>
     );
