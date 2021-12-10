@@ -155,7 +155,7 @@ function mapWhereValue(operator: string, value: any) {
         return value[0].toString();
       }
       
-      // return value.map(v => v.toString());
+      return value.map(v => v.toString());
     default:
       return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
   }
