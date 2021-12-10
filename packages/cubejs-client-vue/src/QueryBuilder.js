@@ -233,6 +233,15 @@ export default {
       });
     }
 
+    if (this.$scopedSlots.builder) {
+      return createElement('div', {}, [
+        this.$scopedSlots.builder({
+          query: this.validatedQuery,
+          ...builderProps,
+        }),
+      ]);
+    }
+
     // Pass parent slots to child QueryRenderer component
     const children = Object.keys(this.$slots).map((slot) =>
       createElement('template', { slot }, this.$slots[slot])
