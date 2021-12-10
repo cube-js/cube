@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.65](https://github.com/cube-js/cube.js/compare/v0.28.64...v0.28.65) (2021-12-10)
+
+
+### Bug Fixes
+
+* **api-gateway:** GraphQL boolean filters ([#3776](https://github.com/cube-js/cube.js/issues/3776)) ([285b371](https://github.com/cube-js/cube.js/commit/285b37157af064483f36e9f7806e12f98b3a5de7))
+* **graphql-api:** Remove irrelevant float filters ([#3778](https://github.com/cube-js/cube.js/issues/3778)) ([3147fe4](https://github.com/cube-js/cube.js/commit/3147fe4e642404b999063a5e45340fa4094f367e))
+
+
+### Features
+
+* **api-gateway:** Enable GraphiQL header editor to pass security context in dev mode ([#3779](https://github.com/cube-js/cube.js/issues/3779)) ([8c335a2](https://github.com/cube-js/cube.js/commit/8c335a2bdf65446ed3ab3ac00c09452751e60a03))
+* **api-gateway:** GraphQL root orderBy ([#3788](https://github.com/cube-js/cube.js/issues/3788)) ([cd88d26](https://github.com/cube-js/cube.js/commit/cd88d269a5c7ab12ec8e326718fdfd2935ab70bd))
+* **playground:** GraphiQL sandbox. Allow using the cube GraphQL API ([#3794](https://github.com/cube-js/cube.js/issues/3794)) ([ea9630f](https://github.com/cube-js/cube.js/commit/ea9630fad3894ed4357d188a2dd5ade0e474e0b0))
+
+
+
+
+
 ## [0.28.63](https://github.com/cube-js/cube.js/compare/v0.28.62...v0.28.63) (2021-12-03)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

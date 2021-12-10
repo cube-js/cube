@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.28.65](https://github.com/cube-js/cube.js/compare/v0.28.64...v0.28.65) (2021-12-10)
+
+
+### Bug Fixes
+
+* **api-gateway:** GraphQL boolean filters ([#3776](https://github.com/cube-js/cube.js/issues/3776)) ([285b371](https://github.com/cube-js/cube.js/commit/285b37157af064483f36e9f7806e12f98b3a5de7))
+* **cubesql:** Special NULL handling for LEAST function ([edb4b02](https://github.com/cube-js/cube.js/commit/edb4b02fe7de249f4d107b5556e3afef433a8e82))
+* **cubestore:** Introduce network protocol hand shakes to avoid corrupted messages deserialization ([aac0a5b](https://github.com/cube-js/cube.js/commit/aac0a5b1a89ffb8607460b48cfbdc6be16c0b199))
+* **graphql-api:** Remove irrelevant float filters ([#3778](https://github.com/cube-js/cube.js/issues/3778)) ([3147fe4](https://github.com/cube-js/cube.js/commit/3147fe4e642404b999063a5e45340fa4094f367e))
+
+
+### Features
+
+* **api-gateway:** Enable GraphiQL header editor to pass security context in dev mode ([#3779](https://github.com/cube-js/cube.js/issues/3779)) ([8c335a2](https://github.com/cube-js/cube.js/commit/8c335a2bdf65446ed3ab3ac00c09452751e60a03))
+* **api-gateway:** GraphQL root orderBy ([#3788](https://github.com/cube-js/cube.js/issues/3788)) ([cd88d26](https://github.com/cube-js/cube.js/commit/cd88d269a5c7ab12ec8e326718fdfd2935ab70bd))
+* **cubesql:** Introduce convert_tz fn (stub) ([1f08272](https://github.com/cube-js/cube.js/commit/1f08272bca28a79c46e8b28fbe43847b276958fb))
+* **cubesql:** Introduce support for least function ([434084e](https://github.com/cube-js/cube.js/commit/434084ed8ea427d5afd2a999951cfacadfbb40d2))
+* **cubesql:** Introduce time_format fn (stub) ([9c9b217](https://github.com/cube-js/cube.js/commit/9c9b21728a7fe192f8452c4959482b473979f2f2))
+* **cubesql:** Introduce timediff fn (stub) ([29dfb97](https://github.com/cube-js/cube.js/commit/29dfb9716298c5a579c0ffba6742e13a29325670))
+* **cubesql:** Support compound identifier in ORDER BY ([6d08ba8](https://github.com/cube-js/cube.js/commit/6d08ba89216f8c856ef10dfe7ac9366c544eea3d))
+* **cubesql:** Support performance_schema.session_variables & global_variables ([a807858](https://github.com/cube-js/cube.js/commit/a807858cdc3d55790be75165d8b1c14045229d80))
+* **cubesql:** Support type coercion for IF function ([3b3f48c](https://github.com/cube-js/cube.js/commit/3b3f48c15166f6e172fa9b3bffe1ea6b5448bad4))
+* **cubestore:** Sort NULLS LAST by default ([#3785](https://github.com/cube-js/cube.js/issues/3785)) ([02744e8](https://github.com/cube-js/cube.js/commit/02744e8c6d33363c6383aa0bf38733074c8e7d09))
+* **helm-charts:** Add sqlPort config to enable SQL Api ([#3706](https://github.com/cube-js/cube.js/issues/3706)) ([8705893](https://github.com/cube-js/cube.js/commit/87058936d76ebe99bf31fafb65b168056a18a11a))
+* **playground:** GraphiQL sandbox. Allow using the cube GraphQL API ([#3794](https://github.com/cube-js/cube.js/issues/3794)) ([ea9630f](https://github.com/cube-js/cube.js/commit/ea9630fad3894ed4357d188a2dd5ade0e474e0b0))
+
+
+
+
+
 ## [0.28.64](https://github.com/cube-js/cube.js/compare/v0.28.63...v0.28.64) (2021-12-05)
 
 
