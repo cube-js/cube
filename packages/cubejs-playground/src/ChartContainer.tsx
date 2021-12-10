@@ -17,12 +17,13 @@ import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
-import { Button, Card, FatalError } from './atoms';
+import { Button, Card, CubeLoader, FatalError } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
+import { GraphQLIcon } from './shared/icons/GraphQLIcon';
 
 const GraphiQLSandbox = lazy(
   () => import('./components/GraphQL/GraphiQLSandbox')
@@ -35,6 +36,8 @@ const frameworkToTemplate = {
 };
 
 const StyledCard: any = styled(Card)`
+  min-height: 420px;
+  
   .ant-card-head {
     position: sticky;
     top: 0;
@@ -130,6 +133,7 @@ type ChartContainerProps = {
   meta: Meta;
   hideActions: boolean;
   chartType: ChartType;
+  isGraphQLSupported: boolean;
   dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;
@@ -366,7 +370,7 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="graphiql-btn"
-              // icon={<CodeOutlined />}
+              icon={<GraphQLIcon />}
               size="small"
               type={showCode === 'graphiql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
@@ -534,7 +538,19 @@ class ChartContainer extends Component<
       } else if (showCode === 'cache') {
         return <CachePane query={query} />;
       } else if (showCode === 'graphiql' && meta) {
-        return <GraphiQLSandbox apiUrl={this.props.apiUrl} query={query} meta={meta} />;
+        if (!this.props.isGraphQLSupported) {
+          return <div>GraphQL API is supported since version 0.28.56</div>
+        }
+        
+        return (
+          <Suspense fallback={<div style={{ height: 363 }}><CubeLoader /></div>}>
+            <GraphiQLSandbox
+              apiUrl={this.props.apiUrl}
+              query={query}
+              meta={meta}
+            />
+          </Suspense>
+        );
       }
 
       return render({ framework, error });
@@ -613,11 +629,9 @@ class ChartContainer extends Component<
     return hideActions ? (
       render({ resultSet, error })
     ) : (
-      <Suspense fallback={<div>Loading...</div>}>
-        <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
-          {renderChart()}
-        </StyledCard>
-      </Suspense>
+      <StyledCard title={title} extra={extra}>
+        {renderChart()}
+      </StyledCard>
     );
   }
 }
