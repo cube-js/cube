@@ -45,8 +45,8 @@ jobs:
 
     strategy:
       matrix:
-        # We should use our minimal version, but there are problems with packages...
-        node-version: [12.x, 14.x, 15.x]
+        # We should use our minimal version (10.x), but there are problems with packages...
+        node-version: [12.x, 14.x, 16.x]
       fail-fast: false
 
     steps:
@@ -94,7 +94,7 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
-        if: (matrix.node-version == '15.x')
+        if: (matrix.node-version == '16.x')
         with:
           files: ./packages/*/coverage/clover.xml
           verbose: true # optional (default = false)
@@ -395,10 +395,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 15.x
+      - name: Use Node.js 16.x
         uses: actions/setup-node@v1
         with:
-          node-version: 15.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -410,9 +410,9 @@ jobs:
             node_modules
             rust/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-15.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
