@@ -159,9 +159,10 @@ relevant options on our Cube.js API instance and Refresh Worker deployments:
 
 <WarningBox>
 
-If you have cubes that use `SECURITY_CONTEXT` in their `sql` property, then you
-must configure [`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the
-refresh workers can correctly create pre-aggregations.
+If you're using [`queryRewrite`][ref-config-queryrewrite] for access control,
+then you must also configure
+[`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the refresh workers
+can correctly create pre-aggregations.
 
 </WarningBox>
 
@@ -262,4 +263,5 @@ spec:
   https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
 [k8s]: https://kubernetes.io/
 [ref-config-db]: /config/databases
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
