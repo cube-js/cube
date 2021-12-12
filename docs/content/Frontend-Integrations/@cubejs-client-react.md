@@ -149,7 +149,7 @@ setQuery? |  (**query**: Query) => *void* | Called by the `QueryBuilder` when th
 setVizState? |  (**vizState**: [VizState](#types-viz-state)) => *void* | - |
 stateChangeHeuristics? |  (**state**: [QueryBuilderState](#query-builder-state)) => *[QueryBuilderState](#query-builder-state)* | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way. |
 vizState? | [VizState](#types-viz-state) | - |
-wrapWithQueryRenderer? | boolean | - |
+wrapWithQueryRenderer? | boolean | Defaults to `true`. Use QueryRenderer to render. Set this to `false` to use your own QueryRenderer. |
 
 ### <--{"id" : "QueryBuilder"}--> QueryBuilderRenderProps
 
