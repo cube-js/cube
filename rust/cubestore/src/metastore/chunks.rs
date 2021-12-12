@@ -124,6 +124,12 @@ impl RocksSecondaryIndex<Chunk, ChunkIndexKey> for ChunkRocksIndex {
         }
     }
 
+    fn version(&self) -> u32 {
+        match self {
+            ChunkRocksIndex::PartitionId => 1,
+        }
+    }
+
     fn get_id(&self) -> IndexId {
         *self as IndexId
     }

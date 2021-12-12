@@ -154,12 +154,14 @@ pub fn partition_file_name(partition_id: u64, suffix: &Option<String>) -> String
 pub(crate) enum PartitionRocksIndex {
     IndexId = 1,
     MultiPartitionId = 2,
+    Active = 3,
 }
 
 rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
     vec![
         Box::new(PartitionRocksIndex::IndexId),
         Box::new(PartitionRocksIndex::MultiPartitionId),
+        Box::new(PartitionRocksIndex::Active),
     ]
 });
 
@@ -167,6 +169,7 @@ rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
 pub enum PartitionIndexKey {
     ByIndexId(u64),
     ByMultiPartitionId(Option<u64>),
+    ByActive(bool),
 }
 
 base_rocks_secondary_index!(Partition, PartitionRocksIndex);
@@ -178,6 +181,7 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
             PartitionRocksIndex::MultiPartitionId => {
                 PartitionIndexKey::ByMultiPartitionId(row.multi_partition_id)
             }
+            PartitionRocksIndex::Active => PartitionIndexKey::ByActive(row.active),
         }
     }
 
@@ -197,6 +201,11 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
                     buf
                 }
             },
+            PartitionIndexKey::ByActive(active) => {
+                let mut buf = Vec::with_capacity(1);
+                buf.write_u8(if *active { 1 } else { 0 }).unwrap();
+                buf
+            }
         }
     }
 
@@ -204,6 +213,15 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
         match self {
             PartitionRocksIndex::IndexId => false,
             PartitionRocksIndex::MultiPartitionId => false,
+            PartitionRocksIndex::Active => false,
+        }
+    }
+
+    fn version(&self) -> u32 {
+        match self {
+            PartitionRocksIndex::IndexId => 1,
+            PartitionRocksIndex::MultiPartitionId => 1,
+            PartitionRocksIndex::Active => 1,
         }
     }
 

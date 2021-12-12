@@ -18,20 +18,18 @@ use log::error;
 use std::collections::{BinaryHeap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::sync::{watch, Mutex, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
 pub struct SchedulerImpl {
     meta_store: Arc<dyn MetaStore>,
     cluster: Arc<dyn Cluster>,
     remote_fs: Arc<dyn RemoteFs>,
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
-    stop_sender: watch::Sender<bool>,
-    stop_receiver: Mutex<watch::Receiver<bool>>,
-    gc_loop: Mutex<DataGCLoop>,
-    gc_sender: UnboundedSender<GCTimedTask>,
+    cancel_token: CancellationToken,
+    gc_loop: Arc<DataGCLoop>,
     config: Arc<dyn ConfigObj>,
     reconcile_loop: WorkerLoop,
 }
@@ -46,18 +44,15 @@ impl SchedulerImpl {
         event_receiver: Receiver<MetaStoreEvent>,
         config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
-        let (tx, rx) = watch::channel(false);
-        let (gc_loop, gc_sender) =
-            DataGCLoop::new(meta_store.clone(), remote_fs.clone(), rx.clone());
+        let cancel_token = CancellationToken::new();
+        let gc_loop = DataGCLoop::new(meta_store.clone(), remote_fs.clone(), cancel_token.clone());
         SchedulerImpl {
             meta_store,
             cluster,
             remote_fs,
             event_receiver: Mutex::new(event_receiver),
-            stop_sender: tx,
-            stop_receiver: Mutex::new(rx),
-            gc_loop: Mutex::new(gc_loop),
-            gc_sender,
+            cancel_token,
+            gc_loop,
             config,
             reconcile_loop: WorkerLoop::new("Reconcile"),
         }
@@ -70,10 +65,7 @@ impl SchedulerImpl {
         let scheduler3 = scheduler.clone();
         vec![
             cube_ext::spawn(async move {
-                let mut gc_loop = scheduler
-                    .gc_loop
-                    .try_lock()
-                    .expect("Trying to spawn loops multiple times");
+                let gc_loop = scheduler.gc_loop.clone();
                 gc_loop.run().await;
                 Ok(())
             }),
@@ -94,15 +86,10 @@ impl SchedulerImpl {
 
     async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
         loop {
-            let mut stop_receiver = scheduler.stop_receiver.lock().await;
             let mut event_receiver = scheduler.event_receiver.lock().await;
             let event = tokio::select! {
-                res = stop_receiver.changed() => {
-                    if res.is_err() || *stop_receiver.borrow() {
-                        return Ok(());
-                    } else {
-                        continue;
-                    }
+                _ = scheduler.cancel_token.cancelled() => {
+                    return Ok(());
                 }
                 event = event_receiver.recv() => {
                     event?
@@ -219,10 +206,12 @@ impl SchedulerImpl {
 
         for partition in all_inactive_partitions.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_sender.send(GCTimedTask {
-                deadline,
-                task: GCTask::DeleteMiddleManPartition(partition.get_id()),
-            })?;
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteMiddleManPartition(partition.get_id()),
+                })
+                .await?;
         }
         Ok(())
     }
@@ -246,10 +235,12 @@ impl SchedulerImpl {
 
         for chunk in all_inactive_not_uploaded_chunks.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_sender.send(GCTimedTask {
-                deadline,
-                task: GCTask::DeleteChunk(chunk.get_id()),
-            })?;
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteChunk(chunk.get_id()),
+                })
+                .await?;
         }
         Ok(())
     }
@@ -260,10 +251,12 @@ impl SchedulerImpl {
 
         for chunk in all_inactive_chunks.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-            self.gc_sender.send(GCTimedTask {
-                deadline,
-                task: GCTask::DeleteChunk(chunk.get_id()),
-            })?;
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteChunk(chunk.get_id()),
+                })
+                .await?;
         }
         Ok(())
     }
@@ -317,7 +310,7 @@ impl SchedulerImpl {
     }
 
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        self.stop_sender.send(true)?;
+        self.cancel_token.cancel();
         self.reconcile_loop.stop();
         Ok(())
     }
@@ -369,10 +362,12 @@ impl SchedulerImpl {
                 } else {
                     let deadline =
                         Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-                    self.gc_sender.send(GCTimedTask {
-                        deadline,
-                        task: GCTask::DeleteChunk(chunk.get_id()),
-                    })?;
+                    self.gc_loop
+                        .send(GCTimedTask {
+                            deadline,
+                            task: GCTask::DeleteChunk(chunk.get_id()),
+                        })
+                        .await?;
                 }
             }
         }
@@ -425,10 +420,12 @@ impl SchedulerImpl {
                         partition_file_name(partition.get_id(), partition.get_row().suffix());
                     let deadline =
                         Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-                    self.gc_sender.send(GCTimedTask {
-                        deadline,
-                        task: GCTask::RemoveRemoteFile(file_name),
-                    })?;
+                    self.gc_loop
+                        .send(GCTimedTask {
+                            deadline,
+                            task: GCTask::RemoveRemoteFile(file_name),
+                        })
+                        .await?;
                 }
             }
         }
@@ -664,13 +661,15 @@ struct GCTimedTask {
 
 impl PartialOrd for GCTimedTask {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.deadline.partial_cmp(&other.deadline)
+        // Reverse order to have min heap
+        other.deadline.partial_cmp(&self.deadline)
     }
 }
 
 impl Ord for GCTimedTask {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.deadline.cmp(&other.deadline)
+        // Reverse order to have min heap
+        other.deadline.cmp(&self.deadline)
     }
 }
 
@@ -686,8 +685,8 @@ enum GCTask {
 struct DataGCLoop {
     metastore: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
-    stop: watch::Receiver<bool>,
-    to_delete: UnboundedReceiver<GCTimedTask>,
+    stop: CancellationToken,
+    task_notify: Notify,
     pending: RwLock<(BinaryHeap<GCTimedTask>, HashSet<GCTask>)>,
 }
 
@@ -695,59 +694,69 @@ impl DataGCLoop {
     fn new(
         metastore: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
-        stop: watch::Receiver<bool>,
-    ) -> (DataGCLoop, UnboundedSender<GCTimedTask>) {
-        let (sender, receiver) = unbounded_channel();
-        (
-            DataGCLoop {
-                metastore,
-                remote_fs,
-                stop,
-                to_delete: receiver,
-                pending: RwLock::new((BinaryHeap::new(), HashSet::new())),
-            },
-            sender,
-        )
+        stop: CancellationToken,
+    ) -> Arc<Self> {
+        Arc::new(DataGCLoop {
+            metastore,
+            remote_fs,
+            stop,
+            task_notify: Notify::new(),
+            pending: RwLock::new((BinaryHeap::new(), HashSet::new())),
+        })
     }
 
-    async fn run(&mut self) {
+    async fn send(&self, task: GCTimedTask) -> Result<(), CubeError> {
+        if self.pending.read().await.1.get(&task.task).is_none() {
+            let mut pending_lock = self.pending.write().await;
+            // Double-checked locking
+            if pending_lock.1.get(&task.task).is_none() {
+                log::trace!("Posting GCTask: {:?}", task);
+                pending_lock.1.insert(task.task.clone());
+                pending_lock.0.push(task);
+                self.task_notify.notify_waiters();
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run(&self) {
         loop {
             tokio::select! {
-                res = self.stop.changed() => {
-                    if res.is_err() || *self.stop.borrow() {
-                        return;
+                _ = self.stop.cancelled() => {
+                    return;
+                }
+                _ = Delay::new(Duration::from_secs(60)) => {}
+                _ = self.task_notify.notified() => {}
+            };
+
+            while self
+                .pending
+                .read()
+                .await
+                .0
+                .peek()
+                .map(|current| current.deadline <= Instant::now())
+                .unwrap_or(false)
+            {
+                let task = {
+                    let mut pending_lock = self.pending.write().await;
+                    // Double-checked locking
+                    if pending_lock
+                        .0
+                        .peek()
+                        .map(|current| current.deadline <= Instant::now())
+                        .unwrap_or(false)
+                    {
+                        let task = pending_lock.0.pop().unwrap();
+                        pending_lock.1.remove(&task.task);
+                        task.task
                     } else {
                         continue;
                     }
-                }
-                _ = Delay::new(Duration::from_secs(60)) => {}
-                event = self.to_delete.recv() => {
-                    match event {
-                        None => return, // channel closed.
-                        Some(task) => {
-                            let mut pending_lock = self.pending.write().await;
+                };
 
-                            if pending_lock.1.get(&task.task).is_none() {
-                                pending_lock.1.insert(task.task.clone());
-                                pending_lock.0.push(task);
-                            }
-                        }
-                    }
-                }
-            };
-
-            let mut pending_lock = self.pending.write().await;
-
-            while pending_lock
-                .0
-                .peek()
-                .map(|current| current.deadline < Instant::now())
-                .unwrap_or(false)
-            {
-                let task = pending_lock.0.pop().unwrap();
-                pending_lock.1.remove(&task.task);
-
-                let task = task.task;
+                log::trace!("Executing GCTask: {:?}", task);
 
                 match task {
                     GCTask::RemoveRemoteFile(remote_path) => {
