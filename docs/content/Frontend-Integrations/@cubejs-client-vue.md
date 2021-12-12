@@ -22,6 +22,7 @@ disableHeuristics? | boolean | Defaults to `false`. This means that the default 
 query? | Query | Query parameters ([learn more about the format](/query-format)). This property is reactive - if you change the object here, the internal query values will be overwritten. This is not two-way. |
 stateChangeHeuristics? |  (**state**: [QueryBuilderState](#types-query-builder-query-builder-state)) => *[QueryBuilderState](#types-query-builder-query-builder-state)* | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way. |
 initialVizState? | [VizState](#types-viz-state) | - |
+wrapWithQueryRenderer? | boolean | Defaults to `true`. Use QueryRenderer to render. Set this to `false` to use your own QueryRenderer. |
 
 ### <--{"id" : "QueryBuilder"}--> Slots
 

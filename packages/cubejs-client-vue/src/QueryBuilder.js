@@ -80,6 +80,10 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    wrapWithQueryRenderer: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     const {
@@ -227,6 +231,12 @@ export default {
           this.setMembers(elementName, members);
         };
       });
+    }
+
+    if (!this.wrapWithQueryRenderer && this.$scopedSlots.builder) {
+      return createElement('div', {}, [
+        this.$scopedSlots.builder(builderProps),
+      ]);
     }
 
     // Pass parent slots to child QueryRenderer component
