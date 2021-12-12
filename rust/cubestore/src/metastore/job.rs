@@ -167,6 +167,13 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
         }
     }
 
+    fn version(&self) -> u32 {
+        match self {
+            JobRocksIndex::RowReference => 1,
+            JobRocksIndex::ByShard => 1,
+        }
+    }
+
     fn get_id(&self) -> IndexId {
         *self as IndexId
     }

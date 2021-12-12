@@ -79,6 +79,12 @@ impl RocksSecondaryIndex<WAL, WALIndexKey> for WALRocksIndex {
         }
     }
 
+    fn version(&self) -> u32 {
+        match self {
+            WALRocksIndex::TableID => 1,
+        }
+    }
+
     fn get_id(&self) -> IndexId {
         *self as IndexId
     }
