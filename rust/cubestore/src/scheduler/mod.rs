@@ -177,6 +177,16 @@ impl SchedulerImpl {
         }
 
         if let Err(e) = warn_long_fut(
+            "Delete orphaned partitions",
+            Duration::from_millis(5000),
+            self.delete_created_but_not_written_partitions(),
+        )
+        .await
+        {
+            error!("Error deleting orphaned partitions: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
             "Delete middle man partitions",
             Duration::from_millis(5000),
             self.delete_middle_man_partitions(),
@@ -197,6 +207,21 @@ impl SchedulerImpl {
 
         for partition in all_inactive_partitions_to_repartition.iter() {
             self.schedule_repartition(&partition).await?;
+        }
+        Ok(())
+    }
+
+    async fn delete_created_but_not_written_partitions(&self) -> Result<(), CubeError> {
+        let all_inactive_partitions = self.meta_store.all_just_created_partitions().await?;
+
+        for partition in all_inactive_partitions.iter() {
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeletePartition(partition.get_id()),
+                })
+                .await?;
         }
         Ok(())
     }
@@ -678,6 +703,7 @@ enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
     DeleteChunk(/*chunk_id*/ u64),
     DeleteMiddleManPartition(/*partition_id*/ u64),
+    DeletePartition(/*partition_id*/ u64),
 }
 
 /// Cleans up deactivated partitions and chunks on remote fs.
@@ -806,6 +832,20 @@ impl DataGCLoop {
                                 "Skipping removing of middle man partition {}",
                                 partition_id
                             );
+                        }
+                    }
+                    GCTask::DeletePartition(partition_id) => {
+                        if let Ok(true) = self.metastore.can_delete_partition(partition_id).await {
+                            log::trace!("Removing orphaned partition {}", partition_id);
+                            if let Err(e) = self.metastore.delete_partition(partition_id).await {
+                                log::error!(
+                                    "Could not remove orphaned partition ({}): {}",
+                                    partition_id,
+                                    e
+                                );
+                            }
+                        } else {
+                            log::trace!("Skipping removing orphaned partition {}", partition_id);
                         }
                     }
                 }

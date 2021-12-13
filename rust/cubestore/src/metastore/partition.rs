@@ -155,6 +155,8 @@ pub(crate) enum PartitionRocksIndex {
     IndexId = 1,
     MultiPartitionId = 2,
     Active = 3,
+    JustCreated = 4,
+    ParentPartitionId = 5,
 }
 
 rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
@@ -162,6 +164,8 @@ rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
         Box::new(PartitionRocksIndex::IndexId),
         Box::new(PartitionRocksIndex::MultiPartitionId),
         Box::new(PartitionRocksIndex::Active),
+        Box::new(PartitionRocksIndex::JustCreated),
+        Box::new(PartitionRocksIndex::ParentPartitionId),
     ]
 });
 
@@ -170,6 +174,8 @@ pub enum PartitionIndexKey {
     ByIndexId(u64),
     ByMultiPartitionId(Option<u64>),
     ByActive(bool),
+    ByJustCreated(bool),
+    ByParentPartitionId(Option<u64>),
 }
 
 base_rocks_secondary_index!(Partition, PartitionRocksIndex);
@@ -182,6 +188,16 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
                 PartitionIndexKey::ByMultiPartitionId(row.multi_partition_id)
             }
             PartitionRocksIndex::Active => PartitionIndexKey::ByActive(row.active),
+            PartitionRocksIndex::JustCreated => PartitionIndexKey::ByJustCreated(
+                !row.active
+                    && !row.warmed_up
+                    && row.main_table_row_count == 0
+                    && row.min_value.is_none()
+                    && row.max_value.is_none(),
+            ),
+            PartitionRocksIndex::ParentPartitionId => {
+                PartitionIndexKey::ByParentPartitionId(row.parent_partition_id)
+            }
         }
     }
 
@@ -206,6 +222,21 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
                 buf.write_u8(if *active { 1 } else { 0 }).unwrap();
                 buf
             }
+            PartitionIndexKey::ByJustCreated(just_created) => {
+                let mut buf = Vec::with_capacity(1);
+                buf.write_u8(if *just_created { 1 } else { 0 }).unwrap();
+                buf
+            }
+            PartitionIndexKey::ByParentPartitionId(parent_partition_id) => {
+                let mut buf = Vec::with_capacity(1);
+                if let Some(parent_partition_id) = parent_partition_id {
+                    buf.write_u8(1).unwrap();
+                    buf.write_u64::<BigEndian>(*parent_partition_id).unwrap();
+                } else {
+                    buf.write_u8(0).unwrap();
+                }
+                buf
+            }
         }
     }
 
@@ -214,6 +245,8 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
             PartitionRocksIndex::IndexId => false,
             PartitionRocksIndex::MultiPartitionId => false,
             PartitionRocksIndex::Active => false,
+            PartitionRocksIndex::JustCreated => false,
+            PartitionRocksIndex::ParentPartitionId => false,
         }
     }
 
@@ -222,6 +255,8 @@ impl RocksSecondaryIndex<Partition, PartitionIndexKey> for PartitionRocksIndex {
             PartitionRocksIndex::IndexId => 1,
             PartitionRocksIndex::MultiPartitionId => 1,
             PartitionRocksIndex::Active => 1,
+            PartitionRocksIndex::JustCreated => 1,
+            PartitionRocksIndex::ParentPartitionId => 1,
         }
     }
 
