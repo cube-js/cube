@@ -32,8 +32,9 @@ use self::engine::context::SystemVar;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_time_format_udf,
-    create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
+    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
+    create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
+    create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1453,6 +1454,7 @@ impl QueryPlanner {
         ctx.register_udf(create_convert_tz_udf());
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
+        ctx.register_udf(create_locate_udf());
 
         let state = ctx.state.lock().unwrap().clone();
         let cube_ctx = CubeContext::new(&state, &self.context.cubes);
@@ -3269,6 +3271,50 @@ mod tests {
             +------------------------------------------------+\n\
             | 0 years 0 mons 0 days 0 hours 0 mins 0.00 secs |\n\
             +------------------------------------------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_instr() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "select \
+                    instr('rust is killing me', 'r') as r1,
+                    instr('rust is killing me', 'e') as r2,
+                    instr('Rust is killing me', 'unknown') as r3;
+                "
+                .to_string()
+            )
+            .await?,
+            "+----+----+----+\n\
+            | r1 | r2 | r3 |\n\
+            +----+----+----+\n\
+            | 1  | 18 | 0  |\n\
+            +----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_locate() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "select \
+                    locate('r', 'rust is killing me') as r1,
+                    locate('e', 'rust is killing me') as r2,
+                    locate('unknown', 'Rust is killing me') as r3
+                "
+                .to_string()
+            )
+            .await?,
+            "+----+----+----+\n\
+            | r1 | r2 | r3 |\n\
+            +----+----+----+\n\
+            | 1  | 18 | 0  |\n\
+            +----+----+----+"
         );
 
         Ok(())
