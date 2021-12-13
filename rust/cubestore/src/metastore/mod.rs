@@ -2090,6 +2090,8 @@ impl RocksMetaStore {
                         }
                     }
 
+                    RocksMetaStore::check_all_indexes(&meta_store).await?;
+
                     return Ok(meta_store);
                 }
             } else {
@@ -2108,6 +2110,12 @@ impl RocksMetaStore {
 
         let meta_store = Self::new(path, remote_fs, config);
 
+        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        Ok(meta_store)
+    }
+
+    async fn check_all_indexes(meta_store: &Arc<RocksMetaStore>) -> Result<(), CubeError> {
         let meta_store_to_move = meta_store.clone();
 
         cube_ext::spawn_blocking(move || {
@@ -2125,7 +2133,7 @@ impl RocksMetaStore {
         })
         .await?;
 
-        Ok(meta_store)
+        Ok(())
     }
 
     pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
