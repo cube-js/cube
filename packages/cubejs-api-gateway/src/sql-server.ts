@@ -77,6 +77,7 @@ export class SQLServer {
               res: (message) => {
                 resolve(message);
               },
+              apiType: 'sql',
             });
           } catch (e) {
             reject(e);

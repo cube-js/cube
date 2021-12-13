@@ -186,7 +186,8 @@ type BaseRequest = {
 
 type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi'
+  queryType?: 'multi';
+  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
 };
 
 export interface ApiGatewayOptions {
@@ -840,7 +841,7 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, ...props }: QueryRequest) {
+  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -930,6 +931,7 @@ export class ApiGateway {
           type: 'Load Request Success',
           query,
           duration: this.duration(requestStarted),
+          apiType,
           isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
           queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
             .length,
@@ -975,7 +977,7 @@ export class ApiGateway {
   }
 
   public async subscribe({
-    query, context, res, subscribe, subscriptionState, queryType
+    query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
     const requestStarted = new Date();
     try {
@@ -988,7 +990,7 @@ export class ApiGateway {
       let error: any = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res, queryType });
+        await this.load({ query, context, res, queryType, apiType });
         return;
       }
 
@@ -1003,7 +1005,8 @@ export class ApiGateway {
             result = { message, opts };
           }
         },
-        queryType
+        queryType,
+        apiType,
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
