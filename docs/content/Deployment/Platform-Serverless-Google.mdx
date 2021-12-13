@@ -143,9 +143,10 @@ relevant options on our Cube.js API instance:
 
 <WarningBox>
 
-If you have cubes that use `SECURITY_CONTEXT` in their `sql` property, then you
-must configure [`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the
-refresh workers can correctly create pre-aggregations.
+If you're using [`queryRewrite`][ref-config-queryrewrite] for access control,
+then you must also configure
+[`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the refresh workers
+can correctly create pre-aggregations.
 
 </WarningBox>
 
@@ -199,5 +200,6 @@ npm][link-cubejs-sls-npm]. Then update your `package.json` to use the version:
 [link-cubejs-sls-npm]: https://www.npmjs.com/package/@cubejs-backend/serverless
 [link-docker-app]: https://www.docker.com/products/docker-app
 [ref-caching-prod]: /caching/running-in-production
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
 [ref-restapi-sched-refresh]: /rest-api#v-1-run-scheduled-refresh

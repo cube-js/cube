@@ -181,9 +181,11 @@ services:
       - ./ssl:/etc/ssl/private
 ```
 
-Don't forget to create a `ssl` directory with the `cert.pem` and `key.pem` files inside so the Nginx service can find them.
+Don't forget to create a `ssl` directory with the `cert.pem` and `key.pem` files
+inside so the Nginx service can find them.
 
-For automatically provisioning SSL certificates with LetsEncrypt, [this blog post](https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71) may be useful.
+For automatically provisioning SSL certificates with LetsEncrypt, [this blog
+post][medium-letsencrypt-nginx] may be useful.
 
 ## Security
 
@@ -195,9 +197,10 @@ relevant options on our Cube.js API instance:
 
 <WarningBox>
 
-If you have cubes that use `SECURITY_CONTEXT` in their `sql` property, then you
-must configure [`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the
-refresh workers can correctly create pre-aggregations.
+If you're using [`queryRewrite`][ref-config-queryrewrite] for access control,
+then you must also configure
+[`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the refresh workers
+can correctly create pre-aggregations.
 
 </WarningBox>
 
@@ -356,8 +359,11 @@ services:
       - redis
 ```
 
+[medium-letsencrypt-nginx]:
+  https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71
 [link-cubejs-docker]: https://hub.docker.com/r/cubejs/cube
 [link-docker-app]: https://www.docker.com/products/docker-app
 [link-nginx]: https://www.nginx.com/
 [ref-config-js]: /config
+[ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts

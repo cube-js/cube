@@ -54,19 +54,7 @@ pub(crate) enum MultiIndexRocksIndex {
     ByName = 1,
 }
 
-impl BaseRocksSecondaryIndex<MultiIndex> for MultiIndexRocksIndex {
-    fn index_key_by(&self, row: &MultiIndex) -> Vec<u8> {
-        self.key_to_bytes(&self.typed_key_by(row))
-    }
-
-    fn get_id(&self) -> u32 {
-        RocksSecondaryIndex::get_id(self)
-    }
-
-    fn is_unique(&self) -> bool {
-        RocksSecondaryIndex::is_unique(self)
-    }
-}
+crate::base_rocks_secondary_index!(MultiIndex, MultiIndexRocksIndex);
 
 rocks_table_impl!(MultiIndex, MultiIndexRocksTable, TableId::MultiIndexes, {
     vec![Box::new(MultiIndexRocksIndex::ByName)]
@@ -100,6 +88,12 @@ impl RocksSecondaryIndex<MultiIndex, MultiIndexIndexKey> for MultiIndexRocksInde
     fn is_unique(&self) -> bool {
         match self {
             MultiIndexRocksIndex::ByName => true,
+        }
+    }
+
+    fn version(&self) -> u32 {
+        match self {
+            MultiIndexRocksIndex::ByName => 1,
         }
     }
 
@@ -224,19 +218,7 @@ pub enum MultiPartitionIndexKey {
     ByParentId(Option<u64>),
 }
 
-impl BaseRocksSecondaryIndex<MultiPartition> for MultiPartitionRocksIndex {
-    fn index_key_by(&self, row: &MultiPartition) -> Vec<u8> {
-        self.key_to_bytes(&self.typed_key_by(row))
-    }
-
-    fn get_id(&self) -> u32 {
-        RocksSecondaryIndex::get_id(self)
-    }
-
-    fn is_unique(&self) -> bool {
-        RocksSecondaryIndex::is_unique(self)
-    }
-}
+crate::base_rocks_secondary_index!(MultiPartition, MultiPartitionRocksIndex);
 
 #[derive(Clone, Copy, Debug)]
 pub enum MultiPartitionRocksIndex {
@@ -281,6 +263,13 @@ impl RocksSecondaryIndex<MultiPartition, MultiPartitionIndexKey> for MultiPartit
         match self {
             MultiPartitionRocksIndex::ByMultiIndexId => false,
             MultiPartitionRocksIndex::ByParentId => false,
+        }
+    }
+
+    fn version(&self) -> u32 {
+        match self {
+            MultiPartitionRocksIndex::ByMultiIndexId => 1,
+            MultiPartitionRocksIndex::ByParentId => 1,
         }
     }
 

@@ -44,6 +44,12 @@ impl RocksSecondaryIndex<Schema, String> for SchemaRocksIndex {
         }
     }
 
+    fn version(&self) -> u32 {
+        match self {
+            SchemaRocksIndex::Name => 1,
+        }
+    }
+
     fn get_id(&self) -> IndexId {
         *self as IndexId
     }

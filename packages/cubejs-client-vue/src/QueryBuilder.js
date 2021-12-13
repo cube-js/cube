@@ -84,6 +84,10 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    wrapWithQueryRenderer: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     const {
@@ -233,12 +237,9 @@ export default {
       });
     }
 
-    if (this.$scopedSlots.builder) {
+    if (!this.wrapWithQueryRenderer && this.$scopedSlots.builder) {
       return createElement('div', {}, [
-        this.$scopedSlots.builder({
-          query: this.validatedQuery,
-          ...builderProps,
-        }),
+        this.$scopedSlots.builder(builderProps),
       ]);
     }
 
