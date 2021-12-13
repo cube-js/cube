@@ -13,6 +13,7 @@ The Cube data modeling workshop is on January 19th at 9-10:30 am PST! If you wan
 You can register for the workshop at [the event page](https://cube.dev/events/data-modeling/). 👈
 
 </InfoBox>
+
 ## Use case
 
 We want to create a cube for a dataset which uses the

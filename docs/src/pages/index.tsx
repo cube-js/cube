@@ -30,7 +30,7 @@ class IndexPage extends Component<Props> {
         <Helmet title="Main | Cube.js Docs" />
         <h1>Documentation</h1>
 
-        <InfoBox >
+<InfoBox>
 
         The Cube data modeling workshop is on January 19 at 9-10:30 am PST! If you want to learn how to get started with data schema, key data modeling concepts, advanced use cases in Cube, you will want to attend this event 😀
         <br />
