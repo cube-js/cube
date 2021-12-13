@@ -87,6 +87,12 @@ impl RocksSecondaryIndex<Source, SourceIndexKey> for SourceRocksIndex {
         }
     }
 
+    fn version(&self) -> u32 {
+        match self {
+            SourceRocksIndex::Name => 1,
+        }
+    }
+
     fn get_id(&self) -> IndexId {
         *self as IndexId
     }

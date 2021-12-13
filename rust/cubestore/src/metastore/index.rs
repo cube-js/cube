@@ -70,19 +70,7 @@ pub(crate) enum IndexRocksIndex {
     MultiIndexId,
 }
 
-impl BaseRocksSecondaryIndex<Index> for IndexRocksIndex {
-    fn index_key_by(&self, row: &Index) -> Vec<u8> {
-        self.key_to_bytes(&self.typed_key_by(row))
-    }
-
-    fn get_id(&self) -> u32 {
-        RocksSecondaryIndex::get_id(self)
-    }
-
-    fn is_unique(&self) -> bool {
-        RocksSecondaryIndex::is_unique(self)
-    }
-}
+crate::base_rocks_secondary_index!(Index, IndexRocksIndex);
 
 rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
     vec![
@@ -141,6 +129,14 @@ impl RocksSecondaryIndex<Index, IndexIndexKey> for IndexRocksIndex {
             IndexRocksIndex::TableID => false,
             IndexRocksIndex::Name => true,
             IndexRocksIndex::MultiIndexId => false,
+        }
+    }
+
+    fn version(&self) -> u32 {
+        match self {
+            IndexRocksIndex::TableID => 1,
+            IndexRocksIndex::Name => 1,
+            IndexRocksIndex::MultiIndexId => 1,
         }
     }
 

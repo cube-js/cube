@@ -119,26 +119,39 @@ module.exports = {
 };
 ```
 
-### Security Context vs Multitenant Compile Context
+### queryRewrite vs Multitenant Compile Context
 
-As a rule of thumb, [`SECURITY_CONTEXT`][ref-cube-security-ctx] should be used
-in scenarios when you want to define row-level security within the same database
-for different users of such database. For example, to separate access of two
-e-commerce administrators who work on different product categories within the
-same e-commerce store.
+As a rule of thumb, the [`queryRewrite`][ref-config-query-rewrite] should be
+used in scenarios when you want to define row-level security within the same
+database for different users of such database. For example, to separate access
+of two e-commerce administrators who work on different product categories within
+the same e-commerce store, you could configure your project as follows:
 
 ```javascript
+// cube.js configuration file
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    if (securityContext.categoryId) {
+      query.filters.push({
+        member: 'Products.categoryId',
+        operator: 'equals',
+        values: [securityContext.categoryId],
+      });
+    }
+    return query;
+  },
+};
+
+// Products cube
 cube(`Products`, {
-  sql: `select * from products where ${SECURITY_CONTEXT.categoryId.filter(
-    'categoryId'
-  )}`,
+  sql: `select * from products`,
 });
 ```
 
-On the other hand, Multitenant [`COMPILE_CONTEXT`][ref-cube-security-ctx] should
-be used when users in fact access different databases. For example, if you
-provide SaaS ecommerce hosting and each of your customers have a separate
-database, then each ecommerce store should be modelled as a separate tenant.
+On the other hand, multi-tenant [`COMPILE_CONTEXT`][ref-cube-security-ctx]
+should be used when users need access to different databases. For example, if
+you provide SaaS ecommerce hosting and each of your customers have a separate
+database, then each e-commerce store should be modelled as a separate tenant.
 
 ```javascript
 const {
@@ -149,21 +162,6 @@ cube(`Products`, {
   sql: `select * from ${tenantId}.products`,
 });
 ```
-
-### Security Context vs queryRewrite
-
-[`SECURITY_CONTEXT`][ref-cube-security-ctx] is great for use cases where you
-want to get explicit control over filtering of underlying data seen by users.
-However for use cases where you want to reuse pre-aggregation tables for
-different users or even tenants, using
-[`queryRewrite`][ref-config-query-rewrite] is a much better choice.
-[`queryRewrite`][ref-config-query-rewrite] is also very convenient way of
-enforcing row level security by means of join logic defined in your cubes
-instead of embedding [`SECURITY_CONTEXT`][ref-cube-security-ctx] filtering
-boilerplate into each cube. Together with
-[`contextToOrchestratorId`][ref-config-ctx-to-orch-id], this allows defining
-both row-level security filtering **and** reusing the same pre-aggregation set
-for each tenant.
 
 ## Same DB Instance with per Tenant Row Level Security
 

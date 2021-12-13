@@ -132,6 +132,10 @@ macro_rules! base_rocks_secondary_index {
                 RocksSecondaryIndex::get_id(self)
             }
 
+            fn version(&self) -> u32 {
+                RocksSecondaryIndex::version(self)
+            }
+
             fn is_unique(&self) -> bool {
                 RocksSecondaryIndex::is_unique(self)
             }
@@ -812,11 +816,13 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         partition_id: u64,
     ) -> Result<IdRow<Partition>, CubeError>;
+    async fn can_delete_partition(&self, partition_id: u64) -> Result<bool, CubeError>;
     async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError>;
     async fn all_inactive_partitions_to_repartition(
         &self,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn all_just_created_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_partitions_with_chunks_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -1018,6 +1024,12 @@ pub enum RowKey {
     Table(TableId, u64),
     Sequence(TableId),
     SecondaryIndex(IndexId, SecondaryKey, u64),
+    SecondaryIndexInfo { index_id: IndexId },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct SecondaryIndexInfo {
+    version: u32,
 }
 
 pub fn get_fixed_prefix() -> usize {
@@ -1045,6 +1057,11 @@ impl RowKey {
 
                 RowKey::SecondaryIndex(table_id, secondary_key, row_id)
             }
+            4 => {
+                let index_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
+
+                RowKey::SecondaryIndexInfo { index_id }
+            }
             v => panic!("Unknown key prefix: {}", v),
         }
     }
@@ -1069,6 +1086,10 @@ impl RowKey {
                     wtr.write_u8(n).unwrap();
                 }
                 wtr.write_u64::<BigEndian>(row_id.clone()).unwrap();
+            }
+            RowKey::SecondaryIndexInfo { index_id } => {
+                wtr.write_u8(4).unwrap();
+                wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
             }
         }
         wtr
@@ -1118,6 +1139,20 @@ enum_from_primitive! {
         MultiIndexes = 0x0900,
         MultiPartitions = 0x0A00
     }
+}
+
+fn check_indexes_for_all_tables<'a>(table_ref: DbTableRef<'a>) -> Result<(), CubeError> {
+    SchemaRocksTable::new(table_ref.clone()).check_indexes()?;
+    TableRocksTable::new(table_ref.clone()).check_indexes()?;
+    IndexRocksTable::new(table_ref.clone()).check_indexes()?;
+    PartitionRocksTable::new(table_ref.clone()).check_indexes()?;
+    ChunkRocksTable::new(table_ref.clone()).check_indexes()?;
+    WALRocksTable::new(table_ref.clone()).check_indexes()?;
+    JobRocksTable::new(table_ref.clone()).check_indexes()?;
+    SourceRocksTable::new(table_ref.clone()).check_indexes()?;
+    MultiIndexRocksTable::new(table_ref.clone()).check_indexes()?;
+    MultiPartitionRocksTable::new(table_ref.clone()).check_indexes()?;
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -1172,6 +1207,8 @@ trait BaseRocksSecondaryIndex<T>: Debug {
     }
 
     fn is_unique(&self) -> bool;
+
+    fn version(&self) -> u32;
 }
 
 trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
@@ -1191,6 +1228,8 @@ trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
     fn get_id(&self) -> u32;
 
     fn is_unique(&self) -> bool;
+
+    fn version(&self) -> u32;
 }
 
 impl<T, I> BaseRocksSecondaryIndex<T> for I
@@ -1207,6 +1246,10 @@ where
 
     fn is_unique(&self) -> bool {
         RocksSecondaryIndex::is_unique(self)
+    }
+
+    fn version(&self) -> u32 {
+        RocksSecondaryIndex::version(self)
     }
 }
 
@@ -1235,6 +1278,43 @@ where
             }
         } else {
             None
+        }
+    }
+}
+
+struct IndexScanIter<'a, RT: RocksTable + ?Sized> {
+    table: &'a RT,
+    secondary_key_val: Vec<u8>,
+    secondary_key_hash: Vec<u8>,
+    iter: DBIterator<'a>,
+}
+
+impl<'a, RT: RocksTable<T = T> + ?Sized, T> Iterator for IndexScanIter<'a, RT>
+where
+    T: Serialize + Clone + Debug + Send,
+{
+    type Item = Result<IdRow<T>, CubeError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let option = self.iter.next();
+            if let Some((key, value)) = option {
+                if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
+                    RowKey::from_bytes(&key)
+                {
+                    if &secondary_index_hash != self.secondary_key_hash.as_slice() {
+                        return None;
+                    }
+
+                    if self.secondary_key_val.as_slice() != value.as_ref() {
+                        continue;
+                    }
+
+                    return Some(self.table.get_row_or_not_found(row_id));
+                };
+            } else {
+                return None;
+            }
         }
     }
 }
@@ -1296,6 +1376,87 @@ trait RocksTable: Debug + Send + Sync {
         Ok(IdRow::new(row_id, row))
     }
 
+    fn check_indexes(&self) -> Result<(), CubeError> {
+        let snapshot = self.snapshot();
+        for index in Self::indexes().into_iter() {
+            let index_info = snapshot.get(
+                &RowKey::SecondaryIndexInfo {
+                    index_id: self.index_id(index.get_id()),
+                }
+                .to_bytes(),
+            )?;
+            if let Some(index_info) = index_info {
+                let index_info = self.deserialize_index_info(index_info.as_slice())?;
+                if index_info.version != index.version() {
+                    self.rebuild_index(&index)?;
+                }
+            } else {
+                self.rebuild_index(&index)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn deserialize_index_info(&self, buffer: &[u8]) -> Result<SecondaryIndexInfo, CubeError> {
+        let r = flexbuffers::Reader::get_root(&buffer).unwrap();
+        let row = SecondaryIndexInfo::deserialize(r)?;
+        Ok(row)
+    }
+
+    fn serialize_index_info(&self, index_info: SecondaryIndexInfo) -> Result<Vec<u8>, CubeError> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        index_info.serialize(&mut ser).unwrap();
+        let serialized_row = ser.take_buffer();
+        Ok(serialized_row)
+    }
+
+    fn rebuild_index(
+        &self,
+        index: &Box<dyn BaseRocksSecondaryIndex<Self::T>>,
+    ) -> Result<(), CubeError> {
+        let time = SystemTime::now();
+        let mut batch = WriteBatch::default();
+        self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
+
+        let all_rows = self.scan_all_rows()?;
+
+        let mut log_shown = false;
+
+        for row in all_rows {
+            if !log_shown {
+                log::info!(
+                    "Rebuilding metastore index {:?} for table {:?}",
+                    index,
+                    self
+                );
+                log_shown = true;
+            }
+            let row = row?;
+            let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
+            batch.put(index_row.key, index_row.val);
+        }
+        batch.put(
+            &RowKey::SecondaryIndexInfo {
+                index_id: self.index_id(index.get_id()),
+            }
+            .to_bytes(),
+            self.serialize_index_info(SecondaryIndexInfo {
+                version: index.version(),
+            })?
+            .as_slice(),
+        );
+        self.db().write(batch)?;
+        if log_shown {
+            log::info!(
+                "Rebuilding metastore index {:?} for table {:?} complete ({:?})",
+                index,
+                self,
+                time.elapsed()?
+            );
+        }
+        Ok(())
+    }
+
     fn get_row_ids_by_index<K: Debug>(
         &self,
         row_key: &K,
@@ -1331,15 +1492,11 @@ trait RocksTable: Debug + Send + Sync {
             if let Some(row) = self.get_row(id)? {
                 res.push(row);
             } else {
-                let secondary_index_key = RowKey::SecondaryIndex(
-                    self.index_id(RocksSecondaryIndex::get_id(secondary_index)),
-                    secondary_index
-                        .typed_key_hash(row_key)
-                        .to_be_bytes()
-                        .to_vec(),
-                    id,
-                );
-                self.db().delete(secondary_index_key.to_bytes())?;
+                let index = Self::indexes()
+                    .into_iter()
+                    .find(|i| i.get_id() == BaseRocksSecondaryIndex::get_id(secondary_index))
+                    .unwrap();
+                self.rebuild_index(&index)?;
                 return Err(CubeError::internal(format!(
                     "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
                     self, id
@@ -1515,19 +1672,28 @@ trait RocksTable: Debug + Send + Sync {
     fn insert_index_row(&self, row: &Self::T, row_id: u64) -> Result<Vec<KeyVal>, CubeError> {
         let mut res = Vec::new();
         for index in Self::indexes().iter() {
-            let hash = index.key_hash(&row);
-            let index_val = index.index_key_by(&row);
-            let key = RowKey::SecondaryIndex(
-                self.index_id(index.get_id()),
-                hash.to_be_bytes().to_vec(),
-                row_id,
-            );
-            res.push(KeyVal {
-                key: key.to_bytes(),
-                val: index_val,
-            });
+            res.push(self.index_key_val(row, row_id, index));
         }
         Ok(res)
+    }
+
+    fn index_key_val(
+        &self,
+        row: &Self::T,
+        row_id: u64,
+        index: &Box<dyn BaseRocksSecondaryIndex<Self::T>>,
+    ) -> KeyVal {
+        let hash = index.key_hash(row);
+        let index_val = index.index_key_by(row);
+        let key = RowKey::SecondaryIndex(
+            self.index_id(index.get_id()),
+            hash.to_be_bytes().to_vec(),
+            row_id,
+        );
+        KeyVal {
+            key: key.to_bytes(),
+            val: index_val,
+        }
     }
 
     fn delete_index_row(&self, row: &Self::T, row_id: u64) -> Result<Vec<KeyVal>, CubeError> {
@@ -1591,6 +1757,34 @@ trait RocksTable: Debug + Send + Sync {
         Ok(res)
     }
 
+    fn delete_all_rows_from_index(
+        &self,
+        secondary_id: u32,
+        batch: &mut WriteBatch,
+    ) -> Result<(), CubeError> {
+        let ref db = self.snapshot();
+        let zero_vec = vec![0 as u8; 8];
+        let key_len = zero_vec.len();
+        let key_min = RowKey::SecondaryIndex(self.index_id(secondary_id), zero_vec.clone(), 0);
+
+        let iter = db.iterator(IteratorMode::From(
+            &key_min.to_bytes()[0..(key_len + 5)],
+            Direction::Forward,
+        ));
+
+        for (key, _) in iter {
+            let row_key = RowKey::from_bytes(&key);
+            if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
+                if index_id == self.index_id(secondary_id) {
+                    batch.delete(key);
+                } else {
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
         let mut res = Vec::new();
         for row in self.table_scan(self.snapshot())? {
@@ -1601,6 +1795,44 @@ trait RocksTable: Debug + Send + Sync {
 
     fn scan_all_rows<'a>(&'a self) -> Result<TableScanIter<'a, Self>, CubeError> {
         self.table_scan(self.snapshot())
+    }
+
+    fn scan_rows_by_index<'a, K: Debug>(
+        &'a self,
+        row_key: &'a K,
+        secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
+    ) -> Result<IndexScanIter<'a, Self>, CubeError>
+    where
+        K: Hash,
+    {
+        let ref db = self.snapshot();
+
+        let secondary_key_hash = secondary_index
+            .typed_key_hash(&row_key)
+            .to_be_bytes()
+            .to_vec();
+        let secondary_key_val = secondary_index.key_to_bytes(&row_key);
+
+        let key_len = secondary_key_hash.len();
+        let key_min = RowKey::SecondaryIndex(
+            self.index_id(RocksSecondaryIndex::get_id(secondary_index)),
+            secondary_key_hash.clone(),
+            0,
+        );
+
+        let mut opts = ReadOptions::default();
+        opts.set_prefix_same_as_start(true);
+        let iter = db.iterator_opt(
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+            opts,
+        );
+
+        Ok(IndexScanIter {
+            table: self,
+            secondary_key_val,
+            secondary_key_hash,
+            iter,
+        })
     }
 
     fn table_scan<'a>(&'a self, db: &'a Snapshot) -> Result<TableScanIter<'a, Self>, CubeError> {
@@ -1860,6 +2092,8 @@ impl RocksMetaStore {
                         }
                     }
 
+                    RocksMetaStore::check_all_indexes(&meta_store).await?;
+
                     return Ok(meta_store);
                 }
             } else {
@@ -1876,7 +2110,32 @@ impl RocksMetaStore {
             );
         }
 
-        Ok(Self::new(path, remote_fs, config))
+        let meta_store = Self::new(path, remote_fs, config);
+
+        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        Ok(meta_store)
+    }
+
+    async fn check_all_indexes(meta_store: &Arc<RocksMetaStore>) -> Result<(), CubeError> {
+        let meta_store_to_move = meta_store.clone();
+
+        cube_ext::spawn_blocking(move || {
+            let table_ref = DbTableRef {
+                db: &meta_store_to_move.db,
+                snapshot: &meta_store_to_move.db.snapshot(),
+                mem_seq: MemorySequence {
+                    seq_store: meta_store_to_move.seq_store.clone(),
+                },
+            };
+
+            if let Err(e) = check_indexes_for_all_tables(table_ref) {
+                log::error!("Error during checking indexes: {}", e);
+            }
+        })
+        .await?;
+
+        Ok(())
     }
 
     pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
@@ -3047,6 +3306,42 @@ impl MetaStore for RocksMetaStore {
 
     async fn delete_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let partition = partitions_table.get_row_or_not_found(partition_id)?;
+
+            if partition.get_row().is_active() {
+                return Err(CubeError::internal(format!(
+                    "Can't drop active partition: {:?}",
+                    partition
+                )));
+            }
+
+            let chunks = chunks_table.get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(partition_id),
+                &ChunkRocksIndex::PartitionId,
+            )?;
+
+            if !chunks.is_empty() {
+                return Err(CubeError::internal(format!(
+                    "Can't drop partition {:?} with chunks: {:?}",
+                    partition, chunks
+                )));
+            }
+
+            let children = partitions_table.get_rows_by_index(
+                &PartitionIndexKey::ByParentPartitionId(Some(partition.get_id())),
+                &PartitionRocksIndex::ParentPartitionId,
+            )?;
+
+            if !children.is_empty() {
+                return Err(CubeError::internal(format!(
+                    "Can't drop partition {:?} with child partitions: {:?}",
+                    partition, children
+                )));
+            }
+
             PartitionRocksTable::new(db_ref).delete(partition_id, batch_pipe)
         })
         .await
@@ -3119,24 +3414,51 @@ impl MetaStore for RocksMetaStore {
 
             let children = partitions_table
                 .get_rows_by_index(
-                    &PartitionIndexKey::ByIndexId(partition.get_row().get_index_id()),
-                    &PartitionRocksIndex::IndexId,
-                )?
-                .into_iter()
-                .filter(|p| p.get_row().parent_partition_id() == &Some(partition.get_id())).collect::<Vec<_>>();
+                    &PartitionIndexKey::ByParentPartitionId(Some(partition.get_id())),
+                    &PartitionRocksIndex::ParentPartitionId,
+                )?;
 
             if !children.is_empty() {
                 for child in children.into_iter() {
                     partitions_table.update_with_fn(child.get_id(), |c| c.update_parent_partition_id(partition.get_row().parent_partition_id().clone()), batch_pipe)?;
                 }
-            } else {
-                return Err(CubeError::internal(format!(
-                    "Can't drop partition {:?} without children",
-                    partition
-                )));
             }
 
             partitions_table.delete(partition_id, batch_pipe)
+        })
+        .await
+    }
+
+    async fn can_delete_partition(&self, partition_id: u64) -> Result<bool, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let partition = partitions_table.get_row_or_not_found(partition_id)?;
+
+            if partition.get_row().is_active() {
+                return Ok(false);
+            }
+
+            let chunks = chunks_table.get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(partition_id),
+                &ChunkRocksIndex::PartitionId,
+            )?;
+
+            if !chunks.is_empty() {
+                return Ok(false);
+            }
+
+            let children = partitions_table.get_rows_by_index(
+                &PartitionIndexKey::ByParentPartitionId(Some(partition.get_id())),
+                &PartitionRocksIndex::ParentPartitionId,
+            )?;
+
+            if !children.is_empty() {
+                return Ok(false);
+            }
+
+            Ok(true)
         })
         .await
     }
@@ -3173,18 +3495,6 @@ impl MetaStore for RocksMetaStore {
                 return Ok(false);
             }
 
-            let child = partitions_table
-                .get_rows_by_index(
-                    &PartitionIndexKey::ByIndexId(partition.get_row().get_index_id()),
-                    &PartitionRocksIndex::IndexId,
-                )?
-                .into_iter()
-                .find(|p| p.get_row().parent_partition_id() == &Some(partition.get_id()));
-
-            if child.is_none() {
-                return Ok(false);
-            }
-
             Ok(true)
         })
         .await
@@ -3210,7 +3520,10 @@ impl MetaStore for RocksMetaStore {
 
             let mut to_repartition = Vec::new();
 
-            for partition in partitions_table.scan_all_rows()? {
+            for partition in partitions_table.scan_rows_by_index(
+                &PartitionIndexKey::ByActive(false),
+                &PartitionRocksIndex::Active,
+            )? {
                 let p = partition?;
                 if !p.get_row().is_active() && partitions_with_chunks.contains(&p.get_id()) {
                     to_repartition.push(p);
@@ -3235,15 +3548,16 @@ impl MetaStore for RocksMetaStore {
                 partitions_with_chunks.insert(chunk?.get_row().get_partition_id());
             }
 
-            let orphaned_partitions = partitions_table.scan_all_rows()?;
+            let orphaned_partitions = partitions_table.scan_rows_by_index(
+                &PartitionIndexKey::ByActive(false),
+                &PartitionRocksIndex::Active,
+            )?;
 
             let mut result = Vec::new();
 
             for partition in orphaned_partitions {
                 let partition = partition?;
-                if !partition.get_row().is_active()
-                    && !partitions_with_chunks.contains(&partition.get_id())
-                {
+                if !partitions_with_chunks.contains(&partition.get_id()) {
                     if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
                         // TODO it actually should fail if it isn't found but skip for now due to bug in reconciliation process which led to missing parents
                         if let Ok(parent_partition) =
@@ -3259,6 +3573,27 @@ impl MetaStore for RocksMetaStore {
                         }
                     }
                 }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    async fn all_just_created_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let orphaned_partitions = partitions_table.scan_rows_by_index(
+                &PartitionIndexKey::ByJustCreated(true),
+                &PartitionRocksIndex::JustCreated,
+            )?;
+
+            let mut result = Vec::new();
+
+            for partition in orphaned_partitions {
+                let partition = partition?;
+                result.push(partition);
             }
 
             Ok(result)
@@ -4700,6 +5035,13 @@ mod tests {
             let result = meta_store.get_schema("foo".to_string()).await;
             println!("{:?}", result);
             assert_eq!(result.is_err(), true);
+
+            let iterator = meta_store.db.iterator(IteratorMode::Start);
+
+            println!("Keys in db");
+            for (key, _) in iterator {
+                println!("Key {:?}", RowKey::from_bytes(&key));
+            }
 
             sleep(Duration::from_millis(300));
 
