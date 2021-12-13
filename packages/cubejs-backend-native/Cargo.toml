@@ -25,6 +25,6 @@ simple_logger = "1.7.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [dependencies.neon]
-version = "0.10.0-alpha.2"
+version = "=0.10.0-alpha.2"
 default-features = false
 features = ["napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]

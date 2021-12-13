@@ -167,8 +167,7 @@ dependencies = [
 [[package]]
 name = "arrow"
 version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "337e668497751234149fd607f5cb41a6ae7b286b6329589126fe67f0ac55d637"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
 dependencies = [
  "bitflags",
  "chrono",
@@ -1287,7 +1286,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c00c1c91c38671f69691b09386b9439f043ff132#c00c1c91c38671f69691b09386b9439f043ff132"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c5aea9ca6047dfeb1dd6404288c33fa628dab13c#c5aea9ca6047dfeb1dd6404288c33fa628dab13c"
 dependencies = [
  "ahash 0.7.4",
  "arrow 6.0.0",
@@ -3214,8 +3213,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d263b9b59ba260518de9e57bd65931c3f765fea0fabacfe84f40d6fde38e841a"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
 dependencies = [
  "arrow 6.0.0",
  "base64 0.13.0",
