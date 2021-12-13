@@ -14,7 +14,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country","Orders.createdAt"],"order":{"Orders.count":"desc","Orders.status":"asc","Users.country":"desc"}} 1`] = `
@@ -31,7 +32,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country","Orders.createdAt"]} 1`] = `
@@ -48,7 +50,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Orders.amount","operator":"equals","values":["5","10"]},{"or":[{"member":"Users.country","operator":"equals","values":["US"]},{"and":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"member":"Users.country","operator":"equals","values":["US"]}]}]}]} 1`] = `
@@ -64,7 +67,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Orders.status","operator":"equals","values":["canceled","active"]}]} 1`] = `
@@ -80,7 +84,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Users.country","operator":"equals","values":["Canada"]}]} 1`] = `
@@ -96,7 +101,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       country
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"filters":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"or":[{"member":"Users.country","operator":"notSet"},{"member":"Users.country","operator":"equals","values":["US"]}]}]} 1`] = `
@@ -109,7 +115,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       status
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"day","dateRange":["2020-01-01","2021-01-01"]}]} 1`] = `
@@ -123,7 +130,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       }
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 1`] = `
@@ -134,7 +142,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       status
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 2`] = `
@@ -145,7 +154,8 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Ord
       status
     }
   }
-}"
+}
+"
 `;
 
 exports[`Cube GraphQL converter: {"measures":["Orders.count"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"quarter"}],"order":[["Orders.count","asc"],["Users.country","asc"]],"dimensions":["Users.country","Orders.createdAt"]} 1`] = `
@@ -162,5 +172,6 @@ exports[`Cube GraphQL converter: {"measures":["Orders.count"],"timeDimensions":[
       country
     }
   }
-}"
+}
+"
 `;
