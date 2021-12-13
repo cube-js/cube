@@ -66,13 +66,12 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "arrow"
-version = "6.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5754504883d2a0f193df3a60565819be37ae4c2d9fc3bac898c6eb722dc2806e"
+version = "6.0.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
 dependencies = [
  "bitflags",
  "chrono",
- "comfy-table 5.0.0",
+ "comfy-table",
  "csv",
  "flatbuffers",
  "hex",
@@ -343,19 +342,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11e95a3e867422fd8d04049041f5671f94d53c32a9dcd82e2be268714942f3f3"
 dependencies = [
  "crossterm",
- "strum 0.21.0",
- "strum_macros 0.21.1",
- "unicode-width",
-]
-
-[[package]]
-name = "comfy-table"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42350b81f044f576ff88ac750419f914abb46a03831bb1747134344ee7a4e64"
-dependencies = [
- "strum 0.22.0",
- "strum_macros 0.22.0",
+ "strum",
+ "strum_macros",
  "unicode-width",
 ]
 
@@ -401,6 +389,12 @@ checksum = "3a6966607622438301997d3dac0d2f6e9a90c68bb6bc1785ea98456ab93c0507"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "cslice"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "697c714f50560202b1f4e2e09cd50a421881c83e9025db75d15f276616f04f40"
 
 [[package]]
 name = "csv"
@@ -469,7 +463,7 @@ dependencies = [
  "byteorder",
  "bytes 0.5.6",
  "chrono",
- "comfy-table 4.1.1",
+ "comfy-table",
  "cubeclient",
  "datafusion",
  "futures",
@@ -497,7 +491,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c00c1c91c38671f69691b09386b9439f043ff132#c00c1c91c38671f69691b09386b9439f043ff132"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c5aea9ca6047dfeb1dd6404288c33fa628dab13c#c5aea9ca6047dfeb1dd6404288c33fa628dab13c"
 dependencies = [
  "ahash",
  "arrow",
@@ -1333,10 +1327,11 @@ dependencies = [
 
 [[package]]
 name = "neon"
-version = "0.10.0-alpha.3"
+version = "0.10.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea1f028ddf17d8f08c7a76c76487e7abfeb1bc23ab62f4a6a020d8510f3ac26d"
+checksum = "e6891a6eb04860d1d72dfab16ab0175d3dfc92b6e06f33c2687cedbd394f055f"
 dependencies = [
+ "cslice",
  "neon-build",
  "neon-macros",
  "neon-runtime",
@@ -1346,9 +1341,9 @@ dependencies = [
 
 [[package]]
 name = "neon-build"
-version = "0.10.0-alpha.3"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe0facb0f69acc991f265c81ed180d8981c7d204d81fecbabe27e77a3e562948"
+checksum = "ad9febc63f515156d4311a0c43899d3ace46352ecdd591c21b98ca3974f2a0d0"
 
 [[package]]
 name = "neon-macros"
@@ -1362,9 +1357,9 @@ dependencies = [
 
 [[package]]
 name = "neon-runtime"
-version = "0.10.0-alpha.3"
+version = "0.10.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29173c7784a6fde8b105c1163031c8534ada586177effe16f3b84ad4ed4699c1"
+checksum = "4181b65d551a5ff98b180a86102249e04529d620bf98e804ab4f533318868cbc"
 dependencies = [
  "cfg-if 1.0.0",
  "libloading",
@@ -1577,9 +1572,8 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "6.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d2d0c2246b313009213b7f45718d0617ccc1fc12208a872ff547df969bd3a03"
+version = "6.0.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2260,28 +2254,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
 
 [[package]]
-name = "strum"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
-
-[[package]]
 name = "strum_macros"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339f799d8b549e3744c7ac7feb216383e4005d94bdb22561b3ab8f3b808ae9fb"
 dependencies = [
  "heck",
  "proc-macro2",
