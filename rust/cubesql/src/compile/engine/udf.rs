@@ -4,12 +4,12 @@ use std::sync::Arc;
 use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int32Builder,
+            ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
             IntervalDayTimeBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
         },
         compute::cast,
         datatypes::{
-            DataType, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
+            DataType, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
             TimestampNanosecondType, UInt64Type,
         },
     },
@@ -179,21 +179,25 @@ pub fn create_instr_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
 
-        let arg1_arr = downcast_string_arg!(args[0], "str", i32);
-        let arg2_arr = downcast_string_arg!(args[1], "substr", i32);
+        let string_arr = downcast_string_arg!(args[0], "str", i32);
+        let substring_arr = downcast_string_arg!(args[1], "substr", i32);
 
-        let input_str = arg1_arr.value(0);
-        let input_substr = arg2_arr.value(0);
+        let result = string_arr
+            .iter()
+            .zip(substring_arr.iter())
+            .map(|(string, substring)| match (string, substring) {
+                (Some(string), Some(substring)) => {
+                    if let Some(idx) = string.to_string().find(substring) {
+                        Some((idx as i32) + 1)
+                    } else {
+                        Some(0)
+                    }
+                }
+                _ => Some(0),
+            })
+            .collect::<PrimitiveArray<Int32Type>>();
 
-        let mut builder = Int32Builder::new(1);
-
-        if let Some(idx) = input_str.to_string().find(input_substr) {
-            builder.append_value((idx as i32) + 1)?;
-        } else {
-            builder.append_value(0)?;
-        };
-
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+        Ok(Arc::new(result) as ArrayRef)
     });
 
     create_udf(
@@ -202,6 +206,44 @@ pub fn create_instr_udf() -> ScalarUDF {
         Arc::new(DataType::Int32),
         Volatility::Immutable,
         fun,
+    )
+}
+
+// LOCATE( substring, string, [start_position ] )
+// This is the same as INSTR(), except that the order of
+// the arguments is reversed.
+pub fn create_locate_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let substring_arr = downcast_string_arg!(args[0], "substring", i32);
+        let string_arr = downcast_string_arg!(args[1], "string", i32);
+
+        let result = string_arr
+            .iter()
+            .zip(substring_arr.iter())
+            .map(|(string, substring)| match (string, substring) {
+                (Some(string), Some(substring)) => {
+                    if let Some(idx) = string.to_string().find(substring) {
+                        Some((idx as i32) + 1)
+                    } else {
+                        Some(0)
+                    }
+                }
+                _ => Some(0),
+            })
+            .collect::<PrimitiveArray<Int32Type>>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "locate",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
     )
 }
 
