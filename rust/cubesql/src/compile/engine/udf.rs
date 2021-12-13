@@ -4,7 +4,7 @@ use std::sync::Arc;
 use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
+            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
             IntervalDayTimeBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
         },
         compute::cast,
@@ -22,7 +22,10 @@ use datafusion::{
 };
 
 use crate::compile::{
-    engine::df::coerce::{if_coercion, least_coercion},
+    engine::df::{
+        coerce::{if_coercion, least_coercion},
+        columar::if_then_else,
+    },
     QueryPlannerExecutionProps,
 };
 
@@ -298,30 +301,42 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = &args[1];
         let right = &args[2];
 
-        let base_type = if_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
+        let return_type = if_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
             DataFusionError::Execution(format!(
-                "positive and negative results must be the same type, actual: [{}, {}]",
+                "Positive and negative results must be the same type, actual: [{}, {}]",
                 left.data_type(),
                 right.data_type(),
             ))
         })?;
 
-        let left = cast(&left, &base_type)?;
-        let right = cast(&right, &base_type)?;
+        let cond_array = match condition.data_type() {
+            // // Arrow doesnt support UTF8 -> Boolean cast
+            DataType::Utf8 => {
+                let cond_array = downcast_string_arg!(condition, "condition", i32);
+                let mut result = BooleanBuilder::new(cond_array.len());
 
-        let is_true: bool = match condition.data_type() {
-            DataType::Boolean => {
-                if condition.is_null(0) {
-                    false
-                } else {
-                    let arr = downcast_boolean_arr!(condition);
-                    arr.value(0)
+                for i in 0..cond_array.len() {
+                    if condition.is_null(i) {
+                        result.append_value(false)?;
+                    } else {
+                        result.append_value(true)?;
+                    }
                 }
+
+                Arc::new(result.finish()) as ArrayRef
             }
-            _ => false,
+            _ => cast(&condition, &DataType::Boolean)?,
         };
 
-        let result = if is_true { left.clone() } else { right.clone() };
+        let left = cast(&left, &return_type)?;
+        let right = cast(&right, &return_type)?;
+
+        let result = if_then_else(
+            &cond_array.as_any().downcast_ref::<BooleanArray>().unwrap(),
+            left,
+            right,
+            &return_type,
+        )?;
 
         Ok(result)
     });
@@ -331,7 +346,7 @@ pub fn create_if_udf() -> ScalarUDF {
 
         let base_type = if_coercion(&types[1], &types[2]).ok_or_else(|| {
             DataFusionError::Execution(format!(
-                "positive and negative results must be the same type, actual: [{}, {}]",
+                "Positive and negative results must be the same type, actual: [{}, {}]",
                 &types[1], &types[2],
             ))
         })?;
