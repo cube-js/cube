@@ -28,7 +28,7 @@
   "cubejsCliVersion": ">=0.22",
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
-    "prepack": "npm run tsc && oclif-dev manifest",
+    "prepack": "OCLIF_TS_NODE=0 oclif-dev manifest",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",

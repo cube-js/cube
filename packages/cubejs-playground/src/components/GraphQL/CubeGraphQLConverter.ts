@@ -30,7 +30,7 @@ function baseCubeQuery(
           kind: t.Kind.NAME,
           value: name,
         },
-        operation: t.OperationTypeNode.QUERY,
+        operation: 'query',
         selectionSet: {
           kind: t.Kind.SELECTION_SET,
           selections: [
@@ -420,12 +420,14 @@ export class CubeGraphQLConverter {
   }
 
   private getCubeArgs() {
-    const cubeArgsKeys: [string, t.Kind.STRING | t.Kind.INT | t.Kind.OBJECT][] =
-      [
-        ['timezone', t.Kind.STRING],
-        ['limit', t.Kind.INT],
-        ['offset', t.Kind.INT],
-      ];
+    const cubeArgsKeys: [
+      string,
+      typeof t.Kind.STRING | typeof t.Kind.INT | typeof t.Kind.OBJECT
+    ][] = [
+      ['timezone', t.Kind.STRING],
+      ['limit', t.Kind.INT],
+      ['offset', t.Kind.INT],
+    ];
 
     const cubeArgs: t.ArgumentNode[] = [];
 
@@ -438,7 +440,7 @@ export class CubeGraphQLConverter {
             value: key,
           },
           value: {
-            kind: <t.Kind.STRING | t.Kind.INT>kind,
+            kind: <typeof t.Kind.STRING | typeof  t.Kind.INT>kind,
             value: this.cubeQuery[key],
           },
         });
