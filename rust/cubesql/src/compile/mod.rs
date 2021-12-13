@@ -33,7 +33,7 @@ use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
     create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_time_format_udf,
-    create_timediff_udf, create_user_udf, create_version_udf,
+    create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 
@@ -1446,6 +1446,7 @@ impl QueryPlanner {
         ctx.register_udf(create_user_udf(props));
         ctx.register_udf(create_current_user_udf(props));
         ctx.register_udf(create_instr_udf());
+        ctx.register_udf(create_ucase_udf());
         ctx.register_udf(create_isnull_udf());
         ctx.register_udf(create_if_udf());
         ctx.register_udf(create_least_udf());
@@ -1537,8 +1538,6 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo parser
-    let query = query.replace("IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME", "COLUMN_TYPE as TYPE_NAME");
     // @todo Case intensive mode
     let query = query.replace("CASE data_type", "CASE DATA_TYPE");
     // @todo problem with parser, space in types
@@ -3214,6 +3213,26 @@ mod tests {
             +----+----+------+------+\n\
             | 1  | 1  | NULL | NULL |\n\
             +----+----+------+------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ucase() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                "select \
+                ucase('super stroka') as r1
+            "
+                .to_string()
+            )
+            .await?,
+            "+--------------+\n\
+            | r1           |\n\
+            +--------------+\n\
+            | SUPER STROKA |\n\
+            +--------------+"
         );
 
         Ok(())
