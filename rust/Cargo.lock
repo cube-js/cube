@@ -1287,7 +1287,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=868f3c4de13d13cda84cee33475b9782b94fa60c#868f3c4de13d13cda84cee33475b9782b94fa60c"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c00c1c91c38671f69691b09386b9439f043ff132#c00c1c91c38671f69691b09386b9439f043ff132"
 dependencies = [
  "ahash 0.7.4",
  "arrow 6.0.0",
@@ -4372,7 +4372,7 @@ dependencies = [
 [[package]]
 name = "sqlparser"
 version = "0.11.1-alpha.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=1d117f501b5a970cea0f2c25ee1b87283399e1f3#1d117f501b5a970cea0f2c25ee1b87283399e1f3"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=82675c4c350fb90c8fdbd7e897adcd95e24e7735#82675c4c350fb90c8fdbd7e897adcd95e24e7735"
 dependencies = [
  "log",
 ]
@@ -5148,7 +5148,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.6.5",
+ "rand 0.8.4",
  "static_assertions",
 ]
 
