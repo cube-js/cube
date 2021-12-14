@@ -127,7 +127,7 @@ databases [in this guide][link-connecting-to-db].
 | Environment variable                 | Description                                                                                  | Possible Values                                                  |
 | ------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `CUBEJS_DB_EXPORT_BUCKET`            | The name of a bucket in cloud storage                                                        | `exports-20210505`                                               |
-| `CUBEJS_DB_EXPORT_BUCKET_TYPE`       | The cloud provider where the bucket is hosted                                                | `gcs`, `s3`                                                      |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE`       | The cloud provider where the bucket is hosted                                                | `gcp`, `s3`                                                      |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`    | The AWS Access Key ID to use for the export bucket                                           | A valid AWS Access Key ID                                        |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET` | The AWS Secret Access Key to use for the export bucket                                       | A valid AWS Secret Access Key                                    |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_REGION` | The AWS region of the export bucket                                                          | [A valid AWS region][link-aws-regions]                           |
