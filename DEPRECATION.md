@@ -300,7 +300,7 @@ CUBEJS_REDIS_TLS=true
 
 ### Node.js 12
 
-**Removed in Release: v0.28.0**
+**Deprecated in Release: v0.28.0**
 
 Node.js 12 reached [End of Life on May 19, 2021][link-nodejs-eol]. This
 means no more updates. Please upgrade to Node.js 14 or higher.
