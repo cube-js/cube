@@ -335,6 +335,7 @@ impl ChunkDataStore for ChunkStore {
             )));
         }
         let mut size = 0;
+        let mut count = 0;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -343,10 +344,13 @@ impl ChunkDataStore for ChunkStore {
             .take_while(|c| {
                 if size == 0 {
                     size += c.get_row().get_row_count();
+                    count += 1;
                     true
                 } else {
                     size += c.get_row().get_row_count();
-                    size <= self.config.compaction_chunks_total_size_threshold()
+                    count += 1;
+                    // TODO config
+                    size <= self.config.compaction_chunks_total_size_threshold() && count < 32
                 }
             })
             .collect::<Vec<_>>();
