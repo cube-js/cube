@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-cli"
   },
   "engines": {
-    "node": ">=12.x"
+    "node": ">=10.8.0"
   },
   "bin": {
     "cubejs": "dist/src/index.js"

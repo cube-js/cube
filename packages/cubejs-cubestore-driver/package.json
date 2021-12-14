@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-cubestore-driver"
   },
   "engines": {
-    "node": ">=12.x"
+    "node": ">=10.8.0"
   },
   "files": [
     "README.md",
