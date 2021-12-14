@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-druid-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "bin": {
     "maven-resolve": "bin/maven-resolve"

@@ -7,7 +7,7 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",

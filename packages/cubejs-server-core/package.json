@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-server-core"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "index.js",
   "types": "dist/src/index.d.ts",

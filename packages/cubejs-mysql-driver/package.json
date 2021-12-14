@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-mysql-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "files": [
     "dist/src",
