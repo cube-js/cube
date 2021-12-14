@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.65",
+  "version": "0.28.66",
   "engines": {},
   "repository": {
     "type": "git",
@@ -88,6 +88,7 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
+    "graphql": "^15.3.0",
     "less-loader": "^8.1.1",
     "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
@@ -100,14 +101,13 @@
     "rollup-plugin-svg": "^2.0.0",
     "styled-components": "5.2.0",
     "tslib": "^2.3.0",
-    "typescript": "^4.3.5",
-    "graphql": "^15.3.0"
+    "typescript": "^4.3.5"
   },
   "peerDependencies": {
     "antd": ">=4.13.0",
+    "graphql": ">=15.3.0",
     "react": ">=17.0.1",
     "react-dom": ">=17.0.1",
-    "styled-components": ">=5.2.0",
-    "graphql": ">=15.3.0"
+    "styled-components": ">=5.2.0"
   }
 }
