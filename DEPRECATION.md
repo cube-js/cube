@@ -34,7 +34,7 @@ features:
   should not rely on this feature.
 
 | Status     | Feature                                                                                                            | Deprecated | Remove    |
-|------------|--------------------------------------------------------------------------------------------------------------------|------------|-----------|
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | --------- |
 | Removed    | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0   |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021 |
 | Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0   |
@@ -65,8 +65,7 @@ means no more updates. Please upgrade to Node.js 10 or higher.
 This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
 replaced by `heartBeatInterval`.
 
-[link-hearbeatinterval]:
-  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+[link-hearbeatinterval]: https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
 
 ### `CUBEJS_ENABLE_TLS`
 
@@ -76,8 +75,7 @@ We no longer recommend setting TLS options via Cube.js. Developers should set up
 TLS on a load balancer or reverse proxy instead. [Read more
 here][link-enable-https].
 
-[link-enable-https]:
-  https://cube.dev/docs/deployment/production-checklist#enable-https
+[link-enable-https]: https://cube.dev/docs/deployment/production-checklist#enable-https
 
 ### Embedding Cube.js within Express
 
@@ -92,8 +90,7 @@ file][link-migration] and deploy Cube.js as a microservice (or multiple
 microservices, if necessary).
 
 [link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
-[link-migration]:
-  https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
+[link-migration]: https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
 
 ### Absolute import for `@cubejs-backend/query-orchestrator`
 
@@ -125,8 +122,7 @@ instance. Now orchestrator instances can be shared by Cube.js instances and
 across different tenants, if need be. Single-tenant setups should consider
 removing the `contextToDataSourceId` property completely.
 
-[link-contexttoorchestratorid]:
-  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+[link-contexttoorchestratorid]: https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
 
 ### Absolute import for `@cubejs-backend/server-core`
 
@@ -186,9 +182,9 @@ documentation][link-custom-auth]
 
 ### Node.js 10
 
-**Deprecated in Release: v0.26.0**
+**Removed in Release: v0.29.0**
 
-Node.js 10 reaches [End of Life on April 30, 2021][link-nodejs-eol]. This means
+Node.js 10 reached [End of Life on April 30, 2021][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 12 or higher.
 
 ### `USER_CONTEXT`
@@ -209,9 +205,7 @@ You should use:
 
 ```js
 cube(`visitors`, {
-  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter(
-    'source'
-  )}`,
+  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter('source')}`,
 });
 ```
 
@@ -255,8 +249,7 @@ const server = new CubejsServer({
     req.authInfo = jwt.verify({ u: auth }, pem);
   },
   contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) =>
-    `pre_aggregations_${authInfo.userId}`,
+  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`,
 });
 ```
 
@@ -271,8 +264,7 @@ const server = new CubejsServer({
   // And here we're now using the `securityContext` parameter
   contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
   // And the same here
-  preAggregationsSchema: ({ securityContext }) =>
-    `pre_aggregations_${securityContext.userId}`,
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
 });
 ```
 
@@ -305,7 +297,6 @@ CUBEJS_REDIS_TLS=true
 
 Node.js 15 reached [End of Life on June 1, 2021][link-nodejs-eol]. This
 means no more updates. Please upgrade to Node.js 14 or higher.
-
 
 ### Node.js 12
 
