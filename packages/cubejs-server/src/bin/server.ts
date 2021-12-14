@@ -10,6 +10,8 @@ if (argv.length === 0) {
   argv.push('server');
 }
 
+process.env.OCLIF_TS_NODE = '0';
+
 require('@oclif/command').run(argv)
   .then(require('@oclif/command/flush'))
   .catch(require('@oclif/errors/handle'));
