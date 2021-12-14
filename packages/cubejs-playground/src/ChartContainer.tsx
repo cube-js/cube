@@ -539,7 +539,7 @@ class ChartContainer extends Component<
         return <CachePane query={query} />;
       } else if (showCode === 'graphiql' && meta) {
         if (!this.props.isGraphQLSupported) {
-          return <div>GraphQL API is supported since version 0.28.56</div>
+          return <div>GraphQL API is supported since version 0.29.0</div>
         }
         
         return (
