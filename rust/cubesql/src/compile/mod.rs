@@ -718,7 +718,7 @@ fn optimize_where_inner_filter(
                 values,
             } => {
                 if operator.eq(&"inDateRange".to_string()) {
-                    let filter_pushdown = builder.push_date_range_for_time_dimenssion(
+                    let filter_pushdown = builder.push_date_range_for_time_dimension(
                         member,
                         json!(values.as_ref().unwrap()),
                     );
@@ -777,7 +777,7 @@ fn optimize_where_filters(
                         values,
                     } => {
                         if operator.eq(&"inDateRange".to_string()) {
-                            let filter_pushdown = builder.push_date_range_for_time_dimenssion(
+                            let filter_pushdown = builder.push_date_range_for_time_dimension(
                                 member,
                                 json!(values.as_ref().unwrap()),
                             );
