@@ -6,12 +6,12 @@ const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);
 const minor = parseInt(<string> semver[1], 10);
 
-if (major < 12) {
+if (major < 12 || major === 15) {
   console.error(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
-      'Cube.js CLI requires Node.js 12 or higher. \n' +
-      'Please update your version of Node.js.'
+      'Cube.js CLI requires Node.js 12 or higher (except 15). \n' +
+      'Please update your Node.js version.'
     )
   );
   process.exit(1);

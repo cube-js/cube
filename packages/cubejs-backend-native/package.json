@@ -21,7 +21,7 @@
     "test:cargo": "cargo test"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "files": [
     "dist/js"
