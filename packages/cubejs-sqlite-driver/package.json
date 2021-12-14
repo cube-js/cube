@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-sqlite-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "main": "driver/SqliteDriver.js",
   "typings": "driver/index.d.ts",

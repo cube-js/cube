@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "private": true,
   "engines": {
-    "node": ">=10.8.0"
+    "node": ">=12.x"
   },
   "dependencies": {
     "@cubejs-backend/athena-driver": "^0.28.64",

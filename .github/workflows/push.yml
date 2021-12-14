@@ -45,7 +45,6 @@ jobs:
 
     strategy:
       matrix:
-        # We should use our minimal version (10.x), but there are problems with packages...
         node-version: [12.x, 14.x, 16.x]
       fail-fast: false
 
@@ -204,7 +203,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
       fail-fast: false
 
     steps:
