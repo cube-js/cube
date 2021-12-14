@@ -199,7 +199,7 @@ export function PlaygroundQueryBuilder({
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const isGraphQLSupported = useServerCoreVersionGte('0.28.66');
+  const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
   
   const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
