@@ -1,49 +1,44 @@
 {
-  "name": "@cubejs-client/core",
+  "name": "@cubejs-client/dx",
   "version": "0.29.0",
   "engines": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
-    "directory": "packages/cubejs-client-core"
+    "directory": "packages/cubejs-client-dx"
   },
-  "description": "cube.js client",
-  "main": "dist/cubejs-client-core.js",
-  "module": "dist/cubejs-client-core.esm.js",
+  "description": "Cube.js Client Developer eXperience",
+  "main": "src/index.js",
+  "module": "src/index.mjs",
   "types": "index.d.ts",
   "author": "Cube Dev, Inc.",
   "dependencies": {
-    "@babel/runtime": "^7.1.2",
-    "@cubejs-client/dx": "^0.29.0",
-    "core-js": "^3.6.5",
-    "cross-fetch": "^3.0.2",
-    "dayjs": "^1.10.4",
-    "ramda": "^0.27.0",
-    "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^8.3.2"
   },
   "scripts": {
     "test": "npm run unit",
-    "unit": "jest",
+    "unit": "jest --passWithNoTests",
     "lint": "eslint src/*.js",
     "lint:fix": "eslint --fix src/*.js"
   },
   "files": [
     "src",
     "dist",
-    "index.d.ts"
+    "index.d.ts",
+    "generated.d.ts"
   ],
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
     "@types/jest": "^26.0.9",
-    "@types/moment-range": "^4.0.0",
     "babel-jest": "^26.0.1",
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
     "jest": "^26.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
