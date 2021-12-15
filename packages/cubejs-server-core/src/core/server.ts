@@ -751,6 +751,7 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
+      standalone: this.standalone
     });
   }
 

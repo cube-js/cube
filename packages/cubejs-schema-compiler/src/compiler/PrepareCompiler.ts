@@ -50,7 +50,8 @@ export const prepareCompiler = (repo, options) => {
       RefreshKeys,
       Reflection
     },
-    compileContext: options.compileContext
+    compileContext: options.compileContext,
+    standalone: options.standalone
   }, options));
 
   return {

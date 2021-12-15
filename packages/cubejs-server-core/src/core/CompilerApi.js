@@ -15,6 +15,7 @@ export class CompilerApi {
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
+    this.standalone = options.standalone;
   }
 
   setGraphQLSchema(schema) {
@@ -49,7 +50,8 @@ export class CompilerApi {
       this.compilers = compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
-        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+        standalone: this.standalone
       });
       this.compilerVersion = compilerVersion;
     }
