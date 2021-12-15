@@ -825,6 +825,7 @@ declare module '@cubejs-client/core' {
     title: string;
     shortTitle: string;
     isVisible?: boolean;
+    meta?: any;
   };
 
   export type BaseCubeMember = {

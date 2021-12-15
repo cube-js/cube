@@ -949,6 +949,7 @@ name | string |
 shortTitle | string |
 title | string |
 isVisible? | boolean |
+meta? | any |
 type | [TCubeMemberType](#types-t-cube-member-type) |
 
 ### <--{"id" : "Types"}-->  TCubeMemberByType
