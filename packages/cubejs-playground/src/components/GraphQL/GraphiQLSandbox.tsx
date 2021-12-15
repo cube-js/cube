@@ -10,7 +10,7 @@ import 'graphiql/graphiql.min.css';
 import useDeepMemo from '../../hooks/deep-memo';
 import { metaToTypes } from '../../utils';
 import { CubeGraphQLConverter } from './CubeGraphQLConverter';
-import { useSecurityContext } from '../../hooks';
+import { useSecurityContext, useToken } from '../../hooks';
 
 const Wrapper = styled.div`
   margin-top: -15px;
@@ -51,7 +51,10 @@ export default function GraphiQLSandbox({
   query,
   meta,
 }: GraphiQLSandboxProps) {
-  const { token } = useSecurityContext();
+  const { token: securityContextToken } = useSecurityContext();
+  const playgroundToken = useToken();
+  
+  const token = securityContextToken || playgroundToken;
 
   const fetcher = useMemo(() => {
     return createGraphiQLFetcher({
