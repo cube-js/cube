@@ -30,7 +30,7 @@ const FilterGroup = ({
             disabled={disabled}
             availableCubes={availableMembers}
             style={{
-              width: 150,
+              minWidth: 150,
               textOverflow: 'ellipsis',
               overflow: 'hidden',
             }}
