@@ -3,14 +3,14 @@ import { createGraphiQLFetcher } from '@graphiql/toolkit';
 import GraphiQL from 'graphiql';
 import gqlParser from 'prettier/parser-graphql';
 import { format } from 'prettier/standalone';
+import styled from 'styled-components';
 import { useMemo } from 'react';
 import 'graphiql/graphiql.min.css';
 
 import useDeepMemo from '../../hooks/deep-memo';
 import { metaToTypes } from '../../utils';
 import { CubeGraphQLConverter } from './CubeGraphQLConverter';
-import styled from 'styled-components';
-import { useToken } from '../../hooks';
+import { useSecurityContext } from '../../hooks';
 
 const Wrapper = styled.div`
   margin-top: -15px;
@@ -28,9 +28,14 @@ const Wrapper = styled.div`
       border-left: none;
       background: none;
     }
-    
-    .CodeMirror-scroll, .CodeMirror-lines {
+
+    .CodeMirror-scroll,
+    .CodeMirror-lines {
       background: white;
+    }
+    
+    .doc-explorer-title-bar {
+      height: 50px;
     }
   }
 `;
@@ -41,17 +46,24 @@ type GraphiQLSandboxProps = {
   meta: Meta;
 };
 
-export default function GraphiQLSandbox({ apiUrl, query, meta }: GraphiQLSandboxProps) {
-  const token = useToken();
-  const fetcher = useMemo(() => {    
+export default function GraphiQLSandbox({
+  apiUrl,
+  query,
+  meta,
+}: GraphiQLSandboxProps) {
+  const { token } = useSecurityContext();
+
+  const fetcher = useMemo(() => {
     return createGraphiQLFetcher({
       url: apiUrl.replace('/v1', '/graphql'),
-      headers: token ? {
-        authorization: token
-      } : {}
+      headers: token
+        ? {
+            authorization: token,
+          }
+        : {},
     });
-  }, [apiUrl, token])
-  
+  }, [apiUrl, token]);
+
   const types = useMemo(() => {
     return metaToTypes(meta);
   }, [meta]);
