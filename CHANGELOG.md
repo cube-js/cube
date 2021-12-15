@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.2](https://github.com/cube-js/cube.js/compare/v0.29.1...v0.29.2) (2021-12-15)
+
+
+### Bug Fixes
+
+* **playground:** respect security context token in GraphQL sandbox ([3d4a18b](https://github.com/cube-js/cube.js/commit/3d4a18b720c2c298834ee41055244a0af6292ce2))
+
+
+
+
+
 ## [0.29.1](https://github.com/cube-js/cube.js/compare/v0.29.0...v0.29.1) (2021-12-15)
 
 
