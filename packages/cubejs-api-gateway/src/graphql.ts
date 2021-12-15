@@ -342,71 +342,77 @@ export function makeSchema(metaConfig: any) {
     OrderBy,
     TimeDimension
   ];
+  
+  function hasMembers(cube: any) {
+    return cube.config.measures.length || cube.config.dimensions.length;
+  }
 
   metaConfig.forEach(cube => {
-    types.push(objectType({
-      name: `${cube.config.name}Members`,
-      definition(t) {
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.nonNull.field(safeName(measure.name), {
-              type: mapType(measure.type),
-              description: measure.description
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.nonNull.field(safeName(dimension.name), {
-              type: mapType(dimension.type),
-              description: dimension.description
-            });
-          }
-        });
-      }
-    }));
+    if (hasMembers(cube)) {
+      types.push(objectType({
+        name: `${cube.config.name}Members`,
+        definition(t) {
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.nonNull.field(safeName(measure.name), {
+                type: mapType(measure.type),
+                description: measure.description
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.nonNull.field(safeName(dimension.name), {
+                type: mapType(dimension.type),
+                description: dimension.description
+              });
+            }
+          });
+        }
+      }));
+    
+      types.push(inputObjectType({
+        name: `${cube.config.name}WhereInput`,
+        definition(t) {
+          t.field('AND', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
+          t.field('OR', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.field(safeName(measure.name), {
+                type: `${mapType(measure.type, true)}Filter`,
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.field(safeName(dimension.name), {
+                type: `${mapType(dimension.type, true)}Filter`,
+              });
+            }
+          });
+        }
+      }));
 
-    types.push(inputObjectType({
-      name: `${cube.config.name}WhereInput`,
-      definition(t) {
-        t.field('AND', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
-        t.field('OR', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.field(safeName(measure.name), {
-              type: `${mapType(measure.type, true)}Filter`,
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.field(safeName(dimension.name), {
-              type: `${mapType(dimension.type, true)}Filter`,
-            });
-          }
-        });
-      }
-    }));
-
-    types.push(inputObjectType({
-      name: `${cube.config.name}OrderByInput`,
-      definition(t) {
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.field(safeName(measure.name), {
-              type: 'OrderBy',
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.field(safeName(dimension.name), {
-              type: 'OrderBy',
-            });
-          }
-        });
-      }
-    }));
+      types.push(inputObjectType({
+        name: `${cube.config.name}OrderByInput`,
+        definition(t) {
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.field(safeName(measure.name), {
+                type: 'OrderBy',
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.field(safeName(dimension.name), {
+                type: 'OrderBy',
+              });
+            }
+          });
+        }
+      }));
+    }
   });
 
   types.push(inputObjectType({
@@ -415,9 +421,11 @@ export function makeSchema(metaConfig: any) {
       t.field('AND', { type: list(nonNull('RootWhereInput')) });
       t.field('OR', { type: list(nonNull('RootWhereInput')) });
       metaConfig.forEach(cube => {
-        t.field(unCapitalize(cube.config.name), {
-          type: `${cube.config.name}WhereInput`
-        });
+        if (hasMembers(cube)) {
+          t.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}WhereInput`
+          });
+        }
       });
     }
   }));
@@ -426,9 +434,11 @@ export function makeSchema(metaConfig: any) {
     name: 'RootOrderByInput',
     definition(t) {
       metaConfig.forEach(cube => {
-        t.field(unCapitalize(cube.config.name), {
-          type: `${cube.config.name}OrderByInput`
-        });
+        if (hasMembers(cube)) {
+          t.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}OrderByInput`
+          });
+        }
       });
     }
   }));
@@ -437,17 +447,19 @@ export function makeSchema(metaConfig: any) {
     name: 'Result',
     definition(t) {
       metaConfig.forEach(cube => {
-        t.nonNull.field(unCapitalize(cube.config.name), {
-          type: `${cube.config.name}Members`,
-          args: {
-            where: arg({
-              type: `${cube.config.name}WhereInput`
-            }),
-            orderBy: arg({
-              type: `${cube.config.name}OrderByInput`
-            }),
-          }
-        });
+        if (hasMembers(cube)) {
+          t.nonNull.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}Members`,
+            args: {
+              where: arg({
+                type: `${cube.config.name}WhereInput`
+              }),
+              orderBy: arg({
+                type: `${cube.config.name}OrderByInput`
+              }),
+            }
+          });
+        }
       });
     }
   }));
