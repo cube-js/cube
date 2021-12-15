@@ -8,6 +8,7 @@
  */
 
 declare module '@cubejs-client/core' {
+
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -714,28 +715,34 @@ declare module '@cubejs-client/core' {
   }
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
-  type LogicalAndFilter = {
+  export type LogicalAndFilter = {
     and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
   };
 
-  type LogicalOrFilter = {
+  export type LogicalOrFilter = {
     or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
   };
 
-  type BinaryFilter = {
+  export interface BinaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
-  type UnaryFilter = {
+  }
+  export interface UnaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
-  };
-  type UnaryOperator = 'set' | 'notSet';
-  type BinaryOperator =
+  }
+  export type UnaryOperator = 'set' | 'notSet';
+  export type BinaryOperator =
     | 'equals'
     | 'notEquals'
     | 'contains'
@@ -753,10 +760,10 @@ declare module '@cubejs-client/core' {
 
   export type DateRange = string | [string, string];
 
-  export type TimeDimensionBase = {
+  export interface TimeDimensionBase {
     dimension: string;
     granularity?: TimeDimensionGranularity;
-  };
+  }
 
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
@@ -771,7 +778,7 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
-  export type Query = {
+  export interface Query {
     measures?: string[];
     dimensions?: string[];
     filters?: Filter[];
@@ -783,7 +790,7 @@ declare module '@cubejs-client/core' {
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
-  };
+  }
 
   export class ProgressResult {
     stage(): string;
@@ -1105,12 +1112,15 @@ declare module '@cubejs-client/core' {
 
   export function defaultOrder(query: Query): { [key: string]: QueryOrder };
 
-  type TFlatFilter = {
+  export interface TFlatFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
+  }
 
   /**
    * @hidden
@@ -1143,3 +1153,5 @@ declare module '@cubejs-client/core' {
     timeElapsed: number;
   };
 }
+
+import '@cubejs-client/dx';
