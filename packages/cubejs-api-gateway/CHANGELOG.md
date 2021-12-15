@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.3](https://github.com/cube-js/cube.js/compare/v0.29.2...v0.29.3) (2021-12-15)
+
+
+### Bug Fixes
+
+* **api-gateway:** skip GraphQL types generation for empty cubes ([28f3c40](https://github.com/cube-js/cube.js/commit/28f3c40bd6fa23dc33b083dda3f8d66d1f5dacc0))
+
+
+
+
+
 # [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
 
 

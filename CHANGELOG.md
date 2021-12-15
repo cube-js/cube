@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.3](https://github.com/cube-js/cube.js/compare/v0.29.2...v0.29.3) (2021-12-15)
+
+
+### Bug Fixes
+
+* **api-gateway:** skip GraphQL types generation for empty cubes ([28f3c40](https://github.com/cube-js/cube.js/commit/28f3c40bd6fa23dc33b083dda3f8d66d1f5dacc0))
+* **playground:** use playground token when security context provided ([74e22e3](https://github.com/cube-js/cube.js/commit/74e22e3aa6355106bf51bd8f9f08ffdeec8d5f9b))
+
+
+
+
+
 ## [0.29.2](https://github.com/cube-js/cube.js/compare/v0.29.1...v0.29.2) (2021-12-15)
 
 
