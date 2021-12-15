@@ -10,7 +10,7 @@ use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
-use sqlparser::ast::{self, Ident, ObjectName};
+use sqlparser::ast::{self, DateTimeField, Ident, ObjectName};
 
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
@@ -162,10 +162,22 @@ fn compile_select_expr(
 }
 
 #[derive(Debug, Clone, PartialEq)]
+struct IntervalLiteral {
+    negative: bool,
+    seconds: u32,
+    minutes: u32,
+    hours: u32,
+    days: u32,
+    months: u32,
+    years: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 enum CompiledExpression {
     Selection(Selection),
     StringLiteral(String),
     DateLiteral(DateTime<Utc>),
+    IntervalLiteral(IntervalLiteral),
     NumberLiteral(String, bool),
     BooleanLiteral(bool),
 }
@@ -241,6 +253,133 @@ fn compile_argument(argument: &ast::Expr) -> CompilationResult<CompiledExpressio
     }
 }
 
+fn function_arguments_unpack2<'a>(
+    f: &'a ast::Function,
+    fn_name: String,
+) -> CompilationResult<(&'a ast::Expr, &'a ast::Expr)> {
+    match f.args.as_slice() {
+        [ast::FunctionArg::Unnamed(arg1), ast::FunctionArg::Unnamed(arg2)] => Ok((arg1, arg2)),
+        _ => Err(CompilationError::User(format!(
+            "Unsupported signature for {} function: {:?}",
+            fn_name, f
+        ))),
+    }
+}
+
+fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
+    let (date_expr, format_expr) = function_arguments_unpack2(&f, "STR_TO_DATE".to_string())?;
+
+    let date = match compile_argument(date_expr)? {
+        CompiledExpression::StringLiteral(str) => str,
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Wrong type of argument (date), must be StringLiteral: {:?}",
+                f
+            )))
+        }
+    };
+    let format = match compile_argument(format_expr)? {
+        CompiledExpression::StringLiteral(str) => str,
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Wrong type of argument (format), must be StringLiteral: {:?}",
+                f
+            )))
+        }
+    };
+
+    if !format.eq("%Y-%m-%d %H:%i:%s.%f") {
+        return Err(CompilationError::User(format!(
+            "Wrong type of argument: {:?}",
+            f
+        )));
+    }
+
+    let parsed_date = Utc
+        .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+        .map_err(|e| {
+            CompilationError::User(format!("Unable to parse {}, err: {}", date, e.to_string(),))
+        })?;
+
+    Ok(CompiledExpression::DateLiteral(parsed_date))
+}
+
+fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<CompiledExpression> {
+    let date_expr = match f.args.as_slice() {
+        [ast::FunctionArg::Unnamed(date_expr)] => date_expr,
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Unsupported signature for DATE function: {:?}",
+                f
+            )));
+        }
+    };
+
+    Ok(compile_expression(&date_expr, &ctx)?)
+}
+
+fn now_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
+    if f.args.len() > 1 {
+        return Err(CompilationError::User(format!(
+            "Unsupported signature for NOW function: {:?}",
+            f
+        )));
+    };
+
+    Ok(CompiledExpression::DateLiteral(Utc::now()))
+}
+
+fn date_add_function(
+    f: &ast::Function,
+    ctx: &QueryContext,
+) -> CompilationResult<CompiledExpression> {
+    let (left_expr, right_expr) = function_arguments_unpack2(&f, "DATE_ADD".to_string())?;
+
+    let date = match compile_expression(&left_expr, &ctx)? {
+        CompiledExpression::DateLiteral(str) => str,
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Wrong type of argument (date), must be DateLiteral: {:?}",
+                f
+            )))
+        }
+    };
+
+    let interval = match compile_expression(&right_expr, &ctx)? {
+        CompiledExpression::IntervalLiteral(str) => str,
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Wrong type of argument (interval), must be IntervalLiteral: {:?}",
+                f
+            )))
+        }
+    };
+
+    let duration = if interval.seconds > 0 {
+        Duration::seconds(interval.seconds as i64)
+    } else if interval.minutes > 0 {
+        Duration::minutes(interval.minutes as i64)
+    } else if interval.days > 0 {
+        Duration::days(interval.days as i64)
+    } else if interval.months > 0 {
+        // @todo use real days
+        Duration::days((interval.months * 30) as i64)
+    } else if interval.years > 0 {
+        // @todo use real years
+        Duration::days((interval.years * 365) as i64)
+    } else {
+        return Err(CompilationError::Unsupported(format!(
+            "Unsupported manipulation with interval",
+        )));
+    };
+
+    Ok(CompiledExpression::DateLiteral(if interval.negative {
+        date - duration
+    } else {
+        date + duration
+    }))
+}
+
 fn compile_expression(
     expr: &ast::Expr,
     ctx: &QueryContext,
@@ -275,70 +414,90 @@ fn compile_expression(
                 expr
             ))),
         },
-        ast::Expr::Value(value) => match value {
+        ast::Expr::Value(val) => match val {
             ast::Value::SingleQuotedString(v) => Ok(CompiledExpression::StringLiteral(v.clone())),
             ast::Value::Number(v, _) => Ok(CompiledExpression::NumberLiteral(v.clone(), false)),
             ast::Value::Boolean(v) => Ok(CompiledExpression::BooleanLiteral(*v)),
+            ast::Value::Interval {
+                value,
+                leading_field,
+                ..
+            } => {
+                let (interval_value, interval_negative) = match compile_expression(&value, &ctx)? {
+                    CompiledExpression::NumberLiteral(n, is_negative) => {
+                        let n = n.to_string().parse::<u32>().map_err(|e| {
+                            CompilationError::Unsupported(format!(
+                                "Unable to parse interval value: {}",
+                                e.to_string()
+                            ))
+                        })?;
+
+                        (n, is_negative)
+                    }
+                    _ => {
+                        return Err(CompilationError::User(format!(
+                            "Unsupported type of Interval value, must be NumberLiteral: {:?}",
+                            value
+                        )))
+                    }
+                };
+
+                let mut interval = IntervalLiteral {
+                    negative: false,
+                    seconds: 0,
+                    minutes: 0,
+                    hours: 0,
+                    days: 0,
+                    months: 0,
+                    years: 0,
+                };
+
+                interval.negative = interval_negative;
+
+                match leading_field.clone().unwrap_or(DateTimeField::Second) {
+                    DateTimeField::Second => {
+                        interval.seconds = interval_value;
+                    }
+                    DateTimeField::Minute => {
+                        interval.minutes = interval_value;
+                    }
+                    DateTimeField::Hour => {
+                        interval.hours = interval_value;
+                    }
+                    DateTimeField::Day => {
+                        interval.days = interval_value;
+                    }
+                    DateTimeField::Month => {
+                        interval.months = interval_value;
+                    }
+                    DateTimeField::Year => {
+                        interval.years = interval_value;
+                    }
+                    _ => {
+                        return Err(CompilationError::User(format!(
+                            "Unsupported type of Interval, actual: {:?}",
+                            leading_field
+                        )))
+                    }
+                };
+
+                Ok(CompiledExpression::IntervalLiteral(interval))
+            }
             _ => Err(CompilationError::User(format!(
                 "Unsupported value: {:?}",
-                value
+                val
             ))),
         },
-        ast::Expr::Function(f) => {
-            match f.name.to_string().to_lowercase().as_str() {
-                //
-                "str_to_date" => match f.args.as_slice() {
-                    [ast::FunctionArg::Unnamed(date_expr), ast::FunctionArg::Unnamed(format_expr)] =>
-                    {
-                        let date = match compile_argument(date_expr)? {
-                            CompiledExpression::StringLiteral(str) => str,
-                            _ => {
-                                return Err(CompilationError::User(format!(
-                                    "Wrong type of argument (date), must be StringLiteral: {:?}",
-                                    f
-                                )))
-                            }
-                        };
-                        let format = match compile_argument(format_expr)? {
-                            CompiledExpression::StringLiteral(str) => str,
-                            _ => {
-                                return Err(CompilationError::User(format!(
-                                    "Wrong type of argument (format), must be StringLiteral: {:?}",
-                                    f
-                                )))
-                            }
-                        };
-
-                        if !format.eq("%Y-%m-%d %H:%i:%s.%f") {
-                            return Err(CompilationError::User(format!(
-                                "Wrong type of argument: {:?}",
-                                f
-                            )));
-                        }
-
-                        let parsed_date = Utc
-                            .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
-                            .map_err(|e| {
-                                CompilationError::User(format!(
-                                    "Unable to parse {}, err: {}",
-                                    date,
-                                    e.to_string(),
-                                ))
-                            })?;
-
-                        Ok(CompiledExpression::DateLiteral(parsed_date))
-                    }
-                    _ => Err(CompilationError::User(format!(
-                        "Unsupported function: {:?}",
-                        f
-                    ))),
-                },
-                _ => Err(CompilationError::User(format!(
-                    "Unsupported function: {:?}",
-                    f
-                ))),
-            }
-        }
+        ast::Expr::Function(f) => match f.name.to_string().to_lowercase().as_str() {
+            "str_to_date" => str_to_date_function(&f),
+            "date" => date_function(&f, &ctx),
+            "date_add" => date_add_function(&f, &ctx),
+            "now" => now_function(&f),
+            _ => Err(CompilationError::User(format!(
+                "Unsupported function: {:?}",
+                f
+            ))),
+        },
         _ => Err(CompilationError::Unsupported(format!(
             "Unable to compile expression: {:?}",
             expr
@@ -3032,6 +3191,40 @@ mod tests {
         match compiled {
             CompiledExpression::DateLiteral(date) => {
                 assert_eq!(date.to_string(), "2021-08-31 00:00:00 UTC".to_string())
+            }
+            _ => panic!("Must be DateLiteral"),
+        };
+    }
+
+    #[test]
+    fn test_now_expr() {
+        let compiled = compile_expression(
+            &parse_expr_from_projection(&"SELECT NOW()".to_string()),
+            &QueryContext::new(&get_test_meta()[0]),
+        )
+        .unwrap();
+
+        match compiled {
+            CompiledExpression::DateLiteral(_) => {}
+            _ => panic!("Must be DateLiteral"),
+        };
+    }
+
+    #[test]
+    fn test_date_date_add_interval_expr() {
+        let compiled = compile_expression(
+            &parse_expr_from_projection(
+                // &"SELECT date(date_add(now(6), INTERVAL -30 day))"
+                &"SELECT date(date_add(STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'), INTERVAL -30 day))"
+                    .to_string(),
+            ),
+            &QueryContext::new(&get_test_meta()[0]),
+        )
+        .unwrap();
+
+        match compiled {
+            CompiledExpression::DateLiteral(date) => {
+                assert_eq!(date.to_string(), "2021-08-01 00:00:00 UTC".to_string())
             }
             _ => panic!("Must be DateLiteral"),
         };
