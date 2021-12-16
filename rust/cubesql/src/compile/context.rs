@@ -340,7 +340,7 @@ impl QueryContext {
                         )))
                     }
                 }
-                [ast::FunctionArg::Unnamed(ast::Expr::Identifier(_i))] => {
+                [ast::FunctionArg::Unnamed(_)] => {
                     let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
                     if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
