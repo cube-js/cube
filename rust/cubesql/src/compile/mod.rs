@@ -395,6 +395,26 @@ fn compile_expression(
                 )))
             }
         }
+        ast::Expr::CompoundIdentifier(i) => {
+            // @todo We need a context with main table rel
+            let identifier = if i.len() == 2 {
+                i[1].value.to_string()
+            } else {
+                return Err(CompilationError::Unsupported(format!(
+                    "Unsupported compound identifier in argument: {}",
+                    expr.to_string()
+                )));
+            };
+
+            if let Some(selection) = ctx.find_selection_for_identifier(&identifier, true) {
+                Ok(CompiledExpression::Selection(selection))
+            } else {
+                Err(CompilationError::User(format!(
+                    "Unable to find selection for: {:?}",
+                    identifier
+                )))
+            }
+        }
         ast::Expr::UnaryOp { expr, op } => match op {
             ast::UnaryOperator::Minus => match *expr.clone() {
                 ast::Expr::Value(value) => match value {
