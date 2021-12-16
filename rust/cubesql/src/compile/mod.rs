@@ -304,6 +304,8 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
     Ok(CompiledExpression::DateLiteral(parsed_date))
 }
 
+// DATE(expr)
+// Extracts the date part of the date or datetime expression expr.
 fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<CompiledExpression> {
     let date_expr = match f.args.as_slice() {
         [ast::FunctionArg::Unnamed(date_expr)] => date_expr,
@@ -315,7 +317,29 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
         }
     };
 
-    Ok(compile_expression(&date_expr, &ctx)?)
+    let compiled = compile_expression(&date_expr, &ctx)?;
+    match compiled {
+        date @ CompiledExpression::DateLiteral(_) => Ok(date),
+        CompiledExpression::StringLiteral(ref input) => {
+            let parsed_date = Utc
+                .datetime_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+                .map_err(|e| {
+                    CompilationError::User(format!(
+                        "Unable to parse {}, err: {}",
+                        input,
+                        e.to_string(),
+                    ))
+                })?;
+
+            Ok(CompiledExpression::DateLiteral(parsed_date))
+        }
+        _ => {
+            return Err(CompilationError::User(format!(
+                "Wrong type of argument (date), must be DateLiteral, actual: {:?}",
+                f
+            )))
+        }
+    }
 }
 
 fn now_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
@@ -1162,6 +1186,7 @@ fn compile_where(
                 )));
             }
         },
+        ast::Expr::Nested(nested) => compile_where_expression(nested, ctx)?,
         inlist @ ast::Expr::InList { .. } => compile_where_expression(inlist, ctx)?,
         isnull @ ast::Expr::IsNull { .. } => compile_where_expression(isnull, ctx)?,
         isnotnull @ ast::Expr::IsNotNull { .. } => compile_where_expression(isnotnull, ctx)?,
@@ -2473,9 +2498,10 @@ mod tests {
             // ["DATE(DATE_SUB(order_date, INTERVAL DAYOFWEEK(order_date) - 1 DAY))".to_string(), "week".to_string()],
             ["DATE(DATE_SUB(order_date, INTERVAL DAYOFMONTH(order_date) - 1 DAY))".to_string(), "month".to_string()],
             ["DATE(DATE_SUB(order_date, INTERVAL DAYOFYEAR(order_date) - 1 DAY))".to_string(), "year".to_string()],
+            // Simple DATE
             ["DATE(order_date)".to_string(), "day".to_string()],
-            // With escaping by `
             ["DATE(`order_date`)".to_string(), "day".to_string()],
+            ["DATE(`KibanaSampleDataEcommerce`.`order_date`)".to_string(), "day".to_string()],
             // With DATE_ADD
             ["DATE_ADD(DATE(order_date), INTERVAL HOUR(order_date) HOUR)".to_string(), "hour".to_string()],
             ["DATE_ADD(DATE(order_date), INTERVAL HOUR(`order_date`) HOUR)".to_string(), "hour".to_string()],
@@ -2527,10 +2553,24 @@ mod tests {
     #[test]
     fn test_where_filter_daterange() {
         let to_check = vec![
-            // // Filter push down to TD (day)
+            // Filter push down to TD (day) - Superset
             (
                 "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
                 "order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
+            // Filter push down to TD (day) - Superset
+            (
+                "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
+                // Now replaced with exact date
+                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
                 Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
