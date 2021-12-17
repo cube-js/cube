@@ -52,6 +52,9 @@ export type Introspected${topLevelType}Name = ${cubeNames.map(c => `${c}${topLev
 };
 
 const generateQueryTypes = async (apiUrl, { token }) => {
+  if (!apiUrl) {
+    await displayError('Please specify the Cube API URL');
+  }
   if (!token) {
     await displayError('Type generation requires a token. Please generate one and try again');
   }
