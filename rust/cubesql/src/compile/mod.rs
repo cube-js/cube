@@ -383,6 +383,8 @@ fn date_add_function(
         Duration::seconds(interval.seconds as i64)
     } else if interval.minutes > 0 {
         Duration::minutes(interval.minutes as i64)
+    } else if interval.hours > 0 {
+        Duration::hours(interval.hours as i64)
     } else if interval.days > 0 {
         Duration::days(interval.days as i64)
     } else if interval.months > 0 {
@@ -3272,22 +3274,55 @@ mod tests {
 
     #[test]
     fn test_date_date_add_interval_expr() {
-        let compiled = compile_expression(
-            &parse_expr_from_projection(
-                // &"SELECT date(date_add(now(6), INTERVAL -30 day))"
-                &"SELECT date(date_add(STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'), INTERVAL -30 day))"
-                    .to_string(),
+        let to_check = vec![
+            // positive
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 second)".to_string(),
+                "2021-01-01 00:00:01 UTC",
             ),
-            &QueryContext::new(&get_test_meta()[0]),
-        )
-        .unwrap();
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 minute)".to_string(),
+                "2021-01-01 00:01:00 UTC",
+            ),
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 hour)".to_string(),
+                "2021-01-01 01:00:00 UTC",
+            ),
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 day)".to_string(),
+                "2021-01-02 00:00:00 UTC",
+            ),
+            // @todo we need to support exact +1 month
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 month)".to_string(),
+                "2021-01-31 00:00:00 UTC",
+            ),
+            // @todo we need to support exact +1 year
+            (
+                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 year)".to_string(),
+                "2022-01-01 00:00:00 UTC",
+            ),
+            // negative
+            (
+                "date_add(date('2021-08-31 00:00:00.000000'), INTERVAL -30 day)".to_string(),
+                "2021-08-01 00:00:00 UTC",
+            ),
+        ];
 
-        match compiled {
-            CompiledExpression::DateLiteral(date) => {
-                assert_eq!(date.to_string(), "2021-08-01 00:00:00 UTC".to_string())
-            }
-            _ => panic!("Must be DateLiteral"),
-        };
+        for (sql, expected_date) in to_check.iter() {
+            let compiled = compile_expression(
+                &parse_expr_from_projection(&format!("SELECT {}", sql)),
+                &QueryContext::new(&get_test_meta()[0]),
+            )
+            .unwrap();
+
+            match compiled {
+                CompiledExpression::DateLiteral(date) => {
+                    assert_eq!(date.to_string(), expected_date.to_string())
+                }
+                _ => panic!("Must be DateLiteral"),
+            };
+        }
     }
 
     #[test]

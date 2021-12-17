@@ -134,6 +134,7 @@ pub fn create_connection_id_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF
     )
 }
 
+#[allow(unused_macros)]
 macro_rules! downcast_boolean_arr {
     ($ARG:expr) => {{
         $ARG.as_any()
@@ -147,6 +148,7 @@ macro_rules! downcast_boolean_arr {
     }};
 }
 
+#[allow(unused_macros)]
 macro_rules! downcast_primitive_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
@@ -161,6 +163,7 @@ macro_rules! downcast_primitive_arg {
     }};
 }
 
+#[allow(unused_macros)]
 macro_rules! downcast_string_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
