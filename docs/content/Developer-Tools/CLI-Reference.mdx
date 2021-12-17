@@ -131,3 +131,32 @@ Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 ```bash
 $ cubejs token -e "1 day" -p appId=1 -p userId=2
 ```
+
+## typegen
+
+The `typegen` command generates type declarations from a Cube API. It requires
+both an API URL and a valid JWT for the API.
+
+The API URL should be in the format `http://<HOST>/cubejs-api/v1`. You should
+run the `typegen` command from a frontend project that uses
+`@cubejs-client/core`.
+
+### Usage
+
+```bash
+$ cubejs typegen API_URL --token TOKEN
+```
+
+### Flags
+
+| Parameter | Description                            | Example                                  |
+| --------- | -------------------------------------- | ---------------------------------------- |
+| --token   | A valid JWT for the provided `API_URL` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ...` |
+
+### Example
+
+Generate types for a locally running Cube deployment:
+
+```bash
+$ cubejs typegen http://localhost:4000/cubejs-api/v1 --token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ...
+```
