@@ -496,10 +496,6 @@ export class PreAggregationLoader {
 
     const versionEntries = await this.loadCache.getVersionEntries(this.preAggregation);
 
-    console.log('Content version', contentVersion);
-    console.log('Structure version', structureVersion);
-    console.log('Version entries', versionEntries);
-
     const getVersionEntryByContentVersion = ({ byContent }: VersionEntriesObj) => byContent[`${this.preAggregation.tableName}_${contentVersion}`];
 
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
