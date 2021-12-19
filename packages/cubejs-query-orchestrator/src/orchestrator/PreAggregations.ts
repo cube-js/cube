@@ -96,6 +96,8 @@ type IndexDescription = {
 };
 
 export type PreAggregationDescription = {
+  preAggregationsSchema: string;
+  type: 'rollup' | 'originalSql';
   preAggregationId: string;
   priority: number;
   dataSource: string;
@@ -222,7 +224,7 @@ class PreAggregationLoadCache {
     return tables;
   }
 
-  public async fetchTables(preAggregation) {
+  public async fetchTables(preAggregation: PreAggregationDescription) {
     if (preAggregation.external && !this.externalDriverFactory) {
       throw new Error('externalDriverFactory is not provided. Please make sure @cubejs-backend/cubestore-driver is installed and use CUBEJS_DEV_MODE=true or provide Cube Store connection env variables for production usage.');
     }
@@ -236,7 +238,7 @@ class PreAggregationLoadCache {
     return newTables;
   }
 
-  private async fetchTablesNoCache(preAggregation) {
+  private async fetchTablesNoCache(preAggregation: PreAggregationDescription) {
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
@@ -246,8 +248,8 @@ class PreAggregationLoadCache {
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
-  public tablesRedisKey(preAggregation) {
-    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.external ? '_EXT' : ''}`;
+  public tablesRedisKey(preAggregation: PreAggregationDescription) {
+    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`;
   }
 
   protected async getTablesQuery(preAggregation) {
@@ -861,16 +863,16 @@ export class PreAggregationLoader {
     try {
       const externalDriver = await this.externalDriverFactory();
       const capabilities = externalDriver.capabilities && externalDriver.capabilities();
-  
+
       let tableData: DownloadTableData;
-  
+
       if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
         tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
       } else if (capabilities.streamImport && client.stream) {
         tableData = await saveCancelFn(
           client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
         );
-  
+
         if (client.unload) {
           const stream = new LargeStreamWarning(preAggregation.preAggregationId);
           tableData.rowStream.pipe(stream);
@@ -879,7 +881,7 @@ export class PreAggregationLoader {
       } else {
         tableData = await saveCancelFn(client.downloadTable(table, capabilities));
       }
-  
+
       if (!tableData.types) {
         tableData.types = await saveCancelFn(client.tableColumnTypes(table));
       }
@@ -1386,9 +1388,9 @@ export class PreAggregations {
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
 
-    const getLoadCacheByDataSource = (dataSource = 'default') => {
-      if (!loadCacheByDataSource[dataSource]) {
-        loadCacheByDataSource[dataSource] =
+    const getLoadCacheByDataSource = (dataSource = 'default', preAggregationSchema) => {
+      if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
+        loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
             dataSource,
@@ -1401,12 +1403,12 @@ export class PreAggregations {
           });
       }
 
-      return loadCacheByDataSource[dataSource];
+      return loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`];
     };
 
     let queryParamsReplacement = null;
 
-    const preAggregationsTablesToTempTablesPromise = preAggregations.map((p, i) => (preAggregationsTablesToTempTables) => {
+    const preAggregationsTablesToTempTablesPromise = preAggregations.map((p: PreAggregationDescription, i) => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
         () => this.driverFactory(p.dataSource || 'default'),
@@ -1415,7 +1417,7 @@ export class PreAggregations {
         this,
         p,
         preAggregationsTablesToTempTables,
-        getLoadCacheByDataSource(p.dataSource),
+        getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
@@ -1475,16 +1477,16 @@ export class PreAggregations {
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
 
-    const getLoadCacheByDataSource = (dataSource = 'default') => {
-      if (!loadCacheByDataSource[dataSource]) {
-        loadCacheByDataSource[dataSource] =
+    const getLoadCacheByDataSource = (dataSource = 'default', preAggregationSchema) => {
+      if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
+        loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(this.redisPrefix, () => this.driverFactory(dataSource), this.queryCache, this, {
             requestId: queryBody.requestId,
             dataSource
           });
       }
 
-      return loadCacheByDataSource[dataSource];
+      return loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`];
     };
 
     const expandedPreAggregations: PreAggregationDescription[][] = await Promise.all(preAggregations.map(p => {
@@ -1496,7 +1498,7 @@ export class PreAggregations {
         this,
         p,
         [],
-        getLoadCacheByDataSource(p.dataSource),
+        getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
@@ -1604,31 +1606,35 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public async getVersionEntries(preAggregations, requestId): Promise<VersionEntry[][]> {
-    const loadCacheByDataSource = [...new Set(preAggregations.map(p => p.dataSource))]
-      .reduce((obj, dataSource: string) => {
-        obj[dataSource] = new PreAggregationLoadCache(
-          this.redisPrefix,
-          () => this.driverFactory(dataSource),
-          this.queryCache,
-          this,
-          {
-            requestId,
-            dataSource
-          }
-        );
+  public async getVersionEntries(preAggregations: PreAggregationDescription[], requestId): Promise<VersionEntry[][]> {
+    const loadCacheByDataSource = {};
 
-        return obj;
-      }, {});
+    const getLoadCacheByDataSource = (dataSource = 'default', preAggregationSchema) => {
+      if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
+        loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
+          new PreAggregationLoadCache(
+            this.redisPrefix,
+            () => this.driverFactory(dataSource),
+            this.queryCache,
+            this,
+            {
+              requestId,
+              dataSource
+            }
+          );
+      }
+
+      return loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`];
+    };
 
     const firstByCacheKey = {};
     const data: VersionEntry[][] = await Promise.all(
       preAggregations.map(
         async preAggregation => {
-          const { dataSource } = preAggregation;
-          const cacheKey = loadCacheByDataSource[dataSource].tablesRedisKey(preAggregation);
+          const { dataSource, preAggregationsSchema } = preAggregation;
+          const cacheKey = getLoadCacheByDataSource(dataSource, preAggregationsSchema).tablesRedisKey(preAggregation);
           if (!firstByCacheKey[cacheKey]) {
-            firstByCacheKey[cacheKey] = loadCacheByDataSource[dataSource].getVersionEntries(preAggregation);
+            firstByCacheKey[cacheKey] = getLoadCacheByDataSource(dataSource, preAggregationsSchema).getVersionEntries(preAggregation);
             const res = await firstByCacheKey[cacheKey];
             return res.versionEntries;
           }
