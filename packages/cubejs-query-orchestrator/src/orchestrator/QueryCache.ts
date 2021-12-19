@@ -9,6 +9,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
+import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {
   external?: boolean;
@@ -19,9 +20,13 @@ type QueryOptions = {
 };
 export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
 export type QueryWithParams = QueryTuple;
-type Query = {
+export type Query = {
   requestId?: string;
   dataSource: string;
+  preAggregations?: PreAggregationDescription[];
+  groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  preAggregationsLoadCacheByDataSource?: any;
+  renewQuery?: boolean;
 };
 
 type CacheEntry = {
