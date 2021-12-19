@@ -47,7 +47,7 @@ class MockDriver {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
-    return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
+    return this.tables.filter(t => t.split('.')[0] === schema).map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
   delay(timeout) {
@@ -730,7 +730,24 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
       renewQuery: true,
-      requestId: 'save structure versions'
+      requestId: 'pre-aggregation version entries'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations_2.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations_2',
+        tableName: 'stb_pre_aggregations_2.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations_2.orders AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT 3', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation version entries'
     });
 
     const {
@@ -772,6 +789,62 @@ describe('QueryOrchestrator', () => {
     expect(structureVersionsByTableName).toMatchObject({
       'stb_pre_aggregations.orders': 'ezlvkhjl'
     });
+  });
+
+  test('pre-aggregation schema cache', async () => {
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_1.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_1',
+        tableName: 'pre_aggregations_1.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
+        invalidateKeyQueries: [['SELECT 1', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_2.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_2',
+        tableName: 'pre_aggregations_2.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_2.orders AS SELECT * FROM public.orders WHERE tenant_id = 2', []],
+        invalidateKeyQueries: [['SELECT 2', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_1.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_1',
+        tableName: 'pre_aggregations_1.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
+        invalidateKeyQueries: [['SELECT 1', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    console.log(mockDriver.tables);
+    expect(mockDriver.tables.length).toEqual(2);
   });
 
   test('range partitions', async () => {
