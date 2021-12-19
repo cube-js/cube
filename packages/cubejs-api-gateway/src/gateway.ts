@@ -643,7 +643,6 @@ export class ApiGateway {
       const result = await this.refreshScheduler()
         .buildPreAggregations(
           context,
-          this.getCompilerApi(context),
           query
         );
 

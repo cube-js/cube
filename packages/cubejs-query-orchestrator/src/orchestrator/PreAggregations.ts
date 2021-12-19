@@ -16,7 +16,7 @@ import {
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -1418,7 +1418,8 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource),
         {
           waitForRenew: queryBody.renewQuery,
-          forceBuild: queryBody.forceBuildPreAggregations,
+          // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
+          forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
@@ -1469,7 +1470,7 @@ export class PreAggregations {
     return result;
   }
 
-  public async expandPartitionsInPreAggregations(queryBody) {
+  public async expandPartitionsInPreAggregations(queryBody: Query): Promise<Query> {
     const preAggregations = queryBody.preAggregations || [];
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
@@ -1506,14 +1507,14 @@ export class PreAggregations {
       return loader.partitionPreAggregations();
     }));
 
+    expandedPreAggregations.forEach((preAggs) => preAggs.forEach(p => {
+      p.expandedPartition = true;
+    }));
+
     return {
       ...queryBody,
-      preAggregations: expandedPreAggregations
-        .reduce((a, b) => a.concat(b), [])
-        .map(p => {
-          p.expandedPartition = true;
-          return p;
-        })
+      preAggregations: expandedPreAggregations.reduce((a, b) => a.concat(b), []),
+      groupedPartitionPreAggregations: expandedPreAggregations
     };
   }
 
