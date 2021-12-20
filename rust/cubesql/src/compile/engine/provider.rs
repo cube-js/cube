@@ -11,8 +11,8 @@ use datafusion::{
 use super::information_schema::{
     columns::InfoSchemaColumnsProvider, key_column_usage::InfoSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider,
-    statistics::InfoSchemaStatisticsProvider, tables::InfoSchemaTableProvider,
-    variables::PerfSchemaVariablesProvider,
+    schemata::InfoSchemaSchemataProvider, statistics::InfoSchemaStatisticsProvider,
+    tables::InfoSchemaTableProvider, variables::PerfSchemaVariablesProvider,
 };
 
 pub struct CubeContext<'a> {
@@ -60,6 +60,10 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
             if tp.eq_ignore_ascii_case("information_schema.key_column_usage") {
                 return Some(Arc::new(InfoSchemaKeyColumnUsageProvider::new()));
+            }
+
+            if tp.eq_ignore_ascii_case("information_schema.schemata") {
+                return Some(Arc::new(InfoSchemaSchemataProvider::new()));
             }
 
             if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {

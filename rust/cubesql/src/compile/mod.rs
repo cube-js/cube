@@ -3429,6 +3429,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_information_schema_schemata() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query("SELECT * FROM information_schema.schemata".to_string()).await?,
+            "+--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
+            | CATALOG_NAME | SCHEMA_NAME        | DEFAULT_CHARACTER_SET_NAME | DEFAULT_COLLATION_NAME | SQL_PATH | DEFAULT_ENCRYPTION |\n\
+            +--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
+            | def          | information_schema | utf8                       | utf8_general_ci        | NULL     | NO                 |\n\
+            | def          | mysql              | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
+            | def          | performance_schema | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
+            | def          | sys                | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
+            | def          | test               | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
+            +--------------+--------------------+----------------------------+------------------------+----------+--------------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
         // This query is used by metabase for introspection
         assert_eq!(
