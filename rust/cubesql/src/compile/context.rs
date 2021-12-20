@@ -109,7 +109,36 @@ impl QueryContext {
         Ok(None)
     }
 
-    pub fn find_selection_for_expr(
+    // Compile any expression from any part of query to Selection
+    // This method is can be used in GROUP BY, ORDER BY, except projection
+    pub fn compile_selection(&self, expr: &ast::Expr) -> CompilationResult<Option<Selection>> {
+        match expr {
+            ast::Expr::Function(f) => self.find_selection_for_function(f),
+            ast::Expr::CompoundIdentifier(i) => {
+                // @todo We need a context with main table rel
+                if i.len() == 2 {
+                    Ok(self.find_selection_for_identifier(&i[1].value.to_string(), true))
+                } else {
+                    Err(CompilationError::Unsupported(format!(
+                        "Unsupported compound identifier: {:?}",
+                        expr
+                    )))
+                }
+            }
+            ast::Expr::Identifier(i) => {
+                Ok(self.find_selection_for_identifier(&i.value.to_string(), true))
+            }
+            _ => {
+                return Err(CompilationError::Unsupported(format!(
+                    "Unable to find selection in selection: {:?}",
+                    expr
+                )));
+            }
+        }
+    }
+
+    // Compile any expression from projection to Selection
+    pub fn compile_selection_from_projection(
         &self,
         expr: &ast::Expr,
     ) -> CompilationResult<Option<Selection>> {

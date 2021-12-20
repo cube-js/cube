@@ -90,72 +90,72 @@ fn compile_select_expr(
     builder: &mut QueryBuilder,
     mb_alias: Option<String>,
 ) -> CompilationResult<()> {
-    if let Some(selection) = ctx.find_selection_for_expr(expr)? {
-        match selection {
-            Selection::TimeDimension(dimension, granularity) => {
-                if let Some(alias) = mb_alias.clone() {
-                    ctx.with_alias(
-                        alias,
-                        Selection::TimeDimension(dimension.clone(), granularity.clone()),
-                    );
-                };
+    let selection =
+        ctx.compile_selection_from_projection(expr)?
+            .ok_or(CompilationError::Unknown(format!(
+                "Expression in selection: {}",
+                expr.to_string()
+            )))?;
 
-                builder.with_time_dimension(
-                    V1LoadRequestQueryTimeDimension {
-                        dimension: dimension.name.clone(),
-                        granularity: Some(granularity),
-                        date_range: None,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: dimension.name.clone(),
-                        column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                        column_type: ColumnType::MYSQL_TYPE_STRING,
-                    },
+    match selection {
+        Selection::TimeDimension(dimension, granularity) => {
+            if let Some(alias) = mb_alias.clone() {
+                ctx.with_alias(
+                    alias,
+                    Selection::TimeDimension(dimension.clone(), granularity.clone()),
                 );
-            }
-            Selection::Measure(measure) => {
-                if let Some(alias) = mb_alias.clone() {
-                    ctx.with_alias(alias, Selection::Measure(measure.clone()));
-                };
+            };
 
-                builder.with_measure(
-                    measure.name.clone(),
-                    CompiledQueryFieldMeta {
-                        column_from: measure.name.clone(),
-                        column_to: mb_alias.unwrap_or(measure.get_real_name()),
-                        column_type: measure.get_mysql_type(),
-                    },
-                );
-            }
-            Selection::Dimension(dimension) => {
-                if let Some(alias) = mb_alias.clone() {
-                    ctx.with_alias(alias, Selection::Dimension(dimension.clone()));
-                };
-
-                builder.with_dimension(
-                    dimension.name.clone(),
-                    CompiledQueryFieldMeta {
-                        column_from: dimension.name.clone(),
-                        column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                        column_type: match dimension._type.as_str() {
-                            "number" => ColumnType::MYSQL_TYPE_DOUBLE,
-                            _ => ColumnType::MYSQL_TYPE_STRING,
-                        },
-                    },
-                );
-            }
-            Selection::Segment(s) => {
-                return Err(CompilationError::User(format!(
-                    "Unable to use segment {} as column in SELECT",
-                    s.get_real_name()
-                )))
-            }
+            builder.with_time_dimension(
+                V1LoadRequestQueryTimeDimension {
+                    dimension: dimension.name.clone(),
+                    granularity: Some(granularity),
+                    date_range: None,
+                },
+                CompiledQueryFieldMeta {
+                    column_from: dimension.name.clone(),
+                    column_to: mb_alias.unwrap_or(dimension.get_real_name()),
+                    column_type: ColumnType::MYSQL_TYPE_STRING,
+                },
+            );
         }
-    } else {
-        return Err(CompilationError::Unknown(format!(
-            "Expression in selection: {}",
-            expr.to_string()
-        )));
+        Selection::Measure(measure) => {
+            if let Some(alias) = mb_alias.clone() {
+                ctx.with_alias(alias, Selection::Measure(measure.clone()));
+            };
+
+            builder.with_measure(
+                measure.name.clone(),
+                CompiledQueryFieldMeta {
+                    column_from: measure.name.clone(),
+                    column_to: mb_alias.unwrap_or(measure.get_real_name()),
+                    column_type: measure.get_mysql_type(),
+                },
+            );
+        }
+        Selection::Dimension(dimension) => {
+            if let Some(alias) = mb_alias.clone() {
+                ctx.with_alias(alias, Selection::Dimension(dimension.clone()));
+            };
+
+            builder.with_dimension(
+                dimension.name.clone(),
+                CompiledQueryFieldMeta {
+                    column_from: dimension.name.clone(),
+                    column_to: mb_alias.unwrap_or(dimension.get_real_name()),
+                    column_type: match dimension._type.as_str() {
+                        "number" => ColumnType::MYSQL_TYPE_DOUBLE,
+                        _ => ColumnType::MYSQL_TYPE_STRING,
+                    },
+                },
+            );
+        }
+        Selection::Segment(s) => {
+            return Err(CompilationError::User(format!(
+                "Unable to use segment {} as column in SELECT",
+                s.get_real_name()
+            )))
+        }
     }
 
     Ok(())
@@ -1223,36 +1223,14 @@ fn compile_order(
     };
 
     for order_expr in order_by.iter() {
-        let order_selection = {
-            let selection_identifier = match &order_expr.expr {
-                ast::Expr::CompoundIdentifier(i) => {
-                    // @todo We need a context with main table rel
-                    if i.len() == 2 {
-                        i[1].value.to_string()
-                    } else {
-                        return Err(CompilationError::Unsupported(format!(
-                            "Unsupported compound identifier in argument: {:?}",
-                            order_expr.expr
-                        )));
-                    }
-                }
-                ast::Expr::Identifier(i) => i.to_string(),
-                _ => {
-                    return Err(CompilationError::Unsupported(format!(
-                        "Unsupported projection: {:?}",
-                        order_expr.expr
-                    )));
-                }
-            };
-
-            ctx.find_selection_for_identifier(&selection_identifier, true)
-                .ok_or_else(|| {
-                    CompilationError::Unknown(format!(
-                        "Unknown dimension: {}",
-                        selection_identifier
-                    ))
-                })
-        }?;
+        let order_selection = ctx
+            .compile_selection(&order_expr.expr.clone())?
+            .ok_or_else(|| {
+                CompilationError::Unsupported(format!(
+                    "Unsupported expression in order: {:?}",
+                    order_expr.expr
+                ))
+            })?;
 
         let direction_as_str = if let Some(direction) = order_expr.asc {
             if direction {
@@ -1313,7 +1291,7 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                 }
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
-                        "Unsupported projection: {:?}",
+                        "Unsupported expression in projection: {:?}",
                         projection
                     )));
                 }
@@ -2148,6 +2126,35 @@ mod tests {
                 time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[test]
+    fn test_order_function_date() {
+        let query = convert_simple_select(
+            "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
+                .to_string(),
+        );
+
+        assert_eq!(
+            query.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_owned()),
+                    date_range: None
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
                     "desc".to_string(),
                 ]]),
                 limit: None,
