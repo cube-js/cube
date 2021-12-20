@@ -13,21 +13,18 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::{
-    statistics::{new_boolean_array_with_placeholder, new_uint32_array_with_placeholder},
-    tables::new_string_array_with_placeholder,
-};
+use super::tables::new_string_array_with_placeholder;
 
-pub struct InfoSchemaKeyColumnUsageProvider {}
+pub struct InfoSchemaReferentialConstraintsProvider {}
 
-impl InfoSchemaKeyColumnUsageProvider {
+impl InfoSchemaReferentialConstraintsProvider {
     pub fn new() -> Self {
         Self {}
     }
 }
 
 #[async_trait]
-impl TableProvider for InfoSchemaKeyColumnUsageProvider {
+impl TableProvider for InfoSchemaReferentialConstraintsProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -41,15 +38,14 @@ impl TableProvider for InfoSchemaKeyColumnUsageProvider {
             Field::new("CONSTRAINT_CATALOG", DataType::Utf8, false),
             Field::new("CONSTRAINT_SCHEMA", DataType::Utf8, false),
             Field::new("CONSTRAINT_NAME", DataType::Utf8, false),
-            Field::new("TABLE_CATALOG", DataType::Utf8, false),
-            Field::new("TABLE_SCHEMA", DataType::Utf8, false),
+            Field::new("UNIQUE_CONSTRAINT_CATALOG", DataType::Utf8, false),
+            Field::new("UNIQUE_CONSTRAINT_SCHEMA", DataType::Utf8, false),
+            Field::new("UNIQUE_CONSTRAINT_NAME", DataType::Utf8, false),
+            Field::new("MATCH_OPTION", DataType::Utf8, false),
+            Field::new("UPDATE_RULE", DataType::Utf8, false),
+            Field::new("DELETE_RULE", DataType::Utf8, false),
             Field::new("TABLE_NAME", DataType::Utf8, false),
-            Field::new("COLUMN_NAME", DataType::Utf8, false),
-            Field::new("ORDINAL_POSITION", DataType::UInt32, false),
-            Field::new("POSITION_IN_UNIQUE_CONSTRAINT", DataType::Boolean, true),
-            Field::new("REFERENCED_TABLE_SCHEMA", DataType::Utf8, false),
             Field::new("REFERENCED_TABLE_NAME", DataType::Utf8, false),
-            Field::new("REFERENCED_COLUMN_NAME", DataType::Utf8, false),
         ]))
     }
 
@@ -89,10 +85,10 @@ impl TableProvider for InfoSchemaKeyColumnUsageProvider {
             0,
             "".to_string(),
         )));
-        // ORDINAL_POSITION
-        data.push(Arc::new(new_uint32_array_with_placeholder(0, 0)));
-        // POSITION_IN_UNIQUE_CONSTRAINT
-        data.push(Arc::new(new_boolean_array_with_placeholder(0, false)));
+        data.push(Arc::new(new_string_array_with_placeholder(
+            0,
+            "".to_string(),
+        )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
             "".to_string(),
