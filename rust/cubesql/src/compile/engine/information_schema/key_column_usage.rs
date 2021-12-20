@@ -63,31 +63,31 @@ impl TableProvider for InfoSchemaKeyColumnUsageProvider {
         let mut data: Vec<Arc<dyn Array>> = vec![];
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // ORDINAL_POSITION
         data.push(Arc::new(new_uint32_array_with_placeholder(0, 0)));
@@ -95,15 +95,15 @@ impl TableProvider for InfoSchemaKeyColumnUsageProvider {
         data.push(Arc::new(new_boolean_array_with_placeholder(0, false)));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
 
         let batch = RecordBatch::try_new(self.schema(), data)?;

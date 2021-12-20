@@ -21,12 +21,18 @@ struct InformationSchemaTablesBuilder {
     table_types: StringBuilder,
 }
 
-pub fn new_string_array_with_placeholder(size: usize, default: String) -> StringArray {
+pub fn new_string_array_with_placeholder(size: usize, default: Option<String>) -> StringArray {
     let mut builder = StringBuilder::new(size);
 
-    for _ in 0..size {
-        builder.append_value(default.clone()).unwrap();
-    }
+    if let Some(d) = default {
+        for _ in 0..size {
+            builder.append_value(d.as_str()).unwrap();
+        }
+    } else {
+        for _ in 0..size {
+            builder.append_null().unwrap();
+        }
+    };
 
     builder.finish()
 }
@@ -83,65 +89,65 @@ impl InformationSchemaTablesBuilder {
 
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "InnoDB".to_string(),
+            Some("InnoDB".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "10".to_string(),
+            Some("10".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "Dynamic".to_string(),
+            Some("Dynamic".to_string()),
         )));
         columns.push(Arc::new(new_int64_array_with_placeholder(total, 0)));
         columns.push(Arc::new(new_int64_array_with_placeholder(total, 0)));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "16384".to_string(),
+            Some("16384".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
 
         columns

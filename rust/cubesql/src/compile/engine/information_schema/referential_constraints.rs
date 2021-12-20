@@ -59,47 +59,47 @@ impl TableProvider for InfoSchemaReferentialConstraintsProvider {
         let mut data: Vec<Arc<dyn Array>> = vec![];
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
         data.push(Arc::new(new_string_array_with_placeholder(
             0,
-            "".to_string(),
+            Some("".to_string()),
         )));
 
         let batch = RecordBatch::try_new(self.schema(), data)?;

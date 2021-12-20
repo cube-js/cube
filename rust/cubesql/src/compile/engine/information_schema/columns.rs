@@ -116,27 +116,27 @@ impl InformationSchemaColumnsBuilder {
         // COLUMN_KEY
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // EXTRA
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // COLUMN_COMMENT
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // GENERATION_EXPRESSION
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // SRS_ID
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
 
         columns

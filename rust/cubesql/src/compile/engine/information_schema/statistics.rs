@@ -70,24 +70,24 @@ impl InformationSchemaStatisticsBuilder {
         // INDEX_SCHEMA
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // INDEX_NAME
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // SEQ_IN_INDEX
         columns.push(Arc::new(new_uint32_array_with_placeholder(total, 0)));
         // COLUMN_NAME
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // COLLATION
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            "".to_string(),
+            Some("".to_string()),
         )));
         // EXPRESSION
         columns.push(Arc::new(new_uint32_array_with_placeholder(total, 0)));
