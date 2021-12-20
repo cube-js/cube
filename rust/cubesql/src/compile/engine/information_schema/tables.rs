@@ -155,9 +155,12 @@ pub struct InfoSchemaTableProvider {
 impl InfoSchemaTableProvider {
     pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InformationSchemaTablesBuilder::new();
+        // information_schema
         builder.add_table("def", "information_schema", "tables");
         builder.add_table("def", "information_schema", "columns");
         builder.add_table("def", "information_schema", "key_column_usage");
+        builder.add_table("def", "information_schema", "referential_constraints");
+        //  performance_schema
         builder.add_table("def", "performance_schema", "session_variables");
         builder.add_table("def", "performance_schema", "global_variables");
 

@@ -4,7 +4,10 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Array, UInt32Builder},
+        array::{
+            Array, ArrayRef, BooleanArray, BooleanBuilder, StringBuilder, UInt32Array,
+            UInt32Builder,
+        },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -24,6 +27,16 @@ struct InformationSchemaStatisticsBuilder {
 
 pub fn new_uint32_array_with_placeholder(size: usize, default: u32) -> UInt32Array {
     let mut builder = UInt32Builder::new(size);
+
+    for _ in 0..size {
+        builder.append_value(default).unwrap();
+    }
+
+    builder.finish()
+}
+
+pub fn new_boolean_array_with_placeholder(size: usize, default: bool) -> BooleanArray {
+    let mut builder = BooleanBuilder::new(size);
 
     for _ in 0..size {
         builder.append_value(default).unwrap();
