@@ -39,7 +39,8 @@
     "typescript": "~4.1.5"
   },
   "dependencies": {
-    "@mapbox/node-pre-gyp": "^1"
+    "@mapbox/node-pre-gyp": "^1",
+    "@cubejs-backend/cubesql": "^0.29.9"
   },
   "binary": {
     "module_name": "index",
