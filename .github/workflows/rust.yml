@@ -130,7 +130,7 @@ jobs:
             cross: false
             strip: true
             compress: true
-          - os: self-hosted
+          - os: ubuntu-20.04
             target: aarch64-unknown-linux-gnu
             executable_name: cubestored
             cross: true
@@ -172,8 +172,10 @@ jobs:
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
-          cargo install cross
+          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          chmod +x cross && sudo mv cross /usr/local/bin/cross
           cd rust
+          apt-get install libc6-dev-i386
           cross build --release --target=${{ matrix.target }}
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
