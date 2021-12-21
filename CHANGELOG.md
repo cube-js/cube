@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Add 'meta' field to typescript TCubeMember type [#3682](https://github.com/cube-js/cube.js/issues/3682) ([#3815](https://github.com/cube-js/cube.js/issues/3815)) Thanks @System-Glitch! ([578c0a7](https://github.com/cube-js/cube.js/commit/578c0a75ec2830f48b5d6156370f9343b2fd8b6b))
+* **@cubejs-client/vue:** fix error when executing deletion ([#3806](https://github.com/cube-js/cube.js/issues/3806)) Thanks [@18207680061](https://github.com/18207680061)! ([9d220a8](https://github.com/cube-js/cube.js/commit/9d220a8cf3bf040b51efefb9f74beb5545a89035))
+* **cubestore:** Reduce excessive startup memory usage ([4f0dfc8](https://github.com/cube-js/cube.js/commit/4f0dfc816edd41f8c1986e7665a1f318b8fe4b70))
+
+
+### Features
+
+* **cubesql:** Improve selection finder for ORDER BY ([d28897b](https://github.com/cube-js/cube.js/commit/d28897b67d233f04f2d0d22adf28f191b3320ebf))
+* **cubesql:** Introduce information_schema.key_column_usage ([922b6e2](https://github.com/cube-js/cube.js/commit/922b6e2641198499eb46467085f5d32a3e4a65f6))
+* **cubesql:** Introduce information_schema.referential_constraints ([cdfdcd7](https://github.com/cube-js/cube.js/commit/cdfdcd771d124fbc97358895d78c2d9770abab5c))
+* **cubesql:** Introduce information_schema.schemata ([3035231](https://github.com/cube-js/cube.js/commit/303523185c65c6cdc60e1a0cb5cabf00fd2315b9))
+* **cubesql:** Rewrite general planner to pass restrictions for QE ([28e127b](https://github.com/cube-js/cube.js/commit/28e127bc6f2ec6ccb24e9c5942b2b97a2593c12f))
+
+
+
+
+
 ## [0.29.7](https://github.com/cube-js/cube.js/compare/v0.29.6...v0.29.7) (2021-12-20)
 
 

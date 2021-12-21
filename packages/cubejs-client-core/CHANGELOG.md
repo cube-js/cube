@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Add 'meta' field to typescript TCubeMember type [#3682](https://github.com/cube-js/cube.js/issues/3682) ([#3815](https://github.com/cube-js/cube.js/issues/3815)) Thanks @System-Glitch! ([578c0a7](https://github.com/cube-js/cube.js/commit/578c0a75ec2830f48b5d6156370f9343b2fd8b6b))
+
+
+
+
+
 ## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
 
 
