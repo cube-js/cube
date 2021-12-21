@@ -8,8 +8,8 @@
 !rust/cubestore/js-wrapper/
 !rust/cubestore/tsconfig.json
 !rust/cubestore/package.json
-!rust/cubestore/yarn.lock
 !rust/cubestore/bin
+!rust/cubesql/package.json
 
 packages/*/node_modules/
 packages/*/dist/
