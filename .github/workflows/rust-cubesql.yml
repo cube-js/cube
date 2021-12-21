@@ -3,10 +3,10 @@ name: Build native
 on:
   push:
     paths:
-      - '.github/workflows/push-native.yml'
+      - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
+      - 'rust/cubesql/**'
     branches:
       - 'master'
   pull_request:
@@ -14,7 +14,7 @@ on:
       - '.github/workflows/push-native.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
+      - 'rust/cubesql/**'
 
 jobs:
   precheck:
@@ -32,7 +32,7 @@ jobs:
           override: true
           components: rustfmt, clippy
       - name: Lint CubeSQL
-        run: cd rust/cubesql && cargo fmt --all -- --check
+        run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
       - name: Clippy Native
@@ -72,7 +72,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -119,7 +119,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |

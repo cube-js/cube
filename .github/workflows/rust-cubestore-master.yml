@@ -2,8 +2,8 @@ name: Rust Master
 on:
   push:
     paths:
-      - '.github/workflows/rust-master.yml'
-      - 'rust/**'
+      - '.github/workflows/rust-cubestore-master.yml'
+      - 'rust/cubestore/**'
     branches:
       - master
 
@@ -29,23 +29,23 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: ./rust
+          working-directory: ./rust/cubestore
           key: ubuntu-20.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path rust/cubestore/Cargo.toml -- --check
+          args: --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
       - name: Run cargo fmt cubehll
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --manifest-path rust/cubehll/Cargo.toml -- --check
+          args: --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --manifest-path rust/Cargo.toml -j 4
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         env:
@@ -57,7 +57,7 @@ jobs:
           TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
         with:
           command: test
-          args: --manifest-path rust/Cargo.toml -j 1
+          args: --manifest-path rust/cubestore/Cargo.toml -j 1
 
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
@@ -125,8 +125,8 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./rust/
-          file: ./rust/Dockerfile
+          context: ./rust/cubestore
+          file: ./rust/cubestore/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.prep.outputs.tags }}
@@ -147,7 +147,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: cubejs/cubestore
-          readme-filepath: ./rust/README.md
+          readme-filepath: ./rust/cubestore/README.md
 
   cross:
     runs-on: ${{ matrix.os }}
@@ -190,7 +190,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: rust
+          working-directory: rust/cubestore
           key: cross-${{ runner.OS }}-${{ matrix.target }}
           sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
@@ -221,13 +221,13 @@ jobs:
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
         with:
-          file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create archive for release
         run: |
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
-          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz

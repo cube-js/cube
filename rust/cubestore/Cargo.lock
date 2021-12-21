@@ -153,33 +153,10 @@ dependencies = [
  "hex",
  "indexmap",
  "lazy_static",
- "lexical-core 0.7.6",
+ "lexical-core",
  "multiversion",
  "num 0.4.0",
  "prettytable-rs",
- "rand 0.8.4",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "arrow"
-version = "6.0.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
-dependencies = [
- "bitflags",
- "chrono",
- "comfy-table",
- "csv",
- "flatbuffers 2.0.0",
- "hex",
- "indexmap",
- "lazy_static",
- "lexical-core 0.8.2",
- "multiversion",
- "num 0.4.0",
  "rand 0.8.4",
  "regex",
  "serde",
@@ -192,7 +169,7 @@ name = "arrow-flight"
 version = "5.0.0"
 source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
 dependencies = [
- "arrow 5.0.0",
+ "arrow",
  "base64 0.13.0",
  "bytes 1.0.1",
  "proc-macro2",
@@ -813,35 +790,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "comfy-table"
-version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11e95a3e867422fd8d04049041f5671f94d53c32a9dcd82e2be268714942f3f3"
-dependencies = [
- "crossterm",
- "strum",
- "strum_macros",
- "unicode-width",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30ed07550be01594c6026cff2a1d7fe9c8f683caa798e12b68694ac9e88286a3"
 dependencies = [
  "cache-padded",
-]
-
-[[package]]
-name = "config"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b076e143e1d9538dde65da30f8481c2a6c44040edb8e02b9bf1351edb92ce3"
-dependencies = [
- "lazy_static",
- "nom 5.1.2",
- "serde",
 ]
 
 [[package]]
@@ -953,16 +907,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam-queue"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b10ddc024425c88c2ad148c1b0fd53f4c6d38db9697c9f1588381212fa657c9"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils 0.8.5",
-]
-
-[[package]]
 name = "crossbeam-utils"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -991,31 +935,6 @@ checksum = "d82cfc11ce7f2c3faef78d8a684447b40d503d9681acebed6cb728d45940c4db"
 dependencies = [
  "cfg-if 1.0.0",
  "lazy_static",
-]
-
-[[package]]
-name = "crossterm"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ebde6a9dd5e331cd6c6f48253254d117642c31653baa475e394657c59c1f7d"
-dependencies = [
- "bitflags",
- "crossterm_winapi",
- "libc",
- "mio 0.7.13",
- "parking_lot 0.11.1",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a6966607622438301997d3dac0d2f6e9a90c68bb6bc1785ea98456ab93c0507"
-dependencies = [
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1061,24 +980,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cubeclient"
-version = "0.28.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "log",
- "reqwest 0.11.8",
- "reqwest-middleware",
- "serde",
- "serde_derive",
- "serde_json",
- "tokio 1.9.0",
- "url",
- "uuid",
- "wiremock",
-]
-
-[[package]]
 name = "cubehll"
 version = "0.1.0"
 dependencies = [
@@ -1105,48 +1006,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "cubesql"
-version = "0.28.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.13.0",
- "bincode",
- "byteorder",
- "bytes 0.5.6",
- "chrono",
- "comfy-table",
- "cubeclient",
- "datafusion 5.1.0",
- "futures 0.3.16",
- "lazy_static",
- "log",
- "mockall",
- "msql-srv 0.9.2 (git+https://github.com/cube-js/msql-srv?rev=76ea0132564959c41ea13f25511fbd84acd06464)",
- "mysql_common 0.26.0",
- "nanoid",
- "pretty_assertions 1.0.0",
- "rand 0.8.4",
- "regex",
- "reqwest 0.11.8",
- "serde",
- "serde_derive",
- "serde_json",
- "simple_logger",
- "smallvec 1.7.0",
- "sqlparser 0.11.1-alpha.0",
- "thiserror",
- "tokio 1.9.0",
- "tokio-util 0.6.7",
- "uuid",
-]
-
-[[package]]
 name = "cubestore"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
- "arrow 5.0.0",
+ "arrow",
  "arrow-flight",
  "async-compression",
  "async-std 0.99.12",
@@ -1166,7 +1030,7 @@ dependencies = [
  "cubehll",
  "cuberpc",
  "cubezetasketch",
- "datafusion 4.0.0-SNAPSHOT",
+ "datafusion",
  "deadqueue",
  "deflate",
  "enum_primitive",
@@ -1185,16 +1049,16 @@ dependencies = [
  "log",
  "lru",
  "mockall",
- "msql-srv 0.9.2 (git+https://github.com/cube-js/msql-srv)",
+ "msql-srv",
  "mysql_common 0.26.0",
  "nanoid",
  "num 0.3.1",
- "parquet 5.0.0",
+ "parquet",
  "parquet-format",
  "paste",
  "pin-project",
  "pin-project-lite 0.2.7",
- "pretty_assertions 0.7.2",
+ "pretty_assertions",
  "rand 0.8.4",
  "regex",
  "reqwest 0.11.8",
@@ -1207,7 +1071,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.7.0",
- "sqlparser 0.9.0",
+ "sqlparser",
  "tarpc",
  "tempfile",
  "tokio 1.9.0",
@@ -1234,7 +1098,7 @@ dependencies = [
  "itertools 0.9.0",
  "lazy_static",
  "log",
- "pretty_assertions 0.7.2",
+ "pretty_assertions",
  "scopeguard",
  "serde",
  "serde_derive",
@@ -1255,7 +1119,7 @@ version = "4.0.0-SNAPSHOT"
 source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#4e9d31e05b69017d972ae4c1ffbeeaab163fd654"
 dependencies = [
  "ahash 0.7.4",
- "arrow 5.0.0",
+ "arrow",
  "async-trait",
  "chrono",
  "futures 0.3.16",
@@ -1266,7 +1130,7 @@ dependencies = [
  "md-5",
  "num_cpus",
  "ordered-float 2.7.0",
- "parquet 5.0.0",
+ "parquet",
  "paste",
  "pin-project-lite 0.2.7",
  "rand 0.8.4",
@@ -1275,7 +1139,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.5",
  "smallvec 1.7.0",
- "sqlparser 0.9.0",
+ "sqlparser",
  "tokio 1.9.0",
  "tokio-stream",
  "tracing",
@@ -1284,51 +1148,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "datafusion"
-version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=a2b23e0d36e0fcd6141756e4b131aac711b1ad67#a2b23e0d36e0fcd6141756e4b131aac711b1ad67"
-dependencies = [
- "ahash 0.7.4",
- "arrow 6.0.0",
- "async-trait",
- "chrono",
- "futures 0.3.16",
- "hashbrown 0.11.2",
- "log",
- "num_cpus",
- "ordered-float 2.7.0",
- "parquet 6.0.0",
- "paste",
- "pin-project-lite 0.2.7",
- "rand 0.8.4",
- "smallvec 1.7.0",
- "sqlparser 0.11.1-alpha.0",
- "tokio 1.9.0",
- "tokio-stream",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "deadpool"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d126179d86aee4556e54f5f3c6bf6d9884e7cc52cef82f77ee6f90a7747616d"
-dependencies = [
- "async-trait",
- "config",
- "crossbeam-queue 0.3.2",
- "num_cpus",
- "serde",
- "tokio 1.9.0",
-]
-
-[[package]]
 name = "deadqueue"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f41ebddf24094fe55ed9861f925e8fd88d761e5231ec1dcc844e7fd66179b1b"
 dependencies = [
- "crossbeam-queue 0.2.3",
+ "crossbeam-queue",
  "tokio 0.2.25",
 ]
 
@@ -2009,27 +1834,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http-types"
-version = "2.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e9b187a72d63adbfba487f48095306ac823049cb504ee195541e91c7775f5ad"
-dependencies = [
- "anyhow",
- "async-channel",
- "base64 0.13.0",
- "futures-lite",
- "http",
- "infer",
- "pin-project-lite 0.2.7",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "serde_qs",
- "serde_urlencoded",
- "url",
-]
-
-[[package]]
 name = "httparse"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2160,12 +1964,6 @@ dependencies = [
  "autocfg 1.0.1",
  "hashbrown 0.11.2",
 ]
-
-[[package]]
-name = "infer"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64e9829a50b42bb782c1df523f78d332fe371b10c661e78b7a3c34b0198e9fac"
 
 [[package]]
 name = "instant"
@@ -2315,7 +2113,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f404a90a744e32e8be729034fc33b90cf2a56418fbf594d69aa3c0214ad414e5"
 dependencies = [
  "cfg-if 1.0.0",
- "lexical-core 0.7.6",
+ "lexical-core",
 ]
 
 [[package]]
@@ -2328,70 +2126,6 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "ryu",
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-core"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a3926d8f156019890be4abe5fd3785e0cff1001e06f59c597641fd513a5a284"
-dependencies = [
- "lexical-parse-float",
- "lexical-parse-integer",
- "lexical-util",
- "lexical-write-float",
- "lexical-write-integer",
-]
-
-[[package]]
-name = "lexical-parse-float"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4d066d004fa762d9da995ed21aa8845bb9f6e4265f540d716fb4b315197bf0e"
-dependencies = [
- "lexical-parse-integer",
- "lexical-util",
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-parse-integer"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2c92badda8cc0fc4f3d3cc1c30aaefafb830510c8781ce4e8669881f3ed53ac"
-dependencies = [
- "lexical-util",
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-util"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff669ccaae16ee33af90dc51125755efed17f1309626ba5c12052512b11e291"
-dependencies = [
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-write-float"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b5186948c7b297abaaa51560f2581dae625e5ce7dfc2d8fdc56345adb6dc576"
-dependencies = [
- "lexical-util",
- "lexical-write-integer",
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-write-integer"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ece956492e0e40fd95ef8658a34d53a3b8c2015762fdcaaff2167b28de1f56ef"
-dependencies = [
- "lexical-util",
  "static_assertions",
 ]
 
@@ -2654,21 +2388,6 @@ dependencies = [
 [[package]]
 name = "msql-srv"
 version = "0.9.2"
-source = "git+https://github.com/cube-js/msql-srv?rev=76ea0132564959c41ea13f25511fbd84acd06464#76ea0132564959c41ea13f25511fbd84acd06464"
-dependencies = [
- "async-trait",
- "byteorder",
- "chrono",
- "mysql_common 0.22.2",
- "nom 5.1.2",
- "rand 0.8.4",
- "time 0.2.7",
- "tokio 1.9.0",
-]
-
-[[package]]
-name = "msql-srv"
-version = "0.9.2"
 source = "git+https://github.com/cube-js/msql-srv#e3010bd6680a89feff53bcd3f74afa21f5403f70"
 dependencies = [
  "async-trait",
@@ -2828,7 +2547,7 @@ version = "5.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
- "lexical-core 0.7.6",
+ "lexical-core",
  "memchr",
  "version_check",
 ]
@@ -3193,27 +2912,7 @@ name = "parquet"
 version = "5.0.0"
 source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
 dependencies = [
- "arrow 5.0.0",
- "base64 0.13.0",
- "brotli",
- "byteorder",
- "chrono",
- "flate2",
- "lz4",
- "num-bigint 0.4.0",
- "parquet-format",
- "rand 0.8.4",
- "snap",
- "thrift",
- "zstd",
-]
-
-[[package]]
-name = "parquet"
-version = "6.0.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=114eb35848ebbb70cbe21d77c488e8320a1de7b5#114eb35848ebbb70cbe21d77c488e8320a1de7b5"
-dependencies = [
- "arrow 6.0.0",
+ "arrow",
  "base64 0.13.0",
  "brotli",
  "byteorder",
@@ -3382,18 +3081,6 @@ name = "pretty_assertions"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1cab0e7c02cf376875e9335e0ba1da535775beb5450d21e1dffca068818ed98b"
-dependencies = [
- "ansi_term",
- "ctor",
- "diff",
- "output_vt100",
-]
-
-[[package]]
-name = "pretty_assertions"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec0cfe1b2403f172ba0f234e500906ee0a3e493fb81092dac23ebefe129301cc"
 dependencies = [
  "ansi_term",
  "ctor",
@@ -3845,7 +3532,6 @@ dependencies = [
  "lazy_static",
  "log",
  "mime",
- "mime_guess",
  "native-tls",
  "percent-encoding",
  "pin-project-lite 0.2.7",
@@ -3864,22 +3550,6 @@ dependencies = [
  "web-sys",
  "webpki-roots",
  "winreg",
-]
-
-[[package]]
-name = "reqwest-middleware"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7648756e1d1ae624bcb42d4a9349b5d39f1e3513ef76ab5087b05d211cb37e4"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures 0.3.16",
- "http",
- "reqwest 0.11.8",
- "serde",
- "task-local-extensions",
- "thiserror",
 ]
 
 [[package]]
@@ -4181,17 +3851,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_qs"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7715380eec75f029a4ef7de39a9200e0a63823176b759d055b613f5a87df6a6"
-dependencies = [
- "percent-encoding",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "serde_urlencoded"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4252,27 +3911,6 @@ name = "shlex"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42a568c8f2cd051a4d283bd6eb0343ac214c1b0f1ac19f93e1175b2dee38c73d"
-
-[[package]]
-name = "signal-hook"
-version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c98891d737e271a2954825ef19e46bd16bdb98e2746f2eec4f7a4ef7946efd1"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
-
-[[package]]
-name = "signal-hook-mio"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29fd5867f1c4f2c5be079aee7a2adf1152ebb04a4bc4d341f504b7dece607ed4"
-dependencies = [
- "libc",
- "mio 0.7.13",
- "signal-hook",
-]
 
 [[package]]
 name = "signal-hook-registry"
@@ -4376,14 +4014,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sqlparser"
-version = "0.11.1-alpha.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=82675c4c350fb90c8fdbd7e897adcd95e24e7735#82675c4c350fb90c8fdbd7e897adcd95e24e7735"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "standback"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4397,24 +4027,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "strum"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
-
-[[package]]
-name = "strum_macros"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "subtle"
@@ -4478,15 +4090,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "task-local-extensions"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36794203e10c86e5998179e260869d156e0674f02d5451b4a3fb9fd86d02aaab"
-dependencies = [
- "tokio 1.9.0",
 ]
 
 [[package]]
@@ -4839,7 +4442,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df720b6581784c118f0eb4310796b12b1d242a7eb95f716a8367855325c25f89"
 dependencies = [
  "crossbeam-deque",
- "crossbeam-queue 0.2.3",
+ "crossbeam-queue",
  "crossbeam-utils 0.7.2",
  "futures 0.1.31",
  "lazy_static",
@@ -5231,7 +4834,6 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]
@@ -5476,26 +5078,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0120db82e8a1e0b9fb3345a539c478767c0048d842860994d96113d5b667bd69"
 dependencies = [
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "wiremock"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33807c11bd2c5a3896c36042ef2ca9663795bb7e4af2fe87474a159ea72c2159"
-dependencies = [
- "async-trait",
- "deadpool",
- "futures 0.3.16",
- "futures-timer 3.0.2",
- "http-types",
- "hyper 0.14.11",
- "log",
- "once_cell",
- "regex",
- "serde",
- "serde_json",
- "tokio 1.9.0",
 ]
 
 [[package]]
