@@ -2,7 +2,7 @@ use log::{debug, error, trace};
 use neon::prelude::*;
 
 use async_trait::async_trait;
-use cubeclient::models::{V1LoadConinueWait, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
+use cubeclient::models::{V1LoadContinueWait, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
 };
@@ -100,7 +100,7 @@ impl SchemaService for NodeBridgeTransport {
                 Err(err) => err,
             };
 
-            if let Ok(res) = serde_json::from_value::<V1LoadConinueWait>(response) {
+            if let Ok(res) = serde_json::from_value::<V1LoadContinueWait>(response) {
                 if res.error.to_lowercase() == *"continue wait" {
                     debug!(
                         "[transport] load - retrying request (continue wait) requestId: {}, span: {}",

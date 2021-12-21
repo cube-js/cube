@@ -31,4 +31,4 @@ pub use self::v1_load_result_annotation::V1LoadResultAnnotation;
 pub mod v1_meta_response;
 pub use self::v1_meta_response::V1MetaResponse;
 pub mod v1_load_continue_wait;
-pub use self::v1_load_continue_wait::V1LoadConinueWait;
+pub use self::v1_load_continue_wait::V1LoadContinueWait;

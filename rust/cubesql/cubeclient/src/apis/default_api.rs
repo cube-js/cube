@@ -64,7 +64,7 @@ pub async fn load_v1(
             };
 
             let response_err =
-                serde_json::from_str::<crate::models::V1LoadConinueWait>(&local_var_content);
+                serde_json::from_str::<crate::models::V1LoadContinueWait>(&local_var_content);
             if let Ok(res) = response_err {
                 if res.error.to_lowercase() == *"continue wait" {
                     debug!(
@@ -100,6 +100,7 @@ pub async fn load_v1(
             content: local_var_content,
             entity: local_var_entity,
         };
+
         return Err(Error::ResponseError(local_var_error));
     }
 }
