@@ -1983,7 +1983,7 @@ impl RocksMetaStore {
 
         let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
             Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
-        >(16_777_216);
+        >(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
             match rw_loop_rx.recv() {
