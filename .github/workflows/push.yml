@@ -6,11 +6,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,11 +23,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -77,7 +75,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -126,7 +124,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -168,7 +166,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -228,7 +226,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -407,7 +405,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |

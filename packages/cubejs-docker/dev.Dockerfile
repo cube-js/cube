@@ -32,8 +32,8 @@ COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
 # Backend
-COPY rust/package.json rust/package.json
-COPY rust/bin rust/bin
+COPY rust/cubestore/package.json rust/cubestore/package.json
+COPY rust/cubestore/bin rust/cubestore/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
 COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
@@ -86,7 +86,7 @@ FROM base as build
 RUN yarn install
 
 # Backend
-COPY rust/ rust/
+COPY rust/cubestore/ rust/cubestore/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing/ packages/cubejs-testing/
@@ -140,7 +140,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
-RUN ln -s  /cubejs/rust/bin/cubestore-dev /usr/local/bin/cubestore-dev
+RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
 WORKDIR /cube/conf
 

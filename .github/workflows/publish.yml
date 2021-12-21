@@ -33,7 +33,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -85,7 +85,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -141,7 +141,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -361,8 +361,8 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./rust/
-          file: ./rust/Dockerfile
+          context: ./rust/cubestore/
+          file: ./rust/cubestore/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.prep.outputs.tags }}
@@ -383,7 +383,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: cubejs/cubestore
-          readme-filepath: ./rust/README.md
+          readme-filepath: ./rust/cubestore/README.md
 
   docker-cubestore-non-avx:
     name: Cube Store Docker (Non AVX)
@@ -445,8 +445,8 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./rust/
-          file: ./rust/Dockerfile
+          context: ./rust/cubestore/
+          file: ./rust/cubestore/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.prep.outputs.tags }}
@@ -516,7 +516,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: rust
+          working-directory: rust/cubestore
           key: cross-${{ runner.OS }}-${{ matrix.target }}
           sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
@@ -542,12 +542,12 @@ jobs:
         run: |
           wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
           chmod +x cross && sudo mv cross /usr/local/bin/cross
-          cd rust
+          cd rust/cubestore
           cross build --release --target=${{ matrix.target }}
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
         run: |
-          cd rust && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
       - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
@@ -557,7 +557,7 @@ jobs:
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
         with:
-          file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -569,7 +569,7 @@ jobs:
         run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
       - name: Create archive for release
         run: |
-          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
       - name: Upload Binary to Release

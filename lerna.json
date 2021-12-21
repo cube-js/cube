@@ -5,7 +5,7 @@
   "packages": [
     "docs",
     "packages/*",
-    "rust"
+    "rust/*"
   ],
   "command": {
     "bootstrap": {
