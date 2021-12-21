@@ -1338,92 +1338,25 @@ impl QueryPlanner {
         Self { context }
     }
 
-    pub fn plan(
+    /// Common case for both planners: meta & olap
+    /// This method tries to detect what planner to use as earlier as possible
+    /// and forward context to correct planner
+    pub fn select_to_plan(
         &self,
         stmt: &ast::Statement,
+        q: &Box<ast::Query>,
         props: &QueryPlannerExecutionProps,
     ) -> CompilationResult<QueryPlan> {
-        let (query, select) = match stmt {
-            ast::Statement::Query(q) => {
-                if q.with.is_some() {
-                    return Err(CompilationError::Unsupported(
-                        "Query with CTE instruction(s)".to_string(),
-                    ));
-                }
-
-                match &q.body {
-                    sqlparser::ast::SetExpr::Select(select) => (q, select),
-                    _ => {
-                        return Err(CompilationError::Unsupported(
-                            "Unsupported Query".to_string(),
-                        ));
-                    }
-                }
-            }
-            ast::Statement::SetTransaction { .. } => {
-                return Ok(QueryPlan::MetaTabular(
-                    StatusFlags::empty(),
-                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
-                ));
-            }
-            ast::Statement::SetNames { charset_name, .. } => {
-                if !(charset_name.eq_ignore_ascii_case("utf8")
-                    || charset_name.eq_ignore_ascii_case("utf8mb4"))
-                {
-                    warn!(
-                        "SET NAME does not support non utf8 charsets, input: {}",
-                        charset_name
-                    );
-                };
-
-                return Ok(QueryPlan::MetaTabular(
-                    StatusFlags::empty(),
-                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
-                ));
-            }
-            ast::Statement::SetVariable { .. } => {
-                return Ok(QueryPlan::MetaOk(StatusFlags::empty()));
-            }
-            ast::Statement::ShowVariable { variable } => {
-                return self.show_variable_to_plan(variable, props);
-            }
-            // Proxy some queries to DF
-            ast::Statement::ShowColumns { .. } => {
-                return self.create_df_logical_plan(stmt.clone(), props);
-            }
+        let select = match &q.body {
+            sqlparser::ast::SetExpr::Select(select) => select,
             _ => {
-                return Err(CompilationError::Unsupported(format!(
-                    "Unsupported query type: {}",
-                    stmt.to_string()
-                )));
+                return Err(CompilationError::Unsupported(
+                    "Unsupported Query".to_string(),
+                ));
             }
         };
 
-        if !select.cluster_by.is_empty() {
-            return Err(CompilationError::Unsupported(
-                "Query with CLUSTER BY instruction(s)".to_string(),
-            ));
-        }
-
-        if !select.distribute_by.is_empty() {
-            return Err(CompilationError::Unsupported(
-                "Query with DISTRIBUTE BY instruction(s)".to_string(),
-            ));
-        }
-
-        if select.having.is_some() {
-            return Err(CompilationError::Unsupported(
-                "Query with HAVING instruction(s)".to_string(),
-            ));
-        }
-
         let from_table = if select.from.len() == 1 {
-            if !select.from[0].joins.is_empty() {
-                return Err(CompilationError::Unsupported(
-                    "Query with JOIN instruction(s)".to_string(),
-                ));
-            }
-
             &select.from[0]
         } else {
             return self.create_df_logical_plan(stmt.clone(), props);
@@ -1459,6 +1392,36 @@ impl QueryPlanner {
             return self.create_df_logical_plan(stmt.clone(), props);
         }
 
+        if !select.from[0].joins.is_empty() {
+            return Err(CompilationError::Unsupported(
+                "Query with JOIN instruction(s)".to_string(),
+            ));
+        }
+
+        if q.with.is_some() {
+            return Err(CompilationError::Unsupported(
+                "Query with CTE instruction(s)".to_string(),
+            ));
+        }
+
+        if !select.cluster_by.is_empty() {
+            return Err(CompilationError::Unsupported(
+                "Query with CLUSTER BY instruction(s)".to_string(),
+            ));
+        }
+
+        if !select.distribute_by.is_empty() {
+            return Err(CompilationError::Unsupported(
+                "Query with DISTRIBUTE BY instruction(s)".to_string(),
+            ));
+        }
+
+        if select.having.is_some() {
+            return Err(CompilationError::Unsupported(
+                "Query with HAVING instruction(s)".to_string(),
+            ));
+        }
+
         if schema_name.to_lowercase() != "db" {
             return Err(CompilationError::Unsupported(format!(
                 "Unable to access schema {}",
@@ -1468,7 +1431,7 @@ impl QueryPlanner {
 
         // @todo Better solution?
         // Metabase
-        if query.to_string()
+        if q.to_string()
             == format!(
                 "SELECT true AS `_` FROM `{}` WHERE 1 <> 1 LIMIT 0",
                 table_name
@@ -1492,7 +1455,7 @@ impl QueryPlanner {
             let mut ctx = QueryContext::new(&cube);
             let mut builder = compile_select(select, &mut ctx)?;
 
-            if let Some(limit_expr) = &query.limit {
+            if let Some(limit_expr) = &q.limit {
                 let limit = limit_expr.to_string().parse::<i32>().map_err(|e| {
                     CompilationError::Unsupported(format!(
                         "Unable to parse limit: {}",
@@ -1503,7 +1466,7 @@ impl QueryPlanner {
                 builder.with_limit(limit);
             }
 
-            if let Some(offset_expr) = &query.offset {
+            if let Some(offset_expr) = &q.offset {
                 let offset = offset_expr.value.to_string().parse::<i32>().map_err(|e| {
                     CompilationError::Unsupported(format!(
                         "Unable to parse offset: {}",
@@ -1515,7 +1478,7 @@ impl QueryPlanner {
             }
 
             compile_group(&select.group_by, &ctx, &mut builder)?;
-            compile_order(&query.order_by, &ctx, &mut builder)?;
+            compile_order(&q.order_by, &ctx, &mut builder)?;
 
             if let Some(selection) = &select.selection {
                 compile_where(selection, &ctx, &mut builder)?;
@@ -1523,10 +1486,49 @@ impl QueryPlanner {
 
             Ok(QueryPlan::CubeSelect(StatusFlags::empty(), builder.build()))
         } else {
-            return Err(CompilationError::Unknown(format!(
+            Err(CompilationError::Unknown(format!(
                 "Unknown cube: {}",
                 table_name
-            )));
+            )))
+        }
+    }
+
+    pub fn plan(
+        &self,
+        stmt: &ast::Statement,
+        props: &QueryPlannerExecutionProps,
+    ) -> CompilationResult<QueryPlan> {
+        match stmt {
+            ast::Statement::Query(q) => self.select_to_plan(stmt, q, props),
+            ast::Statement::SetTransaction { .. } => Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+            )),
+            ast::Statement::SetNames { charset_name, .. } => {
+                if !(charset_name.eq_ignore_ascii_case("utf8")
+                    || charset_name.eq_ignore_ascii_case("utf8mb4"))
+                {
+                    warn!(
+                        "SET NAME does not support non utf8 charsets, input: {}",
+                        charset_name
+                    );
+                };
+
+                Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                ))
+            }
+            ast::Statement::SetVariable { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
+            ast::Statement::ShowVariable { variable } => {
+                self.show_variable_to_plan(variable, props)
+            }
+            // Proxy some queries to DF
+            ast::Statement::ShowColumns { .. } => self.create_df_logical_plan(stmt.clone(), props),
+            _ => Err(CompilationError::Unsupported(format!(
+                "Unsupported query type: {}",
+                stmt.to_string()
+            ))),
         }
     }
 
@@ -1726,6 +1728,7 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
     // @todo Case intensive mode
     let query = query.replace("CASE data_type", "CASE DATA_TYPE");
+    let query = query.replace("CASE update_rule    WHEN", "CASE UPDATE_RULE WHEN");
     // @todo problem with parser, space in types
     let query = query.replace("signed integer", "bigint");
     let query = query.replace("SIGNED INTEGER", "bigint");
@@ -3690,6 +3693,34 @@ mod tests {
             | db        | NULL        | KibanaSampleDataEcommerce | is_male            | 1111      | BOOLEAN   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
             | db        | NULL        | KibanaSampleDataEcommerce | is_female          | 1111      | BOOLEAN   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
             +-----------+-------------+---------------------------+--------------------+-----------+-----------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+"
+        );
+
+        assert_eq!(
+            execute_df_query(
+                "SELECT
+                    KCU.REFERENCED_TABLE_SCHEMA PKTABLE_CAT,
+                    NULL PKTABLE_SCHEM,
+                    KCU.REFERENCED_TABLE_NAME PKTABLE_NAME,
+                    KCU.REFERENCED_COLUMN_NAME PKCOLUMN_NAME,
+                    KCU.TABLE_SCHEMA FKTABLE_CAT,
+                    NULL FKTABLE_SCHEM,
+                    KCU.TABLE_NAME FKTABLE_NAME,
+                    KCU.COLUMN_NAME FKCOLUMN_NAME,
+                    KCU.POSITION_IN_UNIQUE_CONSTRAINT KEY_SEQ,
+                    CASE update_rule    WHEN 'RESTRICT' THEN 1   WHEN 'NO ACTION' THEN 3   WHEN 'CASCADE' THEN 0   WHEN 'SET NULL' THEN 2   WHEN 'SET DEFAULT' THEN 4 END UPDATE_RULE,
+                    CASE DELETE_RULE WHEN 'RESTRICT' THEN 1  WHEN 'NO ACTION' THEN 3  WHEN 'CASCADE' THEN 0  WHEN 'SET NULL' THEN 2  WHEN 'SET DEFAULT' THEN 4 END DELETE_RULE,
+                    RC.CONSTRAINT_NAME FK_NAME,
+                    NULL PK_NAME,
+                    7 DEFERRABILITY
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+                INNER JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS RC ON KCU.CONSTRAINT_SCHEMA = RC.CONSTRAINT_SCHEMA AND KCU.CONSTRAINT_NAME = RC.CONSTRAINT_NAME
+                WHERE (ISNULL(database()) OR (KCU.TABLE_SCHEMA = database())) AND  KCU.TABLE_NAME = 'SlackMessages' ORDER BY PKTABLE_CAT, PKTABLE_SCHEM, PKTABLE_NAME, KEY_SEQ
+                ".to_string()
+            )
+            .await?,
+            "++\n\
+            ++\n\
+            ++"
         );
 
         Ok(())
