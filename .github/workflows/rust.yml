@@ -175,7 +175,7 @@ jobs:
           wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
           chmod +x cross && sudo mv cross /usr/local/bin/cross
           cd rust
-          sudo apt-get install libc6-dev-i386
+          sudo apt-get install libc6 libc6-dev libc6-dev-i386 gcc-multilib
           cross build --release --target=${{ matrix.target }}
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
