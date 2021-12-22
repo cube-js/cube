@@ -755,6 +755,7 @@ pub trait MetaStore: DIService + Send + Sync {
         indexes: Vec<IndexDef>,
         is_ready: bool,
         unique_key_column_names: Option<Vec<String>>,
+        partition_split_threshold: Option<u64>,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn update_location_download_size(
@@ -790,6 +791,7 @@ pub trait MetaStore: DIService + Send + Sync {
         (
             IdRow<Partition>,
             IdRow<Index>,
+            IdRow<Table>,
             Option<IdRow<MultiPartition>>,
         ),
         CubeError,
@@ -2905,6 +2907,7 @@ impl MetaStore for RocksMetaStore {
         indexes: Vec<IndexDef>,
         is_ready: bool,
         unique_key_column_names: Option<Vec<String>>,
+        partition_split_threshold: Option<u64>,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
@@ -2953,6 +2956,7 @@ impl MetaStore for RocksMetaStore {
                 is_ready,
                 unique_key_column_indices,
                 seq_column_index,
+                partition_split_threshold,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
             for index_def in indexes.into_iter() {
@@ -3203,6 +3207,7 @@ impl MetaStore for RocksMetaStore {
         (
             IdRow<Partition>,
             IdRow<Index>,
+            IdRow<Table>,
             Option<IdRow<MultiPartition>>,
         ),
         CubeError,
@@ -3221,6 +3226,8 @@ impl MetaStore for RocksMetaStore {
                     partition.get_row().get_index_id(),
                     partition_id
                 )))?;
+            let table = TableRocksTable::new(db_ref.clone())
+                .get_row_or_not_found(index.get_row().table_id())?;
             let multi_part = match partition.get_row().multi_partition_id {
                 None => None,
                 Some(m) => {
@@ -3233,7 +3240,7 @@ impl MetaStore for RocksMetaStore {
                     partition.get_row()
                 )));
             }
-            Ok((partition, index, multi_part))
+            Ok((partition, index, table, multi_part))
         })
         .await
     }
@@ -5096,6 +5103,7 @@ mod tests {
                     vec![],
                     true,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5111,7 +5119,8 @@ mod tests {
                     None,
                     vec![],
                     true,
-                    None
+                    None,
+                    None,
                 )
                 .await
                 .is_err());

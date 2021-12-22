@@ -337,6 +337,7 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
 pub trait ImportService: DIService + Send + Sync {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError>;
     async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError>;
+    async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
 }
 
 crate::di_service!(MockImportService, [ImportService]);
@@ -484,6 +485,20 @@ impl ImportServiceImpl {
         ingestion.queue_data_frame(finish(builders)).await?;
         ingestion.wait_completion().await
     }
+
+    fn estimate_rows(location: &str, size: Option<u64>) -> u64 {
+        if let Some(size) = size {
+            let uncompressed_size = if location.contains(".gz") {
+                size * 15
+            } else {
+                size
+            };
+            let average_row_length = 256;
+            uncompressed_size / average_row_length
+        } else {
+            7_000_000
+        }
+    }
 }
 
 #[async_trait]
@@ -548,6 +563,29 @@ impl ImportService for ImportServiceImpl {
         }
 
         Ok(())
+    }
+
+    async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
+        if location.starts_with("http") {
+            let client = reqwest::Client::new();
+            let res = client.head(location).send().await?;
+            let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
+
+            let size = if let Some(length) = length {
+                Some(length.to_str()?.parse::<u64>()?)
+            } else {
+                None
+            };
+            Ok(ImportServiceImpl::estimate_rows(location, size))
+        } else if location.starts_with("temp://") {
+            // TODO do the actual estimation
+            Ok(ImportServiceImpl::estimate_rows(location, None))
+        } else {
+            Ok(ImportServiceImpl::estimate_rows(
+                location,
+                Some(tokio::fs::metadata(location).await?.len()),
+            ))
+        }
     }
 }
 

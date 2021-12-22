@@ -220,6 +220,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     false,
                     None,
                     None,
+                    None,
                 ),
             ),
             schema: Arc::new(IdRow::new(0, metastore::Schema::new(schema.to_string()))),

@@ -34,7 +34,9 @@ pub struct Table {
     #[serde(default)]
     seq_column_index: Option<u64>,
     #[serde(default)]
-    location_download_sizes: Option<Vec<u64>>
+    location_download_sizes: Option<Vec<u64>>,
+    #[serde(default)]
+    partition_split_threshold: Option<u64>
 }
 }
 
@@ -62,6 +64,7 @@ impl Table {
         is_ready: bool,
         unique_key_column_indices: Option<Vec<u64>>,
         seq_column_index: Option<u64>,
+        partition_split_threshold: Option<u64>,
     ) -> Table {
         let location_download_sizes = locations.as_ref().map(|locations| vec![0; locations.len()]);
         Table {
@@ -76,6 +79,7 @@ impl Table {
             unique_key_column_indices,
             seq_column_index,
             location_download_sizes,
+            partition_split_threshold,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -176,6 +180,20 @@ impl Table {
 
     pub fn is_stream_location(location: &str) -> bool {
         location.starts_with("stream:")
+    }
+
+    pub fn partition_split_threshold(&self) -> &Option<u64> {
+        &self.partition_split_threshold
+    }
+
+    pub fn partition_split_threshold_or_default(
+        &self,
+        config_partition_split_threshold: u64,
+    ) -> u64 {
+        self.partition_split_threshold
+            .as_ref()
+            .map(|v| *v)
+            .unwrap_or(config_partition_split_threshold)
     }
 }
 

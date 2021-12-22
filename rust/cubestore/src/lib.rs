@@ -423,6 +423,12 @@ impl From<json::Error> for CubeError {
     }
 }
 
+impl From<reqwest::header::ToStrError> for CubeError {
+    fn from(v: reqwest::header::ToStrError) -> Self {
+        CubeError::from_error(v)
+    }
+}
+
 impl From<url::ParseError> for CubeError {
     fn from(v: url::ParseError) -> Self {
         CubeError::from_error(v)
