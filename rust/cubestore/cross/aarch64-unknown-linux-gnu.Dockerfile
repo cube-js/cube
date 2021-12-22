@@ -8,6 +8,10 @@ RUN apt-get update && \
     curl -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && \
     apt-get update && \
     apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
+RUN apt-get install -y libc6
+RUN apt-get install -y gcc-multilib
+RUN apt-get install -y gcc-aarch64-linux-gnu
+RUN apt-get install -y g++-aarch64-linux-gnu
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-9 100
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-9 100
