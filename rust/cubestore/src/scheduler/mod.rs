@@ -797,13 +797,20 @@ impl DataGCLoop {
                         }
                     }
                     GCTask::DeleteChunk(chunk_id) => {
-                        if self.metastore.get_chunk(chunk_id).await.is_ok() {
-                            log::trace!("Removing deactivated chunk {}", chunk_id);
-                            if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
-                                log::error!(
-                                    "Could not remove deactivated chunk ({}): {}",
-                                    chunk_id,
-                                    e
+                        if let Ok(chunk) = self.metastore.get_chunk(chunk_id).await {
+                            if !chunk.get_row().active() {
+                                log::trace!("Removing deactivated chunk {}", chunk_id);
+                                if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
+                                    log::error!(
+                                        "Could not remove deactivated chunk ({}): {}",
+                                        chunk_id,
+                                        e
+                                    );
+                                }
+                            } else {
+                                log::trace!(
+                                    "Skipping removing of chunk {} because it was activated",
+                                    chunk_id
                                 );
                             }
                         } else {
