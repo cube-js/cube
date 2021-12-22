@@ -550,7 +550,7 @@ impl Config {
                 ),
                 max_partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
-                    1048576 * 32,
+                    1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
                 compaction_chunks_total_size_threshold: env_parse(
