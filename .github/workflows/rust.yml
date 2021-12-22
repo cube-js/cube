@@ -130,10 +130,10 @@ jobs:
             cross: false
             strip: true
             compress: true
-          - os: self-hosted
+          - os: ubuntu-20.04
             target: aarch64-unknown-linux-gnu
             executable_name: cubestored
-            cross: false
+            cross: true
             strip: true
             compress: true
       fail-fast: false
