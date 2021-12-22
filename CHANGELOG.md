@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.10](https://github.com/cube-js/cube.js/compare/v0.29.9...v0.29.10) (2021-12-22)
+
+
+### Bug Fixes
+
+* **cubestore:** Do not show errors for not uploaded chunks scheduled for removal ([ca94fb2](https://github.com/cube-js/cube.js/commit/ca94fb284d9d70753099a448b59b60690a229d93))
+* **cubestore:** Re-parent chunks on compaction instead of repartitioning ([cb6b9d5](https://github.com/cube-js/cube.js/commit/cb6b9d536182ff7843ecf7726db886fb3f90511c))
+
+
+
+
+
 ## [0.29.9](https://github.com/cube-js/cube.js/compare/v0.29.8...v0.29.9) (2021-12-22)
 
 
