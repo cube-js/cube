@@ -82,7 +82,7 @@ impl CompactionServiceImpl {
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
-        let (partition, index, multi_part) = self
+        let (partition, index, table, multi_part) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
             .await?;
@@ -139,8 +139,12 @@ impl CompactionService for CompactionServiceImpl {
         }
         let mut new_partitions = Vec::new();
         if new_chunk.is_none() {
-            let new_partitions_count =
-                div_ceil(total_rows, self.config.partition_split_threshold()) as usize;
+            let new_partitions_count = div_ceil(
+                total_rows,
+                table
+                    .get_row()
+                    .partition_split_threshold_or_default(self.config.partition_split_threshold()),
+            ) as usize;
             for _ in 0..new_partitions_count {
                 new_partitions.push(
                     self.meta_store
@@ -367,6 +371,7 @@ impl CompactionService for CompactionServiceImpl {
         let keys = find_partition_keys(
             keys_with_counts(&files, key_len).await?,
             key_len,
+            // TODO should it respect table partition_split_threshold?
             self.config.partition_split_threshold() as usize,
         )
         .await?;
@@ -862,6 +867,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
             )
             .await

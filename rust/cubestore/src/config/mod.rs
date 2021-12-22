@@ -280,6 +280,8 @@ pub struct Config {
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
 
+    fn max_partition_split_threshold(&self) -> u64;
+
     fn compaction_chunks_total_size_threshold(&self) -> u64;
 
     fn compaction_chunks_count_threshold(&self) -> u64;
@@ -338,6 +340,7 @@ pub trait ConfigObj: DIService {
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub partition_split_threshold: u64,
+    pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
     pub wal_split_threshold: u64,
@@ -375,6 +378,10 @@ crate::di_service!(MockConfigObj, [ConfigObj]);
 impl ConfigObj for ConfigObjImpl {
     fn partition_split_threshold(&self) -> u64 {
         self.partition_split_threshold
+    }
+
+    fn max_partition_split_threshold(&self) -> u64 {
+        self.max_partition_split_threshold
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
@@ -537,9 +544,19 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
-                partition_split_threshold: 524288 * 2,
-                compaction_chunks_count_threshold: 4,
-                compaction_chunks_total_size_threshold: 524288,
+                partition_split_threshold: env_parse(
+                    "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
+                    524288 * 2,
+                ),
+                max_partition_split_threshold: env_parse(
+                    "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
+                    524288 * 64,
+                ),
+                compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_total_size_threshold: env_parse(
+                    "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
+                    524288,
+                ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -621,6 +638,7 @@ impl Config {
                     .unwrap()
                     .join(format!("{}-local-store", name)),
                 partition_split_threshold: 20,
+                max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
                 store_provider: FileStoreProvider::Filesystem {
@@ -1001,6 +1019,8 @@ impl Config {
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
                 SqlServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

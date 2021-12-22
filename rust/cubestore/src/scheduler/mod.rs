@@ -365,6 +365,7 @@ impl SchedulerImpl {
         {
             let p = self.meta_store.get_multi_partition(id).await?;
             let active = p.get_row().active();
+            // TODO should it respect table partition_split_threshold?
             if active && self.config.partition_split_threshold() < p.get_row().total_row_count() {
                 self.schedule_multi_partition_split(id).await?;
             }

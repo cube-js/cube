@@ -37,8 +37,9 @@ use parser::Statement as CubeStoreStatement;
 
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::Ingestion;
+use crate::import::{ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
@@ -119,6 +120,8 @@ pub struct SqlServiceImpl {
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
+    import_service: Arc<dyn ImportService>,
+    config_obj: Arc<dyn ConfigObj>,
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
@@ -135,6 +138,8 @@ impl SqlServiceImpl {
         query_planner: Arc<dyn QueryPlanner>,
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
+        import_service: Arc<dyn ImportService>,
+        config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
         query_timeout: Duration,
@@ -148,6 +153,8 @@ impl SqlServiceImpl {
             query_planner,
             query_executor,
             cluster,
+            import_service,
+            config_obj,
             rows_per_chunk,
             query_timeout,
             create_table_timeout,
@@ -240,11 +247,45 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                    None,
                 )
                 .await;
         }
 
         let listener = self.cluster.job_result_listener();
+
+        let partition_split_threshold = if let Some(locations) = locations.as_ref() {
+            let size = join_all(
+                locations
+                    .iter()
+                    .map(|location| {
+                        let location = location.to_string();
+                        let import_service = self.import_service.clone();
+                        return async move {
+                            import_service.estimate_location_row_count(&location).await
+                        };
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .sum::<u64>();
+
+            let mut sel_workers_count = self.config_obj.select_workers().len() as u64;
+            if sel_workers_count == 0 {
+                sel_workers_count = 1;
+            }
+            let threshold = (size / sel_workers_count)
+                .min(self.config_obj.max_partition_split_threshold())
+                .max(self.config_obj.partition_split_threshold());
+
+            Some(threshold)
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -256,6 +297,7 @@ impl SqlServiceImpl {
                 indexes_to_create,
                 false,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                partition_split_threshold,
             )
             .await?;
 
@@ -1370,6 +1412,7 @@ mod tests {
 
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
+    use crate::import::MockImportService;
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
@@ -1413,6 +1456,8 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                Arc::new(MockImportService::new()),
+                config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
@@ -1465,6 +1510,8 @@ mod tests {
                 Arc::new(MockQueryPlanner::new()),
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
+                Arc::new(MockImportService::new()),
+                config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
                 query_timeout,
@@ -1497,6 +1544,7 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2136,6 +2184,80 @@ mod tests {
                     assert_eq!(
                         result.get_rows(),
                         &expected
+                    );
+                }).await;
+            }).await;
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn table_partition_split_threshold() {
+        let test_name = "table_partition_split_threshold";
+        let port_base = 24406;
+        Config::test(test_name).update_config(|mut config| {
+            config.select_workers = vec![format!("127.0.0.1:{}", port_base + 1), format!("127.0.0.1:{}", port_base + 2)];
+            config.metastore_bind_address = Some(format!("127.0.0.1:{}", port_base));
+            config.compaction_chunks_count_threshold = 0;
+            config.max_partition_split_threshold = 200;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test(&format!("{}_cluster_worker_1", test_name)).update_config(|mut config| {
+                config.worker_bind_address = Some(format!("127.0.0.1:{}", port_base + 1));
+                config.server_name = format!("127.0.0.1:{}", port_base + 1);
+                config.metastore_remote_address = Some(format!("127.0.0.1:{}", port_base));
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join(format!("{}-upstream", test_name))),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config.max_partition_split_threshold = 200;
+                config
+            }).start_test_worker(async move |_| {
+                Config::test(&format!("{}_cluster_worker_2", test_name)).update_config(|mut config| {
+                    config.worker_bind_address = Some(format!("127.0.0.1:{}", port_base + 2));
+                    config.server_name = format!("127.0.0.1:{}", port_base + 2);
+                    config.metastore_remote_address = Some(format!("127.0.0.1:{}", port_base));
+                    config.store_provider = FileStoreProvider::Filesystem {
+                        remote_dir: Some(env::current_dir()
+                            .unwrap()
+                            .join(format!("{}-upstream", test_name))),
+                    };
+                    config.compaction_chunks_count_threshold = 0;
+                    config.max_partition_split_threshold = 200;
+                    config
+                }).start_test_worker(async move |_| {
+                    let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
+
+                    service
+                        .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
+                        .await
+                        .unwrap();
+
+                    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+
+                    service.exec_query(&create_table_sql).await.unwrap();
+
+                    let result = service
+                        .exec_query("SELECT count(*) from foo.bikes")
+                        .await
+                        .unwrap();
+
+                    assert_eq!(
+                        result.get_rows(),
+                        &vec![Row::new(vec![TableValue::Int(813)])]
+                    );
+
+                    let result = service
+                        .exec_query("SELECT partition_split_threshold from system.tables")
+                        .await
+                        .unwrap();
+
+                    assert_eq!(
+                        result.get_rows(),
+                        &vec![Row::new(vec![TableValue::Int(200)])]
                     );
                 }).await;
             }).await;

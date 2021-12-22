@@ -161,6 +161,16 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
+                Field::new("partition_split_threshold", DataType::UInt64, true),
+                Box::new(|tables| {
+                    let array = tables
+                        .iter()
+                        .map(|row| row.table.get_row().partition_split_threshold().clone())
+                        .collect::<Vec<_>>();
+                    Arc::new(UInt64Array::from(array))
+                }),
+            ),
+            (
                 Field::new(
                     "created_at",
                     DataType::Timestamp(TimeUnit::Nanosecond, None),
