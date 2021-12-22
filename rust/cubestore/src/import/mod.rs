@@ -489,7 +489,7 @@ impl ImportServiceImpl {
     fn estimate_rows(location: &str, size: Option<u64>) -> u64 {
         if let Some(size) = size {
             let uncompressed_size = if location.contains(".gz") {
-                size * 15
+                size * 5
             } else {
                 size
             };
