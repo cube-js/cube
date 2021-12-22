@@ -530,7 +530,6 @@ export class ApiGateway {
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           normalizeQueryPreAggregations(
             {
               timezones: this.scheduledRefreshTimeZones,
@@ -565,7 +564,6 @@ export class ApiGateway {
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           query
         );
 
@@ -607,12 +605,10 @@ export class ApiGateway {
       const { preAggregationId, versionEntry, timezone } = query;
 
       const orchestratorApi = this.getAdapterApi(context);
-      const compilerApi = this.getCompilerApi(context);
 
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           {
             timezones: [timezone],
             preAggregations: [{ id: preAggregationId }]

@@ -232,9 +232,9 @@ export class RefreshScheduler {
 
   public async preAggregationPartitions(
     context,
-    compilerApi: CompilerApi,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
+    const compilerApi = this.serverCore.getCompilerApi(context);
     const preAggregationsQueryingOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
@@ -277,8 +277,8 @@ export class RefreshScheduler {
           }
           return {
             dependencies,
-            partitions: query.groupedPartitions[query.groupedPartitions.length - 1]
-              .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p?.tableName))
+            partitions: query.groupedPartitions.length && query.groupedPartitions[query.groupedPartitions.length - 1]
+              .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p?.tableName)) || []
           };
         });
 
@@ -471,8 +471,7 @@ export class RefreshScheduler {
     queryingOptions: PreAggregationsQueryingOptions
   ) {
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
-    const compilerApi = this.serverCore.getCompilerApi(context);
-    const preAggregations = await this.preAggregationPartitions(context, compilerApi, queryingOptions);
+    const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
 
     const promise = Promise.all(preAggregations.map(async (p: any) => {
