@@ -3227,7 +3227,7 @@ impl MetaStore for RocksMetaStore {
                     partition_id
                 )))?;
             let table = TableRocksTable::new(db_ref.clone())
-                .get_row_or_not_found(partition.get_row().get_index_id())?;
+                .get_row_or_not_found(index.get_row().table_id())?;
             let multi_part = match partition.get_row().multi_partition_id {
                 None => None,
                 Some(m) => {

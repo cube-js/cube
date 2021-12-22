@@ -555,7 +555,7 @@ impl Config {
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
                 compaction_chunks_total_size_threshold: env_parse(
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
-                    524288,
+                    524288 * 2,
                 ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
@@ -614,7 +614,7 @@ impl Config {
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
-                wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 524288 / 2),
+                wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 524288),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
