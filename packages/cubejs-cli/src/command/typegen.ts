@@ -80,7 +80,9 @@ const generateQueryTypes = async (apiUrl, { token }) => {
   }
 
   const typeDefs = createTypeDefinitions(meta.cubes);
-  const pathToCubeDX = require.resolve('@cubejs-client/dx');
+  const pathToCubeDX = require.resolve('@cubejs-client/dx', {
+    paths: [process.cwd()],
+  });
   const pathToDefinitionFile = pathToCubeDX.replace('/src/index.js', '/generated.d.ts');
 
   try {
