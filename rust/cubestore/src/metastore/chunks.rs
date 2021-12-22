@@ -40,6 +40,12 @@ impl Chunk {
         self.partition_id
     }
 
+    pub fn set_partition_id(&self, partition_id: u64) -> Self {
+        let mut to_update = self.clone();
+        to_update.partition_id = partition_id;
+        to_update
+    }
+
     pub fn set_uploaded(&self, uploaded: bool) -> Chunk {
         let mut to_update = self.clone();
         to_update.uploaded = uploaded;

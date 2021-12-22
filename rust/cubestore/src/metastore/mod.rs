@@ -4734,9 +4734,6 @@ fn swap_active_partitions_impl(
             }
             Some(p) => p,
         };
-        // TODO this check is not atomic
-        // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (35)
-        // TODO Swapping partitions: deactivating (34), deactivating chunks (404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414), activating (36)
         if !current_partition.get_row().is_active() {
             return Err(CubeError::internal(format!(
                 "Current partition is not active: {:?}",
@@ -4791,6 +4788,34 @@ fn swap_active_partitions_impl(
             new_partition.get_row(),
             batch_pipe,
         )?;
+    }
+
+    // if it's chunk compaction only without split then just re-parent all chunks without going through repartition process
+    if current_active.len() == 1
+        && new_active.len() == 1
+        && current_active[0].0.get_row().get_min_val() == new_active[0].get_row().get_min_val()
+        && current_active[0].0.get_row().get_max_val() == new_active[0].get_row().get_max_val()
+    {
+        let chunks_to_repartition = chunk_table
+            .get_rows_by_index(
+                &ChunkIndexKey::ByPartitionId(current_active[0].0.get_id()),
+                &ChunkRocksIndex::PartitionId,
+            )?
+            .into_iter()
+            .filter(|c| {
+                current_active[0]
+                    .1
+                    .iter()
+                    .find(|oc| oc.get_id() == c.get_id())
+                    .is_none()
+            });
+        for chunk in chunks_to_repartition {
+            chunk_table.update_with_fn(
+                chunk.get_id(),
+                |c| c.set_partition_id(new_active[0].get_id()),
+                batch_pipe,
+            )?;
+        }
     }
 
     if !skip_row_count_sanity_check && activated_row_count != deactivated_row_count {
