@@ -211,12 +211,12 @@ jobs:
         run: |
           wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
           chmod +x cross && sudo mv cross /usr/local/bin/cross
-          cd rust
+          cd rust/cubestore
           cross build --release --target=${{ matrix.target }}
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
         run: |
-          cd rust && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
