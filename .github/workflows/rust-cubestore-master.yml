@@ -183,7 +183,7 @@ jobs:
             target: aarch64-unknown-linux-gnu
             executable_name: cubestored
             cross: true
-            strip: true
+            strip: false
             compress: true
       fail-fast: false
     steps:
