@@ -509,7 +509,8 @@ jobs:
             target: aarch64-unknown-linux-gnu
             executable_name: cubestored
             cross: true
-            strip: true
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
             compress: true
       fail-fast: false
     steps:
