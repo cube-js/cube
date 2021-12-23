@@ -168,9 +168,22 @@ jobs:
   docker-default:
     needs: [npm, cubestore, native_linux]
     name: Debian docker image
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64
+            avx: 1
+          - os: self-hosted
+            target: aarch64-unknown-linux-gnu
+            platforms: linux/arm64
+            avx: 0
     timeout-minutes: 30
-
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -207,8 +220,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
         with:
@@ -218,7 +229,7 @@ jobs:
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           labels: |
@@ -231,6 +242,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
+            WITH_AVX2=${{ matrix.avx }}
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-alpine:
