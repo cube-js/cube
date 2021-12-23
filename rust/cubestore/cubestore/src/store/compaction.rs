@@ -95,14 +95,14 @@ impl CompactionService for CompactionServiceImpl {
                 return Ok(());
             }
         }
-        let mut chunks = self
+        let mut all_pending_chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?;
-        chunks.sort_by_key(|c| c.get_row().get_row_count());
+        all_pending_chunks.sort_by_key(|c| c.get_row().get_row_count());
         let mut size = 0;
-        let chunks = chunks
-            .into_iter()
+        let chunks = all_pending_chunks
+            .iter()
             .take_while(|c| {
                 if size == 0 {
                     size += c.get_row().get_row_count();
@@ -112,6 +112,7 @@ impl CompactionService for CompactionServiceImpl {
                     size <= self.config.compaction_chunks_total_size_threshold()
                 }
             })
+            .map(|c| c.clone())
             .collect::<Vec<_>>();
         let partition_id = partition.get_id();
         let chunks_row_count = chunks
@@ -139,12 +140,21 @@ impl CompactionService for CompactionServiceImpl {
         }
         let mut new_partitions = Vec::new();
         if new_chunk.is_none() {
-            let new_partitions_count = div_ceil(
-                total_rows,
+            let pending_rows = all_pending_chunks
+                .iter()
+                .map(|c| c.get_row().get_row_count())
+                .sum::<u64>()
+                + partition.get_row().main_table_row_count();
+            // Split partitions ahead for more than actual compaction size. The trade off here is partition accuracy vs write amplification
+            let new_partitions_count = (div_ceil(
+                pending_rows,
                 table
                     .get_row()
                     .partition_split_threshold_or_default(self.config.partition_split_threshold()),
-            ) as usize;
+            ) as usize)
+                // Do not allow to much of new partitions to limit partition accuracy trade off
+                // TODO config
+                .min(16);
             for _ in 0..new_partitions_count {
                 new_partitions.push(
                     self.meta_store
@@ -843,7 +853,7 @@ mod tests {
     use crate::config::MockConfigObj;
     use crate::metastore::{Column, ColumnType, RocksMetaStore};
     use crate::store::MockChunkDataStore;
-    use crate::table::{Row, TableValue};
+    use crate::table::{cmp_same_types, Row, TableValue};
     use arrow::array::StringArray;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
@@ -923,41 +933,67 @@ mod tests {
             Arc::new(config),
         );
         compaction_service.compact(1).await.unwrap();
-        let partition_1 = metastore.get_partition(2).await.unwrap();
-        let partition_2 = metastore.get_partition(3).await.unwrap();
-        let mut result = vec![
-            (
-                partition_1.get_row().main_table_row_count(),
-                partition_1.get_row().get_min_val().as_ref().cloned(),
-                partition_1.get_row().get_max_val().as_ref().cloned(),
-            ),
-            (
-                partition_2.get_row().main_table_row_count(),
-                partition_2.get_row().get_min_val().as_ref().cloned(),
-                partition_2.get_row().get_max_val().as_ref().cloned(),
-            ),
-        ];
-        result.sort_by_key(|(s, _, _)| *s);
+
+        fn sort_fn(
+            a: &(u64, Option<Row>, Option<Row>),
+            b: &(u64, Option<Row>, Option<Row>),
+        ) -> Ordering {
+            if a.1.is_none() && b.1.is_some() {
+                Ordering::Less
+            } else if a.1.is_some() && b.1.is_none() {
+                Ordering::Greater
+            } else if a.1.is_none() && b.1.is_none() {
+                Ordering::Equal
+            } else {
+                cmp_same_types(
+                    &a.1.as_ref().unwrap().values()[0],
+                    &b.1.as_ref().unwrap().values()[0],
+                )
+            }
+        }
+
+        let active_partitions = metastore
+            .get_active_partitions_by_index_id(1)
+            .await
+            .unwrap();
+        let mut result = active_partitions
+            .iter()
+            .map(|p| {
+                (
+                    p.get_row().main_table_row_count(),
+                    p.get_row().get_min_val().as_ref().cloned(),
+                    p.get_row().get_max_val().as_ref().cloned(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        result.sort_by(sort_fn);
         let mut expected = vec![
             (
-                12,
-                //  4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9
-                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
+                9,
+                // 0, 0, 1, 1, 10, 11, 12, 13, 14,
                 None,
+                Some(Row::new(vec![TableValue::String("foo15".to_string())])),
             ),
             (
-                14,
+                9,
+                Some(Row::new(vec![TableValue::String("foo15".to_string())])),
+                // 15, 2, 2, 3, 3, 4, 4, 5, 5,
+                Some(Row::new(vec![TableValue::String("foo6".to_string())])),
+            ),
+            (
+                8,
+                //  6, 6, 7, 7, 8, 8, 9, 9
+                Some(Row::new(vec![TableValue::String("foo6".to_string())])),
                 None,
-                // 0, 0, 1, 1, 10, 11, 12, 13, 14, 15, 2, 2, 3, 3
-                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
             ),
         ];
-        expected.sort_by_key(|(s, _, _)| *s);
+        expected.sort_by(sort_fn);
         assert_eq!(result, expected);
 
-        let next_partition_id = vec![partition_1, partition_2]
+        let next_partition_id = active_partitions
             .iter()
-            .find(|p| p.get_row().main_table_row_count() == 14)
+            .find(|p| p.get_row().get_min_val().is_none())
             .unwrap()
             .get_id();
         metastore
@@ -968,20 +1004,44 @@ mod tests {
 
         compaction_service.compact(next_partition_id).await.unwrap();
 
-        let partition = metastore.get_partition(4).await.unwrap();
+        let active_partitions = metastore
+            .get_active_partitions_by_index_id(1)
+            .await
+            .unwrap();
+        let mut result = active_partitions
+            .iter()
+            .map(|p| {
+                (
+                    p.get_row().main_table_row_count(),
+                    p.get_row().get_min_val().as_ref().cloned(),
+                    p.get_row().get_max_val().as_ref().cloned(),
+                )
+            })
+            .collect::<Vec<_>>();
 
-        assert_eq!(
+        result.sort_by(sort_fn);
+        let mut expected = vec![
             (
-                partition.get_row().main_table_row_count(),
-                partition.get_row().get_min_val().as_ref().cloned(),
-                partition.get_row().get_max_val().as_ref().cloned(),
-            ),
-            (
-                16,
+                11,
+                // 0, 0, 0, 1, 1, 1, 10, 11, 12, 13, 14,
                 None,
-                Some(Row::new(vec![TableValue::String("foo4".to_string())])),
+                Some(Row::new(vec![TableValue::String("foo15".to_string())])),
             ),
-        );
+            (
+                9,
+                Some(Row::new(vec![TableValue::String("foo15".to_string())])),
+                // 15, 2, 2, 3, 3, 4, 4, 5, 5,
+                Some(Row::new(vec![TableValue::String("foo6".to_string())])),
+            ),
+            (
+                8,
+                //  6, 6, 7, 7, 8, 8, 9, 9
+                Some(Row::new(vec![TableValue::String("foo6".to_string())])),
+                None,
+            ),
+        ];
+        expected.sort_by(sort_fn);
+        assert_eq!(result, expected);
 
         RocksMetaStore::cleanup_test_metastore("compaction");
     }
