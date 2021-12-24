@@ -2,12 +2,15 @@
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.aarch64-unknown-linux-gnu
 FROM rustembedded/cross:aarch64-unknown-linux-gnu
 
-RUN apt-get update && \
-    apt-get install --assume-yes -y wget make git automake autoconf ca-certificates libc6-arm64-cross libc6-dev-arm64-cross apt-transport-https ca-certificates && \
-    echo 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main' >> /etc/apt/sources.list && \
-    curl -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && \
-    apt-get update && \
-    apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
+RUN apt-get update
+RUN apt-get install --assume-yes -y wget make git automake autoconf ca-certificates libc6-arm64-cross libc6-dev-arm64-cross apt-transport-https ca-certificates
+RUN echo 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main' >> /etc/apt/sources.list
+RUN curl -k -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && apt-get update    
+RUN apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
+RUN apt-get install -y libc6
+RUN apt-get install -y gcc-multilib
+RUN apt-get install -y gcc-aarch64-linux-gnu
+RUN apt-get install -y g++-aarch64-linux-gnu
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-9 100
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-9 100

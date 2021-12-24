@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.11](https://github.com/cube-js/cube.js/compare/v0.29.10...v0.29.11) (2021-12-24)
+
+
+### Bug Fixes
+
+* **cubestore:** Respect pending chunks for compaction ([ac23554](https://github.com/cube-js/cube.js/commit/ac235545a0516a27009035b72defaa338a2fc5d3))
+
+
+### Features
+
+* **cubestore:** Build binary for aarch64-unknown-linux-gnu ([#3844](https://github.com/cube-js/cube.js/issues/3844)) ([38b8054](https://github.com/cube-js/cube.js/commit/38b8054308353bb11a023d6c47b05761e7bc7535))
+
+
+
+
+
 ## [0.29.10](https://github.com/cube-js/cube.js/compare/v0.29.9...v0.29.10) (2021-12-22)
 
 
