@@ -98,7 +98,7 @@ which will make them additive and orders of magnitude more performant. This
 `countDistinctApprox` measures can be used in pre-aggregations. However, there are two
 drawbacks:
 
-- This type is approximate, so the measures might yield slightly different results compared to their `countDistinct` counterparts. Please comsult with your database's
+- This type is approximate, so the measures might yield slightly different results compared to their `countDistinct` counterparts. Please consult with your database's
 documentation to learn more.
 - The `countDistinctApprox` is not supported with all databases. Currently, Cube supports it for Athena, BigQuery, and Snowflake.
 
