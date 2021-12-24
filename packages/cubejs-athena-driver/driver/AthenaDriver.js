@@ -22,6 +22,8 @@ class AthenaDriver extends BaseDriver {
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
+
+    this.athena = new AWS.Athena(this.config);
   }
 
   readOnly() {
