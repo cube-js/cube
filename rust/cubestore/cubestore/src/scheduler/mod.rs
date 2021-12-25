@@ -18,7 +18,7 @@ use log::error;
 use std::collections::{BinaryHeap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
-use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::sync::{broadcast, Mutex, Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
@@ -69,7 +69,10 @@ impl SchedulerImpl {
                 gc_loop.run().await;
                 Ok(())
             }),
-            cube_ext::spawn(async move { Self::run_scheduler(scheduler2).await }),
+            cube_ext::spawn(async move {
+                Self::run_scheduler(scheduler2).await;
+                Ok(())
+            }),
             cube_ext::spawn(async move {
                 scheduler3
                     .reconcile_loop
@@ -84,15 +87,24 @@ impl SchedulerImpl {
         ]
     }
 
-    async fn run_scheduler(scheduler: Arc<SchedulerImpl>) -> Result<(), CubeError> {
+    async fn run_scheduler(scheduler: Arc<SchedulerImpl>) {
         loop {
             let mut event_receiver = scheduler.event_receiver.lock().await;
             let event = tokio::select! {
                 _ = scheduler.cancel_token.cancelled() => {
-                    return Ok(());
+                    return;
                 }
                 event = event_receiver.recv() => {
-                    event?
+                    match event {
+                        Err(broadcast::error::RecvError::Lagged(messages)) => {
+                            error!("Scheduler is lagging on meta store event processing for {} messages", messages);
+                            continue;
+                        },
+                        Err(broadcast::error::RecvError::Closed) => {
+                            return;
+                        },
+                        Ok(event) => event,
+                    }
                 }
             };
             let scheduler_to_move = scheduler.clone();
