@@ -15,6 +15,11 @@ COPY . .
 
 RUN yarn policies set-version v1.22.5
 
+# Required for node-oracledb to buld on ARM64
+RUN apk update
+RUN apk add python2 gcc g++ make
+RUN npm config set python /usr/bin/python2.7
+
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
