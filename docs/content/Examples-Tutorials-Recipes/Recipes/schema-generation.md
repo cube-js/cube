@@ -1,5 +1,5 @@
 ---
-title: 'Code Reusability: Schema Generation'
+title: Implementing Schema Generation
 permalink: /recipes/schema-generation
 category: Examples & Tutorials
 subCategory: Code reusability

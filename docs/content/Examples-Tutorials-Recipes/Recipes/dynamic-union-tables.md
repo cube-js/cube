@@ -1,5 +1,5 @@
 ---
-title: Dynamically Union Tables
+title: Using Dynamic Union Tables
 permalink: /recipes/dynamically-union-tables
 category: Examples & Tutorials
 subCategory: Data schema

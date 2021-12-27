@@ -1,5 +1,5 @@
 ---
-title: Incrementally building pre-aggregations for a date range
+title: Incrementally Building Pre-aggregations for a Date Range
 permalink: /recipes/incrementally-building-pre-aggregations-for-a-date-range
 category: Examples & Tutorials
 subCategory: Query acceleration

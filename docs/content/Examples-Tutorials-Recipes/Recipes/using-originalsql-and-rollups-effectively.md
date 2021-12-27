@@ -1,5 +1,5 @@
 ---
-title: Using originalSql and rollup pre-aggregations effectively
+title: Using originalSql and rollup Pre-aggregations Effectively
 permalink: /recipes/using-originalsql-and-rollups-effectively
 category: Examples & Tutorials
 subCategory: Query acceleration

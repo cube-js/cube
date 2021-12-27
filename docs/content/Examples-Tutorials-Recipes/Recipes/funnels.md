@@ -1,5 +1,5 @@
 ---
-title: Funnels
+title: Implementing Funnel Analysis
 permalink: /recipes/funnels
 category: Examples & Tutorials
 subCategory: Analytics

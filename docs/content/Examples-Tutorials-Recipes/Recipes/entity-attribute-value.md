@@ -1,5 +1,5 @@
 ---
-title: Entity-Attribute-Value Model
+title: Implementing Entity-Attribute-Value Model (EAV)
 permalink: /recipes/entity-attribute-value
 category: Examples & Tutorials
 subCategory: Data schema

@@ -1,5 +1,5 @@
 ---
-title: Column-Based Access
+title: Enforcing Column-Based Access
 permalink: /recipes/column-based-access
 category: Examples & Tutorials
 subCategory: Access control
