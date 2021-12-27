@@ -16,7 +16,10 @@ describe('SQLInteface', () => {
         user
       });
 
-      throw new Error('Unsupported');
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
     });
 
     const meta = jest.fn(async ({ request, user }) => {
@@ -52,85 +55,102 @@ describe('SQLInteface', () => {
     });
     console.log(instance);
 
-    const testConnectionFailed = async (/** input */ { user, password }) =>{
-      try {
-        await mysql.createConnection({
-          host: '127.0.0.1',
-          port: 4545,
-          user,
-          password,
-        });;
+    try {
+      const testConnectionFailed = async (/** input */ { user, password }) =>{
+        try {
+          await mysql.createConnection({
+            host: '127.0.0.1',
+            port: 4545,
+            user,
+            password,
+          });;
 
-        throw new Error('must throw error');
-      } catch (e) {
-        expect(e.message).toContain('Incorrect user name or password');
+          throw new Error('must throw error');
+        } catch (e) {
+          expect(e.message).toContain('Incorrect user name or password');
+        }
+
+        console.log(checkAuth.mock.calls)
+        expect(checkAuth.mock.calls.length).toEqual(1);
+        expect(checkAuth.mock.calls[0][0]).toEqual({
+          request: {
+            id: expect.any(String)
+          },
+          user: user || null,
+        });
+      };
+
+      await testConnectionFailed({
+        user: undefined,
+        password: undefined
+      });
+      checkAuth.mockClear();
+
+      await testConnectionFailed({
+        user: 'allowed_user',
+        password: undefined,
+      });
+      checkAuth.mockClear();
+
+      await testConnectionFailed({
+        user: 'allowed_user',
+        password: 'wrong_password'
+      });
+      checkAuth.mockClear();
+
+      const connection = await mysql.createConnection({
+        host: '127.0.0.1',
+        port: 4545,
+        user: 'allowed_user',
+        password: 'password_for_allowed_user'
+      });
+
+      {
+        const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
+        console.log(result);
+  
+        expect(result).toEqual([
+          {
+            Tables_in_db: 'KibanaSampleDataEcommerce',
+            Table_type: 'BASE TABLE',
+          },
+          {
+            Tables_in_db: 'Logs',
+            Table_type: 'BASE TABLE',
+          },
+        ]);  
       }
 
-      console.log(checkAuth.mock.calls)
       expect(checkAuth.mock.calls.length).toEqual(1);
       expect(checkAuth.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String)
         },
-        user: user || null,
+        user: 'allowed_user',
       });
-    };
 
-    await testConnectionFailed({
-      user: undefined,
-      password: undefined
-    });
-    checkAuth.mockClear();
+      expect(meta.mock.calls.length).toEqual(1);
+      expect(meta.mock.calls[0][0]).toEqual({
+        request: {
+          id: expect.any(String)
+        },
+        user: 'allowed_user',
+      });
 
-    await testConnectionFailed({
-      user: 'allowed_user',
-      password: undefined,
-    });
-    checkAuth.mockClear();
-
-    await testConnectionFailed({
-      user: 'allowed_user',
-      password: 'wrong_password'
-    });
-    checkAuth.mockClear();
-
-    const connection = await mysql.createConnection({
-      host: '127.0.0.1',
-      port: 4545,
-      user: 'allowed_user',
-      password: 'password_for_allowed_user'
-    });
-
-    const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
-    console.log(result);
-
-    expect(result).toEqual([
       {
-        Tables_in_db: 'KibanaSampleDataEcommerce',
-        Table_type: 'BASE TABLE',
-      },
-      {
-        Tables_in_db: 'Logs',
-        Table_type: 'BASE TABLE',
-      },
-    ]);
+        try {
+          await connection.query('select * from KibanaSampleDataEcommerce');
 
-    expect(checkAuth.mock.calls.length).toEqual(1);
-    expect(checkAuth.mock.calls[0][0]).toEqual({
-      request: {
-        id: expect.any(String)
-      },
-      user: 'allowed_user',
-    });
+          throw new Error('Error was not passed from transport to the client');
+        } catch (e) {
+          expect(e.sqlState).toEqual('HY000'); 
+          expect(e.sqlMessage).toEqual('This error should be passed back to MySQL client'); 
+        }
+      }
 
-    expect(meta.mock.calls.length).toEqual(1);
-    expect(meta.mock.calls[0][0]).toEqual({
-      request: {
-        id: expect.any(String)
-      },
-      user: 'allowed_user',
-    });
-
-    connection.destroy();
+      connection.destroy();
+    } finally {
+      await native.shutdownInterface(instance)
+    }
   });
 });
