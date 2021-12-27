@@ -1,5 +1,5 @@
 ---
-title: Snapshots
+title: Implementing Data Snapshots
 permalink: /recipes/snapshots
 category: Examples & Tutorials
 subCategory: Data schema

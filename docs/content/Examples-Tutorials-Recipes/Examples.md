@@ -6,11 +6,10 @@ redirect_from:
   - /tutorials/
 ---
 
-Below you can find tutorials to help you get started with Cube.js. If you're
-already building something with Cube, please explore [recipes](/recipes) —
-short, self-contained, and runnable solutions to popular use cases.
+Below you can find tutorials to help you get started with Cube.js.
 
-<!-- Also, please review the [recipes](#recipes) for common use cases. -->
+If you're already building something with Cube, please explore [recipes](/recipes) —
+short, self-contained, and runnable solutions to popular use cases.
 
 ## Tutorials
 

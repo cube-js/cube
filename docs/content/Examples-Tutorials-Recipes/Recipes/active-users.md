@@ -1,5 +1,5 @@
 ---
-title: Daily, Weekly, Monthly Active Users
+title: Calculating Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
 permalink: /recipes/active-users
 category: Examples & Tutorials
 subCategory: Analytics

@@ -1,5 +1,5 @@
 ---
-title: Referencing Dynamic Measures
+title: Using Dynamic Measures
 permalink: /recipes/referencing-dynamic-measures
 category: Examples & Tutorials
 subCategory: Data schema

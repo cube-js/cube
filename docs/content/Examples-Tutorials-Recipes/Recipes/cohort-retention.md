@@ -1,5 +1,5 @@
 ---
-title: Cohort Retention
+title: Implementing Retention Analysis & Cohorts
 permalink: /recipes/cohort-retention
 category: Examples & Tutorials
 subCategory: Analytics
@@ -35,7 +35,7 @@ It’s usually visualized as a cohort grid or retention curves.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/cohort-retention.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/cohort-retention.png"
     style="border: none"
     width="100%"
   />

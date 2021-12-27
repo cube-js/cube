@@ -1,5 +1,5 @@
 ---
-title: Event Analytics
+title: Implementing Event Analytics
 permalink: /recipes/event-analytics
 category: Examples & Tutorials
 subCategory: Analytics

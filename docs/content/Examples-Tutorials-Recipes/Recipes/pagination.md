@@ -1,5 +1,5 @@
 ---
-title: Pagination
+title: Implementing Pagination
 permalink: /recipes/pagination
 category: Examples & Tutorials
 subCategory: Queries

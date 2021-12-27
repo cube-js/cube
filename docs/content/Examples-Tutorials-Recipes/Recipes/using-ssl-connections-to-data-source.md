@@ -1,5 +1,5 @@
 ---
-title: Enable SSL Connections to the Database
+title: Using SSL Connections to a Data Source
 permalink: /recipes/enable-ssl-connections-to-database
 category: Examples & Tutorials
 subCategory: Data sources
