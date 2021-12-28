@@ -106,14 +106,14 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       try {
         birdbox = await entrypoint();
 
-        httpClient = cubejs(async () => 'test', {
+        httpClient = cubejs(async () => '', {
           apiUrl: birdbox.configuration.apiUrl,
         });
 
         wsTransport = new WebSocketTransport({
           apiUrl: birdbox.configuration.apiUrl,
         });
-        wsClient = cubejs(async () => 'test', {
+        wsClient = cubejs(async () => '', {
           apiUrl: birdbox.configuration.apiUrl,
           transport: wsTransport,
         });
@@ -134,7 +134,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       const preAggs = await fetch(`${birdbox.configuration.playgroundUrl}/cubejs-system/v1/pre-aggregations`, {
         method: 'GET',
         headers: {
-          Authorization: 'test'
+          Authorization: ''
         },
       });
       console.log(await preAggs.json());
