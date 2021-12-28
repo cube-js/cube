@@ -330,6 +330,9 @@ const variables: Record<string, (...args: any) => any> = {
   previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
+  batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
+    .default(256 * 1024)
+    .asInt(),
 };
 
 type Vars = typeof variables;
