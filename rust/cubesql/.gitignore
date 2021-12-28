@@ -1,5 +1,6 @@
 /target
 /.idea
+/.vscode
 upstream
 .cargo/config.toml
 dist
