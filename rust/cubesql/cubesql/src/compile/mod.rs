@@ -1519,6 +1519,7 @@ impl QueryPlanner {
                     Arc::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
+            ast::Statement::Kill { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
             ast::Statement::SetVariable { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
             ast::Statement::ShowVariable { variable } => {
                 self.show_variable_to_plan(variable, props)
