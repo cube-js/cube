@@ -231,7 +231,6 @@ impl Backend {
                 ),)
             )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
-            let stmt = parse_sql_to_statement(&query)?;
             match stmt {
                 Statement::ExplainTable { table_name, .. } => {
                     let table_name_filter = if table_name.0.len() == 2 {
@@ -335,7 +334,6 @@ impl Backend {
                 }
             }
         } else if query_lower.starts_with("show create table") {
-            let stmt = parse_sql_to_statement(&query)?;
             match stmt {
                 Statement::ShowCreate { obj_type, obj_name } => {
                     match obj_type {
