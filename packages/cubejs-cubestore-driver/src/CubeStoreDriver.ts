@@ -42,11 +42,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       batchingRowSplitCount: getEnv('batchingRowSplitCount'),
-      host: getEnv('cubeStoreHost'),
-      port: getEnv('cubeStorePort'),
-      user: getEnv('cubeStoreUser'),
-      password: getEnv('cubeStorePass'),
       ...config,
+      // TODO Can arrive as null somehow?
+      host: config?.host || getEnv('cubeStoreHost'),
+      port: config?.port || getEnv('cubeStorePort'),
+      user: config?.user || getEnv('cubeStoreUser'),
+      password: config?.password || getEnv('cubeStorePass'),
     };
     this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
