@@ -71,11 +71,13 @@ jobs:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64
-            avx: 1
+            build-args: WITH_AVX2=1
+            postfix: ""
           - os: self-hosted
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
-            avx: 0
+            build-args: WITH_AVX2=0
+            postfix: "-arm64v8"
     timeout-minutes: 60
     steps:
       - name: Check out the repo
@@ -93,7 +95,8 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION=dev
+          VERSION=dev${{ matrix.postfix }}
+
           if [ "${{ github.event_name }}" = "schedule" ]; then
             VERSION=nightly
           elif [[ $GITHUB_REF == refs/tags/* ]]; then
@@ -106,7 +109,9 @@ jobs:
           elif [[ $GITHUB_REF == refs/pull/* ]]; then
             VERSION=pr-${{ github.event.number }}
           fi
+
           TAGS="${DOCKER_IMAGE}:${VERSION}"
+
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
@@ -114,6 +119,7 @@ jobs:
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:build-1${GITHUB_RUN_NUMBER}"
           fi
+
           echo ::set-output name=version::${VERSION}
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -139,8 +145,7 @@ jobs:
           context: ./rust/cubestore
           file: ./rust/cubestore/Dockerfile
           platforms: ${{ matrix.platforms }}
-          build-args: |
-            WITH_AVX2=${{ matrix.avx }}
+          build-args: ${{ matrix.build-args }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           cache-from: type=local,src=/tmp/.buildx-cache
