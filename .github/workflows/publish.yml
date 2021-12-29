@@ -362,9 +362,9 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/}
           fi
           if [ ${{ matrix.avx }} == 1 ]; then
-            TAGS="${DOCKER_IMAGE}:${VERSION}
+            TAGS="${DOCKER_IMAGE}:${VERSION}"
           elif [ ${{ matrix.avx }} == 0 ]; then
-            TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx
+            TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx"
           fi
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
