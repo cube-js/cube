@@ -203,13 +203,13 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/}
           fi
 
-          if [ ${{ startsWith(matrix.target, 'x86_x64') }}]; then
+          if [ ${{ startsWith(matrix.target, 'x86_x64') }} ]; then
             if [ ${{ matrix.avx }} == 1 ]; then
               TAGS="${DOCKER_IMAGE}:${VERSION}"
             elif [ ${{ matrix.avx }} == 0 ]; then
               TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx"
             fi
-          elif [ ${{ startsWith(matrix.target, 'aarch64') }}]; then
+          elif [ ${{ startsWith(matrix.target, 'aarch64') }} ]; then
             TAGS="${DOCKER_IMAGE}:${VERSION}-arm64"
           fi
         
@@ -225,7 +225,7 @@ jobs:
             elif [ ${{ startsWith(matrix.target, 'aarch64') }}]; then
               TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}-arm64:latest"
             fi
-          elif [ "${{ github.event_name }}" = "push" && ${{ startsWith(matrix.target, 'x86_x64') }} && ${{ matrix.avx }} == 0]; then
+          elif [ "${{ github.event_name }}" = "push" && ${{ startsWith(matrix.target, 'x86_x64') }} && ${{ matrix.avx }} == 0 ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-non-avx"
           fi
           echo ::set-output name=version::${VERSION}
