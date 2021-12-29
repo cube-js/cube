@@ -14,3 +14,4 @@ Native module for Cube.js (binding to Rust codebase).
 ### License
 
 Cube.js Native is [Apache 2.0 licensed](./LICENSE).
+
