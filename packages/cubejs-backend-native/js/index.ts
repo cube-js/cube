@@ -111,6 +111,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     });
 };
 
+// touch
 export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
     const native = loadNative();
 
