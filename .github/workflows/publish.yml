@@ -335,9 +335,6 @@ jobs:
           - os: self-hosted
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
-          - os: self-hosted
-            target: aarch64-unknown-linux-gnu
-            platforms: linux/arm64
     timeout-minutes: 60
     steps:
       - name: Check out the repo
@@ -456,6 +453,7 @@ jobs:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
           - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
         include:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu

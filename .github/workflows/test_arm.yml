@@ -1,0 +1,416 @@
+name: Test Arm
+
+on:
+  push:
+    branches:
+      - post-install-arm64
+
+jobs:
+  # docker-default:
+  #   needs: [npm, cubestore, native_linux]
+  #   name: Debian docker image
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     matrix:
+  #       target:
+  #         - x86_64-unknown-linux-gnu
+  #         - aarch64-unknown-linux-gnu
+  #       include:
+  #         - os: ubuntu-20.04
+  #           target: x86_64-unknown-linux-gnu
+  #           platforms: linux/amd64
+  #           avx: 1
+  #         - os: self-hosted
+  #           target: aarch64-unknown-linux-gnu
+  #           platforms: linux/arm64
+  #           avx: 0
+  #   timeout-minutes: 30
+  #   steps:
+  #     - name: Check out the repo
+  #       uses: actions/checkout@v2
+  #     - name: Repo metadata
+  #       id: repo
+  #       uses: actions/github-script@v3
+  #       with:
+  #         script: |
+  #           const { data } = await github.repos.get(context.repo)
+  #           const reg = new RegExp('📊 ', 'ug');
+  #           data.description = data.description.replace(reg, "")
+  #           return data
+  #     - name: Prepare
+  #       id: prep
+  #       run: |
+  #         DOCKER_IMAGE=cubejs/cube
+  #         VERSION=noop
+  #         if [ "${{ github.event_name }}" = "schedule" ]; then
+  #           VERSION=nightly
+  #         elif [[ $GITHUB_REF == refs/tags/* ]]; then
+  #           VERSION=${GITHUB_REF#refs/tags/}
+  #         fi
+  #         TAGS="${DOCKER_IMAGE}:${VERSION}"
+  #         if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+  #           MINOR=${VERSION%.*}
+  #           MAJOR=${MINOR%.*}
+  #           TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+  #         fi
+  #         echo ::set-output name=version::${VERSION}
+  #         echo ::set-output name=tags::${TAGS}
+  #         echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@v1
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v1
+  #       with:
+  #         version: v0.6.3
+  #     - name: Push to Docker Hub
+  #       uses: docker/build-push-action@v2
+  #       with:
+  #         context: ./packages/cubejs-docker
+  #         file: ./packages/cubejs-docker/latest.Dockerfile
+  #         platforms: ${{ matrix.platforms }}
+  #         push: true
+  #         tags: ${{ steps.prep.outputs.tags }}
+  #         labels: |
+  #           org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+  #           org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+  #           org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+  #           org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+  #           org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+  #           org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+  #           org.opencontainers.image.revision=${{ github.sha }}
+  #           org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+  #         build-args: |
+  #           WITH_AVX2=${{ matrix.avx }}
+  #           IMAGE_VERSION=${{ steps.prep.outputs.version }}
+
+  # docker-alpine:
+  #   needs: [npm, cubestore, native_linux]
+  #   name: Alpine docker image
+  #   runs-on: ubuntu-20.04
+  #   timeout-minutes: 30
+
+  #   steps:
+  #     - name: Check out the repo
+  #       uses: actions/checkout@v2
+  #     - name: Repo metadata
+  #       id: repo
+  #       uses: actions/github-script@v3
+  #       with:
+  #         script: |
+  #           const { data } = await github.repos.get(context.repo)
+  #           const reg = new RegExp('📊 ', 'ug');
+  #           data.description = data.description.replace(reg, "")
+  #           return data
+  #     - name: Prepare
+  #       id: prep
+  #       run: |
+  #         DOCKER_IMAGE=cubejs/cube
+  #         VERSION=noop
+  #         if [ "${{ github.event_name }}" = "schedule" ]; then
+  #           VERSION=nightly
+  #         elif [[ $GITHUB_REF == refs/tags/* ]]; then
+  #           VERSION=${GITHUB_REF#refs/tags/}
+  #         fi
+  #         TAGS="${DOCKER_IMAGE}:${VERSION}-alpine"
+  #         if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+  #           MINOR=${VERSION%.*}
+  #           MAJOR=${MINOR%.*}
+  #           TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-alpine,${DOCKER_IMAGE}:${MAJOR}-alpine,${DOCKER_IMAGE}:alpine"
+  #         elif [ "${{ github.event_name }}" = "push" ]; then
+  #           TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-alpine"
+  #         fi
+  #         echo ::set-output name=version::${VERSION}
+  #         echo ::set-output name=tags::${TAGS}
+  #         echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@v1
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v1
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v1
+  #       with:
+  #         version: v0.6.3
+  #     - name: Push to Docker Hub
+  #       uses: docker/build-push-action@v2
+  #       with:
+  #         context: ./packages/cubejs-docker
+  #         file: ./packages/cubejs-docker/latest-alpine.Dockerfile
+  #         platforms: linux/amd64
+  #         push: true
+  #         tags: ${{ steps.prep.outputs.tags }}
+  #         labels: |
+  #           org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+  #           org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+  #           org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+  #           org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+  #           org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+  #           org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+  #           org.opencontainers.image.revision=${{ github.sha }}
+  #           org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+  #         build-args: |
+  #           IMAGE_VERSION=${{ steps.prep.outputs.version }}
+
+  docker-cubestore:
+    name: Cube Store Docker
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64
+            avx: 0
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64
+            avx: 1
+          - os: self-hosted
+            target: aarch64-unknown-linux-gnu
+            platforms: linux/arm64
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Repo metadata
+        id: repo
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const { data } = await github.repos.get(context.repo)
+            const reg = new RegExp('📊 ', 'ug');
+            data.description = data.description.replace(reg, "")
+            return data
+      - name: Prepare
+        id: prep
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          DOCKER_IMAGE=cubejs/cubestore
+          VERSION=noop
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            VERSION=nightly
+          elif [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          
+          if [ ${{ startsWith(matrix.target, 'x86_x64') }}]; then
+            if [ ${{ matrix.avx }} == 1 ]; then
+              TAGS="${DOCKER_IMAGE}:${VERSION}"
+            elif [ ${{ matrix.avx }} == 0 ]; then
+              TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx"
+            fi
+          elif [ ${{ startsWith(matrix.target, 'aarch64') }}]; then
+            TAGS="${DOCKER_IMAGE}:${VERSION}-arm64"
+          fi
+
+          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR=${VERSION%.*}
+            MAJOR=${MINOR%.*}
+
+            if [ ${{ startsWith(matrix.target, 'x86_x64') }}]; then
+              if [ ${{ matrix.avx }} == 1 ]; then
+                TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+              elif [ ${{ matrix.avx }} == 0 ]; then
+                TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-non-avx,${DOCKER_IMAGE}:${MAJOR}-non-avx,${DOCKER_IMAGE}:non-avx"
+              fi
+            elif [ ${{ startsWith(matrix.target, 'aarch64') }}]; then
+              TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}-arm64:latest"
+            fi
+
+          elif [ "${{ github.event_name }}" = "push"]; then
+            if [ ${{ startsWith(matrix.target, 'x86_x64') && ${{ matrix.avx }} == 0 }}]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-non-avx"
+          fi
+        
+          echo ::set-output name=version::${VERSION}
+          echo ::set-output name=tags::${TAGS}
+          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+      # - name: Login to DockerHub
+      #   uses: docker/login-action@v1
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v1
+      #   with:
+      #     version: v0.6.3
+      # - name: Cache Docker layers
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: /tmp/.buildx-cache
+      #     key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.avx }}-${{ github.sha }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.avx }}-
+      # - name: Push to Docker Hub
+      #   uses: docker/build-push-action@v2
+      #   with:
+      #     context: ./rust/cubestore/
+      #     file: ./rust/cubestore/Dockerfile
+      #     platforms: ${{ matrix.platforms }}
+      #     build-args: |
+      #       WITH_AVX2=${{ matrix.avx }}
+      #     # push: true
+      #     push: false
+      #     tags: ${{ steps.prep.outputs.tags }}
+      #     cache-from: type=local,src=/tmp/.buildx-cache
+      #     cache-to: type=local,dest=/tmp/.buildx-cache
+      #     labels: |
+      #       org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
+      #       org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
+      #       org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
+      #       org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
+      #       org.opencontainers.image.version=${{ steps.prep.outputs.version }}
+      #       org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+      #       org.opencontainers.image.revision=${{ github.sha }}
+      #       org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      # - name: Update repo description
+      #   uses: peter-evans/dockerhub-description@v2
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     repository: cubejs/cubestore
+      #     readme-filepath: ./rust/cubestore/README.md
+
+  cubestore:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: '-Ctarget-feature=+crt-static'
+      OPENSSL_STATIC: 1
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-pc-windows-msvc
+          - x86_64-apple-darwin
+          - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            executable_name: cubestored
+            cross: true
+            strip: true
+            compress: true
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            executable_name: cubestored
+            cross: true
+            strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
+            compress: false
+          - os: windows-2019
+            target: x86_64-pc-windows-msvc
+            executable_name: cubestored.exe
+            cross: false
+            strip: true
+            # cubestored.exe: CantPackException: superfluous data between sections
+            compress: false
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            executable_name: cubestored
+            cross: false
+            strip: true
+            compress: true
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            executable_name: cubestored
+            cross: true
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
+            compress: true
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-musl
+            executable_name: cubestored
+            cross: true
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
+            compress: true
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          target: ${{ matrix.target }}
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: rust/cubestore
+          key: cross-${{ runner.OS }}-${{ matrix.target }}
+          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+      - run: source .github/actions/${{ matrix.before_script }}.sh
+        if: ${{ matrix.before_script }}
+        shell: bash
+      - name: Install OpenSSL for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: vcpkg integrate install; vcpkg install openssl:x64-windows
+      - name: Instal LLVM for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: choco install -y --force llvm --version 9.0.1
+      - name: Set Env Variables for Windows
+        uses: allenevans/set-env@v2.0.0
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        with:
+          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
+          # This paths are required to work with static linking
+          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
+          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
+          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+      - name: Build with Cross
+        if: ${{ matrix.cross }}
+        run: |
+          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          chmod +x cross && sudo mv cross /usr/local/bin/cross
+          cd rust/cubestore
+          cross build --release --target=${{ matrix.target }}
+      - name: Build with Cargo
+        if: ${{ !matrix.cross }}
+        run: |
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew update
+          brew install upx
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        if: ${{ matrix.compress }}
+        with:
+          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
+      # - name: Create folder for archive
+      #   run: |
+      #     mkdir cubestore-archive
+      #     mkdir cubestore-archive/bin
+      # - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
+      #   if: ${{ startsWith(matrix.os, 'windows') }}
+      #   run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
+      # - name: Create archive for release
+      #   run: |
+      #     mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+      #     cd cubestore-archive
+      #     tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
+      # - name: Upload Binary to Release
+      #   uses: svenstaro/upload-release-action@v2
+      #   with:
+      #     repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #     file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+      #     asset_name: cubestored-${{ matrix.target }}.tar.gz
+      #     tag: ${{ github.ref }}
+      #     overwrite: true
+  
