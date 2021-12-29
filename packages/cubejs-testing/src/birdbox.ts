@@ -161,8 +161,13 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
 
-  if (fs.existsSync(path.join(testDir))) {
-    fsExtra.removeSync(path.join(testDir));
+  // Do not remove whole dir as it contains node_modules
+  if (fs.existsSync(path.join(testDir, '.env'))) {
+    fs.unlinkSync(path.join(testDir, '.env'));
+  }
+
+  if (fs.existsSync(path.join(testDir, '.cubestore'))) {
+    fsExtra.removeSync(path.join(testDir, '.env'));
   }
 
   fsExtra.copySync(
