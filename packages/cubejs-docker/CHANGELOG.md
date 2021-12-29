@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.13](https://github.com/cube-js/cube.js/compare/v0.29.12...v0.29.13) (2021-12-29)
+
+
+### Bug Fixes
+
+* arm64 support for cubestore docker images ([#3849](https://github.com/cube-js/cube.js/issues/3849)) ([305c234](https://github.com/cube-js/cube.js/commit/305c2348f5fd6a9c9f4b724b58c7723fc313c890))
+
+
+
+
+
 ## [0.29.12](https://github.com/cube-js/cube.js/compare/v0.29.11...v0.29.12) (2021-12-29)
 
 **Note:** Version bump only for package @cubejs-backend/docker
