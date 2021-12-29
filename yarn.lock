@@ -2831,24 +2831,15 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.0.tgz#c3c5ae543c897caa9c2a68630bed355be5f9990f"
   integrity sha512-JZButFdZ1+/xAfpguQHoabIXkcqRRKpMrWKBkpEZZyxfY9C1DpADFB8PEqGSTeFr135SaTRfKqGKx5xSCLI7ZQ==
 
-"@cubejs-backend/cubestore@^0.29.9":
-  version "0.29.9"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.29.9.tgz#978b422dba15d3d7f126d7d9a4d079f43401f13d"
-  integrity sha512-AxcOQdVUP6EBFHIfTrYmfnwWrR9FV50JmjlQjV5X+mpPRL8mtF90sAJzs0dv3xQAUuVAI8O5S7eHgVHYkD4OdQ==
-  dependencies:
-    "@cubejs-backend/shared" "^0.29.0"
-    "@octokit/core" "^3.2.5"
-    source-map-support "^0.5.19"
-
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
-"@cubejs-infra/node-pre-gyp-github@^1":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@cubejs-infra/node-pre-gyp-github/-/node-pre-gyp-github-1.0.2.tgz#7c52e7f00c74d80a47407d4a80293fbc4acd0fee"
-  integrity sha512-hSwjo95IywfVI6rdp9acR5SmNrvyS4qrekvdOB8HiWN4PHa0yIWMKRoEfHCn+psymjMX3kcABxSdea6xn2eB4Q==
+"@cubejs-infra/node-pre-gyp-github@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@cubejs-infra/node-pre-gyp-github/-/node-pre-gyp-github-1.0.3.tgz#5385b5f3ed4225b3e3664db8a4be37883fce0362"
+  integrity sha512-/othHxhjC85FpOQrV9BrYSLoTRQ8XeuD1Jo8XGc7R4EVzjZimtuInnS1w36H7+OHS7dQjseKYTaW9tt8IfzY9g==
   dependencies:
     "@octokit/rest" "^18.1.1"
     commander "^7.1.0"

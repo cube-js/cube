@@ -30,7 +30,7 @@
     "@mapbox/node-pre-gyp"
   ],
   "devDependencies": {
-    "@cubejs-infra/node-pre-gyp-github": "^1",
+    "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
     "@types/node": "^10",
     "cargo-cp-artifact": "^0.1",
