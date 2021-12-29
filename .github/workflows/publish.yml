@@ -242,9 +242,15 @@ jobs:
   docker-alpine:
     needs: [npm, cubestore, native_linux]
     name: Alpine docker image
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64,linux/arm64
     timeout-minutes: 30
-
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -294,7 +300,7 @@ jobs:
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-alpine.Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           labels: |
