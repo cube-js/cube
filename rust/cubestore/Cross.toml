@@ -21,3 +21,7 @@ xargo = false
 [target.aarch64-unknown-linux-gnu]
 image = "cubejs/rust-cross:aarch64-unknown-linux-gnu-10052021"
 xargo = false
+
+[target.aarch64-unknown-linux-musl]
+image = "cubejs/rust-cross:aarch64-unknown-linux-musl-10052021"
+xargo = false
