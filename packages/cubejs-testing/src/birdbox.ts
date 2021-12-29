@@ -167,7 +167,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
   }
 
   if (fs.existsSync(path.join(testDir, '.cubestore'))) {
-    fsExtra.removeSync(path.join(testDir, '.env'));
+    fsExtra.removeSync(path.join(testDir, '.cubestore'));
   }
 
   fsExtra.copySync(
