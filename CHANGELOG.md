@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.14](https://github.com/cube-js/cube.js/compare/v0.29.12-1...v0.29.14) (2021-12-29)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
 ## [0.29.13](https://github.com/cube-js/cube.js/compare/v0.29.12...v0.29.13) (2021-12-29)
 
 
