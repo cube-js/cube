@@ -217,9 +217,9 @@ jobs:
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
             if [ ${{ startsWith(matrix.target, 'x86_x64') }}]; then
-              if [ ${{ matrix.avx }} == 1 ]; then
+              if [ "${{ matrix.avx }}" == 1 ]; then
                 TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
-              elif [ ${{ matrix.avx }} == 0 ]; then
+              elif [ "${{ matrix.avx }}" == 0 ]; then
                 TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-non-avx,${DOCKER_IMAGE}:${MAJOR}-non-avx,${DOCKER_IMAGE}:non-avx"
               fi
             elif [ ${{ startsWith(matrix.target, 'aarch64') }}]; then
