@@ -68,8 +68,6 @@ describe('getEnv', () => {
   });
 
   test('dbPollTimeout', () => {
-    expect(getEnv('dbPollTimeout')).toBe(15 * 60);
-
     process.env.CUBEJS_DB_POLL_TIMEOUT = '1m';
     expect(getEnv('dbPollTimeout')).toBe(60);
   });

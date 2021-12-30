@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -10,7 +11,7 @@ export class QueryQueue {
     this.redisQueuePrefix = redisQueuePrefix;
     this.concurrency = options.concurrency || 2;
     this.continueWaitTimeout = options.continueWaitTimeout || 5;
-    this.executionTimeout = options.executionTimeout || 600;
+    this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
     this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });

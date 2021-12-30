@@ -11,7 +11,7 @@ export class InvalidConfiguration extends Error {
 export function convertTimeStrToMs(
   input: string,
   envName: string,
-  description: string = 'Must be number (in seconds) or string in time format (1s, 1m, 1h).',
+  description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
 ) {
   if (/^\d+$/.test(input)) {
     return parseInt(input, 10);
@@ -126,8 +126,16 @@ const variables: Record<string, (...args: any) => any> = {
   preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
     .asString(),
   dbPollTimeout: () => {
-    const value = process.env.CUBEJS_DB_POLL_TIMEOUT || '15m';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+    const value = process.env.CUBEJS_DB_POLL_TIMEOUT;
+    if (value) {
+      return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+    } else {
+      return null;
+    }
+  },
+  dbQueryTimeout: () => {
+    const value = process.env.CUBEJS_DB_QUERY_TIMEOUT || '10m';
+    return convertTimeStrToMs(value, 'CUBEJS_DB_QUERY_TIMEOUT');
   },
   dbPollMaxInterval: () => {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';

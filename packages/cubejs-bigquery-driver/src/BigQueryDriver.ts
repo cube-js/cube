@@ -45,7 +45,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       exportBucket: getEnv('dbExportBucket') || process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       location: getEnv('bigQueryLocation'),
       ...config,
-      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 

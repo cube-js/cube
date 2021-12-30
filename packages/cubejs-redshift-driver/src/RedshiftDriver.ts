@@ -100,7 +100,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         .join(' ');
 
       await this.prepareConnection(conn, {
-        executionTimeout: 600000,
+        executionTimeout: this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000,
       });
 
       let unloadTotalRows: number | null = null;

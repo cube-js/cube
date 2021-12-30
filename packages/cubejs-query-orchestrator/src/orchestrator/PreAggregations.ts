@@ -1364,7 +1364,7 @@ export class PreAggregations {
 
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
-    this.usedTablePersistTime = options.usedTablePersistTime || 600;
+    this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
     this.getQueueEventsBus = options.getQueueEventsBus;
   }

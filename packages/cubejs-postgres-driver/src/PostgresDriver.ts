@@ -1,6 +1,7 @@
 import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
+import { getEnv } from '@cubejs-backend/shared';
 import * as moment from 'moment';
 import {
   BaseDriver,
@@ -80,6 +81,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
     this.config = {
       ...this.getInitialConfiguration(),
+      executionTimeout: getEnv('dbQueryTimeout'),
       ...config,
     };
   }
