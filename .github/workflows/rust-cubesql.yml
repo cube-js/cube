@@ -11,7 +11,7 @@ on:
       - 'master'
   pull_request:
     paths:
-      - '.github/workflows/push-native.yml'
+      - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
       - 'rust/cubesql/**'
@@ -45,14 +45,14 @@ jobs:
     needs: [precheck]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} 
     strategy:
       matrix:
         node-version: [12, 14, 16, 17]
-        image: ["stretch"]
+        target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
-      image: node:${{ matrix.node-version }}-${{ matrix.image }}
+      image: cubejs/rust-cross:${{ matrix.target }}-10052021
 
     steps:
       - name: Checkout
@@ -63,6 +63,11 @@ jobs:
           toolchain: nightly-2021-07-04
           override: true
           components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -77,20 +82,28 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Install Yarn
+        run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
         env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build
+      - name: Test native
+        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run test:unit
 
   native:
     needs: [precheck]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
-    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+
     strategy:
       matrix:
         node-version: [12.x, 14.x, 16.x, 17.x]
