@@ -57,6 +57,9 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PACKAGE_TARGET_ARCH: ${{ matrix.package_target_arch }}
+      PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
+      PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} 
     strategy:
@@ -110,9 +113,6 @@ jobs:
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-          PACKAGE_TARGET_ARCH: ${{ matrix.package_target_arch }}
-          PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
-          PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact
         uses: nick-invision/retry@v2
