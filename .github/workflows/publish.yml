@@ -63,6 +63,12 @@ jobs:
       matrix:
         node-version: [12, 14, 16, 17]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+        include:
+          - target: aarch64-unknown-linux-gnu
+            # We use cross for this type, it's why we need to override package
+            package_target_arch: arm64
+            package_target_platform: linux
+            package_target_libc: glibc
       fail-fast: false
     container:
       image: cubejs/rust-cross:${{ matrix.target }}-10052021
@@ -104,6 +110,9 @@ jobs:
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
+          PACKAGE_TARGET_ARCH: ${{ matrix.package_target_arch }}
+          PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
+          PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact
         uses: nick-invision/retry@v2
