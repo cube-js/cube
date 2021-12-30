@@ -1,11 +1,13 @@
 FROM debian:stretch-slim
 
-RUN apt-get update && apt-get -y upgrade && \
-    apt-get install -y curl pkg-config wget gnupg git apt-transport-https ca-certificates && \
-    echo 'deb https://apt.llvm.org/stretch/ llvm-toolchain-stretch-9 main' >> /etc/apt/sources.list && \
-    curl -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && \
-    apt-get update && \
-    apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
+RUN apt-get update \
+    && apt-get -y upgrade \
+    && apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    && add-apt-repository "deb https://apt.llvm.org/stretch/ llvm-toolchain-stretch-9 main"  \
+    && apt-get update \
+    && apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make \
+    && rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-9 100
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-9 100
