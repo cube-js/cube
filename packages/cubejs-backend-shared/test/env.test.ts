@@ -12,7 +12,7 @@ test('convertTimeStrToMs', () => {
 
 test('convertTimeStrToMs(exception)', () => {
   expect(() => convertTimeStrToMs('', 'VARIABLE_ENV')).toThrowError(
-    `Value "" is not valid for VARIABLE_ENV. Must be number (in seconds) or string in time format (1s, 1m, 1h).`
+    `Value "" is not valid for VARIABLE_ENV. Must be a number in seconds or duration string (1s, 1m, 1h).`
   );
 });
 
