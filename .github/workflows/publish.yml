@@ -123,7 +123,7 @@ jobs:
           retry_wait_seconds: 15
           command: |
             cd packages/cubejs-backend-native
-            npm run upload-binary
+            npm run upload-binary-cross
 
   native:
     runs-on: ${{ matrix.os-version }}
