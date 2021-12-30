@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
+
+
+### Features
+
+* **cubestore:** Mark linux GNU as supported on ARM64 (post installer) ([3b385e5](https://github.com/cube-js/cube.js/commit/3b385e54d9f193559e5416a61349c707b40f5653))
+* **native/cubesql:** Build for ARM64 linux GNU ([5351c41](https://github.com/cube-js/cube.js/commit/5351c41110d1940956b242e85b879db6f3622d21))
+
+
+
+
+
 ## [0.29.12](https://github.com/cube-js/cube.js/compare/v0.29.11...v0.29.12) (2021-12-29)
 
 

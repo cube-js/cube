@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
+
+
+### Bug Fixes
+
+* **docker:** remove cache from alpine image ([a52be2f](https://github.com/cube-js/cube.js/commit/a52be2feca4a7b78e791a3bd7d78ab74db55c53f))
+
+
+
+
+
 ## [0.29.14](https://github.com/cube-js/cube.js/compare/v0.29.12-1...v0.29.14) (2021-12-29)
 
 **Note:** Version bump only for package @cubejs-backend/docker
