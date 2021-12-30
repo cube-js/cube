@@ -18,7 +18,7 @@ class AthenaDriver extends BaseDriver {
       S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
       workGroup: process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
       ...config,
-      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout')) * 1000,
+      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 

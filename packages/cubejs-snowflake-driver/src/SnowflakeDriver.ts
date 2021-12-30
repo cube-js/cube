@@ -132,6 +132,7 @@ interface SnowflakeDriverOptions {
   privateKeyPass?: string,
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
+  executionTimeout?: number,
 }
 
 /**
@@ -161,6 +162,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
+      executionTimeout: getEnv('dbQueryTimeout'),
       ...config
     };
   }
@@ -255,7 +257,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ?', [this.config.executionTimeout], false);
 
       return connection;
     } catch (e) {
