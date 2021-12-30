@@ -61,7 +61,7 @@ and deployment instructions for Cube Store.
 | -------- | :---------: | :----------: | :------: | :-----: |
 | `x86`    |     N/A     |     N/A      |   N/A    |   N/A   |
 | `x86_64` |     ✅      |      ✅      |    ✅    |   ✅    |
-| `arm64`  |             |              |  ✅[1]   |         |
+| `arm64`  |     ✅      |              |  ✅[1]   |         |
 
 [1] It can be launched using Rosetta 2 via the `x86_64-apple` binary.
 

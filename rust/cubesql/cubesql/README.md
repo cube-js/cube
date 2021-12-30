@@ -8,9 +8,9 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Rust/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ARust+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-# Cube SQL
+# Cube SQL API
 
-SQL API for Cube as proxy over MySQL protocol.
+Cube SQL API allows querying Cube via MySQL-compatible SQL.
 
 ## License
 
