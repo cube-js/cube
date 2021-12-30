@@ -113,6 +113,7 @@ jobs:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
           - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
         include:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
@@ -142,6 +143,13 @@ jobs:
             compress: true
           - os: ubuntu-20.04
             target: aarch64-unknown-linux-gnu
+            executable_name: cubestored
+            cross: true
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
+            compress: true
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-musl
             executable_name: cubestored
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'

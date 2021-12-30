@@ -26,6 +26,7 @@ docker build -t cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION
 docker build -t cubejs/rust-cross:x86_64-unknown-linux-gnu-stretch-$CROSS_VERSION -f x86_64-unknown-linux-gnu-stretch.Dockerfile .
 docker build -t cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION -f x86_64-unknown-linux-musl.Dockerfile .
 docker build -t cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION -f aarch64-unknown-linux-gnu.Dockerfile .
+docker build -t cubejs/rust-cross:aarch64-unknown-linux-musl-$CROSS_VERSION -f aarch64-unknown-linux-musl.Dockerfile .
 
 #docker push cubejs/rust-cross:x86_64-apple-darwin
 docker push cubejs/rust-cross:x86_64-pc-windows-msvc-$CROSS_VERSION
@@ -34,6 +35,7 @@ docker push cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION
 docker push cubejs/rust-cross:x86_64-unknown-linux-gnu-stretch-$CROSS_VERSION
 docker push cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION
 docker push cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION
+docker push cubejs/rust-cross:aarch64-unknown-linux-musl-$CROSS_VERSION
 
 # Verify versions
 docker run --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-stretch-$CROSS_VERSION cc --version

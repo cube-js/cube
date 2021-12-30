@@ -61,14 +61,23 @@ export function getTarget(): string {
         return 'x86_64-apple-darwin';
       default:
         throw new Error(
-          `You are using ${process.env} platform which is not supported by Cube Store`,
+          `You are using ${process.env} platform on x86 which is not supported by Cube Store`,
         );
     }
   }
 
-  if (process.arch === 'arm64' && process.platform === 'darwin') {
-    // Rosetta 2 is required
-    return 'x86_64-apple-darwin';
+  if (process.arch === 'arm64') {
+    switch (process.platform) {
+      case 'linux':
+        return `aarch64-unknown-linux-${detectLibc()}`;
+      case 'darwin':
+        // Rosetta 2 is required
+        return 'x86_64-apple-darwin';
+      default:
+        throw new Error(
+          `You are using ${process.env} platform on arm64 which is not supported by Cube Store`,
+        );
+    }
   }
 
   throw new Error(
@@ -81,5 +90,10 @@ export function isCubeStoreSupported(): boolean {
     return ['win32', 'darwin', 'linux'].includes(process.platform);
   }
 
-  return process.arch === 'arm64' && process.platform === 'darwin';
+  if (process.arch === 'arm64') {
+    // We mark darwin as supported, but it uses Rosetta 2
+    return ['darwin', 'linux'].includes(process.platform);
+  }
+
+  return false;
 }
