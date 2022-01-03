@@ -2393,7 +2393,7 @@ export class BaseQuery {
           unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
-          typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
+          typeof propValue === 'object' && propValue !== null && this.contextSymbolsProxy(propValue) ||
           methods(propValue);
       }
     });
