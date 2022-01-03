@@ -191,8 +191,212 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1LoadResult"
+    V1FilterOperatorEquals:
+      type: "string"
+      description: >
+        Use it when you need an exact match. It supports multiple values.
+
+        - Applied to measures.
+
+        - Dimension types: `string`, `number`, `time`.
+      example:
+        member: "Users.country"
+        operator: "equals"
+        values: ["US", "Germany", "Israel"]
+      enum: ["equals"]
+    V1FilterOperatorNotEquals:
+      type: "string"
+      description: >
+        The opposite operator of `equals`. It supports multiple values.
+
+        - Applied to measures.
+
+        - Dimension types: `string`, `number`, `time`.
+      example:
+        member: "Users.country"
+        operator: "notEquals"
+        values: ["France"]
+      enum: ["notEquals"]
+    V1FilterOperatorContains:
+      type: "string"
+      description: >
+        The `contains` filter acts as a wildcard case-insensitive `LIKE` operator. In
+        the majority of SQL backends it uses `ILIKE` operator with values being
+        surrounded by `%`. It supports multiple values.
+
+        - Dimension types: `string`.
+      example:
+        member: "Posts.title"
+        operator: "contains"
+        values: ["serverless", "aws"]
+      enum: ["contains"]
+    V1FilterOperatorNotContains:
+      type: "string"
+      description: >
+        The opposite operator of `contains`. It supports multiple values.
+
+        - Dimension types: `string`.
+      example:
+        member: "Posts.title"
+        operator: "notContains"
+        values: ["serverless", "aws"]
+      enum: ["notContains"]
+    V1FilterOperatorGreaterThan:
+      type: "string"
+      description: >
+        The `gt` operator means **greater than** and is used with measures or dimensions
+        of type `number`.
+
+        - Applied to measures.
+
+        - Dimension types: `number`.
+      example:
+        member: "Posts.upvotesCount"
+        operator: "gt"
+        values: ["100"]
+      enum: ["gt"]
+    V1FilterOperatorGreaterThanOrEqualTo:
+      type: "string"
+      description: >
+        The `gte` operator means **greater than or equal to** and is used with measures
+        or dimensions of type `number`.
+
+        - Applied to measures.
+
+        - Dimension types: `number`.
+      example:
+        member: "Posts.upvotesCount"
+        operator: "gte"
+        values: ["100"]
+      enum: ["gte"]
+    V1FilterOperatorLessThan:
+      type: "string"
+      description: >
+        The `lt` operator means **less than** and is used with measures or dimensions of
+        type `number`.
+
+        - Applied to measures.
+
+        - Dimension types: `number`.
+      example:
+        member: "Posts.upvotesCount"
+        operator: "lt"
+        values: ["10"]
+      enum: ["lt"]
+    V1FilterOperatorLessThanOrEqualTo:
+      type: "string"
+      description: >
+        The `lte` operator means **less than or equal to** and is used with measures or
+        dimensions of type `number`.
+
+        - Applied to measures.
+
+        - Dimension types: `number`.
+      example:
+        member: "Posts.upvotesCount"
+        operator: "lte"
+        values: ["10"]
+      enum: ["lte"]
+    V1FilterOperatorSet:
+      type: "string"
+      description: >
+        Operator `set` checks whether the value of the member **is not** `NULL`. You
+        don't need to pass `values` for this operator.
+
+        - Applied to measures.
+
+        - Dimension types: `number`, `string`, `time`.
+      example:
+        member: "Posts.authorName"
+        operator: "set"
+      enum: ["set"]
+    V1FilterOperatorNotSet:
+      type: "string"
+      description: >
+        An opposite to the `set` operator. It checks whether the value of the member
+        **is** `NULL`. You don't need to pass `values` for this operator.
+
+        - Applied to measures.
+        - Dimension types: `number`, `string`, `time`.
+      example:
+        member: "Posts.authorName"
+        operator: "notSet"
+      enum: ["notSet"]
+    V1FilterOperatorInDateRange:
+      type: "string"
+      description: >
+        The operator `inDateRange` is used to filter a time dimension into a specific
+        date range. The values must be an array of dates with the following format
+        `YYYY-MM-DD`. If only one date is specified, the filter would be set exactly to this
+        date.
+
+        There is a convenient way to use date filters with grouping -
+        [learn more about timeDimensions query property here](#time-dimensions-format)
+
+        - Dimension types: `time`.
+      example:
+        member: "Posts.time"
+        operator: "inDateRange"
+        values: ["2015-01-01", "2015-12-31"]
+      enum: ["inDateRange"]
+    V1FilterOperatorNotInDateRange:
+      type: "string"
+      description: >
+        The opposite operator to `inDateRange`, use it when you want to exclude specific
+        dates. The values format is the same as for `inDateRange`.
+
+        - Dimension types: `time`.
+      example:
+        member: "Posts.time"
+        operator: "notInDateRange"
+        values: ["2015-01-01", "2015-12-31"]
+      enum: ["notInDateRange"]
+    V1FilterOperatorBeforeDate:
+      type: "string"
+      description: >
+        Use it when you want to retrieve all results before some specific date. The
+        values should be an array of one element in `YYYY-MM-DD` format.
+
+        - Dimension types: `time`.
+      example:
+        member: "Posts.time"
+        operator: "beforeDate"
+        values: ["2015-01-01"]
+      enum: ["beforeDate"]
+    V1FilterOperatorAfterDate:
+      type: "string"
+      description: >
+        The same as `beforeDate`, but is used to get all results after a specific date.
+
+        - Dimension types: `time`.
+
+      example:
+        member: "Posts.time"
+        operator: "afterDate"
+        values: ['2015-01-01']
+      enum: ["afterDate"]
+    V1FilterOperator:
+      description: >
+        Only some operators are available for measures. For dimensions, the
+        available operators depend on the [type of the dimension](/schema/reference/types-and-formats#types).
+      oneOf:
+        - $ref: '#/components/schemas/V1FilterOperatorEquals'
+        - $ref: '#/components/schemas/V1FilterOperatorNotEquals'
+        - $ref: '#/components/schemas/V1FilterOperatorContains'
+        - $ref: '#/components/schemas/V1FilterOperatorNotContains'
+        - $ref: '#/components/schemas/V1FilterOperatorGreaterThan'
+        - $ref: '#/components/schemas/V1FilterOperatorGreaterThanOrEqualTo'
+        - $ref: '#/components/schemas/V1FilterOperatorLessThan'
+        - $ref: '#/components/schemas/V1FilterOperatorLessThanOrEqualTo'
+        - $ref: '#/components/schemas/V1FilterOperatorSet'
+        - $ref: '#/components/schemas/V1FilterOperatorNotSet'
+        - $ref: '#/components/schemas/V1FilterOperatorInDateRange'
+        - $ref: '#/components/schemas/V1FilterOperatorNotInDateRange'
+        - $ref: '#/components/schemas/V1FilterOperatorBeforeDate'
+        - $ref: '#/components/schemas/V1FilterOperatorAfterDate'
     V1LoadRequestQueryFilterLogicalAnd:
       type: "object"
+      description: "An array with one or more filters or other logical operators."
       properties:
         and:
           type: "array"
@@ -200,6 +404,7 @@ components:
             type: "object"
     V1LoadRequestQueryFilterLogicalOr:
       type: "object"
+      description: "An array with one or more filters or other logical operators."
       properties:
         or:
           type: "array"
@@ -210,12 +415,41 @@ components:
       properties:
         member:
           type: "string"
+          description: >
+            The dimension or measure to be used in the filter, for example:
+            `Stories.isDraft`.
         operator:
+          $ref: '#/components/schemas/V1FilterOperator'
           type: "string"
+          description: >
+            An operator to be used in the filter. Only some operators are
+            available for measures. For dimensions the available operators
+            depend on the type of the dimension. Please see the reference
+            below for the full list of available operators.
         values:
           type: "array"
+          description: >
+            An array of values for the filter. Values must be of type `string`.
+            If you need to pass a date, pass it as a string in `YYYY-MM-DD`
+            format.
           items:
             type: "string"
+    V1TimeDimensionGranularity:
+      type: "string"
+      description: >
+        A granularity for a time dimension. If you pass `null` to the
+        granularity, Cube.js will only perform filtering by a specified time
+        dimension, without grouping.
+      enum:
+        - "second"
+        - "minute"
+        - "hour"
+        - "day"
+        - "week"
+        - "month"
+        - "quarter"
+        - "year"
+        - null
     V1LoadRequestQueryTimeDimension:
       type: "object"
       required:
@@ -223,38 +457,161 @@ components:
       properties:
         dimension:
           type: "string"
+          description: "The name of the time dimension."
         granularity:
-          type: "string"
+          $ref: "#/components/schemas/V1TimeDimensionGranularity"
         dateRange:
           type: "object"
-          # Don't work in rust code-gen
+          description: >
+            An array of dates with the following format `YYYY-MM-DD` or in
+            `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and
+            in query `timezone`. Dates in `YYYY-MM-DD` format are also
+            accepted. Such dates are padded to the start and end of the day if
+            used in start and end of date range interval accordingly. If only
+            one date is specified it's equivalent to passing two of the same
+            dates as a date range. You can also set a relative `dateRange`
+            with a string instead of an array e.g. `today`, `yesterday`,
+            `tomorrow`, `last quarter`, `last year`, `next month`,
+            `last 6 months` or `last 360 days`.
+
+            > Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include
+            > the current date. If you need the current date also you can use
+            > `from N days ago to now` or `from now to N days from now`.
+          example: ["2015-01-01", "next month"]
+          # Doesn't work in rust code-gen
           # oneOf:
           #   - type: "string"
           #   - type: "array"
           #     items:
           #       type: "string"
+        compareDateRange:
+          type: "array"
+          description: >
+            An array of date ranges to compare a measure change over a previous
+            period. You can use compare date range queries when you want to
+            see, for example, how a metric performed over a period in the past
+            and how it performs now. You can pass two or more date ranges where
+            each of them is in the same format as a `dateRange`.
+          example: ["this week", ["2020-05-21", "2020-05-28"]]
+          items:
+            type: "string"
     V1LoadRequestQueryFilterItem:
+      description: >
+        Filters are applied differently to dimensions and measures.
+
+        When you filter on a dimension, you are restricting the raw data before any
+        calculations are made. When you filter on a measure, you are restricting the
+        results after the measure has been calculated.
+
+        Only some operators are available for measures. For dimensions, the available
+        operators depend on the [type of the dimension](/schema/reference/types-and-formats#types).
+
+        Filters can also contain `or` and `and` logical operators.
+
+        > **Note:** You can not put dimensions and measures filters in the same logical
+        > operator.
+      example:
+        or:
+          - "member": "visitors.source"
+            "operator": "equals"
+            "values": ["some"]
+          - and:
+            - "member": "visitors.source"
+              "operator": "equals"
+              "values": ["other"]
+            - "member": "visitor_checkins.cardsCount"
+              "operator": "equals"
+              "values": ["0"]
       oneOf:
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterBase"
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalOr"
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalAnd"
+    V1LoadRequestQueryOrderArray:
+      description: >
+        An array of tuples where the first element is the member name and the second element is the sort direction.
+      example:
+        order:
+          - ['Stories.time', 'asc']
+          - ['Stories.count', 'asc']
+      type: "array"
+      items:
+        type: "array"
+        items:
+          type: "string"
+    V1LoadRequestQueryOrderObject:
+      type: "object"
+      description: >
+        An object where the keys are measures or dimensions to order by and their corresponding values are
+        either `asc` or `desc`. The order of the keys in the object is used to order the final results.
+      example:
+        order:
+          "Stories.time": "asc"
+          "Stories.count": "desc"
+      properties:
+        member:
+          type: "string"
+        order:
+          type: "string"
+          enum: [ "asc", "desc" ]
     V1LoadRequestQuery:
       type: "object"
+      description: >
+        A query sent to the Cube API. Cube queries are plain JSON objects,
+        describing an analytics query. The basic elements of a query (query
+        members) are `measures`, `dimensions`, and `segments`.
+      example:
+        measures: ["Stories.count"]
+        dimensions: ["Stories.category"]
+        filters:
+          - member: "Stories.isDraft"
+            operator: "equals"
+            values: ["No"]
+        timeDimensions:
+          - dimension: "Stories.time"
+            dateRange: ["2015-01-01", "2015-12-31"]
+            granularity: "month"
+        limit: 100
+        offset: 50
+        order:
+          "Stories.time": "asc"
+          "Stories.count": "desc"
+        timezone: "America/Los_Angeles"
       properties:
         measures:
           type: "array"
+          description: >
+            An array of measures. The query member format name is
+            `<CUBE_NAME>.<MEMBER_NAME>`.
+          example: "Users.count"
           items:
             type: "string"
         dimensions:
           type: "array"
+          description: >
+            An array of dimensions. The query member format name is
+            `<CUBE_NAME>.<MEMBER_NAME>`.
+
+            In the case of dimension of type `time`, a granularity can
+            optionally be added to the name, in the following format:
+            `<CUBE_NAME>.<TIME_DIMENSION_NAME>.<GRANULARITY>`
+            e.g. `Stories.time.month`.
+          example: "Users.email"
           items:
             type: "string"
         segments:
           type: "array"
+          description: "An array of segments. A segment is a named filter created in a Data Schema."
           items:
             type: "string"
         timeDimensions:
           type: "array"
+          description: >
+            A convenient way to specify a time dimension with a filter. It is
+            an array of objects in the [timeDimension format](/query-format#time-dimensions-format).
+
+            Since grouping and filtering by a time dimension is quite a common
+            use-case, Cube provides a convenient shortcut to pass a dimension
+            and a filter as a `timeDimension` property.
           items:
             $ref: "#/components/schemas/V1LoadRequestQueryTimeDimension"
         order:
@@ -263,16 +620,72 @@ components:
             type: "array"
             items:
               type: "string"
+          description: >
+            If the `order` property is not specified in the query, Cube.js sorts results by default using the following rules:
+
+            - The first time dimension with granularity, ascending. If no time dimension with granularity exists...
+
+            - The first measure, descending. If no measure exists...
+
+            - The first dimension, ascending.
+          # Doesn't work in Rust code-gen
+        #          oneOf:
+        #            - $ref: "#/components/schemas/V1LoadRequestQueryOrderArray"
+        #            - $ref: "#/components/schemas/V1LoadRequestQueryOrderObject"
         limit:
           type: "integer"
+          minimum: 0
+          maximum: 50000
+          default: 10000
+          description: "A row limit for your query."
           format: "int32"
         offset:
           type: "integer"
+          default: 0
+          description: "The number of initial rows to be skipped for your query."
           format: "int32"
         filters:
           type: "array"
+          description: >
+            A list of filters to apply to the query. Learn more about
+            [the filters format](/query-format#filters-format).
+
+            Filters are applied differently to dimensions and measures. When
+            you filter on a dimension, you are restricting the raw data before
+            any calculations are made. When you filter on a measure, you are
+            restricting the results after the measure has been calculated.
           items:
             $ref: "#/components/schemas/V1LoadRequestQueryFilterItem"
+        timezone:
+          type: "string"
+          default: "UTC"
+          description: >
+            All time based calculations performed within Cube.js are timezone-aware. This
+            property is applied to all time dimensions during aggregation and filtering. It isn't
+            applied to the time dimension referenced in a dimensions query property unless
+            granularity or date filter is specified. Using this property you can set your desired
+            timezone in TZ Database Name format, e.g.: `America/Los_Angeles`.
+        renewQuery:
+          type: "boolean"
+          default: "false"
+          description: >
+            If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for queries and query results in the foreground. However if the `refreshKey` doesn't indicate that there's a need for an update then this setting has no effect.
+
+            > **NOTE**: Cube.js provides only eventual consistency guarantee. Using too
+            > small `refreshKey` values together with `renewQuery` in order to achieve
+            > immediate consistency can lead to endless refresh loops and
+            > overall system instability.
+        ungrouped:
+          type: "boolean"
+          default: "false"
+          description: >
+            If set to `true`, no `GROUP BY` statement will be
+            added to the query. Instead, the raw results after filtering and joining will
+            be returned without grouping. By default `ungrouped` queries require a primary
+            key as a dimension of every cube involved in the query for security purposes.
+            In case of `ungrouped` query measures will be rendered as underlying `sql` of
+            measures without aggregation and time dimensions will be truncated as usual
+            but not grouped by.
     V1LoadRequest:
       type: "object"
       properties:
