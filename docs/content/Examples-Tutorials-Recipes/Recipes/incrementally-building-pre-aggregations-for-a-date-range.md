@@ -82,7 +82,7 @@ range within the users table, we would be unable to as the current configuration
 only applies the date range to the final result of the SQL query defined in
 `sql`.
 
-In order to do the above, we'll "pugh down" the predicates to the inner SQL
+In order to do the above, we'll "push down" the predicates to the inner SQL
 query using [`FILTER_PARAMS`][ref-schema-ref-cube-filterparam] in conjunction
 with the [`buildRangeStart` and `buildRangeStart`
 properties][ref-schema-ref-preagg-buildrange]:
