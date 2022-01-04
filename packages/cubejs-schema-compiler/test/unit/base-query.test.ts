@@ -513,7 +513,7 @@ describe('SQL Generation', () => {
         [],
         {
           external: false,
-          renewalThreshold: 720,
+          renewalThreshold: 7200,
         }
       ]
     ]);
@@ -562,7 +562,7 @@ describe('SQL Generation', () => {
         {
           external: false,
           // 60 * 60 *2
-          renewalThreshold: 720,
+          renewalThreshold: 7200,
         }
       ]
     ]);
