@@ -2311,13 +2311,13 @@ export class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(refreshKey, limitedWithMax = true) {
+  refreshKeyRenewalThresholdForInterval(refreshKey, everyWithoutSql = true) {
     const { every } = refreshKey;
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / 10), 1);
+      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / (everyWithoutSql ? 10 : 1)), 1);
 
-      if (limitedWithMax) {
+      if (everyWithoutSql) {
         return Math.min(threshold, 300);
       }
 
@@ -2325,9 +2325,9 @@ export class BaseQuery {
     }
 
     const { interval } = this.calcIntervalForCronString(refreshKey);
-    const threshold = Math.max(Math.round(interval / 10), 1);
+    const threshold = Math.max(Math.round(interval / (everyWithoutSql ? 10 : 1)), 1);
 
-    if (limitedWithMax) {
+    if (everyWithoutSql) {
       return Math.min(threshold, 300);
     }
 
