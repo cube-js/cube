@@ -676,18 +676,17 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
-Scheduled refreshes will **never** look beyond this range.
+Scheduled refreshes will **never** look beyond this range. By default, the build
+range is defined as the minimum and maximum values possible for the
+[`timeDimension`][self-timedimension] used in the rollup.
 
-It can be used together with `updateWindow` to define granular update settings.
-Set the `updateWindow` property to the interval in which your data can change
-and `buildRangeStart` to the earliest point of time when history should be
-available. For example if `updateWindow` is `1 week` and `buildRangeStart` is
-`SELECT NOW() - interval '365 day'` scheduled refresh will build historic
-partitions for 365 days in past and will refresh only one last week according to
-the `refreshKey` setting.
+<InfoBox>
 
-The refresh range for partitioned pre-aggregations can be controlled using
-`buildRangeStart` and `buildRangeEnd` properties:
+The SQL queries for the build range (as defined by the `sql` property) are
+executed based on the [`refreshKey`][self-refreshkey] settings of the
+pre-aggregation.
+
+</InfoBox>
 
 ```javascript
 cube(`Orders`, {
@@ -696,16 +695,51 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    categoryAndDate: {
+    main: {
       measures: [CUBE.count],
       timeDimension: CUBE.createdAt,
       granularity: `day`,
-      partitionGranularity: `month`,
       buildRangeStart: {
         sql: `SELECT NOW() - interval '300 day'`,
       },
       buildRangeEnd: {
         sql: `SELECT NOW()`,
+      },
+    },
+  },
+});
+```
+
+It can be used together with the pre-aggregation's `refreshKey` to define
+granular update settings. Set `refreshKey.updateWindow` to the interval in which
+your data can change and `buildRangeStart` to the earliest point of time when
+history should be available.
+
+In the following example, `refreshKey.updateWindow` is `1 week` and
+`buildRangeStart` is `SELECT NOW() - interval '365 day'`, so the scheduled
+refresh will build historical partitions for 365 days in the past and will only
+refresh last week's data.
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+
+  ...,
+
+  preAggregations: {
+    main: {
+      measures: [CUBE.count],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      partitionGranularity: `month`,
+      buildRangeStart: {
+        sql: `SELECT NOW() - interval '365 day'`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT NOW()`,
+      },
+      refreshKey: {
+        updateWindow: `1 week`,
       },
     },
   },
