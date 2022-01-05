@@ -346,7 +346,7 @@ export class RefreshScheduler {
         queriesCache[key] = this.refreshQueriesForPreAggregation(
           context, compilerApi, preAggregation, { ...queryingOptions, timezone }
         ).then(
-          ({ groupedPartitions }) => groupedPartitions[groupedPartitions.length - 1].map(partition => {
+          ({ groupedPartitions }) => (groupedPartitions[groupedPartitions.length - 1] || []).map(partition => {
             let cascadedPartitions: PreAggregationDescription[] = [];
             for (let j = 0; j < groupedPartitions.length - 1; j++) {
               cascadedPartitions = cascadedPartitions.concat(groupedPartitions[j]);

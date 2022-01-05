@@ -44,6 +44,19 @@ cube('Foo', {
         incremental: true
       }
     },
+    orphaned: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      scheduledRefresh: true,
+      refreshKey: {
+        every: '1 hour',
+        updateWindow: '1 day',
+        incremental: true
+      }
+    },
     second: {
       type: 'rollup',
       measureReferences: [total],
