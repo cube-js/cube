@@ -892,17 +892,20 @@ export class BaseQuery {
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
-    // TODO params independent sql caching
-    const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
     if (
-      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
-      parser.isSimpleAsteriskQuery()
+      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries
     ) {
-      const conditions = parser.extractWhereConditions(cubeAlias);
-      if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
-        this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+      // TODO params independent sql caching
+      const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
+      if (parser.isSimpleAsteriskQuery()) {
+        const conditions = parser.extractWhereConditions(cubeAlias);
+        if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
+          this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+        }
+        return [parser.extractTableFrom(), cubeAlias, conditions];
+      } else {
+        return [sql, cubeAlias];
       }
-      return [parser.extractTableFrom(), cubeAlias, conditions];
     } else {
       return [sql, cubeAlias];
     }
