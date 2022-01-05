@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.16](https://github.com/cube-js/cube.js/compare/v0.29.15...v0.29.16) (2022-01-05)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** OperationFailedError: SQL compilation error: invalid value [?] for parameter 'STATEMENT_TIMEOUT_IN_SECONDS' ([4a1503e](https://github.com/cube-js/cube.js/commit/4a1503e3b5fe5bdaa5a6af989c26b62a39d24058))
+* `refreshKey` is evaluated ten times more frequently if `sql` and `every` are simultaneously defined ([#3873](https://github.com/cube-js/cube.js/issues/3873)) ([c93ae12](https://github.com/cube-js/cube.js/commit/c93ae127b4d0ce2c214d3665f8d86f6ade5cce6f))
+
+
+
+
+
 ## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
 
 
