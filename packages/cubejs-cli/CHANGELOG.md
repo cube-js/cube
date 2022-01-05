@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.17](https://github.com/cube-js/cube.js/compare/v0.29.16...v0.29.17) (2022-01-05)
+
+
+### Bug Fixes
+
+* **cubejs-cli:** use `process.cwd()` in `typegen` to resolve current project's `node_modules/` ([daceca7](https://github.com/cube-js/cube.js/commit/daceca7bdcc1be3aa6d0f87fd3f27e9409cc4199))
+
+
+
+
+
 ## [0.29.16](https://github.com/cube-js/cube.js/compare/v0.29.15...v0.29.16) (2022-01-05)
 
 **Note:** Version bump only for package cubejs-cli
