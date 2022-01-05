@@ -22,6 +22,19 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     super(options);
   }
 
+  /**
+   * @param {string} schemaName
+   * @return {Promise<Array<unknown>>}
+   */
+   async createSchemaIfNotExists(schemaName: string) {
+    const schemaExistsQuery = `SELECT nspname FROM pg_namespace where nspname = ${this.param(0)}`;
+    const schemas = await this.query(schemaExistsQuery, [schemaName])
+    if (schemas.length === 0) {
+      return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
+    }
+    return null;
+  }
+
   protected getInitialConfiguration(): Partial<RedshiftDriverConfiguration> {
     return {
       // @todo It's not possible to support UNLOAD in readOnly mode, because we need column types (CREATE TABLE?)
