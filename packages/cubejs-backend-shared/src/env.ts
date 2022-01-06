@@ -8,7 +8,7 @@ export class InvalidConfiguration extends Error {
   }
 }
 
-export function convertTimeStrToMs(
+export function convertTimeStrToS(
   input: string,
   envName: string,
   description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
@@ -70,7 +70,7 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
     return false;
   }
 
-  return convertTimeStrToMs(
+  return convertTimeStrToS(
     input,
     envName,
     'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
@@ -128,18 +128,18 @@ const variables: Record<string, (...args: any) => any> = {
   dbPollTimeout: () => {
     const value = process.env.CUBEJS_DB_POLL_TIMEOUT;
     if (value) {
-      return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+      return convertTimeStrToS(value, 'CUBEJS_DB_POLL_TIMEOUT');
     } else {
       return null;
     }
   },
   dbQueryTimeout: () => {
     const value = process.env.CUBEJS_DB_QUERY_TIMEOUT || '10m';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_QUERY_TIMEOUT');
+    return convertTimeStrToS(value, 'CUBEJS_DB_QUERY_TIMEOUT');
   },
   dbPollMaxInterval: () => {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
+    return convertTimeStrToS(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
   // Common db options
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
@@ -341,6 +341,13 @@ const variables: Record<string, (...args: any) => any> = {
   batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
     .default(256 * 1024)
     .asInt(),
+  maxQueryCacheSize: () => get('CUBEJS_MAX_QUERY_CACHE_SIZE')
+    .default(10000)
+    .asInt(),
+  maxQueryCacheAge: () => {
+    const value = process.env.CUBEJS_MAX_QUERY_CACHE_AGE || '10m';
+    return convertTimeStrToS(value, 'CUBEJS_MAX_QUERY_CACHE_AGE');
+  },
 };
 
 type Vars = typeof variables;
