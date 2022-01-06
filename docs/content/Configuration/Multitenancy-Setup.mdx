@@ -29,7 +29,7 @@ organization, app, etc. By default, the
 [`securityContext`][ref-config-security-ctx] is defined by [Cube.js API
 Token][ref-security].
 
-There're several multitenancy setup scenarios that can be achieved by using
+There are several multitenancy setup scenarios that can be achieved by using
 combinations of these configuration options.
 
 ### <--{"id" : "Multitenancy"}--> Multitenancy vs Multiple Data Sources
@@ -156,11 +156,11 @@ database, then each e-commerce store should be modeled as a separate tenant.
 
 ```javascript
 const {
-  securityContext: { tenantId },
+  securityContext: { userId },
 } = COMPILE_CONTEXT;
 
 cube(`Products`, {
-  sql: `select * from ${tenantId}.products`,
+  sql: `select * from ${userId}.products`,
 });
 ```
 
@@ -201,31 +201,31 @@ Postgres host. The database name is `my_app_1_2`, where `1` is **Application
 ID** and `2` is **User ID**.
 
 To make it work with Cube.js, first we need to pass the `appId` and `userId` as
-context to every query. We should include that into our token generation code.
+context to every query. We should include them into our token generation code.
 
 ```javascript
 const jwt = require('jsonwebtoken');
 const CUBE_API_SECRET = 'secret';
 
-const cubejsToken = jwt.sign(
-  { appId: appId, userId: userId },
-  CUBE_API_SECRET,
-  { expiresIn: '30d' }
-);
+const cubejsToken = jwt.sign({ appId: '1', userId: '2' }, CUBE_API_SECRET, {
+  expiresIn: '30d',
+});
 ```
 
-Now, we can access them as [securityContext][ref-config-security-ctx] object
-inside the context object. Let's first use
-[contextToAppId][ref-config-ctx-to-appid] to create a dynamic Cube.js App ID for
-every combination of `appId` and `userId`.
+Now, we can access them through the [`securityContext`][ref-config-security-ctx]
+property inside the context object. Let's use
+[`contextToAppId`][ref-config-ctx-to-appid] and
+[`contextToOrchestratorId`][ref-config-ctx-to-orch-id] to create a dynamic
+Cube.js App ID and Orchestrator ID for every combination of `appId` and
+`userId`, then use [`driverFactory`][ref-config-driverfactory] to dynamically
+select database, again based on `appId` and `userId`:
 
 <WarningBox>
 
-Cube.js App ID (the result of [`contextToAppId`][ref-config-ctx-to-appid]) is
-used as a caching key for various in-memory structures like schema compilation
-results, connection pool, etc. A missing
-[`contextToAppId`][ref-config-ctx-to-appid] definition will result in unexpected
-caching issues such as schema of one tenant is used for another one.
+Cube.js App IDs and Orchestrator IDs are used as caching keys for various
+in-memory structures like schema compilation results, connection pool, etc.
+Missing definitions for either of the above can result in unexpected caching
+issues such as a schema of one tenant being used for another one.
 
 </WarningBox>
 
@@ -235,19 +235,7 @@ caching issues such as schema of one tenant is used for another one.
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
-};
-```
-
-Next, we can use [`driverFactory`][ref-config-driverfactory] to dynamically
-select database, based on `appId` and `userId`.
-
-**cube.js:**
-
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-module.exports = {
-  contextToAppId: ({ securityContext }) =>
+  contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
   driverFactory: ({ securityContext }) =>
     new PostgresDriver({
@@ -280,12 +268,14 @@ module.exports = {
 What if for application with ID 3, the data is stored not in Postgres, but in
 MongoDB?
 
-We can instruct Cube.js to connect to MongoDB in that case, instead of Postgres.
-For that purpose we'll use [`dbType`][ref-config-dbtype] option to dynamically
-set database type. We also need to modify our
-[`driverFactory`][ref-config-driverfactory] option. You should also use
+We can instruct Cube to connect to MongoDB in that case, instead of Postgres. To
+do this, we'll use the [`dbType`][ref-config-dbtype] option to dynamically set
+database type. We will also need to modify our
+[`driverFactory`][ref-config-driverfactory] as well as use
 [`securityContext`][ref-config-security-ctx] to determine which tenant is
-requesting data.
+requesting data. Finally, we want to have separate data schemas for every
+application. We can use the [`repositoryFactory`][ref-config-repofactory] option
+to dynamically set a repository with schema files depending on the `appId`:
 
 **cube.js:**
 
@@ -296,43 +286,7 @@ const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
-  dbType: ({ securityContext }) => {
-    if (securityContext.appId === 3) {
-      return 'mongobi';
-    } else {
-      return 'postgres';
-    }
-  },
-  driverFactory: ({ securityContext }) => {
-    if (securityContext.appId === 3) {
-      return new MongoBIDriver({
-        database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-        port: 3307,
-      });
-    } else {
-      return new PostgresDriver({
-        database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-      });
-    }
-  },
-};
-```
-
-Lastly, we want to have separate data schemas for every application. In this
-case we can use the `repositoryFactory` option to dynamically set a repository
-with schema files depending on the `appId`.
-
-Below you can find the final setup with `repositoryFactory`:
-
-**cube.js:**
-
-```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
-const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
-
-module.exports = {
-  contextToAppId: ({ securityContext }) =>
+  contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
   dbType: ({ securityContext }) => {
     if (securityContext.appId === 3) {
@@ -412,6 +366,7 @@ number of Redis connections **per-tenant**.
 [ref-config-opts]: /config#options-reference
 [ref-config-dbtype]: /config#db-type
 [ref-config-driverfactory]: /config#driver-factory
+[ref-config-repofactory]: /config#repository-factory
 [ref-config-preagg-schema]: /config#pre-aggregations-schema
 [ref-config-ctx-to-appid]: /config#context-to-app-id
 [ref-config-ctx-to-orch-id]: /config#context-to-orchestrator-id
