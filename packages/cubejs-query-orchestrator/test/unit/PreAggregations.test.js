@@ -176,6 +176,7 @@ describe('PreAggregations', () => {
     test('refresh external preaggregation with a writable source (refreshImplTempTableExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastRefreshTimestamp).toEqual(1593709044209);
     });
   });
 
@@ -202,6 +203,7 @@ describe('PreAggregations', () => {
     test('refresh external preaggregation with a writable source (refreshImplStreamExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastRefreshTimestamp).toEqual(1593709044209);
     });
   });
 
@@ -265,6 +267,7 @@ describe('PreAggregations', () => {
     test('load external preaggregation without communicating to the source database', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastRefreshTimestamp).toEqual(1593709044209);
     });
   });
 
@@ -316,6 +319,7 @@ describe('PreAggregations', () => {
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/);
+      expect(result[0][1].lastRefreshTimestamp).toEqual(1600329890000);
     });
   });
 
@@ -347,6 +351,7 @@ describe('PreAggregations', () => {
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/);
+      expect(result[0][1].lastRefreshTimestamp).toEqual(1893709044209);
     });
   });
 });
