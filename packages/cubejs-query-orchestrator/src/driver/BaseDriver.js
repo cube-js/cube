@@ -187,7 +187,7 @@ export class BaseDriver {
    * @param {any} [options]
    * @return {Promise<Array<any>>}
    */
-  async query(queryUnused, valuesUnused, optionsUnused) {
+  async query(queryUnused, valuesUnused, optionsUnused = {}) {
     throw new Error('Not implemented');
   }
 
