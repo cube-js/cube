@@ -263,9 +263,10 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+    const tables = await this.getTablesQuery(preAggregation)
     let versionEntries = tablesToVersionEntries(
       preAggregation.preAggregationsSchema,
-      await this.getTablesQuery(preAggregation)
+      tables
     );
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
@@ -370,7 +371,7 @@ class PreAggregationLoadCache {
 type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[]
-} | string;
+};
 
 export class PreAggregationLoader {
   // eslint-disable-next-line no-use-before-define
@@ -459,7 +460,10 @@ export class PreAggregationLoader {
 
         // the rollups are being maintained independently of this instance of cube.js,
         // immediately return the latest data it already has
-        return this.targetTableName(versionEntryByStructureVersion);
+        return {
+          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          refreshKeyValues: []
+        };
       }
 
       if (versionEntryByStructureVersion) {
@@ -474,10 +478,16 @@ export class PreAggregationLoader {
             });
           }
         });
-        return this.targetTableName(versionEntryByStructureVersion);
+        return {
+          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          refreshKeyValues: []
+        };
       } else {
         // no rollup has been built yet - build it synchronously as part of responding to this request
-        return this.loadPreAggregationWithKeys();
+        return {
+          targetTableName: await this.loadPreAggregationWithKeys(),
+          refreshKeyValues: []
+        };
       }
     } else {
       // either we have no data cached for this rollup or waitForRenew is true, either way,
@@ -489,7 +499,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected async loadPreAggregationWithKeys() {
+  protected async loadPreAggregationWithKeys(): Promise<string> {
     const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
@@ -657,7 +667,7 @@ export class PreAggregationLoader {
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
-  protected targetTableName(versionEntry) {
+  protected targetTableName(versionEntry): string {
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
@@ -1594,7 +1604,7 @@ export class PreAggregations {
     return preAggregation.tableName;
   }
 
-  public static targetTableName(versionEntry) {
+  public static targetTableName(versionEntry): string {
     if (versionEntry.naming_version === 2) {
       return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
