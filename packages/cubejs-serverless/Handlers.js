@@ -32,7 +32,7 @@ const processHandlers = {
 
 class Handlers {
   constructor(options) {
-    options = {
+    const compiledOptions = {
       ...options,
       serverless: true,
       orchestratorOptions: (context) => ({
@@ -75,7 +75,7 @@ class Handlers {
         }
       })
     };
-    this.serverCore = new CubejsServerCore(options);
+    this.serverCore = new CubejsServerCore(compiledOptions);
   }
 
   // eslint-disable-next-line no-unused-vars
