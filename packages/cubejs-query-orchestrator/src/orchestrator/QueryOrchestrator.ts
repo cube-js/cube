@@ -107,10 +107,13 @@ export class QueryOrchestrator {
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
+    const lastRefreshTimestamp = Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt));
+    const lastRefreshTime = lastRefreshTimestamp && new Date(lastRefreshTimestamp);
 
     if (!queryBody.query) {
       return {
-        usedPreAggregations
+        usedPreAggregations,
+        lastRefreshTime
       };
     }
 
@@ -123,7 +126,8 @@ export class QueryOrchestrator {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
-      usedPreAggregations
+      usedPreAggregations,
+      lastRefreshTime
     };
   }
 

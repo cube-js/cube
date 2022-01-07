@@ -2,12 +2,13 @@
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport } = {}) {
+  constructor({ csvImport, now } = {}) {
     this.tables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
+    this.nowTimestamp = now ?? new Date().getTime();
   }
 
   query(query) {
@@ -82,6 +83,10 @@ class MockDriver {
   async tableColumnTypes() {
     return [{ name: 'foo', type: 'int' }];
   }
+
+  now() {
+    return this.nowTimestamp;
+  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -123,7 +128,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
 
   beforeEach(() => {
-    const mockDriverLocal = new MockDriver();
+    const mockDriverLocal = new MockDriver({ now: 12345000 });
     const fooMockDriverLocal = new MockDriver();
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
@@ -183,6 +188,7 @@ describe('QueryOrchestrator', () => {
     const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
+    expect(result.lastRefreshTime.getTime()).toEqual(12345000);
   });
 
   test('indexes', async () => {

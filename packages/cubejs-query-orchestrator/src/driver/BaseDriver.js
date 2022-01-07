@@ -422,4 +422,8 @@ export class BaseDriver {
   capabilities() {
     return {};
   }
+
+  now() {
+    return new Date().getTime();
+  }
 }

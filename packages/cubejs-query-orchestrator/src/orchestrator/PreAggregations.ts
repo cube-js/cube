@@ -370,7 +370,7 @@ class PreAggregationLoadCache {
 type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
-  lastRefreshTimestamp: number;
+  lastUpdatedAt: number;
 };
 
 export class PreAggregationLoader {
@@ -463,7 +463,7 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastRefreshTimestamp: versionEntryByStructureVersion.last_updated_at
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
         };
       }
 
@@ -482,7 +482,7 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastRefreshTimestamp: versionEntryByStructureVersion.last_updated_at
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
         };
       } else {
         // no rollup has been built yet - build it synchronously as part of responding to this request
@@ -513,7 +513,7 @@ export class PreAggregationLoader {
       return {
         targetTableName: this.targetTableName(versionEntryByContentVersion),
         refreshKeyValues: [],
-        lastRefreshTimestamp: versionEntryByContentVersion.last_updated_at
+        lastUpdatedAt: versionEntryByContentVersion.last_updated_at
       };
     }
 
@@ -528,17 +528,19 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastRefreshTimestamp: versionEntryByContentVersion.last_updated_at
+          lastUpdatedAt: versionEntryByContentVersion.last_updated_at
         };
       }
     }
 
+    const client = this.preAggregation.external ?
+      await this.externalDriverFactory() :
+      await this.driverFactory();
+
     if (!versionEntries.versionEntries.length) {
-      const client = this.preAggregation.external ?
-        await this.externalDriverFactory() :
-        await this.driverFactory();
       await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     }
+
     // ensure we find appropriate structure version before invalidating anything
     const versionEntry =
       versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`] ||
@@ -548,7 +550,7 @@ export class PreAggregationLoader {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: new Date().getTime(),
+      last_updated_at: client.now(),
       naming_version: 2,
     };
 
@@ -563,7 +565,7 @@ export class PreAggregationLoader {
       return {
         targetTableName: this.targetTableName(lastVersion),
         refreshKeyValues: [],
-        lastRefreshTimestamp: lastVersion.last_updated_at
+        lastUpdatedAt: lastVersion.last_updated_at
       };
     };
 
@@ -616,7 +618,7 @@ export class PreAggregationLoader {
     return {
       targetTableName: this.targetTableName(versionEntry),
       refreshKeyValues: [],
-      lastRefreshTimestamp: versionEntry.last_updated_at
+      lastUpdatedAt: versionEntry.last_updated_at
     };
   }
 
@@ -1201,7 +1203,7 @@ export class PreAggregationPartitionRangeLoader {
       return {
         targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
-        lastRefreshTimestamp: Math.min(...loadResults.map(r => r.lastRefreshTimestamp)),
+        lastUpdatedAt: Math.min(...loadResults.map(r => r.lastUpdatedAt)),
       };
     } else {
       return new PreAggregationLoader(
