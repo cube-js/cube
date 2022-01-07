@@ -44,15 +44,15 @@ class MockDriver {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  async tableColumnTypes(table) {
+  async tableColumnTypes(tableUnused) {
     return [];
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTable(table, columns, tableDataUnused) {
     await this.createTable(table, columns);
   }
 
-  createTable(quotedTableName, columns) {
+  createTable(quotedTableName, columnsUnused) {
     this.tables.push(quotedTableName);
   }
 

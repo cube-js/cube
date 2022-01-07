@@ -187,7 +187,7 @@ export class BaseDriver {
    * @param {any} [options]
    * @return {Promise<Array<any>>}
    */
-  async query(query, values, options) {
+  async query(queryUnused, valuesUnused, optionsUnused) {
     throw new Error('Not implemented');
   }
 
@@ -195,7 +195,7 @@ export class BaseDriver {
    * @public
    * @return {Promise<any>}
    */
-  async downloadQueryResults(query, values, options) {
+  async downloadQueryResults(query, values, optionsUnused) {
     const rows = await this.query(query, values);
     if (rows.length === 0) {
       throw new Error(
@@ -286,7 +286,7 @@ export class BaseDriver {
    * @param {number} paramIndex
    * @return {string}
    */
-  param(paramIndex) {
+  param(paramIndexUnused) {
     return '?';
   }
 
@@ -330,7 +330,7 @@ export class BaseDriver {
   }
 
   // eslint-disable-next-line no-unused-vars
-  toColumnValue(value, genericType) {
+  toColumnValue(value, genericTypeUnused) {
     return value;
   }
 
