@@ -104,7 +104,7 @@ describe('PreAggregations', () => {
   basicQueryExternalWithRenew.renewQuery = true;
 
   beforeEach(() => {
-    mockDriver = new MockDriver({now: 12345000});
+    mockDriver = new MockDriver({ now: 12345000 });
     mockExternalDriver = new MockDriver();
     mockDriverFactory = async () => mockDriver;
     mockDriverReadOnlyFactory = async () => {
