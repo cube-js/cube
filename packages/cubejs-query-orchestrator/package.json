@@ -18,8 +18,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --coverage --verbose dist/test/unit",
-    "integration": "npm run integration:redis dist/test/integration",
+    "unit": "jest --runInBand --coverage --verbose test/unit",
+    "integration": "npm run integration:redis",
     "integration:redis": "jest --runInBand --verbose dist/test/integration",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
@@ -41,8 +41,6 @@
     "redis": "^3.0.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.16.7",
-    "@babel/preset-env": "^7.16.7",
     "@cubejs-backend/linter": "^0.29.0",
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.19.3",
