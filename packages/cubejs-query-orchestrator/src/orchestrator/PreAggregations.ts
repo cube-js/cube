@@ -1193,14 +1193,14 @@ export class PreAggregationPartitionRangeLoader {
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults
         .map(
-          targetTableName => (typeof targetTableName === 'string' ? targetTableName : targetTableName.targetTableName)
+          targetTableName => targetTableName.targetTableName
         );
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}`)
         .join(' UNION ALL ');
       return {
         targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
-        refreshKeyValues: loadResults.map(t => (typeof t === 'object' ? t.refreshKeyValues : {})),
+        refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
         lastRefreshTimestamp: Math.min(...loadResults.map(r => r.lastRefreshTimestamp)),
       };
     } else {
