@@ -128,7 +128,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
 
   beforeEach(() => {
-    const mockDriverLocal = new MockDriver({ now: 12345000 });
+    const mockDriverLocal = new MockDriver({ now: 1650000000000 });
     const fooMockDriverLocal = new MockDriver();
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
@@ -188,7 +188,7 @@ describe('QueryOrchestrator', () => {
     const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
-    expect(result.lastRefreshTime.getTime()).toEqual(12345000);
+    expect(result.lastRefreshTime.getTime()).toEqual(1650000000000);
   });
 
   test('indexes', async () => {

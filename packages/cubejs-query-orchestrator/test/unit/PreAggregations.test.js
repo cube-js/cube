@@ -3,10 +3,11 @@
 import R from 'ramda';
 
 class MockDriver {
-  constructor() {
+  constructor({ now } = {}) {
     this.tables = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.nowTimestamp = now ?? new Date().getTime();
   }
 
   query(query) {
@@ -59,6 +60,10 @@ class MockDriver {
   readOnly() {
     return false;
   }
+
+  now() {
+    return this.nowTimestamp;
+  }
 }
 
 describe('PreAggregations', () => {
@@ -99,7 +104,7 @@ describe('PreAggregations', () => {
   basicQueryExternalWithRenew.renewQuery = true;
 
   beforeEach(() => {
-    mockDriver = new MockDriver();
+    mockDriver = new MockDriver({now: 12345000});
     mockExternalDriver = new MockDriver();
     mockDriverFactory = async () => mockDriver;
     mockDriverReadOnlyFactory = async () => {
@@ -150,6 +155,7 @@ describe('PreAggregations', () => {
     test('syncronously create rollup from scratch', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(12345000);
     });
   });
 
