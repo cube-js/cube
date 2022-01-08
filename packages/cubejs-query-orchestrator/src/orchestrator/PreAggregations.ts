@@ -550,7 +550,7 @@ export class PreAggregationLoader {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: client.now(),
+      last_updated_at: client.now?.() ?? new Date().getTime(),
       naming_version: 2,
     };
 
