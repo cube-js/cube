@@ -44,12 +44,13 @@ module.exports = {
     '@typescript-eslint/no-empty-function': 'error',
     'no-extra-semi': 'off',
     '@typescript-eslint/no-extra-semi': 'error',
+    'no-underscore-dangle': 'off',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': [
       'warn',
       {
-        argsIgnorePattern: '^.+Unused',
-        varsIgnorePattern: '^.+Unused',
+        argsIgnorePattern: '^_.+',
+        varsIgnorePattern: '^_.+',
       },
     ],
     // '@typescript-eslint/no-var-requires': 'error',
