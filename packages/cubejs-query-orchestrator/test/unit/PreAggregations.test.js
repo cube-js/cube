@@ -7,7 +7,7 @@ class MockDriver {
     this.tables = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
-    this.nowTimestamp = now ?? new Date().getTime();
+    this.now = now ?? new Date().getTime();
   }
 
   query(query) {
@@ -61,8 +61,8 @@ class MockDriver {
     return false;
   }
 
-  now() {
-    return this.nowTimestamp;
+  nowTimestamp() {
+    return this.now;
   }
 }
 

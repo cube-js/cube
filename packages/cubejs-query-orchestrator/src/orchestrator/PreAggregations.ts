@@ -61,6 +61,12 @@ function version(cacheKey) {
   return result;
 }
 
+// There’re community developed and custom drivers which not always up-to-date with latest BaseDriver.
+// Extra defence for drivers that don't expose now() yet.
+function nowTimestamp(client: BaseDriver) {
+  return client.nowTimestamp?.() ?? new Date().getTime();
+}
+
 function getStructureVersion(preAggregation) {
   return version(
     preAggregation.indexesSql && preAggregation.indexesSql.length ?
@@ -550,7 +556,7 @@ export class PreAggregationLoader {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: client.now?.() ?? new Date().getTime(),
+      last_updated_at: nowTimestamp(client),
       naming_version: 2,
     };
 

@@ -8,7 +8,7 @@ class MockDriver {
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
-    this.nowTimestamp = now ?? new Date().getTime();
+    this.now = now ?? new Date().getTime();
   }
 
   query(query) {
@@ -84,8 +84,8 @@ class MockDriver {
     return [{ name: 'foo', type: 'int' }];
   }
 
-  now() {
-    return this.nowTimestamp;
+  nowTimestamp() {
+    return this.now;
   }
 }
 

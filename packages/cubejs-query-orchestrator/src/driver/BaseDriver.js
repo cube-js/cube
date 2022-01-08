@@ -423,7 +423,7 @@ export class BaseDriver {
     return {};
   }
 
-  now() {
+  nowTimestamp() {
     return new Date().getTime();
   }
 }
