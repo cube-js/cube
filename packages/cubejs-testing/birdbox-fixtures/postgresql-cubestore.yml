@@ -49,7 +49,7 @@ services:
 
   cubestore:
     container_name: birdbox-cubestore
-    image: cubejs/cubestore:${BIRDBOX_CUBESTORE_VERSION:-edge}
+    image: cubejs/cubestore:${BIRDBOX_CUBESTORE_VERSION:-latest}
 # Possible workaround for next version of testcontainers
 #    environment:
 #      # Workaround for Error during processing MySQL connection: peer terminated connection
