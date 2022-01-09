@@ -29,5 +29,8 @@
     "@cubejs-backend/sqlite-driver": "^0.29.18",
     "cubejs-cli": "^0.29.18",
     "typescript": "~4.1.5"
+  },
+  "resolutions": {
+    "colors": "1.4.0"
   }
 }
