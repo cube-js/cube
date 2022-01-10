@@ -87,10 +87,10 @@ describe('CubeStoreHandler', () => {
       const startedProcess = fork('./dist/test/process-test-fork', {
         stdio: 'pipe'
       });
-      startedProcess.stdout.on('data', (std) => {
+      startedProcess.stdout?.on('data', (std) => {
         console.log(std.toString());
       });
-      startedProcess.stderr.on('data', (std) => {
+      startedProcess.stderr?.on('data', (std) => {
         console.log(std.toString());
       });
 
@@ -114,10 +114,10 @@ describe('CubeStoreHandler', () => {
       const startedProcess = fork('./dist/test/process-test-fork', {
         stdio: 'pipe'
       });
-      startedProcess.stdout.on('data', (std) => {
+      startedProcess.stdout?.on('data', (std) => {
         console.log(std.toString());
       });
-      startedProcess.stderr.on('data', (std) => {
+      startedProcess.stderr?.on('data', (std) => {
         console.log(std.toString());
       });
 
