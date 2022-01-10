@@ -1287,7 +1287,7 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                     compile_select_expr(expr, ctx, &mut builder, None)?
                 }
                 ast::SelectItem::ExprWithAlias { expr, alias } => {
-                    compile_select_expr(expr, ctx, &mut builder, Some(alias.to_string()))?
+                    compile_select_expr(expr, ctx, &mut builder, Some(alias.value.to_string()))?
                 }
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
@@ -2007,136 +2007,148 @@ mod tests {
     }
 
     #[test]
-    fn test_order_alias_for_dimension_default() {
-        let query = convert_simple_select(
-            "SELECT taxful_total_price as total_price FROM KibanaSampleDataEcommerce ORDER BY total_price"
-                .to_string(),
-        );
+    fn test_order_by() {
+        let supported_orders = vec![
+            // test_order_alias_for_dimension_default
+            (
+                "SELECT taxful_total_price as total_price FROM KibanaSampleDataEcommerce ORDER BY total_price".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "asc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_indentifier_default
+            (
+                "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "asc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_compound_identifier_default
+            (
+                "SELECT taxful_total_price FROM `KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "asc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_indentifier_asc
+            (
+                "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price ASC".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "asc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_indentifier_desc
+            (
+                "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price DESC".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "desc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_identifer_alias_ident_no_escape
+            (
+                "SELECT taxful_total_price as alias1 FROM KibanaSampleDataEcommerce ORDER BY alias1 DESC".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "desc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            // test_order_identifer_alias_ident_escape
+            (
+                "SELECT taxful_total_price as `alias1` FROM KibanaSampleDataEcommerce ORDER BY `alias1` DESC".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "desc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+        ];
 
-        assert_eq!(
-            query.request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                ]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: None
-            }
-        )
-    }
+        for (sql, expected_request) in supported_orders.iter() {
+            let query = convert_simple_select(sql.to_string());
 
-    #[test]
-    fn test_order_indentifier_default() {
-        let query = convert_simple_select(
-            "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price"
-                .to_string(),
-        );
-
-        assert_eq!(
-            query.request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                ]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: None
-            }
-        )
-    }
-
-    #[test]
-    fn test_order_compound_identifier_default() {
-        let query = convert_simple_select(
-            "SELECT taxful_total_price FROM `KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`"
-                .to_string(),
-        );
-
-        assert_eq!(
-            query.request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                ]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: None
-            }
-        )
-    }
-
-    #[test]
-    fn test_order_indentifier_asc() {
-        let query = convert_simple_select(
-            "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price ASC".to_string(),
-        );
-
-        assert_eq!(
-            query.request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                ]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: None
-            }
-        )
-    }
-
-    #[test]
-    fn test_order_indentifier_desc() {
-        let query = convert_simple_select(
-            "SELECT taxful_total_price FROM KibanaSampleDataEcommerce ORDER BY taxful_total_price DESC".to_string(),
-        );
-
-        assert_eq!(
-            query.request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                ]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "desc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: None
-            }
-        )
+            assert_eq!(&query.request, expected_request)
+        }
     }
 
     #[test]
