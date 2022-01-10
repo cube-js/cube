@@ -360,7 +360,7 @@ export class ServerContainer {
       let shutdownHandler: Promise<0 | 1> | null = null;
       let killSignalCount = 0;
 
-      const signalToShutdown = [
+      const signalToShutdown: NodeJS.Signals[] = [
         // Signal Terminate - graceful shutdown in Unix systems
         'SIGTERM',
         // Ctrl+C
