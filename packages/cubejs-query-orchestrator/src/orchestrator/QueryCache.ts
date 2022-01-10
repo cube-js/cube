@@ -9,7 +9,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
-import {PreAggregationDescription, PreAggregations} from './PreAggregations';
+import { PreAggregationDescription, PreAggregations } from './PreAggregations';
 
 type QueryOptions = {
   external?: boolean;

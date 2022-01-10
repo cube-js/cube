@@ -1643,10 +1643,10 @@ export class PreAggregations {
 
   public static getLastRefreshTime(preAggregationsTablesToTempTables) {
     if (preAggregationsTablesToTempTables.length === 0) {
-      return undefined
+      return undefined;
     } else {
-      const lastRefreshTimestamp = Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt))
-      return new Date(lastRefreshTimestamp)
+      const lastRefreshTimestamp = Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt));
+      return new Date(lastRefreshTimestamp);
     }
   }
 
