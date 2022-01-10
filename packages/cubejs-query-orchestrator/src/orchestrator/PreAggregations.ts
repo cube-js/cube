@@ -1641,6 +1641,15 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
+  public static getLastRefreshTime(preAggregationsTablesToTempTables) {
+    if (preAggregationsTablesToTempTables.length === 0) {
+      return undefined
+    } else {
+      const lastRefreshTimestamp = Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt))
+      return new Date(lastRefreshTimestamp)
+    }
+  }
+
   public async getVersionEntries(preAggregations: PreAggregationDescription[], requestId): Promise<VersionEntry[][]> {
     const loadCacheByDataSource = {};
 

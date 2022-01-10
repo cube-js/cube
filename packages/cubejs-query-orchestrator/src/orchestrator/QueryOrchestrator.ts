@@ -107,35 +107,26 @@ export class QueryOrchestrator {
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
-    const lastRefreshTimestamp = preAggregationsTablesToTempTables.length > 0
-      ? Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt))
-      : undefined;
-    const lastRefreshTime = lastRefreshTimestamp && new Date(lastRefreshTimestamp);
 
     if (!queryBody.query) {
+      const lastRefreshTime = PreAggregations.getLastRefreshTime(preAggregationsTablesToTempTables);
       return {
         usedPreAggregations,
-        lastRefreshTime
+        lastRefreshTime,
       };
     }
 
-    const cachedResult = await this.queryCache.cachedQueryResult(
+    const result = await this.queryCache.cachedQueryResult(
       queryBody,
       preAggregationsTablesToTempTables
     );
 
-    const result = {
-      ...cachedResult,
+    return {
+      ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
       usedPreAggregations
     };
-
-    if (result.lastRefreshTime === undefined) {
-      result.lastRefreshTime = lastRefreshTime;
-    }
-
-    return result;
   }
 
   public async loadRefreshKeys(query) {

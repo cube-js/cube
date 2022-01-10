@@ -188,7 +188,6 @@ describe('QueryOrchestrator', () => {
     const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
-    expect(result.lastRefreshTime.getTime()).toEqual(1641836979651);
   });
 
   test('indexes', async () => {

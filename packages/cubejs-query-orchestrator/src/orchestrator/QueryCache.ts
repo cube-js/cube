@@ -9,7 +9,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
-import { PreAggregationDescription } from './PreAggregations';
+import {PreAggregationDescription, PreAggregations} from './PreAggregations';
 
 type QueryOptions = {
   external?: boolean;
@@ -91,13 +91,17 @@ export class QueryCache {
     const expireSecs = this.getExpireSecs(queryBody);
 
     if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
+      const data = await this.queryWithRetryAndRelease(query, values, {
+        cacheKey: [query, values],
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource
+      });
+      const lastRefreshTime = PreAggregations.getLastRefreshTime(preAggregationsTablesToTempTables);
+
       return {
-        data: await this.queryWithRetryAndRelease(query, values, {
-          cacheKey: [query, values],
-          external: queryBody.external,
-          requestId: queryBody.requestId,
-          dataSource: queryBody.dataSource
-        })
+        data,
+        lastRefreshTime
       };
     }
 
