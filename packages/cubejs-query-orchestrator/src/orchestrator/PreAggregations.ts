@@ -1641,12 +1641,11 @@ export class PreAggregations {
     return getStructureVersion(preAggregation);
   }
 
-  public static getLastRefreshTime(preAggregationsTablesToTempTables) {
-    if (preAggregationsTablesToTempTables.length === 0) {
+  public static getLastRefreshTime(times: Date[]): Date | undefined {
+    if (times.length === 0) {
       return undefined;
     } else {
-      const lastRefreshTimestamp = Math.min(...preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt));
-      return new Date(lastRefreshTimestamp);
+      return new Date(Math.min(...times.map(t => t.getTime())));
     }
   }
 

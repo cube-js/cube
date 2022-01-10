@@ -108,11 +108,12 @@ export class QueryOrchestrator {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
+    const paLastRefreshTime = PreAggregations.getLastRefreshTime(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
+
     if (!queryBody.query) {
-      const lastRefreshTime = PreAggregations.getLastRefreshTime(preAggregationsTablesToTempTables);
       return {
         usedPreAggregations,
-        lastRefreshTime,
+        lastRefreshTime: paLastRefreshTime,
       };
     }
 
@@ -121,11 +122,16 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
+    const lastRefreshTime = PreAggregations.getLastRefreshTime(
+      [paLastRefreshTime, result.lastRefreshTime].filter(t => t !== undefined)
+    );
+
     return {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
-      usedPreAggregations
+      usedPreAggregations,
+      lastRefreshTime
     };
   }
 
