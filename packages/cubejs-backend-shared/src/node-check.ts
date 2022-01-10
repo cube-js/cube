@@ -17,7 +17,7 @@ if (major < 12 || major === 15) {
   process.exit(1);
 }
 
-if (major === 10) {
+if (major === 12) {
   process.emitWarning(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
