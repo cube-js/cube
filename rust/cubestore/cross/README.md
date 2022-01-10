@@ -17,11 +17,13 @@ Keep in mind:
 - Try to use one OS for all images (`debian`) for unix*
 
 ```sh
-export CROSS_VERSION=10052021
+# dmY
+export CROSS_VERSION=10012022
 
-#docker build -t cubejs/rust-cross:x86_64-apple-darwin-$CROSS_VERSION -f x86_64-apple-darwin.Dockerfile .
-docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-pc-windows-msvc-$CROSS_VERSION -f x86_64-pc-windows-msvc.Dockerfile .
-docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-pc-windows-gnu-$CROSS_VERSION -f x86_64-pc-windows-gnu.Dockerfile .
+# docker build -t cubejs/rust-cross:x86_64-apple-darwin-$CROSS_VERSION -f x86_64-apple-darwin.Dockerfile .
+# docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-pc-windows-gnu-$CROSS_VERSION -f x86_64-pc-windows-gnu.Dockerfile .
+# docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-pc-windows-msvc-$CROSS_VERSION -f x86_64-pc-windows-msvc.Dockerfile .
+
 docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION -f x86_64-unknown-linux-gnu-stretch.Dockerfile .
 docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION -f x86_64-unknown-linux-musl.Dockerfile .
 docker buildx build --platform linux/amd64 -t cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION -f aarch64-unknown-linux-gnu.Dockerfile .
@@ -30,8 +32,8 @@ docker buildx build --platform linux/amd64 -t cubejs/rust-cross:aarch64-unknown-
 docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION -f x86_64-unknown-linux-gnu-buster.Dockerfile .
 
 #docker push cubejs/rust-cross:x86_64-apple-darwin
-docker push cubejs/rust-cross:x86_64-pc-windows-msvc-$CROSS_VERSION
-docker push cubejs/rust-cross:x86_64-pc-windows-gnu-$CROSS_VERSION
+#docker push cubejs/rust-cross:x86_64-pc-windows-gnu-$CROSS_VERSION
+#docker push cubejs/rust-cross:x86_64-pc-windows-msvc-$CROSS_VERSION
 docker push cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION
 docker push cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION
 docker push cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION

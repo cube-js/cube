@@ -2,22 +2,22 @@
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.aarch64-unknown-linux-gnu
 FROM rustembedded/cross:aarch64-unknown-linux-gnu
 
-RUN apt-get update
-RUN apt-get install --assume-yes -y wget make git automake autoconf ca-certificates libc6-arm64-cross libc6-dev-arm64-cross apt-transport-https ca-certificates
-RUN echo 'deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main' >> /etc/apt/sources.list
-RUN curl -k -JL http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add - && apt-get update    
-RUN apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make;
-RUN apt-get install -y libc6
-RUN apt-get install -y gcc-multilib
-RUN apt-get install -y gcc-aarch64-linux-gnu
-RUN apt-get install -y g++-aarch64-linux-gnu
+RUN apt-get update \
+    && apt-get -y upgrade \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget apt-transport-https ca-certificates \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    && add-apt-repository "deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main"  \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-9 100
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-9 100
 RUN update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-9 100
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1j
+ARG OPENSSL_VERSION=1.1.1l
 
 ENV MACHINE=armv8
 ENV ARCH=arm
