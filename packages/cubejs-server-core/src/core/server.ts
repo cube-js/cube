@@ -43,7 +43,8 @@ import type {
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
-const { version } = require('../../../package.json');
+// const { version } = require('../../../package.json');
+import { version } from '../../package.json';
 
 export type ServerCoreInitializedOptions = Required<
   CreateOptions,
