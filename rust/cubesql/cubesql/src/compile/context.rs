@@ -35,29 +35,29 @@ impl QueryContext {
 
     pub fn find_selection_for_identifier(
         &self,
-        column_name: &String,
+        identifier: &String,
         check_alias: bool,
     ) -> Option<Selection> {
         for dimension in self.meta.dimensions.iter() {
-            if dimension.get_real_name().eq(column_name) {
+            if dimension.get_real_name().eq(identifier) {
                 return Some(Selection::Dimension(dimension.clone()));
             }
         }
 
         for measure in self.meta.measures.iter() {
-            if measure.get_real_name().eq(column_name) {
+            if measure.get_real_name().eq(identifier) {
                 return Some(Selection::Measure(measure.clone()));
             }
         }
 
         for segment in self.meta.segments.iter() {
-            if segment.get_real_name().eq(column_name) {
+            if segment.get_real_name().eq(identifier) {
                 return Some(Selection::Segment(segment.clone()));
             }
         }
 
         if check_alias {
-            if let Some(r) = self.aliases.get(column_name) {
+            if let Some(r) = self.aliases.get(identifier) {
                 // @todo Resolve without match!
                 match r {
                     Selection::Dimension(d) => Some(Selection::Dimension(d.clone())),
