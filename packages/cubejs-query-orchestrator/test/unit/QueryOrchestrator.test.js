@@ -2,13 +2,12 @@
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport, now } = {}) {
+  constructor({ csvImport } = {}) {
     this.tables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
-    this.now = now ?? new Date().getTime();
   }
 
   query(query) {
@@ -83,10 +82,6 @@ class MockDriver {
   async tableColumnTypes() {
     return [{ name: 'foo', type: 'int' }];
   }
-
-  nowTimestamp() {
-    return this.now;
-  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -128,7 +123,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
 
   beforeEach(() => {
-    const mockDriverLocal = new MockDriver({ now: 1650000000000 });
+    const mockDriverLocal = new MockDriver();
     const fooMockDriverLocal = new MockDriver();
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
