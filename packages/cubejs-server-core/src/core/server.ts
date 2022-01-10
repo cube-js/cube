@@ -339,6 +339,12 @@ export class CubejsServerCore {
       );
     }
 
+    if (devServer && externalDbType !== 'cubestore') {
+      displayCLIWarning(
+        `Using ${externalDbType} as an external database is deprecated. Please use Cube Store instead: https://cube.dev/docs/caching/running-in-production`
+      );
+    }
+
     if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
