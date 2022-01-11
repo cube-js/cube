@@ -63,7 +63,7 @@ function version(cacheKey) {
 
 // There’re community developed and custom drivers which not always up-to-date with latest BaseDriver.
 // Extra defence for drivers that don't expose now() yet.
-function nowTimestamp(client: BaseDriver) {
+function nowTimestamp(client: DriverInterface) {
   return client.nowTimestamp?.() ?? new Date().getTime();
 }
 
@@ -1031,7 +1031,7 @@ export class PreAggregationLoader {
         VersionEntry[]
         >(
           R.filter(
-            (v: VersionEntry) => client.nowTimestamp() - v.last_updated_at < this.structureVersionPersistTime * 1000
+            (v: VersionEntry) => nowTimestamp(client) - v.last_updated_at < this.structureVersionPersistTime * 1000
           ),
           R.groupBy(v => `${v.table_name}_${v.structure_version}`),
           R.toPairs,
