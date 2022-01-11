@@ -63,8 +63,8 @@ function version(cacheKey) {
 
 // There’re community developed and custom drivers which not always up-to-date with latest BaseDriver.
 // Extra defence for drivers that don't expose now() yet.
-function nowTimestamp(client: DriverInterface | undefined) {
-  return client?.nowTimestamp?.() ?? new Date().getTime();
+function nowTimestamp(client: DriverInterface) {
+  return client.nowTimestamp?.() ?? new Date().getTime();
 }
 
 // Returns the oldest timestamp, if any.
