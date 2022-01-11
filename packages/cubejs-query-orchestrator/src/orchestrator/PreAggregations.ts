@@ -67,6 +67,16 @@ function nowTimestamp(client: BaseDriver) {
   return client.nowTimestamp?.() ?? new Date().getTime();
 }
 
+// Returns the oldest timestamp, if any.
+export function getLastUpdatedAtTimestamp(timestamps: (number | undefined)[]): number | undefined {
+  timestamps = timestamps.filter(t => t !== undefined);
+  if (timestamps.length === 0) {
+    return undefined;
+  } else {
+    return Math.min(...timestamps);
+  }
+}
+
 function getStructureVersion(preAggregation) {
   return version(
     preAggregation.indexesSql && preAggregation.indexesSql.length ?
@@ -1209,7 +1219,7 @@ export class PreAggregationPartitionRangeLoader {
       return {
         targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
-        lastUpdatedAt: Math.min(...loadResults.map(r => r.lastUpdatedAt)),
+        lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
       };
     } else {
       return new PreAggregationLoader(
@@ -1639,14 +1649,6 @@ export class PreAggregations {
 
   public static structureVersion(preAggregation) {
     return getStructureVersion(preAggregation);
-  }
-
-  public static getLastRefreshTime(times: Date[]): Date | undefined {
-    if (times.length === 0) {
-      return undefined;
-    } else {
-      return new Date(Math.min(...times.map(t => t.getTime())));
-    }
   }
 
   public async getVersionEntries(preAggregations: PreAggregationDescription[], requestId): Promise<VersionEntry[][]> {
