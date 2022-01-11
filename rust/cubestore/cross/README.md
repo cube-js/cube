@@ -13,7 +13,7 @@ For all another, we are using Cross.
 Keep in mind:
 
 - Don't use modern unix*, which ship newest `libc` (why we are using x86_64-unknown-linux-gnu-stretch instead of x86_64-unknown-linux-gnu-buster)
-- Better to use one clang/gcc version across images (`clang-9`)
+- Better to use one clang/gcc version across images (`clang-12`)
 - Try to use one OS for all images (`debian`) for unix*
 
 ```sh
