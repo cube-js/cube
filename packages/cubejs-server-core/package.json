@@ -79,7 +79,7 @@
   },
   "jest": {
     "setupFilesAfterEnv": [
-      "<rootDir>/dist/test/setup.js"
+      "<rootDir>/test/setup.ts"
     ],
     "collectCoverage": false,
     "coverageDirectory": "coverage/",

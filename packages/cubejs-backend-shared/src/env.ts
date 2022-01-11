@@ -81,6 +81,11 @@ let legacyRedisPasswordAlerted: boolean = false;
 let legacyRedisUrlAlerted: boolean = false;
 let legacyRedisTlsAlerted: boolean = false;
 
+function logit(x: any) {
+  console.log('qqq', x);
+  return x;
+};
+
 const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
@@ -120,8 +125,8 @@ const variables: Record<string, (...args: any) => any> = {
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
   // It's only excepted for CI, nothing else.
-  internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
-    .default('false')
+  internalExceptions: () => logit(get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
+    .default('false'))
     .asEnum(['exit', 'log', 'false']),
   preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
     .asString(),

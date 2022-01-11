@@ -5,6 +5,9 @@ import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
+// https://stackoverflow.com/a/50793993
+jest.useFakeTimers();
+
 const schemaContent = `
 cube('Foo', {
   sql: \`select * from foo_\${SECURITY_CONTEXT.tenantId.unsafeValue()}\`,

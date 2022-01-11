@@ -10,7 +10,7 @@
     "watch": "tsc -w",
     "lint": "eslint --debug src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
-    "unit": "jest --coverage dist/test"
+    "unit": "jest --coverage test"
   },
   "files": [
     "README.md",
@@ -31,7 +31,8 @@
     "@types/node-fetch": "^2.5.8",
     "@types/throttle-debounce": "^2.1.0",
     "jest": "^26.6.3",
-    "typescript": "~4.1.5"
+    "typescript": "~4.1.5",
+    "ts-jest": "26.5.6"
   },
   "dependencies": {
     "@oclif/color": "^0.1.2",
@@ -63,6 +64,10 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "preset": "ts-jest",
+    "transform": {
+      "^.+\\.(js|jsx|ts|tsx)?$": "ts-jest"
+    }
   }
 }
