@@ -80,8 +80,7 @@ export class QueryQueue {
 
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
-      // eslint-disable-next-line no-unused-vars
-      const [added, b, c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
+      const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
@@ -390,8 +389,7 @@ export class QueryQueue {
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
     let insertedCount;
-    // eslint-disable-next-line no-unused-vars
-    let removedCount;
+    let _removedCount;
     let activeKeys;
     let queueSize;
     let query;
@@ -400,7 +398,7 @@ export class QueryQueue {
       const processingId = await redisClient.getNextProcessingId();
       const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
       if (retrieveResult) {
-        [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {

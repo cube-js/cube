@@ -379,7 +379,7 @@ export class QueryCache {
       dataSource: string
     }
   ) {
-    return cacheKeyQueries.map((q, i) => {
+    return cacheKeyQueries.map((q) => {
       const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
 
       return this.cacheQueryResult(
