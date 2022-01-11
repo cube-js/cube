@@ -93,7 +93,7 @@ fn compile_select_expr(
     let selection =
         ctx.compile_selection_from_projection(expr)?
             .ok_or(CompilationError::Unknown(format!(
-                "Expression in selection: {}",
+                "Unknown expression in SELECT statement: {}",
                 expr.to_string()
             )))?;
 
@@ -152,7 +152,7 @@ fn compile_select_expr(
         }
         Selection::Segment(s) => {
             return Err(CompilationError::User(format!(
-                "Unable to use segment {} as column in SELECT",
+                "Unable to use segment '{}' as column in SELECT statement",
                 s.get_real_name()
             )))
         }
@@ -1139,7 +1139,7 @@ fn compile_group(
                     match selection {
                         Selection::Segment(s) => {
                             return Err(CompilationError::User(format!(
-                                "Unable to use segment {} in GROUP BY",
+                                "Unable to use segment '{}' in GROUP BY",
                                 s.get_real_name()
                             )));
                         }
@@ -1250,7 +1250,7 @@ fn compile_order(
             }
             Selection::Segment(s) => {
                 return Err(CompilationError::User(format!(
-                    "Unable to use segment {} in ORDER BY",
+                    "Unable to use segment '{}' in ORDER BY",
                     s.get_real_name()
                 )));
             }
@@ -1487,8 +1487,8 @@ impl QueryPlanner {
             Ok(QueryPlan::CubeSelect(StatusFlags::empty(), builder.build()))
         } else {
             Err(CompilationError::Unknown(format!(
-                "Unknown cube: {}",
-                table_name
+                "Unknown cube '{}'. Please ensure your schema files are valid.",
+                table_name,
             )))
         }
     }
@@ -2389,28 +2389,28 @@ mod tests {
         let variants = vec![
             (
                 "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use * as argument to aggregation function (only count supported)".to_string()),
+                CompilationError::User("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
             ),
             (
                 "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use dimension order_date as measure in aggregation function MAX(order_date)".to_string()),
+                CompilationError::User("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
             ),
             (
                 "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use measure minPrice of type min as argument in aggregate function MAX(). Aggregate function must match the type of measure.".to_string()),
+                CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
             ),
             // Check restrictions for segments usage
             (
                 "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use segment is_male as column in SELECT".to_string()),
+                CompilationError::User("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
             ),
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                CompilationError::User("Unable to use segment is_male in GROUP BY".to_string()),
+                CompilationError::User("Unable to use segment 'is_male' in GROUP BY".to_string()),
             ),
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
-                CompilationError::User("Unable to use segment is_male in ORDER BY".to_string()),
+                CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
             ),
         ];
 
@@ -2648,7 +2648,7 @@ mod tests {
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -2663,7 +2663,7 @@ mod tests {
     #[test]
     fn test_where_filter_or() {
         let query = convert_simple_select(
-            "SELECT 
+            "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
@@ -2944,7 +2944,7 @@ mod tests {
 
         for (sql, expected_fitler, expected_time_dimensions) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -3007,7 +3007,7 @@ mod tests {
         for (sql, expected_error) in to_check.iter() {
             let query = convert_sql_to_cube_query(
                 &format!(
-                    "SELECT 
+                    "SELECT
                     COUNT(*), DATE(order_date) AS __timestamp
                     FROM KibanaSampleDataEcommerce
                     WHERE {}
@@ -3225,7 +3225,7 @@ mod tests {
 
         for (sql, expected_fitler) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -3507,7 +3507,7 @@ mod tests {
     async fn test_if() -> Result<(), CubeError> {
         assert_eq!(
             execute_df_query(
-                r#"select 
+                r#"select
                 if(null, true, false) as r1,
                 if(true, false, true) as r2,
                 if(true, 'true', 'false') as r3,
