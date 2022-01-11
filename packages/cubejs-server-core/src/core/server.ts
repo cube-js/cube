@@ -43,8 +43,9 @@ import type {
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
-// This may or maynot work, unsure how the prod builds are made.
 // const { version } = require('../../../package.json');
+// This may or may not work, unsure how the prod builds are made.
+// Enabled via "resolveJsonModule": true in tsconfig.js
 import { version } from '../../package.json';
 
 export type ServerCoreInitializedOptions = Required<
