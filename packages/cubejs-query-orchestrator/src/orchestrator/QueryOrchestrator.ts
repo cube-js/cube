@@ -108,12 +108,12 @@ export class QueryOrchestrator {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
-    const lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
+    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
 
     if (!queryBody.query) {
       return {
         usedPreAggregations,
-        lastRefreshTime: new Date(lastRefreshTimestamp),
+        lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
       };
     }
 
@@ -122,12 +122,14 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
+    lastRefreshTimestamp = getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()]);
+
     return {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
       usedPreAggregations,
-      lastRefreshTime: new Date(getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()])),
+      lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
     };
   }
 
