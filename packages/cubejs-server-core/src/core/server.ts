@@ -43,6 +43,7 @@ import type {
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
+// This may or maynot work, unsure how the prod builds are made.
 // const { version } = require('../../../package.json');
 import { version } from '../../package.json';
 
