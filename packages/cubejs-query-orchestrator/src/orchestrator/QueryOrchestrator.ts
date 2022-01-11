@@ -127,7 +127,7 @@ export class QueryOrchestrator {
       dataSource: queryBody.dataSource,
       external: queryBody.external,
       usedPreAggregations,
-      lastRefreshTime: new Date(getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime.getTime()])),
+      lastRefreshTime: new Date(getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()])),
     };
   }
 
