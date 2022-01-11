@@ -1,4 +1,4 @@
-/* eslint-disable global-require,no-unused-vars */
+/* eslint-disable global-require */
 /* globals describe, jest, beforeEach, test, expect */
 import R from 'ramda';
 
@@ -45,15 +45,15 @@ class MockDriver {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  async tableColumnTypes(table) {
+  async tableColumnTypes(_table) {
     return [];
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTable(table, columns, _tableData) {
     await this.createTable(table, columns);
   }
 
-  createTable(quotedTableName, columns) {
+  createTable(quotedTableName, _columns) {
     this.tables.push(quotedTableName);
   }
 

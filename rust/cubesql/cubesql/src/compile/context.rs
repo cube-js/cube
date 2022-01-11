@@ -35,29 +35,29 @@ impl QueryContext {
 
     pub fn find_selection_for_identifier(
         &self,
-        column_name: &String,
+        identifier: &String,
         check_alias: bool,
     ) -> Option<Selection> {
         for dimension in self.meta.dimensions.iter() {
-            if dimension.get_real_name().eq(column_name) {
+            if dimension.get_real_name().eq(identifier) {
                 return Some(Selection::Dimension(dimension.clone()));
             }
         }
 
         for measure in self.meta.measures.iter() {
-            if measure.get_real_name().eq(column_name) {
+            if measure.get_real_name().eq(identifier) {
                 return Some(Selection::Measure(measure.clone()));
             }
         }
 
         for segment in self.meta.segments.iter() {
-            if segment.get_real_name().eq(column_name) {
+            if segment.get_real_name().eq(identifier) {
                 return Some(Selection::Segment(segment.clone()));
             }
         }
 
         if check_alias {
-            if let Some(r) = self.aliases.get(column_name) {
+            if let Some(r) = self.aliases.get(identifier) {
                 // @todo Resolve without match!
                 match r {
                     Selection::Dimension(d) => Some(Selection::Dimension(d.clone())),
@@ -306,7 +306,7 @@ impl QueryContext {
                         }
                     } else {
                         Err(CompilationError::User(format!(
-                            "Unknown dimension \"{}\" passed as a column in date_trunc",
+                            "Unknown dimension '{}' passed as a column in date_trunc",
                             possible_dimension_name
                         )))
                     }
@@ -358,13 +358,13 @@ impl QueryContext {
                             Ok(Some(Selection::TimeDimension(r, granularity)))
                         } else {
                             Err(CompilationError::User(format!(
-                                "Unable to use non time dimension \"{}\" in date manipulations, please specify time dimension",
+                                "Unable to use non time dimension '{}' in date manipulations, please specify time dimension",
                                 possible_dimension_name
                             )))
                         }
                     } else {
                         Err(CompilationError::User(format!(
-                            "Unknown dimension \"{}\"",
+                            "Unknown dimension '{}'",
                             possible_dimension_name
                         )))
                     }
@@ -376,7 +376,7 @@ impl QueryContext {
                         Ok(Some(Selection::TimeDimension(r, "day".to_string())))
                     } else {
                         return Err(CompilationError::User(format!(
-                            "Unable to find dimension {} from expression: {}",
+                            "Unable to find dimension '{}' from expression: {}",
                             possible_dimension_name,
                             f.to_string()
                         )));
@@ -386,13 +386,15 @@ impl QueryContext {
             }
         } else if aggregate_functions.contains(&fn_name.as_str()) {
             if f.args.is_empty() {
-                return Err(CompilationError::User(
-                    "Unable to use aggregation function without arguments".to_string(),
-                ));
+                return Err(CompilationError::User(format!(
+                    "Unable to use aggregation function '{}()' without arguments",
+                    f.name.to_string(),
+                )));
             } else if f.args.len() > 1 {
-                return Err(CompilationError::User(
-                    "Unable to use aggregation function with more then one argument".to_string(),
-                ));
+                return Err(CompilationError::User(format!(
+                    "Unable to use aggregation function '{}()' with more then one argument",
+                    f.name.to_string(),
+                )));
             };
 
             let argument = match &f.args[0] {
@@ -423,10 +425,10 @@ impl QueryContext {
             };
 
             if measure_name == "*" && !(fn_name.eq(&"count".to_string()) && !f.distinct) {
-                return Err(CompilationError::User(
-                    "Unable to use * as argument to aggregation function (only count supported)"
-                        .to_string(),
-                ));
+                return Err(CompilationError::User(format!(
+                    "Unable to use '*' as argument to aggregation function '{}()' (only COUNT() supported)",
+                    f.name.to_string(),
+                )));
             }
 
             let mut call_agg_type = fn_name;
@@ -459,9 +461,9 @@ impl QueryContext {
                                 && !measure.is_same_agg_type(&call_agg_type)
                             {
                                 return Err(CompilationError::User(format!(
-                                    "Unable to use measure {} of type {} as argument in aggregate function {}(). Aggregate function must match the type of measure.",
+                                    "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
                                     measure.get_real_name(),
-                                    measure.agg_type.unwrap_or("unknown".to_string()),
+                                    measure.agg_type.unwrap_or("unknown".to_string()).to_uppercase(),
                                     f.name.to_string(),
                                 )));
                             } else {
@@ -472,15 +474,15 @@ impl QueryContext {
                         }
                         Selection::Dimension(t) | Selection::TimeDimension(t, _) => {
                             Err(CompilationError::User(format!(
-                                "Unable to use dimension {} as measure in aggregation function {}",
+                                "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                                 t.get_real_name(),
-                                f.to_string(),
+                                f.name.to_string(),
                             )))
                         }
                         Selection::Segment(s) => Err(CompilationError::User(format!(
-                            "Unable to use segment {} as measure in aggregation function {}",
+                            "Unable to use segment '{}' as measure in aggregation function '{}()'",
                             s.get_real_name(),
-                            f.to_string(),
+                            f.name.to_string(),
                         ))),
                     }
                 } else {

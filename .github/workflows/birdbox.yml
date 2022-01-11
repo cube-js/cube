@@ -10,6 +10,12 @@ on:
     workflows: [ "Release" ]
     types:
       - completed
+  push:
+    paths:
+      - '.github/workflows/birdbox.yml'
+      - 'packages/cubejs-testing/**'
+    branches:
+      - 'master'
 
 jobs:
   cli:
