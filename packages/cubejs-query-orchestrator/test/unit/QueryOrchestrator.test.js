@@ -4,11 +4,16 @@ import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 class MockDriver {
   constructor({ csvImport, now } = {}) {
     this.tables = [];
+    this.droppedTables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
     this.now = now ?? new Date().getTime();
+  }
+
+  get allTables() {
+    return [...this.tables, ...this.droppedTables];
   }
 
   query(query) {
@@ -70,6 +75,7 @@ class MockDriver {
 
   async dropTable(tableName) {
     this.tables = this.tables.filter(t => t !== tableName);
+    this.droppedTables.push(tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
 
@@ -128,8 +134,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
 
   beforeEach(() => {
-    const mockDriverLocal = new MockDriver({ now: 1600000000 });
-    // const mockDriverLocal = new MockDriver({ now: new Date().getTime() });
+    const mockDriverLocal = new MockDriver({ now: 1650000000 });
     const fooMockDriverLocal = new MockDriver();
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
@@ -189,7 +194,7 @@ describe('QueryOrchestrator', () => {
     const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
-    expect(result.lastRefreshTime.getTime()).toEqual(1600000000);
+    expect(result.lastRefreshTime.getTime()).toEqual(1650000000);
   });
 
   test('indexes', async () => {
@@ -506,8 +511,9 @@ describe('QueryOrchestrator', () => {
         requestId: 'save structure versions'
       });
     }
-    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
-    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
+    // These tables are async dropped. Not obv
+    expect(mockDriver.allTables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
+    expect(mockDriver.allTables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
   });
 
   test('intermittent empty rollup', async () => {
