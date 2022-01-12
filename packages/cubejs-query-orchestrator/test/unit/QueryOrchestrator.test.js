@@ -506,7 +506,6 @@ describe('QueryOrchestrator', () => {
         requestId: 'save structure versions'
       });
     }
-    // These tables are async dropped. Not obv
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
   });
