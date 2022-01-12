@@ -104,7 +104,7 @@ describe('PreAggregations', () => {
   basicQueryExternalWithRenew.renewQuery = true;
 
   beforeEach(() => {
-    mockDriver = new MockDriver({ now: 12345000 });
+    mockDriver = new MockDriver();
     mockExternalDriver = new MockDriver();
     mockDriverFactory = async () => mockDriver;
     mockDriverReadOnlyFactory = async () => {
@@ -153,6 +153,7 @@ describe('PreAggregations', () => {
     });
 
     test('syncronously create rollup from scratch', async () => {
+      mockDriver.now = 12345000;
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
       expect(result[0][1].lastUpdatedAt).toEqual(12345000);
