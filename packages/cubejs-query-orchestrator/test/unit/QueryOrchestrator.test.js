@@ -2,13 +2,13 @@
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport, now } = {}) {
+  constructor({ csvImport } = {}) {
     this.tables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
-    this.now = now ?? new Date().getTime();
+    this.now = new Date().getTime();
   }
 
   query(query) {
@@ -129,7 +129,7 @@ describe('QueryOrchestrator', () => {
   let testCount = 1;
 
   beforeEach(() => {
-    const mockDriverLocal = new MockDriver({ now: 12345000 });
+    const mockDriverLocal = new MockDriver();
     const fooMockDriverLocal = new MockDriver();
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
@@ -168,6 +168,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('basic', async () => {
+    mockDriver.now = 12345000;
     const query = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],

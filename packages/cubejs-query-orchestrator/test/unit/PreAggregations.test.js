@@ -3,11 +3,11 @@
 import R from 'ramda';
 
 class MockDriver {
-  constructor({ now } = {}) {
+  constructor() {
     this.tables = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
-    this.now = now ?? new Date().getTime();
+    this.now = new Date().getTime();
   }
 
   query(query) {
