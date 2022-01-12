@@ -4,16 +4,11 @@ import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 class MockDriver {
   constructor({ csvImport, now } = {}) {
     this.tables = [];
-    this.droppedTables = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
     this.now = now ?? new Date().getTime();
-  }
-
-  get allTables() {
-    return [...this.tables, ...this.droppedTables];
   }
 
   query(query) {
@@ -512,8 +507,8 @@ describe('QueryOrchestrator', () => {
       });
     }
     // These tables are async dropped. Not obv
-    expect(mockDriver.allTables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
-    expect(mockDriver.allTables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
   });
 
   test('intermittent empty rollup', async () => {
