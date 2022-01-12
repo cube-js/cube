@@ -57,19 +57,9 @@ impl QueryContext {
         }
 
         if check_alias {
-            if let Some(r) = self.aliases.get(identifier) {
-                // @todo Resolve without match!
-                match r {
-                    Selection::Dimension(d) => Some(Selection::Dimension(d.clone())),
-                    Selection::Measure(d) => Some(Selection::Measure(d.clone())),
-                    Selection::TimeDimension(d, g) => {
-                        Some(Selection::TimeDimension(d.clone(), g.clone()))
-                    }
-                    s => panic!("Unable to map this selection type: {:?}", s),
-                }
-            } else {
-                None
-            }
+            self.aliases
+                .get(identifier)
+                .map(|selection| selection.clone())
         } else {
             None
         }
@@ -113,7 +103,7 @@ impl QueryContext {
     // This method is can be used in GROUP BY, ORDER BY, except projection
     pub fn compile_selection(&self, expr: &ast::Expr) -> CompilationResult<Option<Selection>> {
         match expr {
-            ast::Expr::Function(f) => self.find_selection_for_function(f),
+            ast::Expr::Function(f) => Ok(Some(self.find_selection_for_function(f)?)),
             ast::Expr::CompoundIdentifier(i) => {
                 // @todo We need a context with main table rel
                 if i.len() == 2 {
@@ -144,7 +134,7 @@ impl QueryContext {
     ) -> CompilationResult<Option<Selection>> {
         match expr {
             ast::Expr::BinaryOp { .. } => self.find_selection_for_binary_op(&expr.to_string()),
-            ast::Expr::Function(f) => self.find_selection_for_function(f),
+            ast::Expr::Function(f) => Ok(Some(self.find_selection_for_function(f)?)),
             ast::Expr::CompoundIdentifier(i) => {
                 // @todo We need a context with main table rel
                 if i.len() == 2 {
@@ -199,314 +189,359 @@ impl QueryContext {
         Ok(identifier)
     }
 
-    pub fn find_selection_for_function(
+    pub fn find_selection_for_date_add_fn(
         &self,
         f: &ast::Function,
-    ) -> CompilationResult<Option<Selection>> {
-        let aggregate_functions = vec!["sum", "min", "max", "avg", "count"];
+    ) -> CompilationResult<Selection> {
+        let [left_fn, right_fn] = match f.args.as_slice() {
+            [left_arg, right_arg] => {
+                let left_arg_fn = match left_arg {
+                    ast::FunctionArg::Unnamed(l) => l,
+                    ast::FunctionArg::Named { arg, .. } => arg,
+                };
 
-        let fn_name = f.name.to_string().to_lowercase();
-        if fn_name.eq("date_add") {
-            let [left_fn, right_fn] = match f.args.as_slice() {
-                [left_arg, right_arg] => {
-                    let left_arg_fn = match left_arg {
-                        ast::FunctionArg::Unnamed(l) => l,
-                        ast::FunctionArg::Named { arg, .. } => arg,
-                    };
+                let right_arg_fn = match right_arg {
+                    ast::FunctionArg::Unnamed(l) => l,
+                    ast::FunctionArg::Named { arg, .. } => arg,
+                };
 
-                    let right_arg_fn = match right_arg {
-                        ast::FunctionArg::Unnamed(l) => l,
-                        ast::FunctionArg::Named { arg, .. } => arg,
-                    };
+                [left_arg_fn, right_arg_fn]
+            }
+            _ => {
+                return Err(CompilationError::User(format!(
+                    "Unable to unpack function: {:?}",
+                    f
+                )));
+            }
+        };
 
-                    [left_arg_fn, right_arg_fn]
-                }
-                _ => {
+        let time_dimension_opt = match left_fn {
+            ast::Expr::Function(f) => {
+                if !f.name.to_string().to_lowercase().eq("date") {
                     return Err(CompilationError::User(format!(
-                        "Unable to unpack function: {:?}",
-                        f
-                    )));
-                }
-            };
-
-            let time_dimension_opt = match left_fn {
-                ast::Expr::Function(f) => {
-                    if !f.name.to_string().to_lowercase().eq("date") {
-                        return Err(CompilationError::User(format!(
-                            "Unable to detect granularity (left side must be date): {:?}",
-                            left_fn
-                        )));
-                    }
-
-                    let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
-
-                    self.find_dimension_for_identifier(&possible_dimension_name)
-                }
-                _ => {
-                    return Err(CompilationError::User(format!(
-                        "Unable to detect granularity: {:?}",
+                        "Unable to detect granularity (left side must be date): {:?}",
                         left_fn
                     )));
                 }
+
+                let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
+
+                self.find_dimension_for_identifier(&possible_dimension_name)
+            }
+            _ => {
+                return Err(CompilationError::User(format!(
+                    "Unable to detect granularity: {:?}",
+                    left_fn
+                )));
+            }
+        };
+
+        if let Some(time_dimension) = time_dimension_opt {
+            // Convert AST back to string to reduce variants of formating
+            let right_as_str = right_fn.to_string();
+
+            let second_regexp = Regex::new(
+                r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \* 60 \+ MINUTE\([a-zA-Z_`]+\) \* 60 \+ SECOND\([a-zA-Z_`]+\)\)",
+            )?;
+            let minute_regexp = Regex::new(
+                r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \+ MINUTE\([a-zA-Z_`]+\)\) MINUTE",
+            )?;
+            let hour_regexp = Regex::new(r"INTERVAL HOUR\([a-zA-Z_`]+\) HOUR")?;
+
+            let granularity = if second_regexp.is_match(&right_as_str) {
+                "second".to_string()
+            } else if minute_regexp.is_match(&right_as_str) {
+                "minute".to_string()
+            } else if hour_regexp.is_match(&right_as_str) {
+                "hour".to_string()
+            } else {
+                return Err(CompilationError::User(format!(
+                    "Unable to detect granularity: {} ({:?})",
+                    right_fn.to_string(),
+                    right_fn
+                )));
             };
 
-            if let Some(time_dimension) = time_dimension_opt {
-                // Convert AST back to string to reduce variants of formating
-                let right_as_str = right_fn.to_string();
+            Ok(Selection::TimeDimension(time_dimension, granularity))
+        } else {
+            Err(CompilationError::Unsupported(format!(
+                "Unsupported variation of arguments passed to date_add function: {}",
+                f
+            )))
+        }
+    }
 
-                let second_regexp = Regex::new(
-                    r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \* 60 \+ MINUTE\([a-zA-Z_`]+\) \* 60 \+ SECOND\([a-zA-Z_`]+\)\)",
-                )?;
-                let minute_regexp = Regex::new(
-                    r"INTERVAL \(HOUR\([a-zA-Z_`]+\) \* 60 \+ MINUTE\([a-zA-Z_`]+\)\) MINUTE",
-                )?;
-                let hour_regexp = Regex::new(r"INTERVAL HOUR\([a-zA-Z_`]+\) HOUR")?;
+    pub fn find_selection_for_date_trunc_fn(
+        &self,
+        f: &ast::Function,
+    ) -> CompilationResult<Selection> {
+        match f.args.as_slice() {
+            [ast::FunctionArg::Unnamed(ast::Expr::Value(ast::Value::SingleQuotedString(granularity))), ast::FunctionArg::Unnamed(ast::Expr::Identifier(column))] => {
+                let possible_dimension_name = column.value.to_string();
 
-                let granularity = if second_regexp.is_match(&right_as_str) {
-                    "second".to_string()
-                } else if minute_regexp.is_match(&right_as_str) {
-                    "minute".to_string()
-                } else if hour_regexp.is_match(&right_as_str) {
-                    "hour".to_string()
+                match granularity.as_str() {
+                    "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => (),
+                    _ => {
+                        return Err(CompilationError::User(format!(
+                            "Unsupported granularity {:?}",
+                            granularity
+                        )));
+                    }
+                };
+
+                if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
+                    if r.is_time() {
+                        Ok(Selection::TimeDimension(r, granularity.clone()))
+                    } else {
+                        Err(CompilationError::User(format!(
+                            "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
+                            possible_dimension_name
+                        )))
+                    }
+                } else {
+                    Err(CompilationError::User(format!(
+                        "Unknown dimension '{}' passed as a column in date_trunc",
+                        possible_dimension_name
+                    )))
+                }
+            }
+            _ => Err(CompilationError::User(
+                "Unsupported variation of arguments passed to date_trunc function, correct date_trunc(string, column)".to_string()
+            )),
+        }
+    }
+
+    pub fn find_selection_for_date_fn(&self, f: &ast::Function) -> CompilationResult<Selection> {
+        match f.args.as_slice() {
+            [ast::FunctionArg::Unnamed(ast::Expr::Function(date_sub))] => {
+                if !date_sub.name.to_string().to_lowercase().eq("date_sub") {
+                    return Err(CompilationError::User(format!(
+                        "Unable to detect heuristics: {}",
+                        f
+                    )));
+                }
+
+                let column_identifier = date_sub.args[0].to_string();
+                // isoweek is called week in cube.js
+                let iso_week_test = format!(
+                    "INTERVAL DAYOFWEEK(DATE_SUB({}, INTERVAL 1 DAY)) - 1 DAY",
+                    column_identifier
+                );
+                // week is not supported in
+                let week_test = format!("INTERVAL DAYOFWEEK({}) - 1 DAY", column_identifier);
+                let month_test = format!("INTERVAL DAYOFMONTH({}) - 1 DAY", column_identifier);
+                let year_test = format!("INTERVAL DAYOFYEAR({}) - 1 DAY", column_identifier);
+
+                let right_part = date_sub.args[1].to_string();
+                let granularity = if right_part.eq(&iso_week_test) {
+                    "week".to_string()
+                } else if right_part.eq(&week_test) {
+                    return Err(CompilationError::Unsupported(
+                        "date granularity, week is not supported in Cube.js, please use ISOWEEK"
+                            .to_string(),
+                    ));
+                } else if right_part.eq(&month_test) {
+                    "month".to_string()
+                } else if right_part.eq(&year_test) {
+                    "year".to_string()
                 } else {
                     return Err(CompilationError::User(format!(
-                        "Unable to detect granularity: {} ({:?})",
-                        right_fn.to_string(),
-                        right_fn
+                        "Unable to detect granularity: {:?}",
+                        right_part
                     )));
                 };
 
-                Ok(Some(Selection::TimeDimension(time_dimension, granularity)))
-            } else {
-                Ok(None)
-            }
-        } else if fn_name.eq("date_trunc") {
-            match f.args.as_slice() {
-                [ast::FunctionArg::Unnamed(ast::Expr::Value(ast::Value::SingleQuotedString(granularity))), ast::FunctionArg::Unnamed(ast::Expr::Identifier(column))] => {
-                    let possible_dimension_name = column.value.to_string();
+                let possible_dimension_name = self.unpack_identifier_from_arg(&date_sub.args[0])?;
 
-                    match granularity.as_str() {
-                        "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => (),
-                        _ => {
-                            return Err(CompilationError::User(format!(
-                                "Unsupported granularity {:?}",
-                                granularity
-                            )));
-                        }
-                    };
-
-                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
-                        if r.is_time() {
-                            Ok(Some(Selection::TimeDimension(r, granularity.clone())))
-                        } else {
-                            Err(CompilationError::User(format!(
-                                "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
-                                possible_dimension_name
-                            )))
-                        }
+                if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
+                    if r.is_time() {
+                        Ok(Selection::TimeDimension(r, granularity))
                     } else {
                         Err(CompilationError::User(format!(
-                            "Unknown dimension '{}' passed as a column in date_trunc",
+                            "Unable to use non time dimension '{}' in date manipulations, please specify time dimension",
                             possible_dimension_name
                         )))
                     }
+                } else {
+                    Err(CompilationError::User(format!(
+                        "Unknown dimension '{}'",
+                        possible_dimension_name
+                    )))
                 }
-                _ => Err(CompilationError::User("Unsupported variation of arguments passed to date_trunc, correct date_trunc(string, column)".to_string())),
             }
-        } else if fn_name.eq("date") {
-            match f.args.as_slice() {
-                [ast::FunctionArg::Unnamed(ast::Expr::Function(date_sub))] => {
-                    if !date_sub.name.to_string().to_lowercase().eq("date_sub") {
-                        return Err(CompilationError::User(format!(
-                            "Unable to detect heuristics in selection: {}",
-                            f.to_string()
-                        )));
-                    }
+            [ast::FunctionArg::Unnamed(_)] => {
+                let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
-                    let column_identifier = date_sub.args[0].to_string();
-                    // isoweek is called week in cube.js
-                    let iso_week_test = format!(
-                        "INTERVAL DAYOFWEEK(DATE_SUB({}, INTERVAL 1 DAY)) - 1 DAY",
-                        column_identifier
-                    );
-                    // week is not supported in
-                    let week_test = format!("INTERVAL DAYOFWEEK({}) - 1 DAY", column_identifier);
-                    let month_test = format!("INTERVAL DAYOFMONTH({}) - 1 DAY", column_identifier);
-                    let year_test = format!("INTERVAL DAYOFYEAR({}) - 1 DAY", column_identifier);
-
-                    let right_part = date_sub.args[1].to_string();
-                    let granularity = if right_part.eq(&iso_week_test) {
-                        "week".to_string()
-                    } else if right_part.eq(&week_test) {
-                        return Err(CompilationError::Unsupported("date granularity, week is not supported in Cube.js, please use ISOWEEK".to_string()));
-                    } else if right_part.eq(&month_test) {
-                        "month".to_string()
-                    } else if right_part.eq(&year_test) {
-                        "year".to_string()
-                    } else {
-                        return Err(CompilationError::User(format!(
-                            "Unable to detect granularity: {:?}",
-                            right_part
-                        )));
-                    };
-
-                    let possible_dimension_name =
-                        self.unpack_identifier_from_arg(&date_sub.args[0])?;
-
-                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
-                        if r.is_time() {
-                            Ok(Some(Selection::TimeDimension(r, granularity)))
-                        } else {
-                            Err(CompilationError::User(format!(
-                                "Unable to use non time dimension '{}' in date manipulations, please specify time dimension",
-                                possible_dimension_name
-                            )))
-                        }
-                    } else {
-                        Err(CompilationError::User(format!(
-                            "Unknown dimension '{}'",
-                            possible_dimension_name
-                        )))
-                    }
+                if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
+                    Ok(Selection::TimeDimension(r, "day".to_string()))
+                } else {
+                    return Err(CompilationError::User(format!(
+                        "Unable to find dimension '{}' from expression: {}",
+                        possible_dimension_name, f
+                    )));
                 }
-                [ast::FunctionArg::Unnamed(_)] => {
-                    let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
-
-                    if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
-                        Ok(Some(Selection::TimeDimension(r, "day".to_string())))
-                    } else {
-                        return Err(CompilationError::User(format!(
-                            "Unable to find dimension '{}' from expression: {}",
-                            possible_dimension_name,
-                            f.to_string()
-                        )));
-                    }
-                }
-                _ => Ok(None),
             }
-        } else if aggregate_functions.contains(&fn_name.as_str()) {
-            if f.args.is_empty() {
-                return Err(CompilationError::User(format!(
-                    "Unable to use aggregation function '{}()' without arguments",
-                    f.name.to_string(),
-                )));
-            } else if f.args.len() > 1 {
-                return Err(CompilationError::User(format!(
-                    "Unable to use aggregation function '{}()' with more then one argument",
-                    f.name.to_string(),
-                )));
-            };
+            _ => Err(CompilationError::User(format!(
+                "Unsupported variation of arguments passed to date function: {}",
+                f
+            ))),
+        }
+    }
 
-            let argument = match &f.args[0] {
-                ast::FunctionArg::Named { arg, .. } => arg,
-                ast::FunctionArg::Unnamed(expr) => expr,
-            };
+    pub fn find_selection_for_aggregation_fn(
+        &self,
+        f: &ast::Function,
+    ) -> CompilationResult<Selection> {
+        if f.args.is_empty() {
+            return Err(CompilationError::User(format!(
+                "Unable to use aggregation function '{}()' without arguments",
+                f.name.to_string(),
+            )));
+        } else if f.args.len() > 1 {
+            return Err(CompilationError::User(format!(
+                "Unable to use aggregation function '{}()' with more then one argument",
+                f.name.to_string(),
+            )));
+        };
 
-            let measure_name = match argument {
-                ast::Expr::Wildcard => "*".to_string(),
-                ast::Expr::Identifier(i) => i.value.to_string(),
-                ast::Expr::CompoundIdentifier(i) => {
-                    // @todo We need a context with main table rel
-                    if i.len() == 2 {
-                        i[1].value.to_string()
-                    } else {
-                        return Err(CompilationError::Unsupported(format!(
-                            "Unsupported compound identifier in argument: {:?}",
-                            argument
-                        )));
-                    }
-                }
-                _ => {
+        let argument = match &f.args[0] {
+            ast::FunctionArg::Named { arg, .. } => arg,
+            ast::FunctionArg::Unnamed(expr) => expr,
+        };
+
+        let measure_name = match argument {
+            ast::Expr::Wildcard => "*".to_string(),
+            ast::Expr::Identifier(i) => i.value.to_string(),
+            ast::Expr::CompoundIdentifier(i) => {
+                // @todo We need a context with main table rel
+                if i.len() == 2 {
+                    i[1].value.to_string()
+                } else {
                     return Err(CompilationError::Unsupported(format!(
-                        "type of argument {:?}",
+                        "Unsupported compound identifier in argument: {:?}",
                         argument
                     )));
                 }
-            };
-
-            if measure_name == "*" && !(fn_name.eq(&"count".to_string()) && !f.distinct) {
-                return Err(CompilationError::User(format!(
-                    "Unable to use '*' as argument to aggregation function '{}()' (only COUNT() supported)",
-                    f.name.to_string(),
+            }
+            _ => {
+                return Err(CompilationError::Unsupported(format!(
+                    "type of argument {:?}",
+                    argument
                 )));
             }
+        };
 
-            let mut call_agg_type = fn_name;
+        let fn_name = f.name.to_string().to_ascii_lowercase();
 
-            if f.distinct {
-                call_agg_type += &"Distinct".to_string();
-            };
+        if measure_name == "*" && !(fn_name.eq(&"count".to_string()) && !f.distinct) {
+            return Err(CompilationError::User(format!(
+                "Unable to use '*' as argument to aggregation function '{}()' (only COUNT() supported)",
+                f.name.to_string(),
+            )));
+        }
 
-            if call_agg_type.eq(&"count".to_string()) {
-                let measure_for_argument = self.meta.measures.iter().find(|measure| {
-                    if measure.agg_type.is_some() {
-                        let agg_type = measure.agg_type.clone().unwrap();
-                        agg_type.eq(&"count".to_string())
-                    } else {
-                        false
-                    }
-                });
+        let mut call_agg_type = fn_name;
 
-                if let Some(measure) = measure_for_argument {
-                    Ok(Some(Selection::Measure(measure.clone())))
+        if f.distinct {
+            call_agg_type += &"Distinct".to_string();
+        };
+
+        if call_agg_type.eq(&"count".to_string()) {
+            let measure_for_argument = self.meta.measures.iter().find(|measure| {
+                if measure.agg_type.is_some() {
+                    let agg_type = measure.agg_type.clone().unwrap();
+                    agg_type.eq(&"count".to_string())
                 } else {
-                    Ok(None)
+                    false
                 }
+            });
+
+            if let Some(measure) = measure_for_argument {
+                Ok(Selection::Measure(measure.clone()))
             } else {
-                let selection_opt = self.find_selection_for_identifier(&measure_name, true);
-                if let Some(selection) = selection_opt {
-                    match selection {
-                        Selection::Measure(measure) => {
-                            if measure.agg_type.is_some()
-                                && !measure.is_same_agg_type(&call_agg_type)
-                            {
-                                return Err(CompilationError::User(format!(
-                                    "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
-                                    measure.get_real_name(),
-                                    measure.agg_type.unwrap_or("unknown".to_string()).to_uppercase(),
-                                    f.name.to_string(),
-                                )));
-                            } else {
-                                // @todo Should we throw an exception?
-                            };
-
-                            Ok(Some(Selection::Measure(measure)))
-                        }
-                        Selection::Dimension(t) | Selection::TimeDimension(t, _) => {
-                            Err(CompilationError::User(format!(
-                                "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
-                                t.get_real_name(),
-                                f.name.to_string(),
-                            )))
-                        }
-                        Selection::Segment(s) => Err(CompilationError::User(format!(
-                            "Unable to use segment '{}' as measure in aggregation function '{}()'",
-                            s.get_real_name(),
-                            f.name.to_string(),
-                        ))),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-        } else if fn_name.to_lowercase().eq("measure") {
-            if f.args.len() == 1 {
-                let possible_measure_name = self.unpack_identifier_from_arg(&f.args[0])?;
-
-                if let Some(r) = self.meta.measures.iter().find(|measure| {
-                    measure
-                        .get_real_name()
-                        .eq_ignore_ascii_case(&possible_measure_name)
-                }) {
-                    Ok(Some(Selection::Measure(r.clone())))
-                } else {
-                    Ok(None)
-                }
-            } else {
-                Ok(None)
+                Err(CompilationError::User(format!(
+                    "Unable to find measure with count type: {}",
+                    f
+                )))
             }
         } else {
-            Ok(None)
+            let selection_opt = self.find_selection_for_identifier(&measure_name, true);
+            if let Some(selection) = selection_opt {
+                match selection {
+                    Selection::Measure(measure) => {
+                        if measure.agg_type.is_some()
+                            && !measure.is_same_agg_type(&call_agg_type)
+                        {
+                            return Err(CompilationError::User(format!(
+                                "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
+                                measure.get_real_name(),
+                                measure.agg_type.unwrap_or("unknown".to_string()).to_uppercase(),
+                                f.name.to_string(),
+                            )));
+                        } else {
+                            // @todo Should we throw an exception?
+                        };
+
+                        Ok(Selection::Measure(measure))
+                    }
+                    Selection::Dimension(t) | Selection::TimeDimension(t, _) => {
+                        Err(CompilationError::User(format!(
+                            "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
+                            t.get_real_name(),
+                            f.name.to_string(),
+                        )))
+                    }
+                    Selection::Segment(s) => Err(CompilationError::User(format!(
+                        "Unable to use segment '{}' as measure in aggregation function '{}()'",
+                        s.get_real_name(),
+                        f.name.to_string(),
+                    ))),
+                }
+            } else {
+                Err(CompilationError::User(format!(
+                    "Unable to find measure with name '{}' for {}",
+                    measure_name, f
+                )))
+            }
+        }
+    }
+
+    pub fn find_selection_for_measure_fn(&self, f: &ast::Function) -> CompilationResult<Selection> {
+        if f.args.len() == 1 {
+            let possible_measure_name = self.unpack_identifier_from_arg(&f.args[0])?;
+
+            if let Some(r) = self.meta.measures.iter().find(|measure| {
+                measure
+                    .get_real_name()
+                    .eq_ignore_ascii_case(&possible_measure_name)
+            }) {
+                Ok(Selection::Measure(r.clone()))
+            } else {
+                Err(CompilationError::User(format!(
+                    "Unable to find measure with name '{}' for {}",
+                    possible_measure_name, f
+                )))
+            }
+        } else {
+            Err(CompilationError::User(format!(
+                "Unsupported variation of arguments passed to measure function: {}",
+                f
+            )))
+        }
+    }
+
+    pub fn find_selection_for_function(&self, f: &ast::Function) -> CompilationResult<Selection> {
+        let fn_name = f.name.to_string().to_ascii_lowercase();
+        match fn_name.as_str() {
+            "date_add" => self.find_selection_for_date_add_fn(f),
+            "date_trunc" => self.find_selection_for_date_trunc_fn(f),
+            "date" => self.find_selection_for_date_fn(f),
+            "measure" => self.find_selection_for_measure_fn(f),
+            "sum" | "min" | "max" | "avg" | "count" => self.find_selection_for_aggregation_fn(f),
+            _ => Err(CompilationError::Unsupported(format!(
+                "Unsupported function: {}",
+                f
+            ))),
         }
     }
 

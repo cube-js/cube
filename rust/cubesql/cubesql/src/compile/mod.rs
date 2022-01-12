@@ -2399,6 +2399,10 @@ mod tests {
                 "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
                 CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
             ),
+            (
+                "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to find measure with name 'unknownIdentifier' for MAX(unknownIdentifier)".to_string()),
+            ),
             // Check restrictions for segments usage
             (
                 "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
