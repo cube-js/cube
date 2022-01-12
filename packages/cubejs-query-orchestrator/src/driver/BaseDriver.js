@@ -418,4 +418,8 @@ export class BaseDriver {
   capabilities() {
     return {};
   }
+
+  nowTimestamp() {
+    return new Date().getTime();
+  }
 }
