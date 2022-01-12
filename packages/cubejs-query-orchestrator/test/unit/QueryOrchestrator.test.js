@@ -70,7 +70,6 @@ class MockDriver {
 
   async dropTable(tableName) {
     this.tables = this.tables.filter(t => t !== tableName);
-    this.droppedTables.push(tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
 
