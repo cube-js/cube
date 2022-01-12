@@ -1031,7 +1031,7 @@ export class PreAggregationLoader {
         VersionEntry[]
         >(
           R.filter(
-            (v: VersionEntry) => nowTimestamp(client) - v.last_updated_at < this.structureVersionPersistTime * 1000
+            (v: VersionEntry) => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000
           ),
           R.groupBy(v => `${v.table_name}_${v.structure_version}`),
           R.toPairs,
