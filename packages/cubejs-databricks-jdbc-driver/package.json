@@ -33,7 +33,7 @@
     "@cubejs-backend/schema-compiler": "^0.29.20",
     "@cubejs-backend/shared": "^0.29.20",
     "inquirer": "^8.0.0",
-    "ramda": "^0.27.1",
+    "ramda": "^0.27.2",
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
