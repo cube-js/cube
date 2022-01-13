@@ -10,7 +10,7 @@ database.
 
 The first step of creating a Cube App from scratch in Cube Cloud is to create a deployment.
 
-Click the `create deployment` button it'll open up the first step in the deployment creation. Give it a name and select the cloud provider and
+Click the `create deployment` button. This is the first step in the deployment creation. Give it a name and select the cloud provider and
 region of your choice.
 
 <div
@@ -41,7 +41,7 @@ Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
 
 ## Step 3: Connect your Database
 
-Enter your credentials to connect to your database. Consult [connecting to
+Enter your credentials to connect to your database. Check the [connecting to
 databases][link-connecting-to-databases] guide for more details.
 
 <div
@@ -57,7 +57,7 @@ databases][link-connecting-to-databases] guide for more details.
 
 ### Why don't you try out some sample data?
 
-We have a sample database where you can try out Cube Cloud and see how simple and easy it is.
+We have a sample database where you can try out Cube Cloud.
 
 ```json
 Hostname
@@ -89,7 +89,7 @@ In the UI it'll look exactly like the image below.
   />
 </div>
 
-If you run into issues here, make sure to allow the Cube Cloud IPs to access your database. This means you need to open up your firewall to these IPs. In the case of AWS, this would mean adding a security group with allowed IPs.
+If you run into issues here, make sure to allow the Cube Cloud IPs to access your database. This means you need to enable these IPs in your firewall. If you are using AWS, this would mean adding a security group with allowed IPs.
 
 ## Step 4: Generate the Data Schema
 
