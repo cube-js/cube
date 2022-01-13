@@ -51,7 +51,7 @@ cube(`Orders`, {
 
 To query the API with respect to a timezone, we need to provide the timezone via the [`timezone` property](https://cube.dev/docs/query-format#query-properties). The sales stats will be translated to reflect the point of view of a person from that location, e.g., for an online store manager from New York, let's pass `America/New_York`:
 
-```json
+```javascript
 {
   "dimensions": [
     "Orders.status",
@@ -74,7 +74,7 @@ To query the API with respect to a timezone, we need to provide the timezone via
 
 Let's explore the retrieved data:
 
-```json
+```javascript
 [
   {
     "Orders.status": "shipped",
@@ -97,15 +97,15 @@ Let's explore the retrieved data:
 ]
 ```
 
-Note that the `Orders.createdAt` time dimension was provided in the `dimensions` part of the query. So, it was returned "as is", in the UTC timezone. (Apparently, all orders were made at midnight.)
+The `Orders.createdAt` time dimension was provided in the `dimensions` part of the query. So, its values were returned "as is", in the UTC timezone. (Apparently, all orders were made at midnight.)
 
-Also, check out the `Orders.createdAt.day` values in the result. They were returned because we've provided `Orders.createdAt` in the `timeDimensions` part of the query. So, the data was returned translated to New York timezone (shifted 4 hours back from UTC) and also truncated to the start of the day since we've specifed the daily `granularity` in the query.
+Also, check out the `Orders.createdAt.day` values in the result. They were returned because we've provided `Orders.createdAt` in the `timeDimensions` part of the query. So, they were translated to New York timezone (shifted 4 hours back from UTC) and also truncated to the start of the day since we've specifed the daily `granularity` in the query.
 
-We also added the `Orders.createdAtConverted` to `dimensions` in the query. The respective values were also returned translated to New York timezone but not truncated with respect to the granularity. Please check that the `createdAtConverted` dimension is defined using the [`SQL_UTILS.convertTz` method](https://cube.dev/docs/schema/reference/cube#convert-tz) that does the timezone translation.
+We also added the `Orders.createdAtConverted` to `dimensions` in the query. The respective values were also translated to New York timezone but not truncated with respect to the granularity. Please check that the `createdAtConverted` dimension is defined using the [`SQL_UTILS.convertTz` method](https://cube.dev/docs/schema/reference/cube#convert-tz) that does the timezone translation.
 
 ## Configuration
 
-To allow Cube to build pre-aggregations for timezones that can be specified in queries, let's provide a list of such timezones via the `scheduledRefreshTimeZones` configuration option:
+To allow Cube to build pre-aggregations for timezones that can be specified in queries, we need to provide a list of such timezones via the `scheduledRefreshTimeZones` configuration option:
 
 ```javascript
 module.exports = {
