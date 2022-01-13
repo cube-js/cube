@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashMap;
 
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
@@ -158,12 +159,33 @@ impl QueryContext {
         }
     }
 
-    fn unpack_identifier_from_arg(&self, arg: &ast::FunctionArg) -> CompilationResult<String> {
+    fn unpack_function_argument<'a>(&self, arg: &'a ast::FunctionArg) -> &'a ast::Expr {
         let argument = match arg {
             ast::FunctionArg::Named { arg, .. } => arg,
             ast::FunctionArg::Unnamed(expr) => expr,
         };
 
+        argument
+    }
+
+    fn unpack_function_arguments2<'a>(
+        &self,
+        f: &'a ast::Function,
+    ) -> (&'a ast::Expr, &'a ast::Expr) {
+        (
+            self.unpack_function_argument(&f.args[0]),
+            self.unpack_function_argument(&f.args[1]),
+        )
+    }
+
+    fn match_expr_to_function<'a>(&self, expr: &'a ast::Expr) -> Option<&'a ast::Function> {
+        match expr {
+            ast::Expr::Function(fun) => Some(fun),
+            _ => None,
+        }
+    }
+
+    fn unpack_identifier_from_expr(&self, argument: &ast::Expr) -> CompilationResult<String> {
         let identifier = match argument {
             ast::Expr::Wildcard => "*".to_string(),
             ast::Expr::Identifier(i) => i.value.to_string().to_lowercase(),
@@ -187,6 +209,15 @@ impl QueryContext {
         };
 
         Ok(identifier)
+    }
+
+    fn unpack_identifier_from_arg(&self, arg: &ast::FunctionArg) -> CompilationResult<String> {
+        let argument = match arg {
+            ast::FunctionArg::Named { arg, .. } => arg,
+            ast::FunctionArg::Unnamed(expr) => expr,
+        };
+
+        self.unpack_identifier_from_expr(&argument)
     }
 
     pub fn find_selection_for_date_add_fn(
@@ -269,6 +300,57 @@ impl QueryContext {
                 f
             )))
         }
+    }
+
+    pub fn find_selection_for_str_to_date_fn(
+        &self,
+        f: &ast::Function,
+    ) -> CompilationResult<Selection> {
+        let formated_fn = f.to_string();
+
+        let month_regexp = Regex::new(
+            r"str_to_date\(concat\(date_format\([a-zA-Z_`.]+, '%Y-%m'\), '-01'\), '%Y-%m-%d'\)",
+        )?;
+
+        // str_to_date(concat(date_format(`Orders`.`createdAt`, '%Y-%m'), '-01'), '%Y-%m-%d')
+        let result = if month_regexp.is_match(formated_fn.as_str()) {
+            // concat(date_format(`Orders`.`createdAt`, '%Y-%m'), '-01')
+            // '%Y-%m-%d'
+            let (concat_expr, _) = self.unpack_function_arguments2(&f);
+            self.match_expr_to_function(concat_expr).map(|concat_fn| {
+                let (date_format_expr, _) = self.unpack_function_arguments2(&concat_fn);
+
+                // date_format(`Orders`.`createdAt`, '%Y-%m')
+                // '-01'
+                self.match_expr_to_function(&date_format_expr)
+                    .map(|date_format_fn| {
+                        let (identifier, _) = self.unpack_function_arguments2(&date_format_fn);
+
+                        let possible_dimension_name =
+                            self.unpack_identifier_from_expr(&identifier)?;
+
+                        self.find_dimension_for_identifier(&possible_dimension_name)
+                            .map(|time_dimension| {
+                                Selection::TimeDimension(time_dimension, "month".to_string())
+                            })
+                            .ok_or(CompilationError::User(format!(
+                                "Unknown dimension '{}' passed as a column in date_trunc",
+                                possible_dimension_name
+                            )))
+                    })
+                    .unwrap_or(Err(CompilationError::Unsupported(format!(
+                        "Unsupported variation of arguments passed to date_add function: {}",
+                        formated_fn
+                    ))))
+            })
+        } else {
+            None
+        };
+
+        result.unwrap_or(Err(CompilationError::Unsupported(format!(
+            "Unsupported variation of arguments passed to date_add function: {}",
+            formated_fn
+        ))))
     }
 
     pub fn find_selection_for_date_trunc_fn(
@@ -534,6 +616,7 @@ impl QueryContext {
         let fn_name = f.name.to_string().to_ascii_lowercase();
         match fn_name.as_str() {
             "date_add" => self.find_selection_for_date_add_fn(f),
+            "str_to_date" => self.find_selection_for_str_to_date_fn(f),
             "date_trunc" => self.find_selection_for_date_trunc_fn(f),
             "date" => self.find_selection_for_date_fn(f),
             "measure" => self.find_selection_for_measure_fn(f),

@@ -540,7 +540,7 @@ fn compile_expression(
             "date_add" => date_add_function(&f, &ctx),
             "now" => now_function(&f),
             _ => Err(CompilationError::User(format!(
-                "Unsupported function: {:?}",
+                "Unsupported function: {}",
                 f
             ))),
         },
@@ -2515,7 +2515,7 @@ mod tests {
     }
 
     #[test]
-    fn test_group_by_date_granularity_superset() {
+    fn test_group_by_date_granularity() {
         let supported_granularities = vec![
             // With MAKEDATE
             ["MAKEDATE(YEAR(order_date), 1) + INTERVAL QUARTER(order_date) QUARTER - INTERVAL 1 QUARTER".to_string(), "quarter".to_string()],
@@ -2538,6 +2538,10 @@ mod tests {
             ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(`order_date`) * 60 + MINUTE(`order_date`)) MINUTE)".to_string(), "minute".to_string()],
             ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(order_date) * 60 * 60 + MINUTE(order_date) * 60 + SECOND(order_date)) SECOND)".to_string(), "second".to_string()],
             ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(`order_date`) * 60 * 60 + MINUTE(`order_date`) * 60 + SECOND(`order_date`)) SECOND)".to_string(), "second".to_string()],
+            // Metabase
+            // ["str_to_date(date_format(`Orders`.`order_date`, '%Y-%m-%d %H:%i'), '%Y-%m-%d %H:%i')".to_string(), "minute".to_string()],
+            // ["str_to_date(date_format(`Orders`.`order_date`, '%Y-%m-%d %H'), '%Y-%m-%d %H')".to_string(), "minute".to_string()],
+            ["str_to_date(concat(date_format(`Orders`.`order_date`, '%Y-%m'), '-01'), '%Y-%m-%d')".to_string(), "month".to_string()],
         ];
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
