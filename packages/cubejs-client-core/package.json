@@ -18,7 +18,7 @@
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
     "dayjs": "^1.10.4",
-    "ramda": "^0.27.0",
+    "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
     "uuid": "^8.3.2"
   },
