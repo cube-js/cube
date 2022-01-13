@@ -37,7 +37,7 @@
     "lru-cache": "^6.0.0",
     "moment-range": "^4.0.2",
     "moment-timezone": "^0.5.33",
-    "ramda": "^0.27.0",
+    "ramda": "^0.27.2",
     "redis": "^3.0.2"
   },
   "devDependencies": {
