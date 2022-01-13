@@ -42,7 +42,7 @@
     "nexus": "^1.1.0",
     "node-fetch": "^2.6.1",
     "querystring": "^0.2.1",
-    "ramda": "^0.27.0",
+    "ramda": "^0.27.2",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
