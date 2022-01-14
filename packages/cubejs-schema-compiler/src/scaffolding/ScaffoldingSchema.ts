@@ -202,7 +202,7 @@ export class ScaffoldingSchema {
     return tableDefinition.filter(
       column => (!column.name.startsWith('_') &&
         (this.columnType(column) === 'number') &&
-        this.options.includeNonDictionaryMeasures ? column.name.toLowerCase() !== 'id' : this.fromMeasureDictionary(column))
+        (this.options.includeNonDictionaryMeasures ? column.name.toLowerCase() !== 'id' : this.fromMeasureDictionary(column)))
     ).map(column => ({
       name: column.name,
       types: ['sum', 'avg', 'min', 'max'],
