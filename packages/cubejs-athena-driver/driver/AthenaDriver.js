@@ -13,10 +13,11 @@ class AthenaDriver extends BaseDriver {
       credentials: {
         accessKeyId: config.accessKeyId || process.env.CUBEJS_AWS_KEY,
         secretAccessKey: config.secretAccessKey || process.env.CUBEJS_AWS_SECRET,
+        sessionToken: config.sessionToken || undefined
       },
-      region: process.env.CUBEJS_AWS_REGION,
-      S3OutputLocation: process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
-      workGroup: process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
+      region: config.region || process.env.CUBEJS_AWS_REGION,
+      S3OutputLocation: config.s3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
+      workGroup: config.workGroup || (process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary'),
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
