@@ -10,7 +10,8 @@ enum ColumnType {
 
 export enum MemberType {
   Measure = 'measure',
-  Dimension = 'dimension'
+  Dimension = 'dimension',
+  None = 'none'
 }
 
 export type TableName = string | [string, string];
@@ -23,6 +24,8 @@ export type CubeDescriptorMember = {
   memberType: MemberType;
   type: string;
   types: string[];
+  isId: boolean;
+  included?: boolean;
   isPrimaryKey?: boolean;
 };
 
@@ -76,10 +79,17 @@ const DRILL_MEMBERS_DICTIONARY = [
 
 const idRegex = '_id$|id$';
 
+type ScaffoldingSchemaOptions = {
+  includeNonDictionaryMeasures?: boolean;
+};
+
 export class ScaffoldingSchema {
   private tableNamesToTables: any;
 
-  public constructor(private readonly dbSchema: Record<string, Record<string, any>>) {
+  public constructor(
+    private readonly dbSchema: Record<string, Record<string, any>>,
+    private readonly options: ScaffoldingSchemaOptions = {}
+  ) {
   }
 
   public cubeDescriptors(tableNames: TableName[]): CubeDescriptor[] {
@@ -87,11 +97,8 @@ export class ScaffoldingSchema {
 
     function member(type: MemberType) {
       return (value: CubeDescriptorMember) => ({
-        type,
-        name: value.name,
-        title: value.title,
-        types: value.types,
-        isPrimaryKey: value.isPrimaryKey
+        memberType: type,
+        ...R.pick(['name', 'title', 'types', 'isPrimaryKey', 'included', 'isId'], value)
       });
     }
 
@@ -184,7 +191,7 @@ export class ScaffoldingSchema {
       };
 
       if (column.columnType !== 'time') {
-        res.isPrimaryKey = column.attributes && column.attributes.indexOf('primaryKey') !== -1 ||
+        res.isPrimaryKey = column.attributes?.includes('primaryKey') ||
           column.name.toLowerCase() === 'id';
       }
       return res;
@@ -193,13 +200,15 @@ export class ScaffoldingSchema {
 
   protected numberMeasures(tableDefinition) {
     return tableDefinition.filter(
-      column => !column.name.startsWith('_') &&
+      column => (!column.name.startsWith('_') &&
         (this.columnType(column) === 'number') &&
-        this.fromMeasureDictionary(column)
+        this.options.includeNonDictionaryMeasures ? column.name.toLowerCase() !== 'id' : this.fromMeasureDictionary(column))
     ).map(column => ({
       name: column.name,
       types: ['sum', 'avg', 'min', 'max'],
-      title: inflection.titleize(column.name)
+      title: inflection.titleize(column.name),
+      included: this.options.includeNonDictionaryMeasures ? this.fromMeasureDictionary(column) : undefined,
+      isId: !!column.name.match(new RegExp(idRegex, 'i'))
     }));
   }
 
@@ -210,7 +219,7 @@ export class ScaffoldingSchema {
   protected dimensionColumns(tableDefinition: any) {
     const dimensionColumns = tableDefinition.filter(
       column => !column.name.startsWith('_') && this.columnType(column) === 'string' ||
-        column.attributes && column.attributes.indexOf('primaryKey') !== -1 ||
+        column.attributes?.includes('primaryKey') ||
         column.name.toLowerCase() === 'id'
     );
 
@@ -288,7 +297,8 @@ export class ScaffoldingSchema {
     const type = column.type.toLowerCase();
     if (['time', 'date'].find(t => type.indexOf(t) !== -1)) {
       return ColumnType.Time;
-    } else if (['int', 'dec', 'double', 'num'].find(t => type.indexOf(t) !== -1)) {
+    } else if (['int', 'dec', 'double', 'numb'].find(t => type.indexOf(t) !== -1)) {
+      // enums are not Numbers
       return ColumnType.Number;
     } else {
       return ColumnType.String;
