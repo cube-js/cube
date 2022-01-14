@@ -1,6 +1,47 @@
 import inflection from 'inflection';
 import R from 'ramda';
-import { UserError } from '../compiler/UserError';
+import { UserError } from '../compiler';
+
+enum ColumnType {
+  Time = 'time',
+  Number = 'number',
+  String = 'string',
+}
+
+export enum MemberType {
+  Measure = 'measure',
+  Dimension = 'dimension'
+}
+
+type TableName = string | [string, string];
+
+type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
+
+export type CubeDescriptorMember = {
+  name: string;
+  title: string;
+  memberType: MemberType;
+  type: string;
+  types: string[];
+  isPrimaryKey?: boolean;
+};
+
+type Join = {
+  thisTableColumn: string;
+  tableName: TableName;
+  cubeToJoin: string;
+  columnToJoin: string;
+  relationship: JoinRelationship;
+};
+
+export type CubeDescriptor = {
+  cube: string,
+  tableName: TableName,
+  table: string
+  schema: string;
+  members: CubeDescriptorMember[];
+  joins: Join[];
+};
 
 const MEASURE_DICTIONARY = [
   'amount',
@@ -36,21 +77,49 @@ const DRILL_MEMBERS_DICTIONARY = [
 const idRegex = '_id$|id$';
 
 export class ScaffoldingSchema {
-  constructor(dbSchema) {
+  private tableNamesToTables: any;
+
+  public constructor(private readonly dbSchema: Record<string, Record<string, any>>) {
     this.dbSchema = dbSchema;
   }
 
-  generateForTables(tableNames) {
+  public cubeDescriptors(tableNames: TableName[]): CubeDescriptor[] {
+    const cubes = this.generateForTables(tableNames);
+
+    function member(type: MemberType) {
+      return (value: CubeDescriptorMember) => ({
+        type,
+        name: value.name,
+        title: value.title,
+        types: value.types,
+        isPrimaryKey: value.isPrimaryKey
+      });
+    }
+
+    return cubes.map((cube) => ({
+      cube: cube.cube,
+      tableName: cube.tableName,
+      table: cube.table,
+      schema: cube.schema,
+      members: (cube.measures || []).map(member(MemberType.Measure))
+        .concat((cube.dimensions || []).map(member(MemberType.Dimension))),
+      joins: cube.joins
+    }));
+  }
+
+  public generateForTables(tableNames: TableName[]) {
     this.prepareTableNamesToTables(tableNames);
     return tableNames.map(tableName => this.tableSchema(tableName, true));
   }
 
-  prepareTableNamesToTables(tableNames) {
+  protected prepareTableNamesToTables(tableNames: TableName[]) {
     this.tableNamesToTables = R.pipe(
+      // @ts-ignore
       R.unnest,
       R.groupBy(n => n[0]),
       R.map(groupedNameToDef => groupedNameToDef.map(nameToDef => nameToDef[1]))
     )(
+      // @ts-ignore
       tableNames.map(tableName => {
         const [schema, table] = this.parseTableName(tableName);
         const tableDefinition = this.resolveTableDefinition(tableName);
@@ -66,7 +135,7 @@ export class ScaffoldingSchema {
     );
   }
 
-  resolveTableDefinition(tableName) {
+  public resolveTableDefinition(tableName: TableName) {
     const [schema, table] = this.parseTableName(tableName);
     if (!this.dbSchema[schema]) {
       throw new UserError(`Can't resolve ${tableName}: '${schema}' does not exist`);
@@ -77,7 +146,7 @@ export class ScaffoldingSchema {
     return this.dbSchema[schema][table];
   }
 
-  tableSchema(tableName, includeJoins) {
+  protected tableSchema(tableName: TableName, includeJoins) {
     const [schema, table] = this.parseTableName(tableName);
     const tableDefinition = this.resolveTableDefinition(tableName);
     const dimensions = this.dimensions(tableDefinition);
@@ -94,7 +163,7 @@ export class ScaffoldingSchema {
     };
   }
 
-  parseTableName(tableName) {
+  protected parseTableName(tableName) {
     let schemaAndTable;
     if (Array.isArray(tableName)) {
       schemaAndTable = tableName;
@@ -107,12 +176,12 @@ export class ScaffoldingSchema {
     return schemaAndTable;
   }
 
-  dimensions(tableDefinition) {
+  protected dimensions(tableDefinition) {
     return this.dimensionColumns(tableDefinition).map(column => {
-      const res = {
+      const res: any = {
         name: column.name,
         types: [column.columnType || this.columnType(column)],
-        title: inflection.titleize(column.name)
+        title: inflection.titleize(column.name),
       };
 
       if (column.columnType !== 'time') {
@@ -123,7 +192,7 @@ export class ScaffoldingSchema {
     });
   }
 
-  numberMeasures(tableDefinition) {
+  protected numberMeasures(tableDefinition) {
     return tableDefinition.filter(
       column => !column.name.startsWith('_') &&
         (this.columnType(column) === 'number') &&
@@ -135,11 +204,11 @@ export class ScaffoldingSchema {
     }));
   }
 
-  fromMeasureDictionary(column) {
+  protected fromMeasureDictionary(column) {
     return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
   }
 
-  dimensionColumns(tableDefinition) {
+  protected dimensionColumns(tableDefinition: any) {
     const dimensionColumns = tableDefinition.filter(
       column => !column.name.startsWith('_') && this.columnType(column) === 'string' ||
         column.attributes && column.attributes.indexOf('primaryKey') !== -1 ||
@@ -147,15 +216,18 @@ export class ScaffoldingSchema {
     );
 
     const timeColumns = R.pipe(
+      // @ts-ignore
       R.filter(column => !column.name.startsWith('_') && this.columnType(column) === 'time'),
       R.sortBy(column => this.timeColumnIndex(column)),
+      // @ts-ignore
       R.map(column => ({ ...column, columnType: 'time' })) // TODO do we need it?
+      // @ts-ignore
     )(tableDefinition);
 
     return dimensionColumns.concat(timeColumns);
   }
 
-  joins(tableName, tableDefinition) {
+  protected joins(tableName, tableDefinition) {
     return R.unnest(tableDefinition
       .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && column.name.toLowerCase() !== 'id'))
       .map(column => {
@@ -194,15 +266,15 @@ export class ScaffoldingSchema {
       .filter(R.identity));
   }
 
-  drillMembers(dimensions) {
+  protected drillMembers(dimensions) {
     return dimensions.filter(d => this.fromDrillMembersDictionary(d));
   }
 
-  fromDrillMembersDictionary(dimension) {
+  protected fromDrillMembersDictionary(dimension) {
     return !!DRILL_MEMBERS_DICTIONARY.find(word => dimension.name.toLowerCase().indexOf(word) !== -1);
   }
 
-  timeColumnIndex(column) {
+  protected timeColumnIndex(column): number {
     const name = column.name.toLowerCase();
     if (name.indexOf('create') !== -1) {
       return 0;
@@ -213,14 +285,14 @@ export class ScaffoldingSchema {
     }
   }
 
-  columnType(column) {
+  protected columnType(column): ColumnType {
     const type = column.type.toLowerCase();
     if (['time', 'date'].find(t => type.indexOf(t) !== -1)) {
-      return 'time';
+      return ColumnType.Time;
     } else if (['int', 'dec', 'double', 'num'].find(t => type.indexOf(t) !== -1)) {
-      return 'number';
+      return ColumnType.Number;
     } else {
-      return 'string';
+      return ColumnType.String;
     }
   }
 }
