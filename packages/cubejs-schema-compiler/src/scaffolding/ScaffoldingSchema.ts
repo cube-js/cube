@@ -207,8 +207,7 @@ export class ScaffoldingSchema {
       name: column.name,
       types: ['sum', 'avg', 'min', 'max'],
       title: inflection.titleize(column.name),
-      included: this.options.includeNonDictionaryMeasures ? this.fromMeasureDictionary(column) : undefined,
-      isId: !!column.name.match(new RegExp(idRegex, 'i'))
+      ...(this.options.includeNonDictionaryMeasures ? { included: this.fromMeasureDictionary(column) } : null)
     }));
   }
 
