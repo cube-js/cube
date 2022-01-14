@@ -354,7 +354,7 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-dev:
-    needs: [build, unit, lint, latest-tag-sha]
+    needs: [latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
