@@ -1,5 +1,5 @@
 import inflection from 'inflection';
-import { CubeDescriptor, CubeDescriptorMember, MemberType, ScaffoldingSchema } from './ScaffoldingSchema';
+import { CubeDescriptor, CubeDescriptorMember, MemberType, ScaffoldingSchema, TableName } from './ScaffoldingSchema';
 import { UserError } from '../compiler';
 import { ValueWithComments } from './ValueWithComments';
 
@@ -22,9 +22,7 @@ export class ScaffoldingTemplate {
   private readonly scaffoldingSchema: ScaffoldingSchema;
 
   public constructor(private readonly dbSchema, private readonly driver) {
-    this.dbSchema = dbSchema;
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema);
-    this.driver = driver;
   }
 
   protected escapeName(name) {
@@ -34,11 +32,11 @@ export class ScaffoldingTemplate {
     return this.driver.quoteIdentifier(name);
   }
 
-  protected eligibleIdentifier(name) {
+  protected eligibleIdentifier(name: string) {
     return !!name.match(/^[a-z0-9_]+$/);
   }
 
-  public generateFilesByTableNames(tableNames, schemaContext: SchemaContext = {}) {
+  public generateFilesByTableNames(tableNames: TableName[], schemaContext: SchemaContext = {}) {
     const schemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
 
     return schemaForTables.map(tableSchema => ({
@@ -76,7 +74,7 @@ export class ScaffoldingTemplate {
   }
 
   // eslint-disable-next-line consistent-return
-  protected resolveTableName(tableName) {
+  protected resolveTableName(tableName: TableName) {
     let tableParts;
     if (Array.isArray(tableName)) {
       tableParts = tableName;
@@ -87,7 +85,7 @@ export class ScaffoldingTemplate {
     if (tableParts.length === 2) {
       this.scaffoldingSchema.resolveTableDefinition(tableName);
       return tableName;
-    } else if (tableParts.length === 1) {
+    } else if (tableParts.length === 1 && typeof tableName === 'string') {
       const schema = Object.keys(this.dbSchema).find(
         tableSchema => this.dbSchema[tableSchema][tableName] ||
           this.dbSchema[tableSchema][inflection.tableize(tableName)]
@@ -101,9 +99,9 @@ export class ScaffoldingTemplate {
       if (this.dbSchema[schema][inflection.tableize(tableName)]) {
         return `${schema}.${inflection.tableize(tableName)}`;
       }
-    } else {
-      throw new UserError('Table names should be in <table> or <schema>.<table> format');
     }
+
+    throw new UserError('Table names should be in <table> or <schema>.<table> format');
   }
 
   public schemaDescriptorForTable(tableSchema, schemaContext: SchemaContext = {}) {

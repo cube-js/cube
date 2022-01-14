@@ -13,7 +13,7 @@ export enum MemberType {
   Dimension = 'dimension'
 }
 
-type TableName = string | [string, string];
+export type TableName = string | [string, string];
 
 type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
 
@@ -80,7 +80,6 @@ export class ScaffoldingSchema {
   private tableNamesToTables: any;
 
   public constructor(private readonly dbSchema: Record<string, Record<string, any>>) {
-    this.dbSchema = dbSchema;
   }
 
   public cubeDescriptors(tableNames: TableName[]): CubeDescriptor[] {
@@ -227,7 +226,7 @@ export class ScaffoldingSchema {
     return dimensionColumns.concat(timeColumns);
   }
 
-  protected joins(tableName, tableDefinition) {
+  protected joins(tableName: TableName, tableDefinition) {
     return R.unnest(tableDefinition
       .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && column.name.toLowerCase() !== 'id'))
       .map(column => {
