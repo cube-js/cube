@@ -61,7 +61,7 @@ jobs:
       PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
       PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
     timeout-minutes: 60
-    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} 
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
     strategy:
       matrix:
         node-version: [12, 14, 16, 17]
@@ -240,7 +240,7 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./packages/cubejs-docker
+          context: .
           file: ./packages/cubejs-docker/latest.Dockerfile
           platforms: ${{ matrix.platforms }}
           push: true
@@ -310,7 +310,7 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./packages/cubejs-docker
+          context: .
           file: ./packages/cubejs-docker/latest-alpine.Dockerfile
           platforms: linux/amd64
           push: true
@@ -558,4 +558,3 @@ jobs:
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
           overwrite: true
-  
