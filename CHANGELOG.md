@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
+
+
+### Bug Fixes
+
+* **playground:** rollup designer undefined key ([3213e70](https://github.com/cube-js/cube.js/commit/3213e70947c0d1568de804ad3f6c7d515e81b56f))
+
+
+### Features
+
+* **@cubejs-backend/schema-compiler:** extend the schema generation API ([#3936](https://github.com/cube-js/cube.js/issues/3936)) ([48b2335](https://github.com/cube-js/cube.js/commit/48b2335c7d9810dc433fd8c76f4b3ec8a7b83442))
+* **cubestore:** Bump Clang to 12 ([8a16102](https://github.com/cube-js/cube.js/commit/8a161023a183447a45dabc59cc256fc01322ff45))
+* **cubestore:** Use OpenSSL 1.1.1l ([1e18bec](https://github.com/cube-js/cube.js/commit/1e18bec92be6756139387b0e9fef17c7c2cd388d))
+* Surfaces lastUpdateAt for used preaggregation tables and lastRefreshTime for queries using preaggreagation tables ([#3890](https://github.com/cube-js/cube.js/issues/3890)) ([f4ae73d](https://github.com/cube-js/cube.js/commit/f4ae73d9d4fd6b84483c99e8bdd1f9588efde5a2)), closes [#3540](https://github.com/cube-js/cube.js/issues/3540)
+* **cubesql:** Improve error messages ([#3829](https://github.com/cube-js/cube.js/issues/3829)) ([8293e52](https://github.com/cube-js/cube.js/commit/8293e52a4a509e8559949d8af6446ef8a04e33f5))
+
+
+
+
+
 ## [0.29.20](https://github.com/cube-js/cube.js/compare/v0.29.19...v0.29.20) (2022-01-10)
 
 
