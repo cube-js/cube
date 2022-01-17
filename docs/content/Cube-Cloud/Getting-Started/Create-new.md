@@ -18,7 +18,7 @@ region of your choice.
 >
   <img
   alt="Cube Cloud Create Deployment Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f2455031-14b9-49ca-b449-eb113a8deda8.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f5b73cc7-ac72-49ff-a3cd-491c6ab89bbc.png"
   style="border: none"
   width="100%"
   />
@@ -33,7 +33,7 @@ Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
 >
   <img
   alt="Cube Cloud Upload Project Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/0fe2ae4e-d596-499d-b26b-5f62f5780683.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/17f4f303-45cf-4a70-be60-d40cca99ab5e.png"
   style="border: none"
   width="100%"
   />
@@ -49,7 +49,7 @@ databases][link-connecting-to-databases] guide for more details.
 >
   <img
   alt="Cube Cloud Setup Database Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/81442713-0261-424c-bb09-17b1601c10e0.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/1375f9f1-0860-412a-a436-e2e775ec10fa.png"
   style="border: none"
   width="100%"
   />
@@ -83,7 +83,7 @@ In the UI it'll look exactly like the image below.
 >
   <img
   alt="Cube Cloud Setup Database Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/a0c30616-0a8e-4c85-8f79-4f9ba849eb63.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/031bb948-d706-412c-b714-5bf28df01312.png"
   style="border: none"
   width="100%"
   />
@@ -100,7 +100,7 @@ Step four in this case consists of generating a data schema. Start by selecting 
 >
   <img
   alt="Cube Cloud Setup Database Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/a959643f-4e0f-4f62-9dc9-4d48a0405002.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/a906434b-c4da-414a-adb3-f010b1fa45d1.png"
   style="border: none"
   width="100%"
   />
@@ -113,7 +113,7 @@ Cube Cloud will generate the data schema and spin up your Cube deployment. With 
 >
   <img
   alt="Cube Cloud Setup Database Screen"
-  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/4cd2de24-098f-465e-b7ee-dbadd3e82ab9.png"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/b6addada-cc77-4940-aa0c-a0a9c3df6fd1.png"
   style="border: none"
   width="100%"
   />
