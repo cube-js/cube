@@ -55,9 +55,9 @@ databases][link-connecting-to-databases] guide for more details.
   />
 </div>
 
-### Why don't you try out some sample data?
+### Want to use a sample database instead?
 
-We have a sample database where you can try out Cube Cloud.
+We also have a sample database where you can try out Cube Cloud.
 
 ```json
 Hostname
