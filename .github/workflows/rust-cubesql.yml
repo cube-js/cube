@@ -49,17 +49,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2021-07-04
           override: true
           components: rustfmt
-      - name: Unit cubesql
+      - name: Install tarpaulin@0.19.1
         uses: actions-rs/cargo@v1
         with:
-          command: test
-          args: --manifest-path rust/cubesql/Cargo.toml --no-fail-fast
+          command: install
+          args: cargo-tarpaulin --version 0.19.1
+      - name: Unit tests
+        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v2
+        with:
+          files: ./rust/cubesql/cobertura.xml
+          verbose: true
+          flags: cubesql
+          fail_ci_if_error: true
 
   native_linux:
     needs: [lint,unit]

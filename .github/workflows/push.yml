@@ -94,6 +94,7 @@ jobs:
         if: (matrix.node-version == '16.x')
         with:
           files: ./packages/*/coverage/clover.xml
+          flags: cube-backend
           verbose: true # optional (default = false)
 
   lint:
