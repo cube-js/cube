@@ -99,7 +99,7 @@ Let's explore the retrieved data:
 
 The `Orders.createdAt` time dimension was provided in the `dimensions` part of the query. So, its values were returned "as is", in the UTC timezone. (Apparently, all orders were made at midnight.)
 
-Also, check out the `Orders.createdAt.day` values in the result. They were returned because we've provided `Orders.createdAt` in the `timeDimensions` part of the query. So, they were translated to New York timezone (shifted 4 hours back from UTC) and also truncated to the start of the day since we've specified the daily `granularity` in the query.
+Also, check out the `Orders.createdAt.day` values in the result. They were returned because we've provided `Orders.createdAt` in the `timeDimensions` part of the query. So, they were translated to the New York timezone (shifted 4 hours back from UTC) and also truncated to the start of the day since we've specified the daily `granularity` in the query.
 
 We also added the `Orders.createdAtConverted` to `dimensions` in the query. The respective values were also translated to the New York timezone but not truncated with respect to the granularity. Please check that the `createdAtConverted` dimension is defined using the [`SQL_UTILS.convertTz` method](https://cube.dev/docs/schema/reference/cube#convert-tz) that does the timezone translation.
 
