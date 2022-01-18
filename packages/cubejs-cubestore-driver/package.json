@@ -38,7 +38,7 @@
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
     "mysql": "^2.16.0",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.1.1",
     "sqlstring": "^2.3.2",
     "tempy": "^1.0.1",
     "ws": "^7.4.3"
