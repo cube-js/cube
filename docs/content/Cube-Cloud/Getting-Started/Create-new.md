@@ -8,10 +8,10 @@ database.
 
 ## Step 1: Create a new Deployment
 
-The first step of creating a Cube App from scratch in Cube Cloud is to create a deployment.
+The first step of creating a Cube application from scratch in Cube Cloud is to create a deployment.
 
-Click the `create deployment` button. This is the first step in the deployment creation. Give it a name and select the cloud provider and
-region of your choice.
+Click the `Create Deployment` button. This is the first step in the deployment creation. Give
+it a name and select the cloud provider and region of your choice.
 
 <div
   style="text-align: center"
