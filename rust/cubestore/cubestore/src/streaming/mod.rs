@@ -368,6 +368,7 @@ impl KSqlStreamingSource {
         json: &T,
     ) -> Result<Response, CubeError> {
         let client = reqwest::ClientBuilder::new()
+            .http2_prior_knowledge()
             .use_rustls_tls()
             .user_agent("cubestore")
             .build()

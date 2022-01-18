@@ -580,6 +580,8 @@ impl ImportService for ImportServiceImpl {
         } else if location.starts_with("temp://") {
             // TODO do the actual estimation
             Ok(ImportServiceImpl::estimate_rows(location, None))
+        } else if location.starts_with("stream://") {
+            Ok(ImportServiceImpl::estimate_rows(location, None))
         } else {
             Ok(ImportServiceImpl::estimate_rows(
                 location,
