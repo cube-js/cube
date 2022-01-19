@@ -58,6 +58,12 @@ jobs:
           toolchain: nightly-2021-07-04
           override: true
           components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Install tarpaulin@0.19.1
         uses: actions-rs/cargo@v1
         with:
@@ -96,10 +102,19 @@ jobs:
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+          sharedKey: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -114,10 +129,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
@@ -155,6 +166,10 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -169,8 +184,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
       - name: Yarn install
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
