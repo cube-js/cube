@@ -35,6 +35,9 @@
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
