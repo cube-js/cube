@@ -75,66 +75,6 @@ impl Backend {
             return Ok(QueryResponse::Ok(
                 StatusFlags::SERVER_STATUS_AUTOCOMMIT | StatusFlags::SERVER_SESSION_STATE_CHANGED,
             ));
-        } else if query_lower.eq("show variables like 'aurora\\_version'") {
-            return Ok(QueryResponse::ResultSet(
-                StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
-                    vec![
-                        dataframe::Column::new(
-                            "Variable_name".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ),
-                        dataframe::Column::new(
-                            "Value".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ),
-                    ],
-                    vec![],
-                )),
-            ));
-        }
-        if query_lower.eq("show variables like 'sql_mode'") {
-            return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "Variable_name".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Value".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("sql_mode".to_string()),
-                            dataframe::TableValue::String("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string())
-                        ])]
-                    )
-                )),
-            )
-        } else if query_lower.eq("show variables like 'lower_case_table_names'") {
-            return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "Variable_name".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Value".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("lower_case_table_names".to_string()),
-                            dataframe::TableValue::Int64(0)
-                        ])]
-                    )
-                )),
-            )
         } else if query_lower.eq("show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin'") {
             return Ok(
                 QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
