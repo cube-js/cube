@@ -143,9 +143,23 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+
     if (!this.userDefinedTypes) {
-      const customTypes = await conn.query(
-        'SELECT oid, typname FROM pg_type WHERE typcategory = \'U\'',
+      // Postgres enum types defined as typcategory = 'E' these can be assumed
+      // to be of type varchar for the drivers purposes.
+      // TODO: if full implmentation the constraints can be looked up via pg_enum
+      // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
+      const customTypes = await conn.query(`
+            SELECT
+                oid,
+                CASE
+                    WHEN typcategory = 'E' THEN 'varchar'
+                    ELSE typname
+                END
+            FROM
+                pg_type
+            WHERE
+                typcategory in ('U', 'E')'`,
         []
       );
 
