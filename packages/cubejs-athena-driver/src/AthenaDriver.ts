@@ -1,5 +1,5 @@
 import * as AWS from '@aws-sdk/client-athena';
-import { BaseDriver, QueryOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, DriverInterface, QueryOptions } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
@@ -50,7 +50,7 @@ function applyParams(query: string, params: any[]): string {
   return SqlString.format(query, params);
 }
 
-class AthenaDriver extends BaseDriver {
+export class AthenaDriver extends BaseDriver implements DriverInterface {
   private config: AthenaDriverOptionsInitialized;
 
   private athena: AWS.Athena;
