@@ -79,7 +79,7 @@ const DRILL_MEMBERS_DICTIONARY = [
 
 const idRegex = '_id$|id$';
 
-export type DatabaseSchema = Record<string, Record<string, any>>
+export type DatabaseSchema = Record<string, Record<string, any>>;
 
 type ScaffoldingSchemaOptions = {
   includeNonDictionaryMeasures?: boolean;
