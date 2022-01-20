@@ -100,6 +100,13 @@ Cube.js is written in a mixture of plain JavaScript and Typescript. TypeScript i
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
 
+### Debugging with WebStorm
+
+1. Follow all the steps from the previous section. Make sure that the `yarn tsc:watch` daemon is running in the background.
+2. Open the cube.js project in WebStorm.
+3. Create a new configuration, using `./node_modules/.bin/cubejs-server` for Node Parameters and the directory of your test project for Working directory.
+4. Run/Debug dev cube.js servers using the new configuration.
+
 ### Implementing a Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
