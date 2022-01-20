@@ -40,7 +40,6 @@ export class QueryOrchestrator {
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
-    console.log('qqq', redisPrefix);
     this.rollupOnlyMode = options.rollupOnlyMode;
 
     const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
