@@ -158,7 +158,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         FROM
             pg_type
         WHERE
-            typcategory in ('U', 'E')'`,
+            typcategory in ('U', 'E')`,
         []
       );
 

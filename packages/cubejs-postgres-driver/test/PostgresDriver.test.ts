@@ -33,7 +33,7 @@ describe('PostgresDriver', () => {
   });
 
   test('type coercion', async () => {
-    await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\')', []);
+    await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\');', []);
 
     const data = await driver.query(
       `
