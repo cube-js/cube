@@ -82,12 +82,12 @@ https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/READM
 
 #### Development
 
-Cube.js is written in a mixture of plain JavaScript and Typescript. For new code, TypeScript should be preferred.
+Cube.js is written in a mixture of plain JavaScript and Typescript. TypeScript is preferred for new code.
 
 > Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
 
-1. Clone the Cube.js repository, `$ git clone https://github.com/cube-js/cube.js`, then `$ cd cube.js`. 
+1. Clone the Cube.js repository, `$ git clone https://github.com/cube-js/cube.js`. 
 2. Run `$ yarn install` in the root directory.
 3. Run `$ yarn build` in the root directory to build the frontend dependent packages. 
 4. Run `$ yarn build` in `packages/cubejs-playground` to build the frontend.
