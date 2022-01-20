@@ -1265,8 +1265,6 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 
     if !expr.projection.is_empty() {
         for projection in expr.projection.iter() {
-            // println!("{:?}", projection);
-
             match projection {
                 ast::SelectItem::Wildcard => {
                     for dimension in ctx.meta.dimensions.iter() {
@@ -1451,7 +1449,6 @@ impl QueryPlanner {
         };
 
         if let Some(cube) = self.context.find_cube_with_name(table_name.clone()) {
-            // println!("{:?}", select.projection);
             let mut ctx = QueryContext::new(&cube);
             let mut builder = compile_select(select, &mut ctx)?;
 
@@ -1524,6 +1521,7 @@ impl QueryPlanner {
             ast::Statement::ShowVariable { variable } => {
                 self.show_variable_to_plan(variable, props)
             }
+            ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter, props),
             // Proxy some queries to DF
             ast::Statement::ShowColumns { .. } => self.create_df_logical_plan(stmt.clone(), props),
             _ => Err(CompilationError::Unsupported(format!(
@@ -1587,25 +1585,6 @@ impl QueryPlanner {
                     vec![],
                 )),
             ))
-        } else if name.eq_ignore_ascii_case("variables like 'aurora\\_version'") {
-            Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
-                    vec![
-                        dataframe::Column::new(
-                            "Variable_name".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ),
-                        dataframe::Column::new(
-                            "Value".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                            ColumnFlags::empty(),
-                        ),
-                    ],
-                    vec![dataframe::Row::new(vec![])],
-                )),
-            ))
         } else {
             self.create_df_logical_plan(
                 ast::Statement::ShowVariable {
@@ -1614,6 +1593,37 @@ impl QueryPlanner {
                 props,
             )
         }
+    }
+
+    fn show_variables_to_plan(
+        &self,
+        filter: &Option<ast::ShowStatementFilter>,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE VARIABLE_NAME {}", stmt.to_string())
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                return Err(CompilationError::Unsupported(format!(
+                    "Show variable doesnt support WHERE statement: {}",
+                    stmt
+                )))
+            }
+            Some(stmt @ ast::ShowStatementFilter::ILike(_)) => {
+                return Err(CompilationError::User(format!(
+                    "Show variable doesnt define ILIKE statement: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let stmt = parse_sql_to_statement(
+            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter)
+        )?;
+
+        self.create_df_logical_plan(stmt, props)
     }
 
     fn create_df_logical_plan(
@@ -3650,6 +3660,61 @@ mod tests {
             +----+----+----+\n\
             | 1  | 18 | 0  |\n\
             +----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_variable() -> Result<(), CubeError> {
+        // LIKE
+        assert_eq!(
+            execute_df_query(
+                "show variables like 'sql_mode';"
+                .to_string()
+            )
+            .await?,
+            "+---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | Variable_name | Value                                                                                                                 |\n\
+            +---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | sql_mode      | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
+            +---------------+-----------------------------------------------------------------------------------------------------------------------+"
+        );
+
+        // LIKE pattern
+        assert_eq!(
+            execute_df_query(
+                "show variables like '%_mode';"
+                .to_string()
+            )
+            .await?,
+            "+---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | Variable_name | Value                                                                                                                 |\n\
+            +---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | sql_mode      | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
+            +---------------+-----------------------------------------------------------------------------------------------------------------------+"
+        );
+
+        // Negative test, we dont define this variable
+        assert_eq!(
+            execute_df_query("show variables like 'aurora_version';".to_string()).await?,
+            "++\n++\n++"
+        );
+
+        // All variables
+        assert_eq!(
+            execute_df_query(
+                "show variables;"
+                .to_string()
+            )
+            .await?,
+            "+------------------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | Variable_name          | Value                                                                                                                 |\n\
+            +------------------------+-----------------------------------------------------------------------------------------------------------------------+\n\
+            | sql_mode               | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
+            | max_allowed_packet     | 67108864                                                                                                              |\n\
+            | lower_case_table_names | 0                                                                                                                     |\n\
+            +------------------------+-----------------------------------------------------------------------------------------------------------------------+"
         );
 
         Ok(())

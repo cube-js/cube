@@ -21,6 +21,8 @@ impl PerfSchemaVariablesProvider {
     pub fn new() -> Self {
         let mut variables = HashMap::new();
         variables.insert("max_allowed_packet".to_string(), "67108864".to_string());
+        variables.insert("sql_mode".to_string(), "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string());
+        variables.insert("lower_case_table_names".to_string(), "0".to_string());
 
         Self { variables }
     }
