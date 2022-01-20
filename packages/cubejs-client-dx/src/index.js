@@ -1,1 +1,3 @@
-module.exports = {};
+
+
+module.exports = require('@cubejs-client/core');

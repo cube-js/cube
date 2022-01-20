@@ -25,6 +25,9 @@
     "generated.d.ts"
   ],
   "license": "MIT",
+  "dependencies": {
+    "@cubejs-client/core": "^0.29.8"
+  },
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
