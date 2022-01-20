@@ -1,10 +1,8 @@
 import * as AWS from '@aws-sdk/client-athena';
 import { BaseDriver, QueryOptions } from '@cubejs-backend/query-orchestrator';
-import { getEnv, pausePromise } from '@cubejs-backend/shared';
+import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
-
-const applyParams = (query, params) => SqlString.format(query, params);
 
 interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
@@ -14,6 +12,12 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   S3OutputLocation?: string
   pollTimeout?: number
   pollMaxInterval?: number
+}
+
+type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
+
+interface AthenaQueryId {
+  QueryExecutionId: string;
 }
 
 interface AthenaTable {
@@ -29,8 +33,25 @@ interface AthenaColumn {
 
 type AthenaSchema = Record<string, Record<string, AthenaColumn[]>>;
 
+function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
+  if (x === undefined || x === null) {
+    throw new Error(`${name} is not defined.`);
+  }
+  return x!;
+}
+
+function checkQueryId<T extends {QueryExecutionId?: string}>(name: string, t: T): AthenaQueryId {
+  return {
+    QueryExecutionId: checkNonNullable(name, t.QueryExecutionId)
+  };
+}
+
+function applyParams(query: string, params: any[]): string {
+  return SqlString.format(query, params);
+}
+
 class AthenaDriver extends BaseDriver {
-  private config: AthenaDriverOptions;
+  private config: AthenaDriverOptionsInitialized;
 
   private athena: AWS.Athena;
 
@@ -39,8 +60,8 @@ class AthenaDriver extends BaseDriver {
 
     this.config = {
       credentials: {
-        accessKeyId: config.accessKeyId || process.env.CUBEJS_AWS_KEY,
-        secretAccessKey: config.secretAccessKey || process.env.CUBEJS_AWS_SECRET,
+        accessKeyId: checkNonNullable('CUBEJS_AWS_KEY', config.accessKeyId || process.env.CUBEJS_AWS_KEY),
+        secretAccessKey: checkNonNullable('CUBEJS_AWS_SECRET', config.secretAccessKey || process.env.CUBEJS_AWS_SECRET),
       },
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
@@ -63,14 +84,12 @@ class AthenaDriver extends BaseDriver {
     });
   }
 
-  protected async awaitForJobStatus(QueryExecutionId, query, options) {
-    const queryExecution = await this.athena.getQueryExecution({
-      QueryExecutionId
-    });
+  protected async awaitForJobStatus<R = unknown>(qid: AthenaQueryId, query: string, options: any): Promise<R[] | null> {
+    const queryExecution = await this.athena.getQueryExecution(qid);
 
-    const status = queryExecution.QueryExecution.Status.State;
+    const status = queryExecution.QueryExecution?.Status?.State;
     if (status === 'FAILED') {
-      throw new Error(queryExecution.QueryExecution.Status.StateChangeReason);
+      throw new Error(queryExecution.QueryExecution?.Status?.StateChangeReason);
     }
 
     if (status === 'CANCELLED') {
@@ -80,32 +99,40 @@ class AthenaDriver extends BaseDriver {
     if (
       status === 'SUCCEEDED'
     ) {
-      const allRows = [];
-      let columnInfo;
+      const allRows: AWS.Row[] = [];
+      let columnInfo: { Name: string }[] | undefined;
 
       this.reportQueryUsage({
-        dataScannedInBytes: queryExecution.QueryExecution.Statistics.DataScannedInBytes
+        dataScannedInBytes: queryExecution.QueryExecution?.Statistics?.DataScannedInBytes
       }, options);
 
       for (
-        let results = await this.athena.getQueryResults({ QueryExecutionId });
+        let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
         results;
-        results = results.NextToken && (await this.athena.getQueryResults({
-          QueryExecutionId, NextToken: results.NextToken
-        }))
+        results = results.NextToken
+          ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
+          : undefined
       ) {
-        const [header, ...tableRows] = results.ResultSet.Rows;
-        allRows.push(...(allRows.length ? results.ResultSet.Rows : tableRows));
-        if (!columnInfo) {
-          columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
-            ? [{ Name: 'column' }]
-            : results.ResultSet.ResultSetMetadata.ColumnInfo;
+        const rows = results.ResultSet?.Rows ?? [];
+        if (rows.length > 0) {
+          const [header, ...tableRows] = rows;
+          allRows.push(...(allRows.length ? rows : tableRows));
+          if (!columnInfo) {
+            columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+              ? [{ Name: 'column' }]
+              : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
+          }
         }
       }
 
-      return allRows.map(r => columnInfo
-        .map((c, i) => ({ [c.Name]: r.Data[i].VarCharValue }))
-        .reduce((a, b) => ({ ...a, ...b }), {}));
+      return allRows.map(r => {
+        const fields: Record<string, any> = {};
+        checkNonNullable('ColumnInfo', columnInfo)
+          .forEach((c, i) => {
+            fields[c.Name] = r.Data?.[i].VarCharValue;
+          });
+        return fields;
+      }) as unknown as R[];
     }
 
     return null;
@@ -119,18 +146,21 @@ class AthenaDriver extends BaseDriver {
       } : s))
     );
 
-    const { QueryExecutionId } = await this.athena.startQueryExecution({
-      QueryString: queryString,
-      WorkGroup: this.config.workGroup,
-      ResultConfiguration: {
-        OutputLocation: this.config.S3OutputLocation
-      }
-    });
+    const qid = checkQueryId(
+      'Start query id',
+      await this.athena.startQueryExecution({
+        QueryString: queryString,
+        WorkGroup: this.config.workGroup,
+        ResultConfiguration: {
+          OutputLocation: this.config.S3OutputLocation
+        }
+      })
+    );
 
     const startedTime = Date.now();
 
     for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
-      const result = await this.awaitForJobStatus(QueryExecutionId, query, options);
+      const result: R[] | null = await this.awaitForJobStatus(qid, query, options);
       if (result) {
         return result;
       }
@@ -152,7 +182,7 @@ class AthenaDriver extends BaseDriver {
     return this.mergeSchemas([tablesSchema, viewsSchema]);
   }
 
-  private async viewsSchema(tablesSchema): Promise<AthenaSchema> {
+  private async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
     // eslint-disable-next-line camelcase
     const isView = (table: AthenaTable) => !tablesSchema[table.schema]
       || !tablesSchema[table.schema][table.name];
@@ -183,7 +213,7 @@ class AthenaDriver extends BaseDriver {
   // eslint-disable-next-line camelcase
   protected async getColumns(table: AthenaTable): Promise<AthenaSchema> {
     // eslint-disable-next-line camelcase
-    const data = await this.query(`SHOW COLUMNS IN \`${table.schema}\`.\`${table.name}\``, []);
+    const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.schema}\`.\`${table.name}\``, []);
 
     return {
       [table.schema]: {
