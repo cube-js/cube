@@ -171,7 +171,7 @@ export function Cubes({
         openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
-          const { membertype } = (event.domEvent.target as HTMLElement).dataset;
+          const { membertype } = (event.domEvent.currentTarget as HTMLElement).dataset;
 
           onSelect(
             membertype as QueryMemberKey,

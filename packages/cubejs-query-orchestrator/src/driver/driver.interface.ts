@@ -111,4 +111,6 @@ export interface DriverInterface {
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
   // Some drivers can implement UNLOAD data to external storage
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
+  // Current timestamp, defaults to new Date().getTime()
+  nowTimestamp(): number;
 }

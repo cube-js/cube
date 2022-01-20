@@ -21,6 +21,7 @@
 extern crate lazy_static;
 
 use core::fmt;
+use cubeclient::apis::default_api::{LoadV1Error, MetaV1Error};
 use log::SetLoggerError;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
@@ -86,9 +87,33 @@ impl fmt::Display for CubeError {
     }
 }
 
-impl<T> From<cubeclient::apis::Error<T>> for CubeError {
-    fn from(v: cubeclient::apis::Error<T>) -> Self {
-        CubeError::from_error(v)
+impl From<cubeclient::apis::Error<LoadV1Error>> for CubeError {
+    fn from(v: cubeclient::apis::Error<LoadV1Error>) -> Self {
+        let message: String = match v {
+            cubeclient::apis::Error::ResponseError(e) => match e.entity {
+                None => e.content,
+                Some(LoadV1Error::UnknownValue(_)) => e.content,
+                Some(LoadV1Error::Status4XX(unwrapped)) => unwrapped.error,
+                Some(LoadV1Error::Status5XX(unwrapped)) => unwrapped.error,
+            },
+            _ => v.to_string(),
+        };
+        return CubeError::internal(message);
+    }
+}
+
+impl From<cubeclient::apis::Error<MetaV1Error>> for CubeError {
+    fn from(v: cubeclient::apis::Error<MetaV1Error>) -> Self {
+        let message: String = match v {
+            cubeclient::apis::Error::ResponseError(e) => match e.entity {
+                None => e.content,
+                Some(MetaV1Error::UnknownValue(_)) => e.content,
+                Some(MetaV1Error::Status4XX(unwrapped)) => unwrapped.error,
+                Some(MetaV1Error::Status5XX(unwrapped)) => unwrapped.error,
+            },
+            _ => v.to_string(),
+        };
+        return CubeError::internal(message);
     }
 }
 

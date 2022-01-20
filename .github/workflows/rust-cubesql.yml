@@ -17,7 +17,7 @@ on:
       - 'rust/cubesql/**'
 
 jobs:
-  precheck:
+  lint:
     runs-on: ubuntu-20.04
     timeout-minutes: 20
     name: Check fmt/clippy
@@ -41,11 +41,31 @@ jobs:
       #- name: Clippy CubeSQL
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
+  unit:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 20
+    name: Unit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Unit cubesql
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path rust/cubesql/Cargo.toml --no-fail-fast
+
   native_linux:
-    needs: [precheck]
+    needs: [lint,unit]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} 
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
     strategy:
       matrix:
         node-version: [12, 14, 16, 17]
@@ -99,7 +119,7 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run test:unit
 
   native:
-    needs: [precheck]
+    needs: [lint,unit]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}

@@ -61,6 +61,22 @@ function version(cacheKey) {
   return result;
 }
 
+// There’re community developed and custom drivers which not always up-to-date with latest BaseDriver.
+// Extra defence for drivers that don't expose now() yet.
+function nowTimestamp(client: DriverInterface) {
+  return client.nowTimestamp?.() ?? new Date().getTime();
+}
+
+// Returns the oldest timestamp, if any.
+export function getLastUpdatedAtTimestamp(timestamps: (number | undefined)[]): number | undefined {
+  timestamps = timestamps.filter(t => t !== undefined);
+  if (timestamps.length === 0) {
+    return undefined;
+  } else {
+    return Math.min(...timestamps);
+  }
+}
+
 function getStructureVersion(preAggregation) {
   return version(
     preAggregation.indexesSql && preAggregation.indexesSql.length ?
@@ -369,8 +385,9 @@ class PreAggregationLoadCache {
 
 type LoadPreAggregationResult = {
   targetTableName: string;
-  refreshKeyValues: any[]
-} | string;
+  refreshKeyValues: any[];
+  lastUpdatedAt: number;
+};
 
 export class PreAggregationLoader {
   // eslint-disable-next-line no-use-before-define
@@ -459,7 +476,11 @@ export class PreAggregationLoader {
 
         // the rollups are being maintained independently of this instance of cube.js,
         // immediately return the latest data it already has
-        return this.targetTableName(versionEntryByStructureVersion);
+        return {
+          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          refreshKeyValues: [],
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
+        };
       }
 
       if (versionEntryByStructureVersion) {
@@ -474,7 +495,11 @@ export class PreAggregationLoader {
             });
           }
         });
-        return this.targetTableName(versionEntryByStructureVersion);
+        return {
+          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          refreshKeyValues: [],
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
+        };
       } else {
         // no rollup has been built yet - build it synchronously as part of responding to this request
         return this.loadPreAggregationWithKeys();
@@ -482,14 +507,15 @@ export class PreAggregationLoader {
     } else {
       // either we have no data cached for this rollup or waitForRenew is true, either way,
       // synchronously renew what data is needed so that the most current data will be returned for the current request
+      const result = await this.loadPreAggregationWithKeys();
       return {
-        targetTableName: await this.loadPreAggregationWithKeys(),
+        ...result,
         refreshKeyValues: await this.getInvalidationKeyValues()
       };
     }
   }
 
-  protected async loadPreAggregationWithKeys() {
+  protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
     const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
@@ -500,7 +526,11 @@ export class PreAggregationLoader {
 
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
     if (versionEntryByContentVersion && !this.forceBuild) {
-      return this.targetTableName(versionEntryByContentVersion);
+      return {
+        targetTableName: this.targetTableName(versionEntryByContentVersion),
+        refreshKeyValues: [],
+        lastUpdatedAt: versionEntryByContentVersion.last_updated_at
+      };
     }
 
     // TODO this check can be redundant due to structure version is already checked in loadPreAggregation()
@@ -511,16 +541,22 @@ export class PreAggregationLoader {
     ) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
-        return this.targetTableName(versionEntryByStructureVersion);
+        return {
+          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          refreshKeyValues: [],
+          lastUpdatedAt: versionEntryByContentVersion.last_updated_at
+        };
       }
     }
 
+    const client = this.preAggregation.external ?
+      await this.externalDriverFactory() :
+      await this.driverFactory();
+
     if (!versionEntries.versionEntries.length) {
-      const client = this.preAggregation.external ?
-        await this.externalDriverFactory() :
-        await this.driverFactory();
       await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     }
+
     // ensure we find appropriate structure version before invalidating anything
     const versionEntry =
       versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`] ||
@@ -530,11 +566,11 @@ export class PreAggregationLoader {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
-      last_updated_at: new Date().getTime(),
+      last_updated_at: nowTimestamp(client),
       naming_version: 2,
     };
 
-    const mostRecentTargetTableName = async () => {
+    const mostRecentResult: () => Promise<LoadPreAggregationResult> = async () => {
       await this.loadCache.reset(this.preAggregation);
       const lastVersion = getVersionEntryByContentVersion(
         await this.loadCache.getVersionEntries(this.preAggregation)
@@ -542,7 +578,11 @@ export class PreAggregationLoader {
       if (!lastVersion) {
         throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created`);
       }
-      return this.targetTableName(lastVersion);
+      return {
+        targetTableName: this.targetTableName(lastVersion),
+        refreshKeyValues: [],
+        lastUpdatedAt: lastVersion.last_updated_at
+      };
     };
 
     if (this.forceBuild) {
@@ -554,7 +594,7 @@ export class PreAggregationLoader {
         newVersionEntry
       });
       await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
-      return mostRecentTargetTableName();
+      return mostRecentResult();
     }
 
     if (versionEntry) {
@@ -566,7 +606,7 @@ export class PreAggregationLoader {
           newVersionEntry
         });
         await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
-        return mostRecentTargetTableName();
+        return mostRecentResult();
       } else if (versionEntry.content_version !== newVersionEntry.content_version) {
         if (this.waitForRenew) {
           this.logger('Waiting for pre-aggregation renew', {
@@ -576,7 +616,7 @@ export class PreAggregationLoader {
             newVersionEntry
           });
           await this.executeInQueue(invalidationKeys, this.priority(0), newVersionEntry);
-          return mostRecentTargetTableName();
+          return mostRecentResult();
         } else {
           this.scheduleRefresh(invalidationKeys, newVersionEntry);
         }
@@ -589,9 +629,13 @@ export class PreAggregationLoader {
         newVersionEntry
       });
       await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
-      return mostRecentTargetTableName();
+      return mostRecentResult();
     }
-    return this.targetTableName(versionEntry);
+    return {
+      targetTableName: this.targetTableName(versionEntry),
+      refreshKeyValues: [],
+      lastUpdatedAt: versionEntry.last_updated_at
+    };
   }
 
   protected contentVersion(invalidationKeys) {
@@ -657,7 +701,7 @@ export class PreAggregationLoader {
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
-  protected targetTableName(versionEntry) {
+  protected targetTableName(versionEntry): string {
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
@@ -1167,14 +1211,15 @@ export class PreAggregationPartitionRangeLoader {
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults
         .map(
-          targetTableName => (typeof targetTableName === 'string' ? targetTableName : targetTableName.targetTableName)
+          targetTableName => targetTableName.targetTableName
         );
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}`)
         .join(' UNION ALL ');
       return {
         targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
-        refreshKeyValues: loadResults.map(t => (typeof t === 'object' ? t.refreshKeyValues : {}))
+        refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
+        lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
       };
     } else {
       return new PreAggregationLoader(
@@ -1429,9 +1474,9 @@ export class PreAggregations {
         }
       );
 
-      const preAggregationPromise = () => loader.loadPreAggregations().then(async targetTableName => {
+      const preAggregationPromise = () => loader.loadPreAggregations().then(async loadResult => {
         const usedPreAggregation = {
-          ...(typeof targetTableName === 'string' ? { targetTableName } : targetTableName),
+          ...loadResult,
           type: p.type,
         };
         await this.addTableUsed(usedPreAggregation.targetTableName);
@@ -1594,7 +1639,7 @@ export class PreAggregations {
     return preAggregation.tableName;
   }
 
-  public static targetTableName(versionEntry) {
+  public static targetTableName(versionEntry): string {
     if (versionEntry.naming_version === 2) {
       return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
