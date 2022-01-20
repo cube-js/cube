@@ -52,7 +52,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 
 #### Development
 
-1. After cloning Cube.js repository run `$ yarn` to install dependencies.
+1. After cloning Cube.js repository run `$ yarn install` to install dependencies.
 2. Use `$ docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
 
 ### Cube.js Client
@@ -75,26 +75,32 @@ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/c
 
 #### Prerequisites
 
-If you are going to develop any JDBC driver, you need to [install Java with JDK][link-java-guide].
+If you are going to develop a JDBC driver, you need to [install Java with JDK][link-java-guide].
 
 [link-java-guide]:
 https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 
 #### Development
 
-Cube.js is written in plain JavaScript, but some parts have already been migrated to TypeScript.
+Cube.js is written in a mixture of plain JavaScript and Typescript. For new code, TypeScript should be preferred.
 
 > Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
 
-1. After cloning Cube.js repository run `$ yarn install` in root directory.
-2. Use `yarn tsc:watch` to start TypeScript compiler in watch mode.
-3. Use `$ yarn link` in `packages/cubejs-<pkg>` to add these package to link registry.
-3. Create or choose an existed project for testing.
-4. Use `$ yarn link @cubejs-backend/cubejs-<pkg>` inside your testing project to link changed package in it.
-5. Use `$ yarn dev` to start your testing project and verify changes.
+1. Clone the Cube.js repository, `$ git clone https://github.com/cube-js/cube.js`, then `$ cd cube.js`. 
+2. Run `$ yarn install` in the root directory.
+3. Run `$ yarn build` in the root directory to build the frontend dependent packages. 
+4. Run `$ yarn build` in `packages/cubejs-playground` to build the frontend.
+5. Run `$ yarn tsc:watch` to start the TypeScript compiler in watch mode.
+6. Run `$ yarn link` in `packages/cubejs-<pkg>` for the drivers and dependent packages you intend to modify. 
+7. Run `$ yarn install` in `packages/cubejs-<pkg>` to install dependencies for drivers and dependent packages.
+8. Run `$ yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
+9. Run `$ yarn link` in `packages/cubejs-server-core`.
+10. Create or choose an existing project for testing.
+11. Run `$ yarn link @cubejs-backend/server-core` in your project directory. 
+12. Run `$ yarn dev` to start your testing project and verify changes.
 
-### Implementing Driver
+### Implementing a Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
 `@cubejs-backend/mysql-driver` is a very good candidate for copying this structure.
@@ -109,7 +115,7 @@ The rest will be done by `BaseDriver` class.
 8. Please use yarn to add any dependencies and run `$ yarn` within the package before committing to ensure right `yarn.lock` is in place.
 9. Add this driver dependency to [cubejs-server-core/core/DriverDependencies.js](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-server-core/core/DriverDependencies.js#L1).
 
-### Implementing JDBC Driver
+### Implementing a JDBC Driver
 
 If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
 [cubejs-jdbc-driver/driver/JDBCDriver.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-jdbc-driver/driver/JDBCDriver.js#L31).
@@ -142,21 +148,7 @@ For example one can publish `cubejs-foo-driver` npm package to fullfil driver de
 ### Testing Schema Compiler
 
 In order to run tests in `cubejs-schema-compiler` package you need to have running [Docker](https://docs.docker.com/install/) on your machine.
-When it's up and running just use `$ npm test` in `packages/cubejs-schema-compiler` to execute tests.
-
-### Linking Server Core for Development
-
-It's convenient to link `@cubejs-backend/server-core` into your project for manual tests of changes of backend code.
-Cube.js uses `yarn` as package manager instead of `npm`.
-In order to link `@cubejs-backend/server-core`:
-
-1. Create new project using `npx cubejs-cli create` or use existing one.
-2. Install yarn: `npm install -g yarn`.
-3. Link server-core package: `yarn link` inside `packages/cubejs-server-core`.
-4. Link all drivers and dependent packages where you make changes in `packages/cubejs-server-core`.
-5. Run `yarn build` in `packages/cubejs-playground`.
-6. Install dependencies in all linked packages using `yarn`.
-7. Run `yarn link @cubejs-backend/server-core` in your project directory.
+When it's up and running just use `$ yarn test` in `packages/cubejs-schema-compiler` to execute tests.
 
 ### Client Packages
 
@@ -185,11 +177,11 @@ Following these guidelines is not a requirement, but you can save some time for 
 
 ### Code
 
-1. Run `npm run lint` in package before committing your changes.
+1. Run `yarn lint` in package before committing your changes.
 If package doesn't have lint script, please add it and run.
 There's one root `.eslintrc.js` file for all packages except client ones.
 Client packages has it's own `.eslintrc.js` files.
-2. Run `npm test` before committing if package has tests.
+2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.
 All PRs are merged using squash so only PR name matters.
