@@ -115,7 +115,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ) {
         const rows = results.ResultSet?.Rows ?? [];
         if (rows.length > 0) {
-          const [header, ...tableRows] = rows;
+          const [_header, ...tableRows] = rows;
           allRows.push(...(allRows.length ? rows : tableRows));
           if (!columnInfo) {
             columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
@@ -183,7 +183,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   private async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
-    // eslint-disable-next-line camelcase
     const isView = (table: AthenaTable) => !tablesSchema[table.schema]
       || !tablesSchema[table.schema][table.name];
 
@@ -210,9 +209,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return data as AthenaTable[];
   }
 
-  // eslint-disable-next-line camelcase
   protected async getColumns(table: AthenaTable): Promise<AthenaSchema> {
-    // eslint-disable-next-line camelcase
     const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.schema}\`.\`${table.name}\``, []);
 
     return {
