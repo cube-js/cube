@@ -240,5 +240,3 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return result;
   }
 }
-
-module.exports = AthenaDriver;
