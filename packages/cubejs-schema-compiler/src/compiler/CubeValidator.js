@@ -207,7 +207,8 @@ const OriginalSqlSchema = condition(
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
     type: Joi.any().valid('originalSql').required(),
-  })
+    uniqueKeyColumns: Joi.array().items(Joi.string()),
+  }),
 );
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
