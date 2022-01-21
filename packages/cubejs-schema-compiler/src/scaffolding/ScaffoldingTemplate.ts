@@ -1,5 +1,5 @@
 import inflection from 'inflection';
-import { CubeDescriptor, CubeDescriptorMember, MemberType, ScaffoldingSchema, TableName } from './ScaffoldingSchema';
+import { CubeDescriptor, CubeDescriptorMember, DatabaseSchema, MemberType, ScaffoldingSchema, TableName } from './ScaffoldingSchema';
 import { UserError } from '../compiler';
 import { ValueWithComments } from './ValueWithComments';
 
@@ -21,7 +21,7 @@ class MemberReference {
 export class ScaffoldingTemplate {
   private readonly scaffoldingSchema: ScaffoldingSchema;
 
-  public constructor(private readonly dbSchema, private readonly driver) {
+  public constructor(private readonly dbSchema: DatabaseSchema, private readonly driver) {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema);
   }
 
@@ -46,12 +46,12 @@ export class ScaffoldingTemplate {
     }));
   }
 
-  public generateFilesByCubeDescriptors(cubeDescriptors: CubeDescriptor[], schemaContext = {}) {
+  public generateFilesByCubeDescriptors(cubeDescriptors: CubeDescriptor[], schemaContext: SchemaContext = {}) {
     const tableNames = cubeDescriptors.map(({ tableName }) => tableName);
     const generatedSchemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
 
     const schemaForTables = cubeDescriptors.map((descriptor) => {
-      const generatedDescriptor = generatedSchemaForTables.find(({ cube }) => descriptor.cube);
+      const generatedDescriptor = generatedSchemaForTables.find(({ cube }) => cube === descriptor.cube);
       const cubeMembers = descriptor.members.reduce<CubeMembers>((memo, member) => ({
         measures: [...memo.measures].concat(member.memberType === MemberType.Measure ? [member] : []),
         dimensions: [...memo.dimensions].concat(member.memberType === MemberType.Dimension ? [member] : []),
@@ -61,12 +61,12 @@ export class ScaffoldingTemplate {
       });
 
       return {
-        ...descriptor,
         ...generatedDescriptor,
+        ...descriptor,
         ...cubeMembers
       };
     });
-
+    
     return schemaForTables.map(tableSchema => ({
       fileName: `${tableSchema.cube}.js`,
       content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext))
