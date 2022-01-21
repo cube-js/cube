@@ -16,7 +16,7 @@
     "@babel/runtime": "^7.1.2",
     "@cubejs-client/dx": "^0.29.5",
     "core-js": "^3.6.5",
-    "cross-fetch": "^3.0.2",
+    "cross-fetch": "^3.1.5",
     "dayjs": "^1.10.4",
     "ramda": "^0.27.0",
     "url-search-params-polyfill": "^7.0.0",
