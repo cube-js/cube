@@ -40,12 +40,6 @@ function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
   return x!;
 }
 
-function checkQueryId<T extends {QueryExecutionId?: string}>(name: string, t: T): AthenaQueryId {
-  return {
-    QueryExecutionId: checkNonNullable(name, t.QueryExecutionId)
-  };
-}
-
 function applyParams(query: string, params: any[]): string {
   return SqlString.format(query, params);
 }
@@ -146,16 +140,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       } : s))
     );
 
-    const qid = checkQueryId(
-      'Start query id',
-      await this.athena.startQueryExecution({
-        QueryString: queryString,
-        WorkGroup: this.config.workGroup,
-        ResultConfiguration: {
-          OutputLocation: this.config.S3OutputLocation
-        }
-      })
-    );
+    const { QueryExecutionId } = await this.athena.startQueryExecution({
+      QueryString: queryString,
+      WorkGroup: this.config.workGroup,
+      ResultConfiguration: {
+        OutputLocation: this.config.S3OutputLocation
+      }
+    });
+    const qid = { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
 
     const startedTime = Date.now();
 
