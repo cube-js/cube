@@ -12,10 +12,10 @@
     "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "scripts": {
-    "lint": "eslint **/*.js"
+    "lint": "eslint src/index.d.ts"
   },
-  "main": "driver/AthenaDriver.js",
-  "types": "driver/index.d.ts",
+  "main": "src/AthenaDriver.ts",
+  "types": "src/index.d.ts",
   "dependencies": {
     "@aws-sdk/client-athena": "^3.22.0",
     "@cubejs-backend/query-orchestrator": "^0.29.21",
