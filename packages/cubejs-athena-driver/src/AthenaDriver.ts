@@ -108,14 +108,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
           : undefined
       ) {
         const rows = results.ResultSet?.Rows ?? [];
-        if (rows.length > 0) {
-          const [_header, ...tableRows] = rows;
-          allRows.push(...(allRows.length ? rows : tableRows));
-          if (!columnInfo) {
-            columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
-              ? [{ Name: 'column' }]
-              : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
-          }
+        allRows.push(...(allRows.length > 0 ? rows : rows.slice(1)));
+        if (!columnInfo) {
+          columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+            ? [{ Name: 'column' }]
+            : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
         }
       }
 
