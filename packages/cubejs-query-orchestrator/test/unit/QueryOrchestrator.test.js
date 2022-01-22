@@ -8,6 +8,7 @@ class MockDriver {
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
+    this.now = new Date().getTime();
   }
 
   query(query) {
@@ -47,7 +48,7 @@ class MockDriver {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
-    return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
+    return this.tables.filter(t => t.split('.')[0] === schema).map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
   delay(timeout) {
@@ -81,6 +82,10 @@ class MockDriver {
 
   async tableColumnTypes() {
     return [{ name: 'foo', type: 'int' }];
+  }
+
+  nowTimestamp() {
+    return this.now;
   }
 }
 
@@ -162,6 +167,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('basic', async () => {
+    mockDriver.now = 12345000;
     const query = {
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
@@ -183,6 +189,7 @@ describe('QueryOrchestrator', () => {
     const result = await promise;
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
+    expect(result.lastRefreshTime.getTime()).toEqual(12345000);
   });
 
   test('indexes', async () => {
@@ -213,7 +220,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('index is part of query key', async () => {
-    const firstPromise = queryOrchestrator.fetchQuery({
+    queryOrchestrator.fetchQuery({
       query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191102) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
       values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
       cacheKeyQueries: {
@@ -730,7 +737,24 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
       renewQuery: true,
-      requestId: 'save structure versions'
+      requestId: 'pre-aggregation version entries'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations_2.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations_2',
+        tableName: 'stb_pre_aggregations_2.orders',
+        loadSql: ['CREATE TABLE stb_pre_aggregations_2.orders AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT 3', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation version entries'
     });
 
     const {
@@ -772,6 +796,62 @@ describe('QueryOrchestrator', () => {
     expect(structureVersionsByTableName).toMatchObject({
       'stb_pre_aggregations.orders': 'ezlvkhjl'
     });
+  });
+
+  test('pre-aggregation schema cache', async () => {
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_1.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_1',
+        tableName: 'pre_aggregations_1.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
+        invalidateKeyQueries: [['SELECT 1', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_2.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_2',
+        tableName: 'pre_aggregations_2.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_2.orders AS SELECT * FROM public.orders WHERE tenant_id = 2', []],
+        invalidateKeyQueries: [['SELECT 2', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    await queryOrchestrator.fetchQuery({
+      query: 'SELECT * FROM pre_aggregations_1.orders',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'pre_aggregations_1',
+        tableName: 'pre_aggregations_1.orders',
+        loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
+        invalidateKeyQueries: [['SELECT 1', []]]
+      }],
+      renewQuery: true,
+      requestId: 'pre-aggregation schema cache'
+    });
+
+    console.log(mockDriver.tables);
+    expect(mockDriver.tables.length).toEqual(2);
   });
 
   test('range partitions', async () => {

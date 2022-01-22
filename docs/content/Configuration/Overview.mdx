@@ -77,8 +77,7 @@ For example, your existing `package.json` might look something like:
   },
   "dependencies": {
     "@cubejs-backend/postgres-driver": "^0.20.0",
-    "@cubejs-backend/server": "^0.20.0",
-    "jwk-to-pem": "^2.0.4"
+    "@cubejs-backend/server": "^0.20.0"
   }
 }
 ```
@@ -94,7 +93,6 @@ It should become:
     "dev": "./node_modules/.bin/cubejs-server server"
   },
   "dependencies": {
-    "jwk-to-pem": "^2.0.4"
   },
   "devDependencies": {
     "@cubejs-backend/postgres-driver": "^0.23.6",
@@ -111,22 +109,11 @@ For an `index.js` like the following:
 
 ```javascript
 const CubejsServer = require('@cubejs-backend/server');
-const fs = require('fs');
-const jwt = require('jsonwebtoken');
-const jwkToPem = require('jwk-to-pem');
-const jwks = JSON.parse(fs.readFileSync('jwks.json'));
-const _ = require('lodash');
 
 const server = new CubejsServer({
-  checkAuth: async (req, auth) => {
-    const decoded = jwt.decode(auth, { complete: true });
-    const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
-    const pem = jwkToPem(jwk);
-    req.securityContext = jwt.verify(auth, pem);
+  logger: (msg, params) => {
+    console.log(`${msg}: ${JSON.stringify(params)}`);
   },
-  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  preAggregationsSchema: ({ securityContext }) =>
-    `pre_aggregations_${securityContext.userId}`,
 });
 
 server
@@ -143,23 +130,27 @@ server
 It should be renamed to `cube.js` and its' contents should look like:
 
 ```javascript
-const fs = require('fs');
-const jwt = require('jsonwebtoken');
-const jwkToPem = require('jwk-to-pem');
-const jwks = JSON.parse(fs.readFileSync('jwks.json'));
-const _ = require('lodash');
-
 module.exports = {
-  checkAuth: async (req, auth) => {
-    const decoded = jwt.decode(auth, { complete: true });
-    const jwk = _.find(jwks.keys, (x) => x.kid === decoded.header.kid);
-    const pem = jwkToPem(jwk);
-    req.securityContext = jwt.verify(auth, pem);
+  logger: (msg, params) => {
+    console.log(`${msg}: ${JSON.stringify(params)}`);
   },
-  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  preAggregationsSchema: ({ securityContext }) =>
-    `pre_aggregations_${securityContext.userId}`,
 };
+```
+
+Finally, add a `docker-compose.yml` file alongside the `cube.js` configuration
+file:
+
+```yaml
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    env_file: .env
+    volumes:
+      - .:/cube/conf
 ```
 
 [link-config]: /config

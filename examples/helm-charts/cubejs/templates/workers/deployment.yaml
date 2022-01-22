@@ -26,7 +26,11 @@ spec:
     spec:
       containers:
         - name: cube
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.config.apiPort }}

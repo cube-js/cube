@@ -10,6 +10,12 @@ on:
     workflows: [ "Release" ]
     types:
       - completed
+  push:
+    paths:
+      - '.github/workflows/birdbox.yml'
+      - 'packages/cubejs-testing/**'
+    branches:
+      - 'master'
 
 jobs:
   cli:
@@ -40,7 +46,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -100,7 +106,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -161,7 +167,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |

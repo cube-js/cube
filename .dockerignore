@@ -5,13 +5,11 @@
 !yarn.lock
 !lerna.json
 !packages/
-!rust/js-wrapper/
-!rust/tsconfig.json
-!rust/package.json
-!rust/yarn.lock
-!rust/bin
-!rust/cubeclient
-!rust/cubesql
+!rust/cubestore/js-wrapper/
+!rust/cubestore/tsconfig.json
+!rust/cubestore/package.json
+!rust/cubestore/bin
+!rust/cubesql/package.json
 
 packages/*/node_modules/
 packages/*/dist/

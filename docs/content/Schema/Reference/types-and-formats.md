@@ -76,7 +76,7 @@ Calculates the number of distinct values in a given field. It makes use of SQL�
 `COUNT DISTINCT` function.
 
 The `sql` parameter is required and can take any valid SQL expression that
-results in a table column, or interpolated Javascript expression.
+results in a table column, or interpolated JavaScript expression.
 
 ```javascript
 cube('Orders', {
@@ -120,7 +120,7 @@ However, unlike writing raw SQL, Cube.js will properly calculate sums even if
 your query’s joins will result in row duplication.
 
 The `sql` parameter is required and can take any valid SQL expression that
-results in a numeric table column, or interpolated Javascript expression. `sql`
+results in a numeric table column, or interpolated JavaScript expression. `sql`
 parameter should contain only expression to sum without actual aggregate
 function.
 
@@ -164,7 +164,7 @@ However, unlike writing raw SQL, Cube.js will properly calculate averages even
 if your query’s joins will result in row duplication.
 
 The sql parameter for type: average measures can take any valid SQL expression
-that results in a numeric table column, or interpolated Javascript expression.
+that results in a numeric table column, or interpolated JavaScript expression.
 
 ```javascript
 cube('Orders', {

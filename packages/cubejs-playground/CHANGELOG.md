@@ -3,6 +3,133 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
+
+
+### Bug Fixes
+
+* **playground:** rollup designer undefined key ([3213e70](https://github.com/cube-js/cube.js/commit/3213e70947c0d1568de804ad3f6c7d515e81b56f))
+
+
+
+
+
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.29.4](https://github.com/cube-js/cube.js/compare/v0.29.3...v0.29.4) (2021-12-16)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** responsive filter group size ([5129cca](https://github.com/cube-js/cube.js/commit/5129cca0883394ea247e706d7bfc6cfd81f315de))
+* **cubejs-playground:** responsive filter group size * 2 ([2e340df](https://github.com/cube-js/cube.js/commit/2e340df88583013133b05e6337972dee2f1a5c15))
+
+
+
+
+
+## [0.29.3](https://github.com/cube-js/cube.js/compare/v0.29.2...v0.29.3) (2021-12-15)
+
+
+### Bug Fixes
+
+* **playground:** use playground token when security context provided ([74e22e3](https://github.com/cube-js/cube.js/commit/74e22e3aa6355106bf51bd8f9f08ffdeec8d5f9b))
+
+
+
+
+
+## [0.29.2](https://github.com/cube-js/cube.js/compare/v0.29.1...v0.29.2) (2021-12-15)
+
+
+### Bug Fixes
+
+* **playground:** respect security context token in GraphQL sandbox ([3d4a18b](https://github.com/cube-js/cube.js/commit/3d4a18b720c2c298834ee41055244a0af6292ce2))
+
+
+
+
+
+## [0.29.1](https://github.com/cube-js/cube.js/compare/v0.29.0...v0.29.1) (2021-12-15)
+
+
+### Bug Fixes
+
+* bump min supported GraphQL version ([4490fe2](https://github.com/cube-js/cube.js/commit/4490fe22952aa41d93bab2a3568d48a38e927d6e))
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### Features
+
+* **playground:** GraphiQL sandbox. Allow using the cube GraphQL API  ([#3810](https://github.com/cube-js/cube.js/issues/3810)) ([1f39042](https://github.com/cube-js/cube.js/commit/1f39042ac063feaa852b3674a1b857d2dbbc9d17))
+
+
+
+
+
+## [0.28.67](https://github.com/cube-js/cube.js/compare/v0.28.66...v0.28.67) (2021-12-14)
+
+
+### Bug Fixes
+
+* **playground:** Revert GraphQL support ([#3807](https://github.com/cube-js/cube.js/issues/3807)) ([6eb894b](https://github.com/cube-js/cube.js/commit/6eb894b856eaa918a66bf537e88d90bb6ae9f71e))
+
+
+
+
+
+## [0.28.66](https://github.com/cube-js/cube.js/compare/v0.28.65...v0.28.66) (2021-12-14)
+
+
+### Features
+
+* **playground:** GraphiQL sandbox. Allow using the cube GraphQL API ([#3803](https://github.com/cube-js/cube.js/issues/3803)) ([6c848c0](https://github.com/cube-js/cube.js/commit/6c848c02fae2f2658e2051055d4bf8419554fb26))
+
+
+
+
+
+## [0.28.65](https://github.com/cube-js/cube.js/compare/v0.28.64...v0.28.65) (2021-12-10)
+
+
+### Features
+
+* **playground:** GraphiQL sandbox. Allow using the cube GraphQL API ([#3794](https://github.com/cube-js/cube.js/issues/3794)) ([ea9630f](https://github.com/cube-js/cube.js/commit/ea9630fad3894ed4357d188a2dd5ade0e474e0b0))
+
+
+
+
+
+## [0.28.62](https://github.com/cube-js/cube.js/compare/v0.28.61...v0.28.62) (2021-12-02)
+
+
+### Bug Fixes
+
+* **playground:** rollup designer overflow ([60ce358](https://github.com/cube-js/cube.js/commit/60ce35887bad0614cc38b0e1d41725f283699a08))
+
+
+
+
+
 ## [0.28.57](https://github.com/cube-js/cube.js/compare/v0.28.56...v0.28.57) (2021-11-16)
 
 **Note:** Version bump only for package @cubejs-client/playground

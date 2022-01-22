@@ -187,7 +187,7 @@ describe('ResultSet', () => {
         {
           x: 'Name 1',
           
-          'Foo.count': null,
+          'Foo.count': 0,
           xValues: [
             'Name 1'
           ],
@@ -235,8 +235,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          
-          'Foo.count': undefined,
+          'Foo.count': 0,
           xValues: [
             'Name 1'
           ],

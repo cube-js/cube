@@ -30,9 +30,7 @@ const FilterGroup = ({
             disabled={disabled}
             availableCubes={availableMembers}
             style={{
-              width: 150,
-              textOverflow: 'ellipsis',
-              overflow: 'hidden',
+              minWidth: 150,
             }}
             onClick={(updateWith) =>
               updateMethods.update(m, { ...m, dimension: updateWith })

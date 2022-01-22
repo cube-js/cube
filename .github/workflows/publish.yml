@@ -33,7 +33,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -57,15 +57,24 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PACKAGE_TARGET_ARCH: ${{ matrix.package_target_arch }}
+      PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
+      PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
     timeout-minutes: 60
-    name: Build native ${{ matrix.node-version }}-${{ matrix.image }}
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} 
     strategy:
       matrix:
-        node-version: [10, 12, 14, 15, 16]
-        image: ["stretch"]
+        node-version: [12, 14, 16, 17]
+        target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+        include:
+          - target: aarch64-unknown-linux-gnu
+            # We use cross for this type, it's why we need to override package
+            package_target_arch: arm64
+            package_target_platform: linux
+            package_target_libc: glibc
       fail-fast: false
     container:
-      image: node:${{ matrix.node-version }}-${{ matrix.image }}
+      image: cubejs/rust-cross:${{ matrix.target }}-10052021
 
     steps:
       - name: Checkout
@@ -76,6 +85,11 @@ jobs:
           toolchain: nightly-2021-07-04
           override: true
           components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -85,16 +99,20 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Install Yarn
+        run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Build native
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact
         uses: nick-invision/retry@v2
@@ -105,17 +123,17 @@ jobs:
           retry_wait_seconds: 15
           command: |
             cd packages/cubejs-backend-native
-            npm run upload-binary
+            npm run upload-binary-cross
 
   native:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    name: Build native ${{ matrix.node-version }}-${{ matrix.os-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x, 15.x, 16.x]
+        node-version: [12.x, 14.x, 16.x, 17.x]
         os-version: [windows-2019, macos-11]
       fail-fast: false
 
@@ -141,7 +159,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubesql/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -168,9 +186,15 @@ jobs:
   docker-default:
     needs: [npm, cubestore, native_linux]
     name: Debian docker image
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64,linux/arm64
     timeout-minutes: 30
-
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -218,7 +242,7 @@ jobs:
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           labels: |
@@ -305,7 +329,30 @@ jobs:
 
   docker-cubestore:
     name: Cube Store Docker
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64
+            build-args: WITH_AVX2=1
+            postfix: ""
+            tag: "latest"
+          - os: self-hosted
+            target: aarch64-unknown-linux-gnu
+            platforms: linux/arm64
+            build-args: WITH_AVX2=0
+            postfix: "-arm64v8"
+            tag: "arm64v8"
+          # Non AVX build
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            platforms: linux/amd64
+            build-args: WITH_AVX2=0
+            postfix: "-non-avx"
+            tag: "non-avx"
     timeout-minutes: 60
     steps:
       - name: Check out the repo
@@ -331,12 +378,15 @@ jobs:
           elif [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}"
+
+          TAGS="${DOCKER_IMAGE}:${VERSION}${{ matrix.postfix }}"
+
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
+
           echo ::set-output name=version::${VERSION}
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -345,8 +395,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
         with:
@@ -355,15 +403,16 @@ jobs:
         uses: actions/cache@v2
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.tag }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-
+            ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.tag }}-
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
-          context: ./rust/
-          file: ./rust/Dockerfile
-          platforms: linux/amd64
+          context: ./rust/cubestore/
+          file: ./rust/cubestore/Dockerfile
+          platforms: ${{ matrix.platforms }}
+          build-args: ${{ matrix.build-args }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -383,86 +432,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: cubejs/cubestore
-          readme-filepath: ./rust/README.md
-
-  docker-cubestore-non-avx:
-    name: Cube Store Docker (Non AVX)
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Repo metadata
-        id: repo
-        uses: actions/github-script@v3
-        with:
-          script: |
-            const { data } = await github.repos.get(context.repo)
-            const reg = new RegExp('📊 ', 'ug');
-            data.description = data.description.replace(reg, "")
-            return data
-      - name: Prepare
-        id: prep
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-        run: |
-          DOCKER_IMAGE=cubejs/cubestore
-          VERSION=noop
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}-non-avx"
-          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            MINOR=${VERSION%.*}
-            MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-non-avx,${DOCKER_IMAGE}:${MAJOR}-non-avx,${DOCKER_IMAGE}:non-avx"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-non-avx"
-          fi
-          echo ::set-output name=version::${VERSION}
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          version: v0.6.3
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-non-avx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-non-avx-
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
-        with:
-          context: ./rust/
-          file: ./rust/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.prep.outputs.tags }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-          build-args: |
-            WITH_AVX2=0
-          labels: |
-            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
-            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
-            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
-            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
-            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+          readme-filepath: ./rust/cubestore/README.md
 
   cubestore:
     runs-on: ${{ matrix.os }}
@@ -477,6 +447,7 @@ jobs:
           - x86_64-unknown-linux-musl
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-unknown-linux-gnu
         include:
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
@@ -504,6 +475,13 @@ jobs:
             cross: false
             strip: true
             compress: true
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            executable_name: cubestored
+            cross: true
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
+            compress: true
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -516,7 +494,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
         with:
-          working-directory: rust
+          working-directory: rust/cubestore
           key: cross-${{ runner.OS }}-${{ matrix.target }}
           sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
@@ -542,12 +520,12 @@ jobs:
         run: |
           wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
           chmod +x cross && sudo mv cross /usr/local/bin/cross
-          cd rust
+          cd rust/cubestore
           cross build --release --target=${{ matrix.target }}
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
         run: |
-          cd rust && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
       - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
@@ -557,7 +535,7 @@ jobs:
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
         with:
-          file: rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
       - name: Create folder for archive
@@ -569,7 +547,7 @@ jobs:
         run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
       - name: Create archive for release
         run: |
-          mv rust/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
       - name: Upload Binary to Release
@@ -580,3 +558,4 @@ jobs:
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
           overwrite: true
+  

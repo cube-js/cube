@@ -33,13 +33,16 @@ describe('PostgresDriver', () => {
   });
 
   test('type coercion', async () => {
+    await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\');', []);
+
     const data = await driver.query(
       `
         SELECT
           CAST('2020-01-01' as DATE) as date,
           CAST('2020-01-01 00:00:00' as TIMESTAMP) as timestamp,
           CAST('2020-01-01 00:00:00+02' as TIMESTAMPTZ) as timestamptz,
-          CAST('1.0' as DECIMAL(10,2)) as decimal
+          CAST('1.0' as DECIMAL(10,2)) as decimal,
+          CAST('FOO' as CUBEJS_TEST_ENUM) as enum
       `,
       []
     );
@@ -52,7 +55,9 @@ describe('PostgresDriver', () => {
         // converted to utc
         timestamptz: '2019-12-31T22:00:00.000',
         // Numerics as string
-        decimal: '1.00'
+        decimal: '1.00',
+        // Enum datatypes as string
+        enum: 'FOO',
       }
     ]);
   });

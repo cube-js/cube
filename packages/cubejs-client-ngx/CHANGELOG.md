@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### chore
+
+* angular 12 ([#2863](https://github.com/cube-js/cube.js/issues/2863)) ([18efb65](https://github.com/cube-js/cube.js/commit/18efb65b3acbbd7da00ae02967d13070e9a33a90))
+
+
+### BREAKING CHANGES
+
+* drop Angular 10/11 support
+
+
+
+
+
 ## [0.28.51](https://github.com/cube-js/cube.js/compare/v0.28.50...v0.28.51) (2021-10-30)
 
 

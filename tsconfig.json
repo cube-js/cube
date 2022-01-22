@@ -62,7 +62,7 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
-      "path": "rust/"
+      "path": "rust/cubestore"
     },
     {
       "path": "packages/cubejs-cubestore-driver"
@@ -75,9 +75,6 @@
     },
     {
       "path": "packages/cubejs-cli"
-    },
-    {
-      "path": "rust"
     }
   ]
 }

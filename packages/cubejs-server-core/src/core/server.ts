@@ -144,7 +144,7 @@ export class CubejsServerCore {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
 
-    this.contextToOrchestratorId = this.options.contextToOrchestratorId || this.contextToAppId;
+    this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -751,6 +751,7 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
+      standalone: this.standalone
     });
   }
 

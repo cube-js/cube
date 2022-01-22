@@ -6,11 +6,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,11 +23,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -45,8 +43,7 @@ jobs:
 
     strategy:
       matrix:
-        # We should use our minimal version, but there are problems with packages...
-        node-version: [12.x, 14.x, 15.x]
+        node-version: [12.x, 14.x, 16.x]
       fail-fast: false
 
     steps:
@@ -78,7 +75,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -94,9 +91,10 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
-        if: (matrix.node-version == '15.x')
+        if: (matrix.node-version == '16.x')
         with:
           files: ./packages/*/coverage/clover.xml
+          flags: cube-backend
           verbose: true # optional (default = false)
 
   lint:
@@ -127,7 +125,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -169,7 +167,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -204,7 +202,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
       fail-fast: false
 
     steps:
@@ -229,7 +227,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -277,7 +275,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
         db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless', 'cubestore']
       fail-fast: false
 
@@ -357,7 +355,7 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-dev:
-    needs: [build, unit, lint, latest-tag-sha]
+    needs: [latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
@@ -395,10 +393,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 15.x
+      - name: Use Node.js 16.x
         uses: actions/setup-node@v1
         with:
-          node-version: 15.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -408,11 +406,11 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-15.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install

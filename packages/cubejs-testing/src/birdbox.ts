@@ -41,15 +41,18 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     };
   }
 
+  const composeFile = `${options.name}.yml`;
   const dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
-    `${options.name}.yml`
+    composeFile
   );
+
+  console.log(`[Birdbox] Using ${composeFile} compose file`);
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'edge')
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
     .up();
 
   const host = '127.0.0.1';
@@ -161,8 +164,13 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
 
+  // Do not remove whole dir as it contains node_modules
   if (fs.existsSync(path.join(testDir, '.env'))) {
     fs.unlinkSync(path.join(testDir, '.env'));
+  }
+
+  if (fs.existsSync(path.join(testDir, '.cubestore'))) {
+    fsExtra.removeSync(path.join(testDir, '.cubestore'));
   }
 
   fsExtra.copySync(

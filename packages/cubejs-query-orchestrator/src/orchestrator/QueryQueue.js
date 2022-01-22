@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -10,7 +11,7 @@ export class QueryQueue {
     this.redisQueuePrefix = redisQueuePrefix;
     this.concurrency = options.concurrency || 2;
     this.continueWaitTimeout = options.continueWaitTimeout || 5;
-    this.executionTimeout = options.executionTimeout || 600;
+    this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
     this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
@@ -79,8 +80,7 @@ export class QueryQueue {
 
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
-      // eslint-disable-next-line no-unused-vars
-      const [added, b, c, queueSize] = await redisClient.addToQueue(
+      const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
@@ -95,6 +95,8 @@ export class QueryQueue {
           preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild,
+          preAggregation: query.preAggregation,
+          addedToQueueTime
         });
       }
 
@@ -222,6 +224,8 @@ export class QueryQueue {
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
+          preAggregation: query.query?.preAggregation,
+          addedToQueueTime: query.addedToQueueTime,
         });
         await this.sendCancelMessageFn(query);
       }
@@ -251,6 +255,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
           await this.sendCancelMessageFn(query);
         }
@@ -383,8 +389,7 @@ export class QueryQueue {
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
     let insertedCount;
-    // eslint-disable-next-line no-unused-vars
-    let removedCount;
+    let _removedCount;
     let activeKeys;
     let queueSize;
     let query;
@@ -393,7 +398,7 @@ export class QueryQueue {
       const processingId = await redisClient.getNextProcessingId();
       const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
       if (retrieveResult) {
-        [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {
@@ -413,6 +418,8 @@ export class QueryQueue {
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
+          preAggregation: query.query?.preAggregation,
+          addedToQueueTime: query.addedToQueueTime,
         });
         await redisClient.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
 
@@ -437,6 +444,8 @@ export class QueryQueue {
                       metadata: query.query?.metadata,
                       preAggregationId: query.query?.preAggregation?.preAggregationId,
                       newVersionEntry: query.query?.newVersionEntry,
+                      preAggregation: query.query?.preAggregation,
+                      addedToQueueTime: query.addedToQueueTime,
                     });
                   }
                   return null;
@@ -455,6 +464,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
         } catch (e) {
           executionResult = {
@@ -471,6 +482,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
@@ -484,6 +497,8 @@ export class QueryQueue {
                 metadata: queryWithCancelHandle.query?.metadata,
                 preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
+                preAggregation: queryWithCancelHandle.query?.preAggregation,
+                addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
               });
               await this.sendCancelMessageFn(queryWithCancelHandle);
             }
@@ -502,6 +517,8 @@ export class QueryQueue {
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
+            preAggregation: query.query?.preAggregation,
+            addedToQueueTime: query.addedToQueueTime,
           });
         }
 

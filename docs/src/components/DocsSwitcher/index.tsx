@@ -3,9 +3,9 @@ import GatsbyLink from 'gatsby-link';
 import React, { useEffect, useRef, useState } from 'react';
 
 import * as styles from './styles.module.scss';
-import cubeJsLogo from './cube.js-logo.svg';
-import cubeCloudLogo from './cube-cloud-logo.svg';
-import cubeCloudLogoSmall from './cube-cloud-logo-sm.svg';
+import cubeJsLogo from './cube-logo.svg';
+import cubeCloudLogo from './cube-logo-cloud.svg';
+import cubeCloudLogoSmall from './cube-logo-cloud-min.svg';
 
 export const DocsSwitcher = () => {
   const [isCloudPage, setIsCloudPage] = useState(false);

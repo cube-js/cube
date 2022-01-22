@@ -14,7 +14,7 @@ import last from 'lodash/last';
 import { renameCategory } from '../rename-category';
 
 import 'katex/dist/katex.min.css';
-import '../../static/styles/math.scss'
+import '../../static/styles/math.scss';
 
 import FeedbackBlock from '../components/FeedbackBlock';
 import ScrollLink, {
@@ -37,12 +37,14 @@ import {
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
-import ScrollSpyH2 from '../components/Headers/ScrollSpyH2'
+import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
 import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
 
-const MyH4 = (props) => <h4 name={kebabCase(props.id)} {...props} />;
+const MyH4: React.FC<{ children: string }> = ({ children }) => {
+  return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
+}
 
 const components = {
   DangerBox,
@@ -124,8 +126,10 @@ class DocTemplate extends Component<Props, State> {
       noscrollmenu: false,
     });
 
-    const hackFixFileAbsPath = this.props.pageContext.fileAbsolutePath
-      .replace('/opt/build/repo/', '')
+    const hackFixFileAbsPath = this.props.pageContext.fileAbsolutePath.replace(
+      '/opt/build/repo/',
+      ''
+    );
 
     this.createAnchors(
       <MDXForSideMenu {...this.props} />,
@@ -251,7 +255,10 @@ class DocTemplate extends Component<Props, State> {
         }
 
         sectionTags.push({
-          id: currentID,
+          id:
+            currentParentID != currentID
+              ? `${currentParentID}-${currentID}`
+              : currentID,
           type: item.type,
           nodes: [],
           title: item.props.children[0],

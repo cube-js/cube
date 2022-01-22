@@ -44,8 +44,15 @@ module.exports = {
     '@typescript-eslint/no-empty-function': 'error',
     'no-extra-semi': 'off',
     '@typescript-eslint/no-extra-semi': 'error',
+    'no-underscore-dangle': 'off',
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'warn',
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_.*',
+        varsIgnorePattern: '^_.*',
+      },
+    ],
     // '@typescript-eslint/no-var-requires': 'error',
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',

@@ -15,6 +15,7 @@ const StyledMenu = styled(Menu)`
   position: relative;
   max-height: 600px;
   overflow-y: scroll;
+  overflow-x: hidden;
 
   li {
     font-size: var(--font-size-base);
@@ -170,7 +171,7 @@ export function Cubes({
         openKeys={search ? allCubeKeys : openKeys}
         mode="inline"
         onClick={(event) => {
-          const { membertype } = (event.domEvent.target as HTMLElement).dataset;
+          const { membertype } = (event.domEvent.currentTarget as HTMLElement).dataset;
 
           onSelect(
             membertype as QueryMemberKey,

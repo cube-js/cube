@@ -355,7 +355,7 @@ class ResultSet {
     const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
 
-      let measureValue = (row, measure) => row[measure];
+      const measureValue = (row, measure) => row[measure] || 0;
 
       if (
         pivotConfig.fillMissingDates &&
@@ -379,8 +379,6 @@ class ResultSet {
             );
             return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
           };
-
-          measureValue = (row, measure) => row[measure] || 0;
         }
       }
 

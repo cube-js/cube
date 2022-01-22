@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue3",
-  "version": "0.28.57",
+  "version": "0.29.8",
   "engines": {},
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "^0.28.52",
+    "@cubejs-client/core": "^0.29.8",
     "@vue/compiler-sfc": "^3.0.11",
     "core-js": "^3.6.5",
     "flush-promises": "^1.0.2",

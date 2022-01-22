@@ -49,22 +49,23 @@ A Query has the following properties:
   [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.:
   `America/Los_Angeles`. The default value is `UTC`.
 - `renewQuery`: If `renewQuery` is set to `true`, Cube.js will renew all
-  `refreshKey` for queries and query results in the foreground. However if the
-  `refreshKey` or `refreshKeyRenewalThreshold` don't indicate that there's a
-  need for an update this setting has no effect. The default value is `false`.
-  > **NOTE**: Cube.js provides only eventual consistency guarantee. Using too
-  > small `refreshKeyRenewalThreshold` values together with `renewQuery` in
-  > order to achieve immediate consistency can lead to endless refresh loops and
-  > overall system instability.
+  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
+  results in the foreground. However, if the
+  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] (or
+  [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
+  indicate that there's a need for an update this setting has no effect. The
+  default value is `false`.
+  > **NOTE**: Cube.js provides only eventual consistency guarantee. Using a
+  > small [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value
+  > together with `renewQuery` to achieve immediate consistency can lead to
+  > endless refresh loops and overall system instability.
 - `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be
   added to the query. Instead, the raw results after filtering and joining will
   be returned without grouping. By default `ungrouped` queries require a primary
   key as a dimension of every cube involved in the query for security purposes.
-  To disable this behavior please see the
-  [allowUngroupedWithoutPrimaryKey](@cubejs-backend-server-core#allow-ungrouped-without-primary-key)
-  server option. In case of `ungrouped` query measures will be rendered as
-  underlying `sql` of measures without aggregation and time dimensions will be
-  truncated as usual however not grouped by.
+  In case of `ungrouped` query measures will be rendered as underlying `sql` of
+  measures without aggregation and time dimensions will be truncated as usual
+  however not grouped by.
 
 ```js
 {
@@ -481,3 +482,8 @@ date. If you need the current date also you can use `from N days ago to now` or
   }]
 }
 ```
+
+[ref-schema-ref-preaggs-refreshkey]:
+  /schema/reference/pre-aggregations#parameters-refresh-key
+[ref-schema-ref-preaggs-refreshkey-every]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-every

@@ -20,6 +20,7 @@ import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
 import useDeepMemo from '../../hooks/deep-memo';
 import { useCloud } from '../../playground/cloud';
 import { getNameMemberPairs, request } from '../../shared/helpers';
+import { QueryMemberKey } from '../../types';
 import { prettifyObject } from '../../utils';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
@@ -38,6 +39,12 @@ import {
 const { Paragraph, Link, Text } = Typography;
 const { TabPane } = Tabs;
 
+const Wrapper = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 16px;
+`;
+
 const MainBox = styled(Box)`
   & .ant-tabs-nav {
     padding-left: 24px;
@@ -48,8 +55,6 @@ const MainBox = styled(Box)`
 const RollupQueryBox = styled.div`
   padding: 0 24px 32px;
   background: #f6f6f8;
-  width: 420px;
-  min-width: 420px;
 
   & .ant-tabs-nav {
     margin-bottom: 24px;
@@ -266,7 +271,7 @@ export function RollupDesigner({
     setSaving(false);
   }
 
-  function handleMemberToggle(memberType) {
+  function handleMemberToggle(memberType: QueryMemberKey) {
     return (key) => {
       setReferences(updateQuery(references, memberType, key) as any);
     };
@@ -351,15 +356,20 @@ export function RollupDesigner({
   }
 
   return (
-    <Flex justifyContent="space-between" margin={[0, 0, 2, 0]}>
-      <MainBox grow={1}>
+    <Wrapper>
+      <MainBox grow={1} style={{ overflowX: 'scroll' }}>
         <Tabs style={{ minHeight: '100%' }}>
           <TabPane
             tab={<span data-testid="rd-members-tab">Members</span>}
             key="members"
           >
             <Flex gap={2}>
-              <Box style={{ minWidth: 256 }}>
+              <Box
+                style={{
+                  minWidth: 280,
+                  maxWidth: 280,
+                }}
+              >
                 <Cubes
                   openKeys={openKeys}
                   selectedKeys={selectedKeys}
@@ -372,7 +382,13 @@ export function RollupDesigner({
                 />
               </Box>
 
-              <Box grow={1} style={{ marginTop: 24 }}>
+              <Box
+                grow={1}
+                style={{
+                  marginTop: 24,
+                  overflowX: 'scroll',
+                }}
+              >
                 {references.measures?.length ? (
                   <>
                     <Members
@@ -563,6 +579,6 @@ export function RollupDesigner({
           ) : null}
         </Tabs>
       </RollupQueryBox>
-    </Flex>
+    </Wrapper>
   );
 }

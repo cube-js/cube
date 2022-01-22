@@ -3,7 +3,7 @@ title: Docker Compose
 permalink: /getting-started/docker/compose
 ---
 
-This guide will help you get Cube.js running using Docker Compose.
+This guide will help you get Cube running using Docker Compose.
 
 <LoomVideo url="https://www.loom.com/embed/268bc36e80a34f8790c805d33d6accf5" />
 
@@ -25,17 +25,14 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      - 4000:4000 # Cube.js API and Developer Playground
-      - 3000:3000 # Dashboard app, if created
+      - 4000:4000
     environment:
       - CUBEJS_DEV_MODE=true
     volumes:
       - .:/cube/conf
-      # Prevent dev dependencies leaking
-      - .empty:/cube/conf/node_modules/@cubejs-backend/
 ```
 
-## 2. Run Cube.js
+## 2. Run Cube
 
 <InfoBox>
 
@@ -45,13 +42,13 @@ Using Windows? Remember to use [PowerShell][link-powershell] or
 </InfoBox>
 
 ```bash
-$ docker-compose up -d
+$ docker compose up -d
 ```
 
 Check if the container is running:
 
 ```bash
-$ docker-compose ps
+$ docker compose ps
 ```
 
 ## 3. Open Developer Playground

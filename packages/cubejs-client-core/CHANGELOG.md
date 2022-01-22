@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Add 'meta' field to typescript TCubeMember type [#3682](https://github.com/cube-js/cube.js/issues/3682) ([#3815](https://github.com/cube-js/cube.js/issues/3815)) Thanks @System-Glitch! ([578c0a7](https://github.com/cube-js/cube.js/commit/578c0a75ec2830f48b5d6156370f9343b2fd8b6b))
+
+
+
+
+
+## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
+
+
+### Features
+
+* **@cubejs-client/dx:** introduce new dependency for Cube.js Client ([5bfaf1c](https://github.com/cube-js/cube.js/commit/5bfaf1cf99d68dfcdddb04f2b3151ad451657ff9))
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### Bug Fixes
+
+* **client-core:** nullish measure values ([#3664](https://github.com/cube-js/cube.js/issues/3664)) ([f28f803](https://github.com/cube-js/cube.js/commit/f28f803521c9020ce639f68612143c2e962975ea))
+
+
+### BREAKING CHANGES
+
+* **client-core:** All undefined/null measure values will now be converted to 0
+
+
+
+
+
 ## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
 
 

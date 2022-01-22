@@ -186,7 +186,8 @@ type BaseRequest = {
 
 type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi'
+  queryType?: 'multi';
+  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
 };
 
 export interface ApiGatewayOptions {
@@ -300,7 +301,7 @@ export class ApiGateway {
           req,
           apiGateway: this
         },
-        graphiql: getEnv('nodeEnv') !== 'production'
+        graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
       })(req, res);
     });
 
@@ -529,7 +530,6 @@ export class ApiGateway {
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           normalizeQueryPreAggregations(
             {
               timezones: this.scheduledRefreshTimeZones,
@@ -564,7 +564,6 @@ export class ApiGateway {
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           query
         );
 
@@ -606,12 +605,10 @@ export class ApiGateway {
       const { preAggregationId, versionEntry, timezone } = query;
 
       const orchestratorApi = this.getAdapterApi(context);
-      const compilerApi = this.getCompilerApi(context);
 
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           {
             timezones: [timezone],
             preAggregations: [{ id: preAggregationId }]
@@ -642,7 +639,6 @@ export class ApiGateway {
       const result = await this.refreshScheduler()
         .buildPreAggregations(
           context,
-          this.getCompilerApi(context),
           query
         );
 
@@ -840,7 +836,7 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, ...props }: QueryRequest) {
+  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -930,6 +926,7 @@ export class ApiGateway {
           type: 'Load Request Success',
           query,
           duration: this.duration(requestStarted),
+          apiType,
           isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
           queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
             .length,
@@ -975,7 +972,7 @@ export class ApiGateway {
   }
 
   public async subscribe({
-    query, context, res, subscribe, subscriptionState, queryType
+    query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
     const requestStarted = new Date();
     try {
@@ -988,7 +985,7 @@ export class ApiGateway {
       let error: any = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res, queryType });
+        await this.load({ query, context, res, queryType, apiType });
         return;
       }
 
@@ -1003,7 +1000,8 @@ export class ApiGateway {
             result = { message, opts };
           }
         },
-        queryType
+        queryType,
+        apiType,
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {

@@ -40,9 +40,11 @@ const FloatFilter = inputObjectType({
     t.float('notEquals');
     t.list.float('in');
     t.list.float('notIn');
-    t.float('contains');
-    t.float('notContains');
     t.boolean('set');
+    t.float('gt');
+    t.float('lt');
+    t.float('gte');
+    t.float('lte');
   }
 });
 
@@ -145,8 +147,17 @@ function mapWhereValue(operator: string, value: any) {
   switch (operator) {
     case 'set':
       return undefined;
+    case 'inDateRange':
+    case 'notInDateRange':
+      // This is a hack for named date ranges (e.g. "This year", "Today")
+      // We should use enums in the future
+      if (value.length === 1 && !/^[0-9]/.test(value[0])) {
+        return value[0].toString();
+      }
+      
+      return value.map(v => v.toString());
     default:
-      return Array.isArray(value) ? value.map(v => `${v}`) : [`${value}`];
+      return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
   }
 }
 
@@ -229,41 +240,78 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   ));
 }
 
-function whereArgToQueryFilters(whereArg: any, prefix?: string) {
+function whereArgToQueryFilters(
+  whereArg: Record<string, any>,
+  prefix?: string
+) {
   const queryFilters: any[] = [];
-  Object.keys(whereArg).forEach(member => {
-    if (member === 'OR') {
+  
+  Object.keys(whereArg).forEach((key) => {
+    if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
-        or: whereArg[member].reduce((filters, whereBooleanArg) => (
-          [...filters, ...whereArgToQueryFilters(whereBooleanArg, prefix)]
-        ), [] as any[])
+        [key.toLowerCase()]: whereArg[key].reduce(
+          (filters, whereBooleanArg) => [
+            ...filters,
+            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+          ],
+          []
+        ),
       });
-    } else if (member === 'AND') {
-      queryFilters.push({
-        and: whereArg[member].reduce((filters, whereBooleanArg) => (
-          [...filters, ...whereArgToQueryFilters(whereBooleanArg, prefix)]
-        ), [] as any[])
-      });
-    } else {
-      Object.keys(whereArg[member]).forEach(operator => {
-        const value = whereArg[member][operator];
+    } else if (whereArg[key].OR || whereArg[key].AND) {
+      // users: {
+      //   OR: {
+      //     name: { equals: "Alex" }
+      //     country: { equals: "US" }
+      //   } # <-- a single boolean filter can be passed in directly
+      //   age: { equals: 28 } # <-- will require AND
+      // }
+      if (Object.keys(whereArg[key]).length > 1) {
+        queryFilters.push(
+          ...whereArgToQueryFilters(
+            {
+              AND: Object.entries(whereArg[key]).reduce<any>(
+                (memo, [k, v]) => [...memo, { [k]: v }],
+                []
+              ),
+            },
+            capitalize(key)
+          )
+        );
+      } else {
+        const res = whereArgToQueryFilters(whereArg[key], capitalize(key));
+
+        queryFilters.push(...res);
+      }
+    } else if (prefix) {
+      // handle a subfilter
+      // { country: { in: ["US"] }
+      Object.entries(whereArg[key]).forEach(([operator, value]) => {
         queryFilters.push({
-          member: prefix ? `${prefix}.${member}` : member,
+          member: `${prefix}.${key}`,
           operator: mapWhereOperator(operator, value),
           ...(mapWhereValue(operator, value) && {
-            values: mapWhereValue(operator, value)
-          })
+            values: mapWhereValue(operator, value),
+          }),
+        });
+      });
+    } else {
+      Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
+        Object.entries(filters).forEach(([operator, value]) => {
+          queryFilters.push({
+            member: prefix
+              ? `${prefix}.${key}`
+              : `${capitalize(key)}.${member}`,
+            operator: mapWhereOperator(operator, value),
+            ...(mapWhereValue(operator, value) && {
+              values: mapWhereValue(operator, value),
+            }),
+          });
         });
       });
     }
   });
-  return queryFilters;
-}
 
-function rootWhereArgToQueryFilters(whereArg: any) {
-  return Object.keys(whereArg).reduce((filters, cubeName) => (
-    [...filters, ...whereArgToQueryFilters(whereArg[cubeName], capitalize(cubeName))]
-  ), [] as any[]);
+  return queryFilters;
 }
 
 function parseDates(result: any) {
@@ -294,71 +342,77 @@ export function makeSchema(metaConfig: any) {
     OrderBy,
     TimeDimension
   ];
+  
+  function hasMembers(cube: any) {
+    return cube.config.measures.length || cube.config.dimensions.length;
+  }
 
   metaConfig.forEach(cube => {
-    types.push(objectType({
-      name: `${cube.config.name}Members`,
-      definition(t) {
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.nonNull.field(safeName(measure.name), {
-              type: mapType(measure.type),
-              description: measure.description
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.nonNull.field(safeName(dimension.name), {
-              type: mapType(dimension.type),
-              description: dimension.description
-            });
-          }
-        });
-      }
-    }));
+    if (hasMembers(cube)) {
+      types.push(objectType({
+        name: `${cube.config.name}Members`,
+        definition(t) {
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.nonNull.field(safeName(measure.name), {
+                type: mapType(measure.type),
+                description: measure.description
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.nonNull.field(safeName(dimension.name), {
+                type: mapType(dimension.type),
+                description: dimension.description
+              });
+            }
+          });
+        }
+      }));
+    
+      types.push(inputObjectType({
+        name: `${cube.config.name}WhereInput`,
+        definition(t) {
+          t.field('AND', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
+          t.field('OR', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.field(safeName(measure.name), {
+                type: `${mapType(measure.type, true)}Filter`,
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.field(safeName(dimension.name), {
+                type: `${mapType(dimension.type, true)}Filter`,
+              });
+            }
+          });
+        }
+      }));
 
-    types.push(inputObjectType({
-      name: `${cube.config.name}WhereInput`,
-      definition(t) {
-        t.field('AND', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
-        t.field('OR', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.field(safeName(measure.name), {
-              type: `${mapType(measure.type, true)}Filter`,
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.field(safeName(dimension.name), {
-              type: `${mapType(dimension.type, true)}Filter`,
-            });
-          }
-        });
-      }
-    }));
-
-    types.push(inputObjectType({
-      name: `${cube.config.name}OrderByInput`,
-      definition(t) {
-        cube.config.measures.forEach(measure => {
-          if (measure.isVisible) {
-            t.field(safeName(measure.name), {
-              type: 'OrderBy',
-            });
-          }
-        });
-        cube.config.dimensions.forEach(dimension => {
-          if (dimension.isVisible) {
-            t.field(safeName(dimension.name), {
-              type: 'OrderBy',
-            });
-          }
-        });
-      }
-    }));
+      types.push(inputObjectType({
+        name: `${cube.config.name}OrderByInput`,
+        definition(t) {
+          cube.config.measures.forEach(measure => {
+            if (measure.isVisible) {
+              t.field(safeName(measure.name), {
+                type: 'OrderBy',
+              });
+            }
+          });
+          cube.config.dimensions.forEach(dimension => {
+            if (dimension.isVisible) {
+              t.field(safeName(dimension.name), {
+                type: 'OrderBy',
+              });
+            }
+          });
+        }
+      }));
+    }
   });
 
   types.push(inputObjectType({
@@ -367,9 +421,24 @@ export function makeSchema(metaConfig: any) {
       t.field('AND', { type: list(nonNull('RootWhereInput')) });
       t.field('OR', { type: list(nonNull('RootWhereInput')) });
       metaConfig.forEach(cube => {
-        t.field(unCapitalize(cube.config.name), {
-          type: `${cube.config.name}WhereInput`
-        });
+        if (hasMembers(cube)) {
+          t.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}WhereInput`
+          });
+        }
+      });
+    }
+  }));
+  
+  types.push(inputObjectType({
+    name: 'RootOrderByInput',
+    definition(t) {
+      metaConfig.forEach(cube => {
+        if (hasMembers(cube)) {
+          t.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}OrderByInput`
+          });
+        }
       });
     }
   }));
@@ -378,17 +447,19 @@ export function makeSchema(metaConfig: any) {
     name: 'Result',
     definition(t) {
       metaConfig.forEach(cube => {
-        t.nonNull.field(unCapitalize(cube.config.name), {
-          type: `${cube.config.name}Members`,
-          args: {
-            where: arg({
-              type: `${cube.config.name}WhereInput`
-            }),
-            orderBy: arg({
-              type: `${cube.config.name}OrderByInput`
-            }),
-          }
-        });
+        if (hasMembers(cube)) {
+          t.nonNull.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}Members`,
+            args: {
+              where: arg({
+                type: `${cube.config.name}WhereInput`
+              }),
+              orderBy: arg({
+                type: `${cube.config.name}OrderByInput`
+              }),
+            }
+          });
+        }
       });
     }
   }));
@@ -396,7 +467,7 @@ export function makeSchema(metaConfig: any) {
   types.push(extendType({
     type: 'Query',
     definition(t) {
-      t.nonNull.field('load', {
+      t.nonNull.field('cube', {
         type: list(nonNull('Result')),
         args: {
           where: arg({
@@ -406,49 +477,75 @@ export function makeSchema(metaConfig: any) {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          orderBy: arg({
+            type: 'RootOrderByInput'
+          }),
         },
-        resolve: async (parent, { where, limit, offset, timezone, renewQuery }, { req, apiGateway }, infos) => {
+        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
           let filters: any[] = [];
-          const order: Record<string, string> = {};
-
+          const order: [string, 'asc' | 'desc'][] = [];
+          
           if (where) {
-            filters = [...filters, ...rootWhereArgToQueryFilters(where)];
+            filters = whereArgToQueryFilters(where);
+          }
+          
+          if (orderBy) {
+            Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
+              Object.entries<any>(members).forEach(([member, value]) => {
+                order.push([`${capitalize(cubeName)}.${member}`, value]);
+              });
+            });
           }
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeName = capitalize(cubeNode.name.value);
             const orderByArg = getArgumentValue(cubeNode, 'orderBy');
+            // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
               Object.keys(orderByArg).forEach(key => {
-                order[`${cubeName}.${key}`] = orderByArg[key];
+                order.push([`${cubeName}.${key}`, orderByArg[key]]);
               });
             }
 
             const whereArg = getArgumentValue(cubeNode, 'where');
             if (whereArg) {
-              filters = [...filters, ...whereArgToQueryFilters(whereArg, cubeName)];
+              filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
+            
+            const inDateRangeFilters = {};
+            filters = filters.filter((f) => {
+              if (f.operator === 'inDateRange') {
+                inDateRangeFilters[f.member] = f.values;
+                return false;
+              }
+              
+              return true;
+            });
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
               const memberType = getMemberType(metaConfig, cubeName, memberName);
+              const key = `${cubeName}.${memberName}`;
 
               if (memberType === 'measure') {
-                measures.push(`${cubeName}.${memberName}`);
+                measures.push(key);
               } else if (memberType === 'dimension') {
                 const granularityNodes = getFieldNodeChildren(memberNode, infos);
                 if (granularityNodes.length > 0) {
                   granularityNodes.forEach(granularityNode => {
                     const granularityName = granularityNode.name.value;
                     if (granularityName === 'value') {
-                      dimensions.push(`${cubeName}.${memberName}`);
+                      dimensions.push(key);
                     } else {
                       timeDimensions.push({
-                        dimension: `${cubeName}.${memberName}`,
-                        granularity: granularityName
+                        dimension: key,
+                        granularity: granularityName,
+                        ...(inDateRangeFilters[key] ? {
+                          dateRange: inDateRangeFilters[key],
+                        } : null)
                       });
                     }
                   });
@@ -470,7 +567,7 @@ export function makeSchema(metaConfig: any) {
             ...(filters.length && { filters }),
             ...(renewQuery && { renewQuery }),
           };
-
+          
           // eslint-disable-next-line no-async-promise-executor
           const results = await (new Promise<any>(async (resolve, reject) => {
             try {
@@ -484,6 +581,7 @@ export function makeSchema(metaConfig: any) {
                   }
                   resolve(message);
                 },
+                apiType: 'graphql',
               });
             } catch (e) {
               reject(e);

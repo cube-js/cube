@@ -25,7 +25,11 @@ spec:
     spec:
       containers:
         - name: cubestore
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
@@ -68,7 +72,7 @@ spec:
             {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
-            {{- end}}
+            {{- end }}
           {{- if .Values.router.livenessProbe.enabled }}
           livenessProbe:
             initialDelaySeconds: {{ .Values.router.livenessProbe.initialDelaySeconds }}
@@ -145,4 +149,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.router.persistence.size | quote }}
-  {{- end}}
+  {{- end }}

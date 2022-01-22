@@ -176,6 +176,7 @@ cubestore:
 | Name                               | Description                                                                                                                     | Value   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `config.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `config.sqlPort`                   | The port for a Cube.js deployment to listen to SQL connections on                                                               |         |
 | `config.devMode`                   | If true, enables development mode                                                                                               | `false` |
 | `config.debug`                     | If true, enables debug logging                                                                                                  | `false` |
 | `config.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |

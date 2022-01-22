@@ -31,7 +31,6 @@ Add the following to a `.env` file in your Cube.js project:
 CUBEJS_DB_TYPE=bigquery
 CUBEJS_DB_BQ_PROJECT_ID=my-bigquery-project-12345
 CUBEJS_DB_BQ_KEY_FILE=/path/to/my/keyfile.json
-CUBEJS_DB_BQ_LOCATION=us-central1
 ```
 
 You could also encode the key file using Base64 and set the result to
@@ -48,7 +47,7 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 | `CUBEJS_DB_BQ_PROJECT_ID`      | The Google BigQuery project ID to connect to                     | A valid Google BigQuery Project ID                                      |    ✅    |
 | `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery    | A valid Google BigQuery JSON key file                                   |    ✅    |
 | `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
-| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to               | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ✅    |
+| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to               | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcs`                                                                   |    ❌    |
 
@@ -99,15 +98,14 @@ configuring Cube.js with the following environment variables:
 
 <InfoBox>
 
-When using an export bucket, remember to assign the **Storage Object Admin**
-role to your BigQuery credentials (`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`).
+When using an export bucket, remember to assign the **BigQuery Data Editor** and **Storage Object Admin**
+role to your BigQuery service account.
 
 </InfoBox>
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET=export_data_58148478376
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
-CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 ```
 
 ## SSL

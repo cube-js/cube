@@ -80,6 +80,10 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    wrapWithQueryRenderer: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     const {
@@ -227,6 +231,12 @@ export default {
           this.setMembers(elementName, members);
         };
       });
+    }
+
+    if (!this.wrapWithQueryRenderer && this.$scopedSlots.builder) {
+      return createElement('div', {}, [
+        this.$scopedSlots.builder(builderProps),
+      ]);
     }
 
     // Pass parent slots to child QueryRenderer component
@@ -497,21 +507,15 @@ export default {
       }
     },
     removeMember(element, member) {
-      const name = element.charAt(0).toUpperCase() + element.slice(1);
-      let mem;
-
+      let index;
       if (element === 'timeDimensions') {
-        mem = this[`available${name}`].find((x) => x.name === member);
+        index = this[element].findIndex((x) => x.name === member);
       } else if (element === 'filters') {
-        mem = member;
+        index = this[element].findIndex((x) => x.member.name === member);
       } else {
-        mem = this[`available${name}`].find((m) => m.name === member);
+        index = this[element].findIndex((x) => x.name === member);
       }
-
-      if (mem) {
-        const index = this[element].findIndex((x) => x.name === mem);
-        this[element].splice(index, 1);
-      }
+      this[element].splice(index, 1);
     },
     updateMember(element, old, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);

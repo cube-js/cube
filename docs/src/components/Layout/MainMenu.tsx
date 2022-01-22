@@ -22,7 +22,8 @@ const menuOrderCloud = [
   'Configuration',
   'Developer Tools',
   'Deploys',
-  'Inspecting Queries'
+  'Inspecting Queries',
+  'Release Notes',
 ];
 
 const menuOrder = [
@@ -33,7 +34,7 @@ const menuOrder = [
   'Caching',
   'Authentication & Authorization',
   'API Reference',
-  'Cube.js Frontend',
+  'Frontend Integrations',
   'Deployment',
   'Developer Tools',
   'Examples & Tutorials',

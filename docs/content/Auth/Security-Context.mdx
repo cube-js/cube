@@ -23,10 +23,13 @@ JWTs can also be used to pass additional information about the user, known as a
 current user that the Cube.js server can use to ensure that users only have
 access to the data that they are authorized to access.
 
-It will be accessible in the [`SECURITY_CONTEXT`][ref-schema-sec-ctx] object in
-the Data Schema and as the [`securityContext`][ref-config-sec-ctx] property
-inside the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
-support [multi-tenant deployments][link-multitenancy].
+It will be accessible as the [`securityContext`][ref-config-sec-ctx] property
+inside:
+
+- The [`queryRewrite`][ref-config-queryrewrite] configuration option in your
+  Cube configuration file.
+- the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
+  support [multi-tenant deployments][link-multitenancy].
 
 ## Using queryRewrite
 
@@ -127,18 +130,15 @@ LIMIT 10000
 ## Using COMPILE_CONTEXT
 
 In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
-into the security context and will be accessible in both the
-[`SECURITY_CONTEXT`][ref-schema-sec-ctx] and
-[`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global variables in the Cube.js Data
-Schema.
+into the security context and will be accessible in both the [Security
+Context][ref-schema-sec-ctx] and [`COMPILE_CONTEXT`][ref-cubes-compile-ctx]
+global variable in the Cube.js Data Schema.
 
 <InfoBox>
 
 `COMPILE_CONTEXT` is used by Cube.js at schema compilation time, which allows
-changing the underlying dataset completely; whereas `SECURITY_CONTEXT` is used
-at query execution time, which simply filters the dataset with a `WHERE` clause.
-[More information on these differences can be found
-here][ref-sec-ctx-vs-compile-ctx].
+changing the underlying dataset completely; the Security Context is only used at
+query execution time, which simply filters the dataset with a `WHERE` clause.
 
 </InfoBox>
 
@@ -173,9 +173,9 @@ cube(`Orders`, {
 
 ### <--{"id" : "Using COMPILE_CONTEXT"}--> Usage with Pre-Aggregations
 
-To generate pre-aggregations that rely on `SECURITY_CONTEXT` and/or
-`COMPILE_CONTEXT`, [configure `scheduledRefreshContexts` in your `cube.js`
-configuration file][ref-config-sched-refresh].
+To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
+`scheduledRefreshContexts` in your `cube.js` configuration
+file][ref-config-sched-refresh].
 
 ## Testing during development
 
@@ -192,7 +192,5 @@ build one from a JSON object.
 [ref-config-sec-ctx]: /config#security-context
 [ref-schema-sec-ctx]: /schema/reference/cube#security-context
 [ref-cubes-compile-ctx]: https://cube.dev/docs/cube#compile-context
-[ref-sec-ctx-vs-compile-ctx]:
-  /multitenancy-setup#security-context-vs-multitenant-compile-context
 [ref-devtools-playground]:
   /dev-tools/dev-playground#editing-the-security-context

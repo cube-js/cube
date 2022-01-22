@@ -1,13 +1,13 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.28.60",
+  "version": "0.29.22",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": ">=10.8.0"
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "scripts": {
     "cypress:open": "kill-port 4000 && TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
@@ -40,10 +40,10 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.28.60",
-    "@cubejs-backend/schema-compiler": "^0.28.60",
-    "@cubejs-backend/shared": "^0.28.55",
-    "@cubejs-client/ws-transport": "^0.28.52",
+    "@cubejs-backend/query-orchestrator": "^0.29.21",
+    "@cubejs-backend/schema-compiler": "^0.29.22",
+    "@cubejs-backend/shared": "^0.29.21",
+    "@cubejs-client/ws-transport": "^0.29.21",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
@@ -51,8 +51,8 @@
   },
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
-    "@cubejs-backend/linter": "^0.28.22",
-    "@cubejs-client/core": "^0.28.52",
+    "@cubejs-backend/linter": "^0.29.21",
+    "@cubejs-client/core": "^0.29.8",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",

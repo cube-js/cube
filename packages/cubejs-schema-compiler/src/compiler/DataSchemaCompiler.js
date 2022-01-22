@@ -28,6 +28,7 @@ export class DataSchemaCompiler {
     this.compileContext = options.compileContext;
     this.compilerCache = options.compilerCache;
     this.errorReport = options.errorReport;
+    this.standalone = options.standalone;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -204,11 +205,19 @@ export class DataSchemaCompiler {
             return exports[foundFile.fileName];
           }
         },
-        COMPILE_CONTEXT: R.clone(this.compileContext || {})
+        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {})
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
     }
+  }
+
+  standaloneCompileContextProxy() {
+    return new Proxy({}, {
+      get: () => {
+        throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://cube.dev/docs/config#options-reference-context-to-app-id.');
+      }
+    });
   }
 
   resolveModuleFile(currentFile, modulePath, toCompile, errorsReport) {

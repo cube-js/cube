@@ -646,7 +646,8 @@ export class BaseQuery {
     );
 
     // TODO all having filters should be pushed down
-    if (toJoin.length === 1 && this.measureFilters.length === 0) {
+    // subQuery dimensions can introduce projection remapping
+    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
@@ -892,17 +893,20 @@ export class BaseQuery {
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
-    // TODO params independent sql caching
-    const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
     if (
-      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
-      parser.isSimpleAsteriskQuery()
+      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries
     ) {
-      const conditions = parser.extractWhereConditions(cubeAlias);
-      if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
-        this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+      // TODO params independent sql caching
+      const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
+      if (parser.isSimpleAsteriskQuery()) {
+        const conditions = parser.extractWhereConditions(cubeAlias);
+        if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
+          this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+        }
+        return [parser.extractTableFrom(), cubeAlias, conditions];
+      } else {
+        return [sql, cubeAlias];
       }
-      return [parser.extractTableFrom(), cubeAlias, conditions];
     } else {
       return [sql, cubeAlias];
     }
@@ -2311,13 +2315,13 @@ export class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(refreshKey, limitedWithMax = true) {
+  refreshKeyRenewalThresholdForInterval(refreshKey, everyWithoutSql = true) {
     const { every } = refreshKey;
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / 10), 1);
+      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / (everyWithoutSql ? 10 : 1)), 1);
 
-      if (limitedWithMax) {
+      if (everyWithoutSql) {
         return Math.min(threshold, 300);
       }
 
@@ -2325,9 +2329,9 @@ export class BaseQuery {
     }
 
     const { interval } = this.calcIntervalForCronString(refreshKey);
-    const threshold = Math.max(Math.round(interval / 10), 1);
+    const threshold = Math.max(Math.round(interval / (everyWithoutSql ? 10 : 1)), 1);
 
-    if (limitedWithMax) {
+    if (everyWithoutSql) {
       return Math.min(threshold, 300);
     }
 
@@ -2393,7 +2397,7 @@ export class BaseQuery {
           unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
-          typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
+          typeof propValue === 'object' && propValue !== null && this.contextSymbolsProxy(propValue) ||
           methods(propValue);
       }
     });

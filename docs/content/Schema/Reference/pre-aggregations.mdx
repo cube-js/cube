@@ -58,13 +58,13 @@ query with.
 
 ### <--{"id" : "Parameters"}--> type
 
-Cube.js supports three types of pre-aggregations:
+Cube supports three types of pre-aggregations:
 
 - [`rollup`][self-rollup]
 - [`originalSql`][self-originalsql]
 - [`rollupJoin`][self-rollupjoin]
 
-Default type is `rollup`.
+The default type is `rollup`.
 
 <h4 id="parameters-type-rollup">rollup</h4>
 
@@ -372,28 +372,25 @@ property is required when using [`timeDimension`][self-timedimension].
 The `segments` property is an array of [segments from the
 cube][ref-schema-segments] that can target the pre-aggregation:
 
-<WarningBox>
-
-The relevant measures/dimensions that make up the segment **must** be included
-in the pre-aggregation definition.
-
-</WarningBox>
-
 ```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  ...,
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
 
   segments: {
     onlyComplete: {
-      sql: `${CUBE}.status = 'complete'`,
+      sql: `${CUBE}.status = 'completed'`,
     },
   },
 
   preAggregations: {
     main: {
-      dimensions: [CUBE.status],
+      measures: [CUBE.count],
       segments: [CUBE.onlyComplete],
     },
   },
@@ -547,6 +544,13 @@ cube(`Orders`, {
 ```
 
 <h4 id="parameters-refresh-key-updatewindow">updateWindow</h4>
+
+<WarningBox>
+
+Incremental refreshes without a defined `updateWindow` will only update the last
+partition as determined by the pre-aggregation's `partitionGranularity`.
+
+</WarningBox>
 
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
