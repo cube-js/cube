@@ -13,7 +13,7 @@ export class LargeStreamWarning extends stream.Transform {
         count++;
 
         if (count === THRESHOLD_LIMIT) {
-          const msg = `The pre-aggregation "${preAggregationName}" has more than ${THRESHOLD_LIMIT} rows. Consider exporting this pre-aggregation.`;
+          const msg = `The pre-aggregation "${preAggregationName}" has more than ${THRESHOLD_LIMIT} rows. Please consider using an export bucket.`;
           displayCLIWarning(msg);
           onWarning(msg);
         }
