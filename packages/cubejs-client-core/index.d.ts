@@ -1154,5 +1154,3 @@ declare module '@cubejs-client/core' {
     timeElapsed: number;
   };
 }
-
-import '@cubejs-client/dx';

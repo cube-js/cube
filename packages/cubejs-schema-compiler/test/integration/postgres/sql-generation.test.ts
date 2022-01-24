@@ -123,6 +123,12 @@ describe('SQL Generation', () => {
           subQuery: true
         },
         
+        checkinsRolling: {
+          sql: \`\${visitor_checkins.visitorCheckinsRolling}\`,
+          type: \`number\`,
+          subQuery: true
+        },
+        
         checkinsWithPropagation: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
@@ -180,6 +186,14 @@ describe('SQL Generation', () => {
         visitor_checkins_count: {
           type: 'count'
         },
+        
+        visitorCheckinsRolling: {
+          type: 'count',
+          rollingWindow: {
+            trailing: 'unbounded'
+          }
+        },
+        
         revenue_per_checkin: {
           type: 'number',
           sql: \`\${visitors.visitor_revenue} / \${visitor_checkins_count}\`
@@ -956,6 +970,54 @@ describe('SQL Generation', () => {
           visitors__visitor_count: '1'
         }, {
           visitors__checkins: '3',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }]
+      );
+    });
+  });
+
+  it('subquery rolling', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.checkinsRolling'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitors.checkins'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [{
+          visitors__checkins_rolling: '0',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitor_count: '2'
+        }, {
+          visitors__checkins_rolling: '1',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }, {
+          visitors__checkins_rolling: '2',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }, {
+          visitors__checkins_rolling: '3',
           visitors__created_at_day: '2017-01-02T00:00:00.000Z',
           visitors__visitor_count: '1'
         }]
