@@ -1,6 +1,7 @@
 import * as AWS from "@aws-sdk/client-athena";
 import * as stream from 'stream';
 import { AthenaQueryId } from "./AthenaDriver";
+import { checkNonNullable } from "@cubejs-backend/shared";
 
 export class HydrationStream extends stream.Readable {
   public constructor(
