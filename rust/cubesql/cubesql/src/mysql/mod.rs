@@ -165,21 +165,6 @@ impl Backend {
                     )
                 ),)
             )
-        } else if query_lower.eq("select @@transaction_isolation") {
-            return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "@@transaction_isolation".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("REPEATABLE-READ".to_string())
-                        ])]
-                    )
-                ),)
-            )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
             let stmt = parse_sql_to_statement(&query)?;
             match stmt {
