@@ -18,6 +18,7 @@ use cubeclient::models::{
 
 use crate::mysql::dataframe;
 pub use crate::schema::ctx::*;
+use crate::schema::V1CubeMetaExt;
 
 use crate::CubeError;
 use crate::{
@@ -1522,7 +1523,9 @@ impl QueryPlanner {
                 self.show_variable_to_plan(variable, props)
             }
             ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter, props),
-            // Proxy some queries to DF
+            ast::Statement::ShowCreate { obj_name, obj_type } => {
+                self.show_create_to_plan(&obj_name, &obj_type)
+            }
             ast::Statement::ShowColumns { .. } => self.create_df_logical_plan(stmt.clone(), props),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
@@ -1624,6 +1627,67 @@ impl QueryPlanner {
         )?;
 
         self.create_df_logical_plan(stmt, props)
+    }
+
+    fn show_create_to_plan(
+        &self,
+        obj_name: &ObjectName,
+        obj_type: &ast::ShowCreateObject,
+    ) -> Result<QueryPlan, CompilationError> {
+        match obj_type {
+            ast::ShowCreateObject::Table => {}
+            _ => {
+                return Err(CompilationError::User(format!(
+                    "SHOW CREATE doesn't support type: {}",
+                    obj_type
+                )))
+            }
+        };
+
+        let table_name_filter = if obj_name.0.len() == 2 {
+            &obj_name.0[1].value
+        } else {
+            &obj_name.0[0].value
+        };
+
+        self.context.cubes.iter().find(|c| c.name.eq(table_name_filter)).map(|cube| {
+            let mut fields: Vec<String> = vec![];
+
+            for column in &cube.get_columns() {
+                fields.push(format!(
+                    "`{}` {}{}",
+                    column.get_name(),
+                    column.get_column_type(),
+                    if column.mysql_can_be_null() { " NOT NULL" } else { "" }
+                ));
+            }
+
+            QueryPlan::MetaTabular(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
+                vec![
+                    dataframe::Column::new(
+                        "Table".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
+                    ),
+                    dataframe::Column::new(
+                        "Create Table".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
+                    )
+                ],
+                vec![dataframe::Row::new(vec![
+                    dataframe::TableValue::String(cube.name.clone()),
+                    dataframe::TableValue::String(
+                        format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
+                    ),
+                ])]
+            )))
+        }).ok_or(
+            CompilationError::User(format!(
+                "Unknown table: {}",
+                table_name_filter
+            ))
+        )
     }
 
     fn create_df_logical_plan(
@@ -3398,7 +3462,7 @@ mod tests {
         );
     }
 
-    async fn execute_df_query(query: String) -> Result<String, CubeError> {
+    async fn execute_query(query: String) -> Result<String, CubeError> {
         let query = convert_sql_to_cube_query(
             &query,
             get_test_tenant_ctx(),
@@ -3412,18 +3476,54 @@ mod tests {
             QueryPlan::DataFushionSelect(_, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
                 let batches = df.collect().await?;
-                let response = batch_to_dataframe(&batches)?;
+                let frame = batch_to_dataframe(&batches)?;
 
-                return Ok(response.print());
+                return Ok(frame.print());
             }
-            _ => panic!("Must return DF plan"),
+            QueryPlan::MetaTabular(_, frame) => {
+                return Ok(frame.print());
+            }
+            _ => panic!("Unknown execution method"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_show_create_table() -> Result<(), CubeError> {
+        let exepected =
+            "+---------------------------+-----------------------------------------------+\n\
+        | Table                     | Create Table                                  |\n\
+        +---------------------------+-----------------------------------------------+\n\
+        | KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` (\r    |\n\
+        |                           |   `count` int,\r                                |\n\
+        |                           |   `maxPrice` int,\r                             |\n\
+        |                           |   `minPrice` int,\r                             |\n\
+        |                           |   `avgPrice` int,\r                             |\n\
+        |                           |   `order_date` datetime NOT NULL,\r             |\n\
+        |                           |   `customer_gender` varchar(255) NOT NULL,\r    |\n\
+        |                           |   `taxful_total_price` varchar(255) NOT NULL,\r |\n\
+        |                           |   `is_male` boolean,\r                          |\n\
+        |                           |   `is_female` boolean\r                         |\n\
+        |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4       |\n\
+        +---------------------------+-----------------------------------------------+";
+
+        assert_eq!(
+            execute_query("show create table KibanaSampleDataEcommerce;".to_string()).await?,
+            exepected.clone()
+        );
+
+        assert_eq!(
+            execute_query("show create table `db`.`KibanaSampleDataEcommerce`;".to_string())
+                .await?,
+            exepected
+        );
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_information_schema_tables() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.tables".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.tables".to_string()).await?,
             "+---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
             | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |\n\
             +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
@@ -3444,7 +3544,7 @@ mod tests {
     #[tokio::test]
     async fn test_information_schema_columns() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
             "+---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
             | TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME                | COLUMN_NAME        | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE | CHARACTER_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | COLUMN_TYPE  | NUMERIC_PRECISION | DATETIME_PRECISION | COLUMN_KEY | EXTRA | COLUMN_COMMENT | GENERATION_EXPRESSION | SRS_ID |\n\
             +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
@@ -3468,7 +3568,7 @@ mod tests {
     #[tokio::test]
     async fn test_information_schema_schemata() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.schemata".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.schemata".to_string()).await?,
             "+--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
             | CATALOG_NAME | SCHEMA_NAME        | DEFAULT_CHARACTER_SET_NAME | DEFAULT_COLLATION_NAME | SQL_PATH | DEFAULT_ENCRYPTION |\n\
             +--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
@@ -3487,7 +3587,7 @@ mod tests {
     async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
         // This query is used by metabase for introspection
         assert_eq!(
-            execute_df_query("
+            execute_query("
             SELECT
                 A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
             FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
@@ -3502,7 +3602,7 @@ mod tests {
     #[tokio::test]
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
             "+--------------------+----------------+\n\
             | VARIABLE_NAME      | VARIABLE_VALUE |\n\
             +--------------------+----------------+\n\
@@ -3511,7 +3611,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
             "+--------------------+----------------+\n\
             | VARIABLE_NAME      | VARIABLE_VALUE |\n\
             +--------------------+----------------+\n\
@@ -3525,7 +3625,7 @@ mod tests {
     #[tokio::test]
     async fn test_if() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 r#"select
                 if(null, true, false) as r1,
                 if(true, false, true) as r2,
@@ -3550,7 +3650,7 @@ mod tests {
     #[tokio::test]
     async fn test_least() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                 least(1, 2) as r1, \
                 least(2, 1) as r2, \
@@ -3573,7 +3673,7 @@ mod tests {
     #[tokio::test]
     async fn test_ucase() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                 ucase('super stroka') as r1
             "
@@ -3593,7 +3693,7 @@ mod tests {
     #[tokio::test]
     async fn test_convert_tz() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select convert_tz('2021-12-08T15:50:14.337Z'::timestamp, @@GLOBAL.time_zone, '+00:00') as r1;".to_string()
             )
             .await?,
@@ -3610,7 +3710,7 @@ mod tests {
     #[tokio::test]
     async fn test_timediff() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     timediff('1994-11-26T13:25:00.000Z'::timestamp, '1994-11-26T13:25:00.000Z'::timestamp) as r1
                 ".to_string()
@@ -3629,7 +3729,7 @@ mod tests {
     #[tokio::test]
     async fn test_instr() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     instr('rust is killing me', 'r') as r1,
                     instr('rust is killing me', 'e') as r2,
@@ -3651,7 +3751,7 @@ mod tests {
     #[tokio::test]
     async fn test_locate() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     locate('r', 'rust is killing me') as r1,
                     locate('e', 'rust is killing me') as r2,
@@ -3673,7 +3773,7 @@ mod tests {
     #[tokio::test]
     async fn test_select_variables() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 // This query I saw in Google Data Studio
                 "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
                 SELECT  \
@@ -3714,7 +3814,7 @@ mod tests {
     async fn test_show_variable() -> Result<(), CubeError> {
         // LIKE
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables like 'sql_mode';"
                 .to_string()
             )
@@ -3728,7 +3828,7 @@ mod tests {
 
         // LIKE pattern
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables like '%_mode';"
                 .to_string()
             )
@@ -3742,13 +3842,13 @@ mod tests {
 
         // Negative test, we dont define this variable
         assert_eq!(
-            execute_df_query("show variables like 'aurora_version';".to_string()).await?,
+            execute_query("show variables like 'aurora_version';".to_string()).await?,
             "++\n++\n++"
         );
 
         // All variables
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables;"
                 .to_string()
             )
@@ -3768,7 +3868,7 @@ mod tests {
     #[tokio::test]
     async fn test_metabase() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT \
                     @@GLOBAL.time_zone AS global_tz, \
                     @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'
@@ -3783,7 +3883,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT \
                 TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, \
                 CASE data_type WHEN 'bit' THEN -7 WHEN 'tinyblob' THEN -3 WHEN 'mediumblob' THEN -4 WHEN 'longblob' THEN -4 WHEN 'blob' THEN -4 WHEN 'tinytext' THEN 12 WHEN 'mediumtext' THEN -1 WHEN 'longtext' THEN -1 WHEN 'text' THEN -1 WHEN 'date' THEN 91 WHEN 'datetime' THEN 93 WHEN 'decimal' THEN 3 WHEN 'double' THEN 8 WHEN 'enum' THEN 12 WHEN 'float' THEN 7 WHEN 'int' THEN IF( COLUMN_TYPE like '%unsigned%', 4,4) WHEN 'bigint' THEN -5 WHEN 'mediumint' THEN 4 WHEN 'null' THEN 0 WHEN 'set' THEN 12 WHEN 'smallint' THEN IF( COLUMN_TYPE like '%unsigned%', 5,5) WHEN 'varchar' THEN 12 WHEN 'varbinary' THEN -3 WHEN 'char' THEN 1 WHEN 'binary' THEN -2 WHEN 'time' THEN 92 WHEN 'timestamp' THEN 93 WHEN 'tinyint' THEN IF(COLUMN_TYPE like 'tinyint(1)%',-7,-6)  WHEN 'year' THEN 91 ELSE 1111 END  DATA_TYPE, IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME,  CASE DATA_TYPE  WHEN 'time' THEN IF(DATETIME_PRECISION = 0, 10, CAST(11 + DATETIME_PRECISION as signed integer))  WHEN 'date' THEN 10  WHEN 'datetime' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  WHEN 'timestamp' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  ELSE   IF(NUMERIC_PRECISION IS NULL, LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647), NUMERIC_PRECISION)  END COLUMN_SIZE, \
@@ -3823,7 +3923,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT
                     KCU.REFERENCED_TABLE_SCHEMA PKTABLE_CAT,
                     NULL PKTABLE_SCHEM,
