@@ -1,6 +1,6 @@
 import * as AWS from '@aws-sdk/client-athena';
 import { BaseDriver, DriverInterface, QueryOptions } from '@cubejs-backend/query-orchestrator';
-import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 
@@ -32,13 +32,6 @@ interface AthenaColumn {
 }
 
 type AthenaSchema = Record<string, Record<string, AthenaColumn[]>>;
-
-function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
-  if (x === undefined || x === null) {
-    throw new Error(`${name} is not defined.`);
-  }
-  return x!;
-}
 
 function applyParams(query: string, params: any[]): string {
   return SqlString.format(query, params);
