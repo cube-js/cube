@@ -79,6 +79,8 @@ const DRILL_MEMBERS_DICTIONARY = [
 
 const idRegex = '_id$|id$';
 
+export type DatabaseSchema = Record<string, Record<string, any>>;
+
 type ScaffoldingSchemaOptions = {
   includeNonDictionaryMeasures?: boolean;
 };
@@ -87,7 +89,7 @@ export class ScaffoldingSchema {
   private tableNamesToTables: any;
 
   public constructor(
-    private readonly dbSchema: Record<string, Record<string, any>>,
+    private readonly dbSchema: DatabaseSchema,
     private readonly options: ScaffoldingSchemaOptions = {}
   ) {
   }
@@ -152,7 +154,7 @@ export class ScaffoldingSchema {
     return this.dbSchema[schema][table];
   }
 
-  protected tableSchema(tableName: TableName, includeJoins) {
+  protected tableSchema(tableName: TableName, includeJoins: boolean) {
     const [schema, table] = this.parseTableName(tableName);
     const tableDefinition = this.resolveTableDefinition(tableName);
     const dimensions = this.dimensions(tableDefinition);

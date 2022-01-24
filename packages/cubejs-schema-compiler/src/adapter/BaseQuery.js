@@ -646,7 +646,8 @@ export class BaseQuery {
     );
 
     // TODO all having filters should be pushed down
-    if (toJoin.length === 1 && this.measureFilters.length === 0) {
+    // subQuery dimensions can introduce projection remapping
+    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
