@@ -1,5 +1,5 @@
 import * as AWS from '@aws-sdk/client-athena';
-import { BaseDriver, DriverInterface, QueryOptions } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, DriverInterface, QueryOptions, StreamTableData } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
@@ -16,7 +16,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
-interface AthenaQueryId {
+export interface AthenaQueryId {
   QueryExecutionId: string;
 }
 
@@ -36,8 +36,9 @@ type AthenaSchema = Record<string, Record<string, AthenaColumn[]>>;
 function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
   if (x === undefined || x === null) {
     throw new Error(`${name} is not defined.`);
+  } else {
+    return x!;
   }
-  return x!;
 }
 
 function applyParams(query: string, params: any[]): string {
@@ -171,7 +172,23 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return this.mergeSchemas([tablesSchema, viewsSchema]);
   }
 
-  private async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
+  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+    const stream = await this.athena.createQueryStream({
+      query,
+      params: values,
+      parameterMode: 'positional',
+      useLegacySql: false
+    });
+
+    const rowStream = new HydrationStream();
+    stream.pipe(rowStream);
+
+    return {
+      rowStream,
+    };
+  }
+
+  protected async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
     const isView = (table: AthenaTable) => !tablesSchema[table.schema]
       || !tablesSchema[table.schema][table.name];
 
