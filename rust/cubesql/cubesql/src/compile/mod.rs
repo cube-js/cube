@@ -3487,7 +3487,12 @@ mod tests {
     async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
         // This query is used by metabase for introspection
         assert_eq!(
-            execute_df_query("SELECT A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME  FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME  ORDER BY A.COLUMN_NAME".to_string()).await?,
+            execute_df_query("
+            SELECT
+                A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
+            WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
+            ORDER BY A.COLUMN_NAME".to_string()).await?,
             "++\n++\n++"
         );
 
@@ -3660,6 +3665,46 @@ mod tests {
             +----+----+----+\n\
             | 1  | 18 | 0  |\n\
             +----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_select_variables() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_df_query(
+                // This query I saw in Google Data Studio
+                "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
+                SELECT  \
+                    @@session.auto_increment_increment AS auto_increment_increment, \
+                    @@character_set_client AS character_set_client, \
+                    @@character_set_connection AS character_set_connection, \
+                    @@character_set_results AS character_set_results, \
+                    @@character_set_server AS character_set_server, \
+                    @@collation_server AS collation_server, \
+                    @@collation_connection AS collation_connection, \
+                    @@init_connect AS init_connect, \
+                    @@interactive_timeout AS interactive_timeout, \
+                    @@license AS license, \
+                    @@lower_case_table_names AS lower_case_table_names, \
+                    @@max_allowed_packet AS max_allowed_packet, \
+                    @@net_buffer_length AS net_buffer_length, \
+                    @@net_write_timeout AS net_write_timeout, \
+                    @@sql_mode AS sql_mode, \
+                    @@system_time_zone AS system_time_zone, \
+                    @@time_zone AS time_zone, \
+                    @@transaction_isolation AS transaction_isolation, \
+                    @@wait_timeout AS wait_timeout
+                "
+                .to_string()
+            )
+            .await?,
+            "+--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
+            | auto_increment_increment | character_set_client | character_set_connection | character_set_results | character_set_server | collation_server   | collation_connection | init_connect | interactive_timeout | license  | lower_case_table_names | max_allowed_packet | net_buffer_length | net_write_timeout | sql_mode                                                                                                              | system_time_zone | time_zone | transaction_isolation | wait_timeout |\n\
+            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
+            | 1                        | utf8mb4              | utf8mb4                  | utf8mb4               | utf8mb4              | utf8mb4_0900_ai_ci | utf8mb4_general_ci   |              | 28800               | Apache 2 | 0                      | 67108864           | 16384             | 600               | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION | UTC              | SYSTEM    | REPEATABLE-READ       | 28800        |\n\
+            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+"
         );
 
         Ok(())
