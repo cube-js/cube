@@ -46,11 +46,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   public constructor(config: AthenaDriverOptions = {}) {
     super();
 
+    const accessKeyId = config.accessKeyId || process.env.CUBEJS_AWS_KEY;
+    const secretAccessKey = config.secretAccessKey || process.env.CUBEJS_AWS_SECRET;
+
     this.config = {
-      credentials: {
-        accessKeyId: checkNonNullable('CUBEJS_AWS_KEY', config.accessKeyId || process.env.CUBEJS_AWS_KEY),
-        secretAccessKey: checkNonNullable('CUBEJS_AWS_SECRET', config.secretAccessKey || process.env.CUBEJS_AWS_SECRET),
-      },
+      credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
       region: process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
       workGroup: config.workGroup || process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
