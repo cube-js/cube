@@ -918,7 +918,12 @@ export class PreAggregationLoader {
         );
 
         if (client.unload) {
-          const stream = new LargeStreamWarning(preAggregation.preAggregationId);
+          const stream = new LargeStreamWarning(preAggregation.preAggregationId, (msg) => {
+            this.logger('Downloading external pre-aggregation warning', {
+              ...queryOptions,
+              error: msg
+            });
+          });
           tableData.rowStream.pipe(stream);
           tableData.rowStream = stream;
         }
