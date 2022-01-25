@@ -148,8 +148,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async* lazyRowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
-    let columnInfo: { Name: string }[] = [];
     let isFirstBatch = true;
+    let columnInfo: { Name: string }[] = [];
     for (
       let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
       results;
