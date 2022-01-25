@@ -73,50 +73,23 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  protected async awaitForJobStatus<R = unknown>(qid: AthenaQueryId, query: string, options: any): Promise<R[] | null> {
-    const queryExecution = await this.athena.getQueryExecution(qid);
-
-    const status = queryExecution.QueryExecution?.Status?.State;
-    if (status === 'FAILED') {
-      throw new Error(queryExecution.QueryExecution?.Status?.StateChangeReason);
-    }
-
-    if (status === 'CANCELLED') {
-      throw new Error('Query has been cancelled');
-    }
-
-    if (
-      status === 'SUCCEEDED'
-    ) {
-      const rows: R[] = [];
-      for await (const row of this.rowIterator(qid, query)) {
-        rows.push(row);
-      }
-      return rows;
-    }
-
-    return null;
-  }
-
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const qid = await this.startQuery(query, values);
-
-    const startedTime = Date.now();
-
-    for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
-      const result: R[] | null = await this.awaitForJobStatus(qid, query, options);
-      if (result) {
-        return result;
-      }
-
-      await pausePromise(
-        Math.min(this.config.pollMaxInterval, 500 * i)
-      );
+    await this.waitForSuccess(qid);
+    const rows: R[] = [];
+    for await (const row of this.rowIterator(qid, query)) {
+      rows.push(row);
     }
+    return rows;
+  }
 
-    throw new Error(
-      `Athena job timeout reached ${this.config.pollTimeout}ms`
-    );
+  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+    const qid = await this.startQuery(query, values);
+    await this.waitForSuccess(qid);
+    const rowStream = stream.Readable.from(this.rowIterator(qid, query));
+    return {
+      rowStream
+    };
   }
 
   public async tablesSchema(): Promise<AthenaSchema> {
@@ -124,14 +97,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const viewsSchema = await this.viewsSchema(tablesSchema);
 
     return this.mergeSchemas([tablesSchema, viewsSchema]);
-  }
-
-  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
-    const qid = await this.startQuery(query, values);
-    const rowStream = stream.Readable.from(this.rowIterator(qid, query));
-    return {
-      rowStream
-    };
   }
 
   protected async startQuery(query: string, values: unknown[]): Promise<AthenaQueryId> {
@@ -151,6 +116,36 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
 
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
+  }
+
+  protected async checkStatus(qid: AthenaQueryId): Promise<boolean> {
+    const queryExecution = await this.athena.getQueryExecution(qid);
+
+    const status = queryExecution.QueryExecution?.Status?.State;
+    if (status === 'FAILED') {
+      throw new Error(queryExecution.QueryExecution?.Status?.StateChangeReason);
+    }
+
+    if (status === 'CANCELLED') {
+      throw new Error('Query has been cancelled');
+    }
+
+    return status === 'SUCCEEDED';
+  }
+
+  protected async waitForSuccess(qid: AthenaQueryId): Promise<void> {
+    const startedTime = Date.now();
+    for (let i = 0; Date.now() - startedTime <= this.config.pollTimeout; i++) {
+      if (await this.checkStatus(qid)) {
+        return;
+      }
+      await pausePromise(
+        Math.min(this.config.pollMaxInterval, 500 * i)
+      );
+    }
+    throw new Error(
+      `Athena job timeout reached ${this.config.pollTimeout}ms`
+    );
   }
 
   protected async* rowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
