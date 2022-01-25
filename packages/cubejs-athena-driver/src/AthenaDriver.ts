@@ -1,10 +1,9 @@
 import * as AWS from '@aws-sdk/client-athena';
 import * as stream from 'stream';
 import { BaseDriver, DriverInterface, QueryOptions, StreamTableData } from '@cubejs-backend/query-orchestrator';
-import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { assertNonNullable, checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
-import { hydrationStream } from "./HydrationStream";
 
 interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
@@ -77,7 +76,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const rows: R[] = [];
-    for await (const row of this.rowIterator(qid, query)) {
+    for await (const row of this.lazyRowIterator<R>(qid, query)) {
       rows.push(row);
     }
     return rows;
@@ -86,7 +85,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
-    const rowStream = stream.Readable.from(this.rowIterator(qid, query));
+    const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query));
     return {
       rowStream
     };
@@ -148,8 +147,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  protected async* rowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
-    let columnInfo: { Name: string }[] | undefined;
+  protected async* lazyRowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
+    let columnInfo: { Name: string }[] = [];
+    let isFirstBatch = true;
     for (
       let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
       results;
@@ -157,17 +157,20 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
         : undefined
     ) {
-      if (!columnInfo) {
+      let rows = results.ResultSet?.Rows ?? [];
+      if (isFirstBatch) {
+        isFirstBatch = false;
+        // Athena returns the columns names in first row, skip it.
+        rows = rows.slice(1);
         columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
           ? [{ Name: 'column' }]
-          : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
+          : checkNonNullable('ColumnInfo', results.ResultSet?.ResultSetMetadata?.ColumnInfo)
+            .map(info => ({ Name: checkNonNullable('Name', info.Name) }));
       }
 
-      const rows = results.ResultSet?.Rows ?? [];
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+      for (const row of rows) {
         const fields: Record<string, any> = {};
-        checkNonNullable('ColumnInfo', columnInfo)
+        columnInfo
           .forEach((c, j) => {
             fields[c.Name] = row.Data?.[j].VarCharValue;
           });
