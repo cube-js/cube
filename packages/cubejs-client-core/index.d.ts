@@ -7,6 +7,15 @@
  * @description Vanilla JavaScript Cube.js client.
  */
 
+import type {
+  IntrospectedBinaryFilter,
+  IntrospectedQuery,
+  IntrospectedTimeDimensionBase,
+  IntrospectedTQueryOrderObject,
+  IntrospectedTQueryOrderArray,
+  IntrospectedUnaryFilter,
+} from '@cubejs-client/dx';
+
 declare module '@cubejs-client/core' {
 
   export type TransportOptions = {
@@ -125,7 +134,7 @@ declare module '@cubejs-client/core' {
     timeDimensions: Record<string, Annotation>;
   };
 
-  type PivotQuery = Query & {
+  type PivotQuery = (IntrospectedQuery | Query) & {
     queryType: QueryType;
   };
 
@@ -154,7 +163,7 @@ declare module '@cubejs-client/core' {
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
     lastRefreshTime: string;
-    query: Query;
+    query: IntrospectedQuery | Query;
     data: T[];
     external: boolean | null;
     dbType: string;
@@ -397,7 +406,7 @@ declare module '@cubejs-client/core' {
      * ```
      * @returns Drill down query
      */
-    drillDown(drillDownLocator: DrillDownLocator, pivotConfig?: PivotConfig): Query | null;
+    drillDown(drillDownLocator: DrillDownLocator, pivotConfig?: PivotConfig): IntrospectedQuery | Query | null;
 
     /**
      * Returns an array of series with key, title and series data.
@@ -709,18 +718,18 @@ declare module '@cubejs-client/core' {
     categories(pivotConfig?: PivotConfig): ChartPivotRow[];
 
     tableRow(): ChartPivotRow;
-    query(): Query;
+    query(): IntrospectedQuery | Query;
     rawData(): T[];
     annotation(): QueryAnnotations;
   }
 
-  export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
+  export type Filter = IntrospectedBinaryFilter | BinaryFilter | IntrospectedUnaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
   export type LogicalAndFilter = {
-    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
+    and: (IntrospectedBinaryFilter | BinaryFilter | IntrospectedUnaryFilter | UnaryFilter | LogicalOrFilter)[];
   };
 
   export type LogicalOrFilter = {
-    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
+    or: (IntrospectedBinaryFilter | BinaryFilter | IntrospectedUnaryFilter | UnaryFilter | LogicalAndFilter)[];
   };
 
   export interface BinaryFilter {
@@ -769,12 +778,12 @@ declare module '@cubejs-client/core' {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
   };
-  export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
+  export type TimeDimensionComparison = (IntrospectedTimeDimensionBase | TimeDimensionBase) & TimeDimensionComparisonFields;
 
   type TimeDimensionRangedFields = {
     dateRange?: DateRange;
   };
-  export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
+  export type TimeDimensionRanged = (IntrospectedTimeDimensionBase | TimeDimensionBase) & TimeDimensionRangedFields;
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
@@ -786,7 +795,7 @@ declare module '@cubejs-client/core' {
     segments?: string[];
     limit?: number;
     offset?: number;
-    order?: TQueryOrderObject | TQueryOrderArray;
+    order?: IntrospectedTQueryOrderObject | TQueryOrderObject | IntrospectedTQueryOrderArray | TQueryOrderArray;
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
@@ -876,7 +885,7 @@ declare module '@cubejs-client/core' {
    */
   type TDryRunResponse = {
     queryType: QueryType;
-    normalizedQueries: Query[];
+    normalizedQueries: (IntrospectedQuery | Query)[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
     transformedQueries: TransformedQuery[];
@@ -884,7 +893,7 @@ declare module '@cubejs-client/core' {
 
   export type DryRunResponse = {
     queryType: QueryType;
-    normalizedQueries: Query[];
+    normalizedQueries: (IntrospectedQuery | Query)[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
     transformedQueries: TransformedQuery[];
@@ -932,7 +941,7 @@ declare module '@cubejs-client/core' {
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
      * @param query - context query to provide filtering of members available to add to this query
      */
-    membersForQuery(query: Query | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
+    membersForQuery(query: IntrospectedQuery | Query | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
 
     /**
      * Get meta information for a cube member
@@ -967,7 +976,7 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: Query | Query[], options?: LoadMethodOptions): Promise<ResultSet>;
+    load(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options?: LoadMethodOptions): Promise<ResultSet>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -992,7 +1001,7 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
@@ -1018,14 +1027,14 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: Query | Query[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
 
-    sql(query: Query | Query[], options?: LoadMethodOptions): Promise<SqlQuery>;
+    sql(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
@@ -1033,11 +1042,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
+    dryRun(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**
@@ -1082,24 +1091,24 @@ declare module '@cubejs-client/core' {
   export type TDefaultHeuristicsResponse = {
     shouldApplyHeuristicOrder: boolean;
     pivotConfig: PivotConfig | null;
-    query: Query;
+    query: IntrospectedQuery | Query;
     chartType?: ChartType;
   };
 
   export type TDefaultHeuristicsState = {
-    query: Query;
+    query: IntrospectedQuery | Query;
     chartType?: ChartType;
   };
 
   export function defaultHeuristics(
     newState: TDefaultHeuristicsState,
-    oldQuery: Query,
+    oldQuery: IntrospectedQuery | Query,
     options: TDefaultHeuristicsOptions
   ): TDefaultHeuristicsResponse;
   /**
    * @hidden
    */
-  export function isQueryPresent(query: Query | Query[] | null | undefined): boolean;
+  export function isQueryPresent(query: IntrospectedQuery | Query | IntrospectedQuery[] | Query[] | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
@@ -1112,7 +1121,7 @@ declare module '@cubejs-client/core' {
    */
   export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
 
-  export function defaultOrder(query: Query): { [key: string]: QueryOrder };
+  export function defaultOrder(query: IntrospectedQuery | Query): { [key: string]: QueryOrder };
 
   export interface TFlatFilter {
     /**
@@ -1139,16 +1148,16 @@ declare module '@cubejs-client/core' {
    */
   export function getOrderMembersFromOrder(
     orderMembers: any,
-    order: TQueryOrderObject | TQueryOrderArray
+    order: IntrospectedTQueryOrderObject | TQueryOrderObject | IntrospectedTQueryOrderArray | TQueryOrderArray
   ): TOrderMember[];
 
   export const GRANULARITIES: TGranularityMap[];
   /**
    * @hidden
    */
-  export function getQueryMembers(query: Query): string[];
+  export function getQueryMembers(query: IntrospectedQuery | Query): string[];
 
-  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
+  export function areQueriesEqual(query1: IntrospectedQuery | Query | null, query2: IntrospectedQuery | Query | null): boolean;
 
   export type ProgressResponse = {
     stage: string;

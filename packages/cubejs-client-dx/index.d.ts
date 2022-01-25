@@ -1,15 +1,26 @@
-declare module "@cubejs-client/core" {
+import type {
+  BinaryOperator,
+  Filter,
+  TimeDimension,
+  TimeDimensionGranularity,
+  UnaryOperator,
+} from '@cubejs-client/core';
 
-  export type IntrospectedMeasureName = import('./generated').IntrospectedMeasureName;
-  export type IntrospectedDimensionName = import('./generated').IntrospectedDimensionName;
-  export type IntrospectedTimeDimensionName = import('./generated').IntrospectedTimeDimensionName;
-  export type IntrospectedSegmentName = import('./generated').IntrospectedSegmentName;
+declare module "@cubejs-client/dx" {
+
+  type GetGeneratedValue<T> = T extends undefined ? string : T;
+
+  export type IntrospectedMeasureName = GetGeneratedValue<import('./generated').IntrospectedMeasureName>;
+  export type IntrospectedDimensionName = GetGeneratedValue<import('./generated').IntrospectedDimensionName>;
+  export type IntrospectedTimeDimensionName = GetGeneratedValue<import('./generated').IntrospectedTimeDimensionName>;
+  export type IntrospectedSegmentName = GetGeneratedValue<import('./generated').IntrospectedSegmentName>;
   export type IntrospectedMemberName = IntrospectedMeasureName | IntrospectedDimensionName;
 
+  export type QueryOrder = 'asc' | 'desc';
   export type IntrospectedTQueryOrderObject = { [key in IntrospectedMemberName]?: QueryOrder };
   export type IntrospectedTQueryOrderArray = Array<[IntrospectedMemberName, QueryOrder]>;
 
-  export interface Query {
+  export interface IntrospectedQuery {
     measures?: IntrospectedMeasureName[];
     dimensions?: IntrospectedDimensionName[];
     filters?: Filter[];
@@ -23,22 +34,21 @@ declare module "@cubejs-client/core" {
     ungrouped?: boolean;
   }
 
-  export interface TimeDimensionBase {
+  export interface IntrospectedTimeDimensionBase {
     dimension: IntrospectedTimeDimensionName;
+    granularity?: TimeDimensionGranularity;
   }
 
-  export interface BinaryFilter {
+  export interface IntrospectedBinaryFilter {
     dimension?: IntrospectedMemberName;
     member?: IntrospectedMemberName;
+    operator: BinaryOperator;
+    values: string[];
   }
-
-  export interface UnaryFilter {
+  export interface IntrospectedUnaryFilter {
     dimension?: IntrospectedMemberName;
     member?: IntrospectedMemberName;
-  }
-
-  export interface TFlatFilter {
-    dimension?: IntrospectedMemberName;
-    member?: IntrospectedMemberName;
+    operator: UnaryOperator;
+    values?: never;
   }
 }
