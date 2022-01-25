@@ -53,21 +53,21 @@ export class CubejsClient {
   }
 
   public load(
-    query: Query | Query[],
+    query: Parameters<CubejsApi['load']>[0],
     options?: LoadMethodOptions
   ): Observable<ResultSet> {
     return from(<Promise<ResultSet>>this.apiInstace().load(query, options));
   }
 
   public sql(
-    query: Query | Query[],
+    query: Parameters<CubejsApi['load']>[0],
     options?: LoadMethodOptions
   ): Observable<SqlQuery> {
     return from(this.apiInstace().sql(query, options));
   }
 
   public dryRun(
-    query: Query | Query[],
+    query: Parameters<CubejsApi['load']>[0],
     options?: LoadMethodOptions
   ): Observable<DryRunResponse> {
     return from(this.apiInstace().dryRun(query, options));
