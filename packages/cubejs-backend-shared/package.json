@@ -8,7 +8,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint --debug src/* --ext .ts",
+    "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
     "unit": "jest --coverage dist/test"
   },
