@@ -544,7 +544,7 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByContentVersion.last_updated_at
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
         };
       }
     }
