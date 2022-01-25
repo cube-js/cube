@@ -1,9 +1,10 @@
 import * as AWS from '@aws-sdk/client-athena';
+import * as stream from 'stream';
 import { BaseDriver, DriverInterface, QueryOptions, StreamTableData } from '@cubejs-backend/query-orchestrator';
-import { checkNonNullable, getEnv, pausePromise, Required} from '@cubejs-backend/shared';
+import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
-import { HydrationStream } from "./HydrationStream";
+import { hydrationStream } from "./HydrationStream";
 
 interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
@@ -87,58 +88,18 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     if (
       status === 'SUCCEEDED'
     ) {
-      const allRows: AWS.Row[] = [];
-      let columnInfo: { Name: string }[] | undefined;
-
-      this.reportQueryUsage({
-        dataScannedInBytes: queryExecution.QueryExecution?.Statistics?.DataScannedInBytes
-      }, options);
-
-      for (
-        let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
-        results;
-        results = results.NextToken
-          ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
-          : undefined
-      ) {
-        const rows = results.ResultSet?.Rows ?? [];
-        allRows.push(...(allRows.length > 0 ? rows : rows.slice(1)));
-        if (!columnInfo) {
-          columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
-            ? [{ Name: 'column' }]
-            : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
-        }
+      const rows: R[] = [];
+      for await (const row of this.rowIterator(qid, query)) {
+        rows.push(row);
       }
-
-      return allRows.map(r => {
-        const fields: Record<string, any> = {};
-        checkNonNullable('ColumnInfo', columnInfo)
-          .forEach((c, i) => {
-            fields[c.Name] = r.Data?.[i].VarCharValue;
-          });
-        return fields;
-      }) as unknown as R[];
+      return rows;
     }
 
     return null;
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
-    const queryString = applyParams(
-      query,
-      (values || []).map(s => (typeof s === 'string' ? {
-        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
-      } : s))
-    );
-
-    const { QueryExecutionId } = await this.athena.startQueryExecution({
-      QueryString: queryString,
-      WorkGroup: this.config.workGroup,
-      ResultConfiguration: {
-        OutputLocation: this.config.S3OutputLocation
-      }
-    });
-    const qid = { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
+    const qid = await this.startQuery(query, values);
 
     const startedTime = Date.now();
 
@@ -166,19 +127,58 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
-    const stream = await this.athena.createQueryStream({
+    const qid = await this.startQuery(query, values);
+    const rowStream = stream.Readable.from(this.rowIterator(qid, query));
+    return {
+      rowStream
+    };
+  }
+
+  protected async startQuery(query: string, values: unknown[]): Promise<AthenaQueryId> {
+    const queryString = applyParams(
       query,
-      params: values,
-      parameterMode: 'positional',
-      useLegacySql: false
+      (values || []).map(s => (typeof s === 'string' ? {
+        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
+      } : s))
+    );
+
+    const { QueryExecutionId } = await this.athena.startQueryExecution({
+      QueryString: queryString,
+      WorkGroup: this.config.workGroup,
+      ResultConfiguration: {
+        OutputLocation: this.config.S3OutputLocation
+      }
     });
 
-    const rowStream = new HydrationStream();
-    stream.pipe(rowStream);
+    return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
+  }
 
-    return {
-      rowStream,
-    };
+  protected async* rowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
+    let columnInfo: { Name: string }[] | undefined;
+    for (
+      let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
+      results;
+      results = results.NextToken
+        ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
+        : undefined
+    ) {
+      if (!columnInfo) {
+        columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+          ? [{ Name: 'column' }]
+          : results.ResultSet?.ResultSetMetadata?.ColumnInfo?.map(info => ({ Name: checkNonNullable('Name', info.Name) }));
+      }
+
+      const rows = results.ResultSet?.Rows ?? [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const fields: Record<string, any> = {};
+        checkNonNullable('ColumnInfo', columnInfo)
+          .forEach((c, j) => {
+            fields[c.Name] = row.Data?.[j].VarCharValue;
+          });
+        yield fields as R;
+      }
+    }
   }
 
   protected async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
