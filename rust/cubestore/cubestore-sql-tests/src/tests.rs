@@ -76,6 +76,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_messed_order",
             create_table_with_location_messed_order,
         ),
+        t(
+            "create_table_with_location_invalid_digit",
+            create_table_with_location_invalid_digit,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -1621,6 +1625,42 @@ async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+}
+
+async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("invalid_digit.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c1,c3\n".as_bytes()).unwrap();
+        file.write_all("foo,1a23\n".as_bytes()).unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let res = service
+        .exec_query(&format!(
+            "CREATE TABLE test.main (`c1` text, `c3` decimal)  LOCATION {}",
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await;
+
+    println!("Res: {:?}", res);
+
+    assert!(
+        res.is_err(),
+        "Expected invalid digit error but got {:?}",
+        res
+    );
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
