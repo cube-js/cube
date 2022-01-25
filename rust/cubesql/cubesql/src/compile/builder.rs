@@ -81,6 +81,7 @@ impl QueryBuilder {
                 dimension: member.clone(),
                 date_range: Some(date_range),
                 granularity: None,
+                compare_date_range: None,
             });
 
             true
@@ -157,6 +158,9 @@ impl QueryBuilder {
                 } else {
                     None
                 },
+                renew_query: None,
+                timezone: None,
+                ungrouped: None,
             },
             meta: self.meta.clone(),
         }

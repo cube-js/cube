@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
+use cubeclient::models::{
+    V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment,
+    V1TimeDimensionGranularity,
+};
 use regex::Regex;
 use sqlparser::ast;
 
@@ -100,7 +103,7 @@ impl QueryContext {
                 let identifier = identifiers.name("column").unwrap().as_str();
                 let result = self
                     .find_dimension_for_identifier(&identifier.to_string())
-                    .map(|dimension| Selection::TimeDimension(dimension, "quarter".to_string()));
+                    .map(|dimension| Selection::TimeDimension(dimension, V1TimeDimensionGranularity::Quarter.to_string()));
 
                 return Ok(result);
             };
@@ -336,13 +339,13 @@ impl QueryContext {
 
                     let right_part = date_sub.args[1].to_string();
                     let granularity = if right_part.eq(&iso_week_test) {
-                        "week".to_string()
+                        V1TimeDimensionGranularity::Week.to_string()
                     } else if right_part.eq(&week_test) {
                         return Err(CompilationError::Unsupported("date granularity, week is not supported in Cube.js, please use ISOWEEK".to_string()));
                     } else if right_part.eq(&month_test) {
-                        "month".to_string()
+                        V1TimeDimensionGranularity::Month.to_string()
                     } else if right_part.eq(&year_test) {
-                        "year".to_string()
+                        V1TimeDimensionGranularity::Year.to_string()
                     } else {
                         return Err(CompilationError::User(format!(
                             "Unable to detect granularity: {:?}",
@@ -373,7 +376,7 @@ impl QueryContext {
                     let possible_dimension_name = self.unpack_identifier_from_arg(&f.args[0])?;
 
                     if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
-                        Ok(Some(Selection::TimeDimension(r, "day".to_string())))
+                        Ok(Some(Selection::TimeDimension(r, V1TimeDimensionGranularity::Day.to_string())))
                     } else {
                         return Err(CompilationError::User(format!(
                             "Unable to find dimension {} from expression: {}",

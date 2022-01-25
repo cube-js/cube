@@ -13,7 +13,13 @@ use serde_json::json;
 use sqlparser::ast::{self, DateTimeField, Ident, ObjectName};
 
 use cubeclient::models::{
-    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+    V1FilterOperator,
+    V1FilterOperatorInDateRange,
+    V1FilterOperatorNotInDateRange,
+    V1FilterOperatorNotSet,
+    V1LoadRequestQuery,
+    V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryTimeDimension,
 };
 
 use crate::mysql::dataframe;
@@ -111,6 +117,7 @@ fn compile_select_expr(
                     dimension: dimension.name.clone(),
                     granularity: Some(granularity),
                     date_range: None,
+                    compare_date_range: None,
                 },
                 CompiledQueryFieldMeta {
                     column_from: dimension.name.clone(),
@@ -774,7 +781,8 @@ fn compile_where_expression(
 
             Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
                 member: column_for_filter.name.clone(),
-                operator: "notSet".to_string(),
+                // operator: "notSet".to_string(),
+                operator: V1FilterOperatorNotSet::NotSet.to_string(),
                 values: None,
             }))
         }
@@ -826,9 +834,11 @@ fn compile_where_expression(
             Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
                 member: column_for_filter.name.clone(),
                 operator: if *negated {
-                    "notInDateRange".to_string()
+                    V1FilterOperatorNotInDateRange::NotInDateRange.to_string()
+                    // "notInDateRange".to_string()
                 } else {
-                    "inDateRange".to_string()
+                    V1FilterOperatorInDateRange::InDateRange.to_string()
+                    // "inDateRange".to_string()
                 },
                 values: Some(vec![
                     low_compiled_date.to_value_as_str()?,
@@ -1065,7 +1075,7 @@ fn convert_where_filters_base(
             CompiledFilter::Filter {
                 member,
                 operator,
-                values,
+                values, ..
             } => Ok(V1LoadRequestQueryFilterItem {
                 member: Some(member),
                 operator: Some(operator),
@@ -2636,7 +2646,7 @@ mod tests {
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -2651,7 +2661,7 @@ mod tests {
     #[test]
     fn test_where_filter_or() {
         let query = convert_simple_select(
-            "SELECT 
+            "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
@@ -2853,7 +2863,8 @@ mod tests {
                 "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
                 Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("notInDateRange".to_string()),
+                    // operator: Some("notInDateRange".to_string()),
+                    operator: Some(V1FilterOperatorNotInDateRange.to_string()),
                     values: Some(vec![
                         "2021-08-31T00:00:00.000Z".to_string(),
                         "2021-09-07T00:00:00.000Z".to_string(),
@@ -2876,6 +2887,7 @@ mod tests {
                         // -1 milleseconds hack for cube.js
                         "2021-09-06T23:59:59.999Z".to_string(),
                     ])),
+                    compare_date_range: None,
                 }]),
             ),
             //  SIMILAR as BETWEEN but without -1 nanosecond because <=
@@ -2890,6 +2902,7 @@ mod tests {
                         // without -1 because <=
                         "2021-09-07T00:00:00.000Z".to_string(),
                     ])),
+                    compare_date_range: None,
                 }]),
             ),
             // LIKE
@@ -2932,7 +2945,7 @@ mod tests {
 
         for (sql, expected_fitler, expected_time_dimensions) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -2995,7 +3008,7 @@ mod tests {
         for (sql, expected_error) in to_check.iter() {
             let query = convert_sql_to_cube_query(
                 &format!(
-                    "SELECT 
+                    "SELECT
                     COUNT(*), DATE(order_date) AS __timestamp
                     FROM KibanaSampleDataEcommerce
                     WHERE {}
@@ -3213,7 +3226,7 @@ mod tests {
 
         for (sql, expected_fitler) in to_check.iter() {
             let query = convert_simple_select(format!(
-                "SELECT 
+                "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
@@ -3495,7 +3508,7 @@ mod tests {
     async fn test_if() -> Result<(), CubeError> {
         assert_eq!(
             execute_df_query(
-                r#"select 
+                r#"select
                 if(null, true, false) as r1,
                 if(true, false, true) as r2,
                 if(true, 'true', 'false') as r3,
