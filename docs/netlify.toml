@@ -1,10 +1,10 @@
 [build]
 publish = "public/"
-command = "source .env.production && ./build-netlify.sh"
+command = "source .env.production && ./docs-gen.sh && ./build-netlify.sh"
 ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
 
 # we need to wrap the public files to the docs folder on prod deployment so we use a different script for this
 [context.production]
   publish = "dist/"
-  command = "source .env.production && ./build-netlify-prod.sh"
+  command = "source .env.production && ./docs-gen.sh && ./build-netlify-prod.sh"
   ignore = "cd .. && git diff --quiet HEAD^ HEAD -- docs/"
