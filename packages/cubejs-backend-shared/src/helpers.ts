@@ -34,3 +34,15 @@ export async function executeCommand(
     });
   });
 }
+
+export function assertNonNullable<T>(name: string, x: T): asserts x is NonNullable<T> {
+  if (x === undefined || x === null) {
+    throw new Error(`${name} is not defined.`);
+  }
+}
+
+// If x is nullable, throws and error, else return x with a nonnulable type.
+export function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
+  assertNonNullable(name, x);
+  return x;
+}
