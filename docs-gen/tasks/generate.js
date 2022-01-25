@@ -2,7 +2,7 @@ const TypeDoc = require('typedoc');
 const path = require('path');
 const fs = require('fs-extra');
 
-const outputDir = '../docs/content/Cube.js-Frontend';
+const outputDir = '../docs/content/Frontend-Integrations';
 
 const app = new TypeDoc.Application();
 

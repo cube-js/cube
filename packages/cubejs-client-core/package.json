@@ -14,7 +14,6 @@
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/dx": "^0.29.5",
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
     "dayjs": "^1.10.4",

@@ -28,7 +28,7 @@ use crate::mysql::dataframe::batch_to_dataframe;
 use crate::schema::SchemaService;
 use crate::schema::V1CubeMetaExt;
 use crate::CubeError;
-use sqlparser::ast::{ShowCreateObject, Statement};
+use sqlparser::ast;
 
 pub mod dataframe;
 
@@ -120,7 +120,7 @@ impl Backend {
                     )
                 )),
             )
-        }else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
+        } else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
                 QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
@@ -165,25 +165,10 @@ impl Backend {
                     )
                 ),)
             )
-        } else if query_lower.eq("select @@transaction_isolation") {
-            return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "@@transaction_isolation".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("REPEATABLE-READ".to_string())
-                        ])]
-                    )
-                ),)
-            )
         } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
             let stmt = parse_sql_to_statement(&query)?;
             match stmt {
-                Statement::ExplainTable { table_name, .. } => {
+                ast::Statement::ExplainTable { table_name, .. } => {
                     let table_name_filter = if table_name.0.len() == 2 {
                         &table_name.0[1].value
                     } else {
@@ -252,7 +237,7 @@ impl Backend {
                         return Err(CubeError::internal("Unknown table".to_string()))
                     }
                 },
-                Statement::Explain { statement, .. } => {
+                ast::Statement::Explain { statement, .. } => {
                     let auth_ctx = if self.context.is_some() {
                         self.context.as_ref().unwrap()
                     } else {
@@ -282,73 +267,6 @@ impl Backend {
                 },
                 _ => {
                     return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
-                }
-            }
-        } else if query_lower.starts_with("show create table") {
-            let stmt = parse_sql_to_statement(&query)?;
-            match stmt {
-                Statement::ShowCreate { obj_type, obj_name } => {
-                    match obj_type {
-                        ShowCreateObject::Table => {
-                            let table_name_filter = if obj_name.0.len() == 2 {
-                                &obj_name.0[1].value
-                            } else {
-                                &obj_name.0[0].value
-                            };
-
-                            let ctx = if self.context.is_some() {
-                                self.context.as_ref().unwrap()
-                            } else {
-                                return Err(CubeError::user("must be auth".to_string()))
-                            };
-
-                            let ctx = self.schema
-                                .get_ctx_for_tenant(ctx)
-                                .await?;
-
-                            if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
-                                let mut fields: Vec<String> = vec![];
-
-                                for column in &cube.get_columns() {
-                                    fields.push(format!(
-                                        "`{}` {}{}",
-                                        column.get_name(),
-                                        column.get_column_type(),
-                                        if column.mysql_can_be_null() { " NOT NULL" } else { "" }
-                                    ));
-                                }
-
-                                return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                                    vec![
-                                        dataframe::Column::new(
-                                            "Table".to_string(),
-                                            ColumnType::MYSQL_TYPE_STRING,
-                                            ColumnFlags::empty(),
-                                        ),
-                                        dataframe::Column::new(
-                                            "Create Table".to_string(),
-                                            ColumnType::MYSQL_TYPE_STRING,
-                                            ColumnFlags::empty(),
-                                        )
-                                    ],
-                                    vec![dataframe::Row::new(vec![
-                                        dataframe::TableValue::String(cube.name.clone()),
-                                        dataframe::TableValue::String(
-                                            format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
-                                        ),
-                                    ])]
-                                ))))
-                            } else {
-                                return Err(CubeError::internal("Unknown table".to_string()));
-                            }
-                        }
-                        _ => {
-                            return Err(CubeError::internal("Unexpected type in ShowCreate".to_string()))
-                        }
-                    }
-                },
-                _ => {
-                    return Err(CubeError::internal("Unexpected AST in ShowCreate method".to_string()))
                 }
             }
         } else if query_lower.starts_with("show full tables from") {

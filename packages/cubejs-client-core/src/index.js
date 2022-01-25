@@ -24,7 +24,7 @@ function mutexPromise(promise) {
 
 class CubejsApi {
   constructor(apiToken, options) {
-    if (typeof apiToken === 'object') {
+    if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
       apiToken = undefined;
     }

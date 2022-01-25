@@ -84,6 +84,42 @@ impl SystemVar {
             "@@collation_connection".to_string(),
             ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
         );
+        variables.insert(
+            "@@collation_server".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4_0900_ai_ci".to_string())),
+        );
+        variables.insert(
+            "@@init_connect".to_string(),
+            ScalarValue::Utf8(Some("".to_string())),
+        );
+        variables.insert(
+            "@@interactive_timeout".to_string(),
+            ScalarValue::UInt32(Some(28800)),
+        );
+        variables.insert(
+            "@@license".to_string(),
+            ScalarValue::Utf8(Some("Apache 2".to_string())),
+        );
+        variables.insert(
+            "@@lower_case_table_names".to_string(),
+            ScalarValue::UInt32(Some(0)),
+        );
+        variables.insert(
+            "@@net_buffer_length".to_string(),
+            ScalarValue::UInt32(Some(16384)),
+        );
+        variables.insert(
+            "@@net_write_timeout".to_string(),
+            ScalarValue::UInt32(Some(600)),
+        );
+        variables.insert(
+            "@@wait_timeout".to_string(),
+            ScalarValue::UInt32(Some(28800)),
+        );
+        variables.insert(
+            "@@sql_mode".to_string(),
+            ScalarValue::Utf8(Some("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string()))
+        );
 
         Self { variables }
     }

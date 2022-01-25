@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.22](https://github.com/cube-js/cube.js/compare/v0.29.21...v0.29.22) (2022-01-21)
+
+
+### Bug Fixes
+
+* **postgres-driver:** Support enums as UD types for columns, fix [#3946](https://github.com/cube-js/cube.js/issues/3946) ([#3957](https://github.com/cube-js/cube.js/issues/3957)) ([842cc53](https://github.com/cube-js/cube.js/commit/842cc53d59a323b56a575f697ddccacbf7b3a632))
+
+
+
+
+
 ## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
