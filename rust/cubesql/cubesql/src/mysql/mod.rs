@@ -517,6 +517,19 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             Ok(random_bytes)
         }
     }
+
+    /// Called when client switches database: USE `db`;
+    async fn on_init<'a>(
+        &'a mut self,
+        database: &'a str,
+        writter: InitWriter<'a, W>,
+    ) -> Result<(), Self::Error> {
+        self.props.set_database(Some(database.to_string()));
+
+        writter.ok()?;
+
+        Ok(())
+    }
 }
 
 pub struct MySqlServer {
