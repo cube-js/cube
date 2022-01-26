@@ -8,10 +8,10 @@ services:
       - 3001:3000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      # TODO: Fill in the values below
-      - CUBEJS_DB_BQ_PROJECT_ID=
-      - CUBEJS_DB_BQ_CREDENTIALS=
-      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+      # Via external .env file
+      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
+      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=${CUBEJS_DB_BQ_EXPORT_BUCKET}
 
       - CUBEJS_EXT_DB_TYPE=cubestore
       - CUBEJS_EXT_DB_HOST=cubestore
@@ -32,10 +32,10 @@ services:
     environment:
       - CUBEJS_SCHEDULED_REFRESH_TIMER=true
       - CUBEJS_DB_TYPE=bigquery
-      # TODO: Fill in the values below
-      - CUBEJS_DB_BQ_PROJECT_ID=
-      - CUBEJS_DB_BQ_CREDENTIALS=
-      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+      # Via external .env file
+      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
+      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
+      - CUBEJS_DB_BQ_EXPORT_BUCKET=${CUBEJS_DB_BQ_EXPORT_BUCKET}
 
       - CUBEJS_EXT_DB_TYPE=cubestore
       - CUBEJS_EXT_DB_HOST=cubestore
