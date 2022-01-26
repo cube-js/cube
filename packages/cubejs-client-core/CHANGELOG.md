@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** restore support for Angular by removing dependency on `@cubejs-client/dx` ([#3972](https://github.com/cube-js/cube.js/issues/3972)) ([13d30dc](https://github.com/cube-js/cube.js/commit/13d30dc98a08c6ef93808adaf1be6c2aa10c664a))
+* **client-core:** apiToken nullable check ([3f93f68](https://github.com/cube-js/cube.js/commit/3f93f68170ff87a50bd6bbf768e1cd36c478c20c))
+
+
+
+
+
 ## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
 
 

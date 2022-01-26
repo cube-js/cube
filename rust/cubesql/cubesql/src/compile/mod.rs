@@ -1320,6 +1320,10 @@ impl QueryPlannerExecutionProps {
     pub fn set_user(&mut self, user: Option<String>) {
         self.user = user;
     }
+
+    pub fn set_database(&mut self, database: Option<String>) {
+        self.database = database;
+    }
 }
 
 impl QueryPlannerExecutionProps {
