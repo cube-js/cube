@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::env;
+use std::fmt::Debug;
 use std::io;
 
 use std::sync::Arc;
@@ -24,6 +26,7 @@ use crate::compile::convert_statement_to_cube_query;
 use crate::compile::parser::parse_sql_to_statement;
 use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
+use crate::config::ConfigObj;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::schema::SchemaService;
 use crate::schema::V1CubeMetaExt;
@@ -32,14 +35,15 @@ use sqlparser::ast;
 
 pub mod dataframe;
 
-struct Backend {
+struct Connection {
     auth: Arc<dyn SqlAuthService>,
     schema: Arc<dyn SchemaService>,
     props: QueryPlannerExecutionProps,
+    server: Arc<ServerManager>,
+    // statements1: Option<Box<Statements>>,
+    // statements2: Statements,
     // Auth result from SqlAuthService
     context: Option<AuthContext>,
-    // From MysqlServerOptions
-    nonce: Arc<Option<Vec<u8>>>,
 }
 
 enum QueryResponse {
@@ -47,7 +51,7 @@ enum QueryResponse {
     ResultSet(StatusFlags, Arc<dataframe::DataFrame>),
 }
 
-impl Backend {
+impl Connection {
     async fn execute_query<'a>(&'a mut self, query: &'a str) -> Result<QueryResponse, CubeError> {
         let _start = SystemTime::now();
 
@@ -393,7 +397,7 @@ impl Backend {
 }
 
 #[async_trait]
-impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
+impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     type Error = io::Error;
 
     fn server_version(&self) -> &str {
@@ -406,19 +410,26 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
     async fn on_prepare<'a>(
         &'a mut self,
-        _query: &'a str,
+        query: &'a str,
         info: StatementMetaWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        info.reply(42, &[], &[])
+        let statement_id = self.server.insert_prepared_statement(query.to_string());
+
+        info.reply(statement_id, &[], &[])
     }
 
     async fn on_execute<'a>(
         &'a mut self,
-        _id: u32,
+        id: u32,
         _params: ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        results.completed(0, 0, StatusFlags::empty())
+        let statement_opt = self.server.get_prepared_statement(id);
+        if let Some(statement) = statement_opt {
+            results.completed(0, 0, StatusFlags::empty())
+        } else {
+            results.error(ErrorKind::ER_INTERNAL_ERROR, b"Unknown prepared statement")
+        }
     }
 
     async fn on_close<'a>(&'a mut self, _stmt: u32)
@@ -510,12 +521,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     where
         W: 'async_trait,
     {
-        if let Some(n) = &*self.nonce {
-            Ok(n.clone())
-        } else {
-            let random_bytes: Vec<u8> = (0..20).map(|_| rand::random::<u8>()).collect();
-            Ok(random_bytes)
-        }
+        Ok(self
+            .server
+            .get_nonce()
+            .unwrap_or_else(|| (0..20).map(|_| rand::random::<u8>()).collect()))
     }
 
     /// Called when client switches database: USE `db`;
@@ -538,7 +547,7 @@ pub struct MySqlServer {
     schema: Arc<dyn SchemaService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
-    nonce: Arc<Option<Vec<u8>>>,
+    server: Arc<ServerManager>,
 }
 
 crate::di_service!(MySqlServer, []);
@@ -575,7 +584,7 @@ impl ProcessingLoop for MySqlServer {
 
             let auth = self.auth.clone();
             let schema = self.schema.clone();
-            let nonce = self.nonce.clone();
+            let server = self.server.clone();
 
             let connection_id = if connection_id_incr > 100_000_u32 {
                 connection_id_incr = 1;
@@ -589,12 +598,12 @@ impl ProcessingLoop for MySqlServer {
 
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
-                    Backend {
+                    Connection {
                         auth,
                         schema,
                         props: QueryPlannerExecutionProps::new(connection_id, None, None),
                         context: None,
-                        nonce,
+                        server,
                     },
                     socket,
                 )
@@ -612,6 +621,55 @@ impl ProcessingLoop for MySqlServer {
     }
 }
 
+struct CyclicTable<Item: Debug + ToOwned> {
+    id: u32 // Atomic,
+    items: std::sync::RwLock<HashMap<u32, Item>>,
+}
+
+impl<Item: Debug + ToOwned> CyclicTable<Item> {
+    pub fn new() -> Self {
+        Self {
+            id: 1,
+            items: std::sync::RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn insert(&self, item: Item) -> u32 {
+        // self.id = self.id + 1;
+
+        let mut items = self.items.write().expect("getting write lock on insert");
+        items.insert(self.id, item);
+
+        self.id
+    }
+
+    // Get & remove
+    pub fn get_and_remove(&self, key: u32) -> Option<Item> {
+        let mut items = self.items.write().expect("getting write lock on insert");
+        let item = self.items.write().unwrap().remove(&key);
+
+        item
+    }
+}
+
+struct ServerManager {
+    pub(crate) prepared_statements: CyclicTable<String>,
+    nonce: Option<Vec<u8>>,
+}
+
+impl ServerManager {
+    pub fn new(nonce: Option<Vec<u8>>) -> Self {
+        Self {
+            prepared_statements: CyclicTable::new(),
+            nonce
+        }
+    }
+
+    pub fn get_nonce(&self) -> Option<Vec<u8>> {
+        self.nonce.clone()
+    }
+}
+
 impl MySqlServer {
     pub fn new(
         address: String,
@@ -624,7 +682,7 @@ impl MySqlServer {
             address,
             auth,
             schema,
-            nonce: Arc::new(nonce),
+            server: Arc::new(ServerManager::new(nonce)),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })
