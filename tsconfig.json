@@ -50,9 +50,6 @@
       "path": "packages/cubejs-bigquery-driver"
     },
     {
-      "path": "packages/cubejs-athena-driver"
-    },
-    {
       "path": "packages/cubejs-snowflake-driver"
     },
     {
