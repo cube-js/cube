@@ -1,5 +1,7 @@
+import type { SchemaFileRepository } from '../types';
+
 import { CubeValidator } from './CubeValidator';
-import { DataSchemaCompiler } from './DataSchemaCompiler';
+import { DataSchemaCompiler, DataSchemaCompilerOptions } from './DataSchemaCompiler';
 import {
   CubeCheckDuplicatePropTranspiler,
   CubePropContextTranspiler,
@@ -16,7 +18,21 @@ import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
 
-export const prepareCompiler = (repo, options) => {
+export interface PrepareCompilerOptions extends DataSchemaCompilerOptions {
+  adapter?: string;
+  allowJsDuplicatePropsInSchema?: boolean;
+  headCommitId?: string;
+  maxQueryCacheAge?: number;
+  maxQueryCacheSize?: number;
+}
+
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions) => {
+  const {
+    allowJsDuplicatePropsInSchema,
+    maxQueryCacheSize,
+    maxQueryCacheAge
+  } = options;
+
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
   const cubeValidator = new CubeValidator(cubeSymbols);
@@ -24,7 +40,6 @@ export const prepareCompiler = (repo, options) => {
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
-  const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
 
   const transpilers: TranspilerInterface[] = [
@@ -33,7 +48,7 @@ export const prepareCompiler = (repo, options) => {
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary),
   ];
 
-  if (!options.allowJsDuplicatePropsInSchema) {
+  if (!allowJsDuplicatePropsInSchema) {
     transpilers.push(new CubeCheckDuplicatePropTranspiler());
   }
 
@@ -65,7 +80,7 @@ export const prepareCompiler = (repo, options) => {
   };
 };
 
-export const compile = (repo, options) => {
+export const compile = (repo: SchemaFileRepository, options: PrepareCompilerOptions): Promise<ReturnType<typeof prepareCompiler>> => {
   const compilers = prepareCompiler(repo, options);
   return compilers.compiler.compile().then(
     () => compilers

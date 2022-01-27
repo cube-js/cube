@@ -7,14 +7,83 @@ import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 
+import type { CompilerCache } from './CompilerCache';
+import type { ContextEvaluator } from './ContextEvaluator';
+import type { CubeDictionary } from './CubeDictionary';
+import type { AbstractExtensionConstructorFn } from '../extensions/extension.abstract';
+import type { TranspilerInterface } from './transpilers';
+import type { FileContent, RequestContext } from '../types';
+
 import { UserError } from './UserError';
-import { ErrorReporter } from './ErrorReporter';
+import { ErrorReporter, ErrorReporterOptions } from './ErrorReporter';
+import { BaseQuery } from '../adapter';
 
 const moduleFileCache = {};
 
+export interface ContextCompiler {
+  compile: (contexts, errorReporter?: ErrorReporterOptions) => void;
+}
+
+export interface CubeCompiler {
+  compile: (cubes, errorReporter?: ErrorReporterOptions) => void;
+}
+
+export interface DataSchemaCompilerOptions {
+  allowNodeRequire?: boolean;
+  compilerCache?: CompilerCache;
+  compileContext?: RequestContext;
+  contextCompilers?: ContextEvaluator[];
+  cubeCompilers?: CubeCompiler[];
+  cubeFactory?: any;
+  cubeNameCompilers?: CubeDictionary[];
+  errorReport?: ErrorReporterOptions;
+  extensions?: Record<string, AbstractExtensionConstructorFn>;
+  filesToCompile?: string[];
+  omitErrors?: boolean;
+  preTranspileCubeCompilers?: CubeCompiler[];
+  standalone?: boolean;
+  transpilers?: TranspilerInterface[];
+}
+
 export class DataSchemaCompiler {
-  constructor(repository, options = {}) {
-    this.repository = repository;
+  public compilePromise: Promise<any> | undefined;
+
+  protected allowNodeRequire: boolean | undefined;
+
+  protected compilerCache: CompilerCache | undefined;
+
+  protected compileContext: RequestContext | undefined;
+
+  protected contextCompilers: ContextEvaluator[];
+
+  protected cubeCompilers: CubeCompiler[] | undefined;
+
+  protected cubeFactory: any;
+
+  protected cubeNameCompilers: CubeDictionary[];
+
+  protected currentQuery!: BaseQuery;
+
+  protected errorReport: ErrorReporterOptions | undefined;
+
+  protected extensions: Record<string, AbstractExtensionConstructorFn>;
+
+  protected filesToCompile: string[] | undefined;
+
+  protected omitErrors: boolean | undefined;
+
+  protected preTranspileCubeCompilers: CubeCompiler[];
+
+  protected standalone: boolean | undefined;
+
+  protected transpilers: TranspilerInterface[];
+
+  public errorsReport: ErrorReporter | undefined;
+
+  public constructor(
+    protected repository,
+    options: DataSchemaCompilerOptions = {},
+  ) {
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
     this.transpilers = options.transpilers || [];
@@ -31,7 +100,7 @@ export class DataSchemaCompiler {
     this.standalone = options.standalone;
   }
 
-  compileObjects(compileServices, objects, errorsReport) {
+  protected compileObjects(compileServices: any[], objects: any, errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -45,7 +114,13 @@ export class DataSchemaCompiler {
     }
   }
 
-  compile() {
+  /**
+   * Retrieves data schema files from `this.repository` and compiles them.
+   *
+   * If any errors are found during compilation, then they are available
+   * through `this.errorsReport`.
+   */
+  public compile(): Promise<any> {
     if (!this.compilePromise) {
       this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
         const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
@@ -71,17 +146,17 @@ export class DataSchemaCompiler {
       });
     }
 
-    return this.compilePromise;
+    return this.compilePromise as Promise<any>;
   }
 
-  transpileFile(file, errorsReport) {
+  protected transpileFile(file: FileContent, errorsReport: ErrorReporter): FileContent | undefined {
     try {
       const ast = parse(
         file.content,
         {
           sourceFilename: file.fileName,
           sourceType: 'module',
-          plugins: ['objectRestSpread']
+          plugins: ['objectRestSpread'],
         },
       );
 
@@ -105,7 +180,7 @@ export class DataSchemaCompiler {
     return undefined;
   }
 
-  withQuery(query, fn) {
+  public withQuery(query: BaseQuery, fn) {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
     try {
@@ -115,16 +190,20 @@ export class DataSchemaCompiler {
     }
   }
 
-  contextQuery() {
+  public contextQuery() {
     return this.currentQuery;
   }
 
-  async compileCubeFiles(compilers, toCompile, errorsReport) {
+  protected async compileCubeFiles(
+    compilers: { cubeCompilers: CubeCompiler[], contextCompilers: ContextCompiler[] },
+    toCompile: FileContent[],
+    errorsReport: ErrorReporter,
+  ) {
     const cubes = [];
     const exports = {};
     const contexts = [];
     const compiledFiles = {};
-    const asyncModules = [];
+    const asyncModules: any[] = [];
 
     toCompile
       .forEach((file) => {
@@ -136,7 +215,7 @@ export class DataSchemaCompiler {
           contexts,
           toCompile,
           compiledFiles,
-          asyncModules
+          asyncModules,
         );
       });
     await asyncModules.reduce((a, b) => a.then(() => b()), Promise.resolve());
@@ -144,12 +223,19 @@ export class DataSchemaCompiler {
       .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
   }
 
-  throwIfAnyErrors() {
-    this.errorsReport.throwIfAny();
+  public throwIfAnyErrors() {
+    this.errorsReport?.throwIfAny();
   }
 
-  compileFile(
-    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
+  public compileFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes: any[],
+    exports: {},
+    contexts: any[],
+    toCompile: FileContent[],
+    compiledFiles: {},
+    asyncModules: any[] = [],
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -199,28 +285,33 @@ export class DataSchemaCompiler {
               exports,
               contexts,
               toCompile,
-              compiledFiles
+              compiledFiles,
             );
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
           }
         },
-        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {})
+        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {}),
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
     }
   }
 
-  standaloneCompileContextProxy() {
+  public standaloneCompileContextProxy() {
     return new Proxy({}, {
       get: () => {
         throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://cube.dev/docs/config#options-reference-context-to-app-id.');
-      }
+      },
     });
   }
 
-  resolveModuleFile(currentFile, modulePath, toCompile, errorsReport) {
+  public resolveModuleFile(
+    currentFile: FileContent,
+    modulePath: string,
+    toCompile: FileContent[],
+    errorsReport: ErrorReporter,
+  ) {
     const localImport = modulePath.match(/^\.\/(.*)$/);
 
     if (!currentFile.isModule && localImport) {
@@ -274,7 +365,7 @@ export class DataSchemaCompiler {
     return this.readModuleFile(absPath, errorsReport);
   }
 
-  readModuleFile(absPath, errorsReport) {
+  public readModuleFile(absPath: string, errorsReport: ErrorReporter) {
     const nodeModulesPath = path.resolve('node_modules');
     if (!moduleFileCache[absPath]) {
       const content = fs.readFileSync(absPath, 'utf-8');
@@ -282,7 +373,7 @@ export class DataSchemaCompiler {
       const fileName = absPath.replace(nodeModulesPath + '/', '');
       const transpiled = this.transpileFile(
         { fileName, content, isModule: true },
-        errorsReport
+        errorsReport,
       );
       if (!transpiled) {
         throw new UserError(`'${fileName}' transpiling failed`);
@@ -292,7 +383,7 @@ export class DataSchemaCompiler {
     return moduleFileCache[absPath];
   }
 
-  isWhiteListedPackage(packagePath) {
+  public isWhiteListedPackage(packagePath: string): boolean {
     return packagePath.indexOf('-schema') !== -1 &&
       (packagePath.indexOf('-schema') === packagePath.length - '-schema'.length);
   }

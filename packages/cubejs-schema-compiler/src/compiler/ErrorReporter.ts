@@ -1,5 +1,7 @@
 import { codeFrameColumns, SourceLocation } from '@babel/code-frame';
 
+import type { FileContent } from '../types';
+
 import { UserError } from './UserError';
 import { CompileError } from './CompileError';
 
@@ -15,12 +17,7 @@ export interface SyntaxErrorInterface {
   loc: SourceLocation | null,
 }
 
-interface File {
-  fileName: string,
-  content: string,
-}
-
-interface ErrorReporterOptions {
+export interface ErrorReporterOptions {
   logger: (msg: string) => void
 }
 
@@ -29,7 +26,7 @@ export class ErrorReporter {
 
   protected errors: CompilerErrorInterface[] = [];
 
-  protected file: File | null = null;
+  protected file: FileContent | null = null;
 
   public constructor(
     protected readonly parent: ErrorReporter | null = null,
@@ -44,7 +41,7 @@ export class ErrorReporter {
     this.file = null;
   }
 
-  public inFile(file: File) {
+  public inFile(file: FileContent) {
     this.file = file;
   }
 

@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, describe, it, beforeAll, afterAll, expect } from '@jest/globals';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { BaseQuery, prepareCompiler as originalPrepareCompiler, SchemaFileRepository } from '@cubejs-backend/schema-compiler';
 import { StartedTestContainer } from 'testcontainers';
 import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
@@ -12,7 +12,7 @@ export const prepareCompiler = (content: any, options?: any) => originalPrepareC
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.js', content }
   ])
-}, { adapter: 'postgres', ...options });
+} as SchemaFileRepository, { adapter: 'postgres', ...options });
 
 export abstract class QueryTestAbstract<T extends BaseDriver> {
   abstract getQueryClass(): any;

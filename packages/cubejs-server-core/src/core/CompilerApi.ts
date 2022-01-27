@@ -1,12 +1,78 @@
+import type { SchemaFileRepository } from '@cubejs-backend/schema-compiler';
+
 import crypto from 'crypto';
 import { createQuery, compile, PreAggregations } from '@cubejs-backend/schema-compiler';
 
+import type {
+  DatabaseType,
+  DbTypeFn,
+  DialectContext,
+  DialectFactoryFn,
+  DriverContext,
+  ExternalDbTypeFn,
+  LoggerFn,
+  PreAggregationFilter,
+  RequestContext,
+  SchemaVersionFn,
+} from './types';
+
+export interface CompilerApiOptions {
+  allowJsDuplicatePropsInSchema?: boolean;
+  allowNodeRequire?: boolean;
+  allowUngroupedWithoutPrimaryKey?: boolean;
+  compileContext?: RequestContext;
+  dialectClass?: DialectFactoryFn;
+  devServer?: boolean;
+  externalDbType?: DatabaseType | ExternalDbTypeFn;
+  externalDialectClass?: any;
+  logger?: LoggerFn;
+  preAggregationsSchema?: any;
+  schemaVersion?: SchemaVersionFn;
+  sqlCache?: boolean;
+  standalone?: boolean;
+}
+
+export interface GetCompilersArgs {
+  requestId?: string;
+}
+
+export interface GetSqlOptions {
+  includeDebugInfo?: boolean;
+}
+
 export class CompilerApi {
-  constructor(repository, dbType, options) {
-    this.repository = repository;
-    this.dbType = dbType;
+  protected readonly dialectClass: DialectFactoryFn;
+
+  protected readonly allowJsDuplicatePropsInSchema: boolean;
+
+  protected readonly allowNodeRequire: boolean;
+
+  protected readonly allowUngroupedWithoutPrimaryKey: boolean;
+
+  protected readonly compileContext: RequestContext;
+
+  protected readonly logger: LoggerFn;
+
+  protected readonly sqlCache: boolean;
+
+  protected readonly standalone: boolean;
+
+  protected compilers: ReturnType<typeof compile>;
+
+  protected compilerVersion: string;
+
+  protected graphqlSchema: any;
+
+  public readonly preAggregationsSchema: any;
+
+  public schemaVersion: SchemaVersionFn;
+
+  public constructor(
+    protected repository: SchemaFileRepository,
+    protected dbType: DatabaseType | DbTypeFn,
+    protected options: CompilerApiOptions = {},
+  ) {
     this.dialectClass = options.dialectClass;
-    this.options = options || {};
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
@@ -18,15 +84,15 @@ export class CompilerApi {
     this.standalone = options.standalone;
   }
 
-  setGraphQLSchema(schema) {
+  public setGraphQLSchema(schema) {
     this.graphqlSchema = schema;
   }
 
-  getGraphQLSchema() {
+  public getGraphQLSchema() {
     return this.graphqlSchema;
   }
 
-  async getCompilers({ requestId } = {}) {
+  public async getCompilers({ requestId }: GetCompilersArgs = {}): Promise<ReturnType<typeof compile>> {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -44,14 +110,14 @@ export class CompilerApi {
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
-        requestId
+        requestId,
       });
       // TODO check if saving this promise can produce memory leak?
       this.compilers = compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-        standalone: this.standalone
+        standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
     }
@@ -59,19 +125,19 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  getDbType(dataSource = 'default') {
+  public getDbType(dataSource = 'default') {
     if (typeof this.dbType === 'function') {
-      return this.dbType({ dataSource, });
+      return this.dbType({ dataSource } as DriverContext);
     }
 
     return this.dbType;
   }
 
-  getDialectClass(dataSource = 'default', dbType) {
-    return this.dialectClass && this.dialectClass({ dataSource, dbType });
+  public getDialectClass(dataSource = 'default', dbType: DatabaseType) {
+    return this.dialectClass && this.dialectClass({ dataSource, dbType } as DialectContext);
   }
 
-  async getSql(query, options = {}) {
+  public async getSql(query, options: GetSqlOptions = {}) {
     const { includeDebugInfo } = options;
 
     const dbType = this.getDbType();
@@ -89,7 +155,7 @@ export class CompilerApi {
       sqlGenerator = this.createQueryByDataSource(
         compilers,
         query,
-        dataSource
+        dataSource,
       );
 
       if (!sqlGenerator) {
@@ -109,7 +175,7 @@ export class CompilerApi {
       aliasNameToMember: sqlGenerator.aliasNameToMember,
       rollupMatchResults: includeDebugInfo ?
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
+      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
     }));
 
     if (this.sqlCache) {
@@ -122,23 +188,23 @@ export class CompilerApi {
     }
   }
 
-  async preAggregations(filter) {
+  public async preAggregations(filter?: PreAggregationFilter) {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.preAggregations(filter);
   }
 
-  async scheduledPreAggregations() {
+  public async scheduledPreAggregations() {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQueryByDataSource(compilers, query, dataSource) {
+  public createQueryByDataSource(compilers, query, dataSource?: string) {
     const dbType = this.getDbType(dataSource);
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
 
-  createQuery(compilers, dbType, dialectClass, query) {
+  public createQuery(compilers, dbType, dialectClass, query) {
     return createQuery(
       compilers,
       dbType, {
@@ -147,16 +213,16 @@ export class CompilerApi {
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
-      }
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
+      },
     );
   }
 
-  async metaConfig(options) {
+  public async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 
-  canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
+  public canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(transformedQuery, refs);
   }
 }

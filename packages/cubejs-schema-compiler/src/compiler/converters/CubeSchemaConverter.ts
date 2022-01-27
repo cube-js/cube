@@ -3,6 +3,8 @@ import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
 
+import type { FileContent } from '../../types';
+
 export type AstSet = {
   fileName: string;
   ast: t.File;
@@ -15,13 +17,8 @@ export interface CubeConverterInterface {
   convert(astByCubeName: AstByCubeName): void;
 }
 
-type SchemaFile = {
-  fileName: string;
-  content: string;
-};
-
 export class CubeSchemaConverter {
-  protected dataSchemaFiles: SchemaFile[] = [];
+  protected dataSchemaFiles: FileContent[] = [];
 
   protected parsedFiles: AstByCubeName = {};
 
@@ -67,7 +64,7 @@ export class CubeSchemaConverter {
     });
   }
 
-  protected parse(file: SchemaFile) {
+  protected parse(file: FileContent) {
     try {
       return parse(file.content, {
         sourceFilename: file.fileName,

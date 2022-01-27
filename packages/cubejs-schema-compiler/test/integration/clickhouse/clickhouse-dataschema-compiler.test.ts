@@ -1,3 +1,5 @@
+import type { SchemaFileRepository } from '../../../src/types';
+
 import { CompileError } from '../../../src/compiler/CompileError';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
@@ -400,7 +402,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
           `
         }
       ])
-    }, { adapter: dbRunner.adapter });
+    } as SchemaFileRepository, { adapter: dbRunner.adapter });
     return compiler.compile().then(() => {
       const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['Main.count'],

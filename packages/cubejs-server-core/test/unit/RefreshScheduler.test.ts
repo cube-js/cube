@@ -1,6 +1,9 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { CubejsServerCore, DatabaseType, SchemaFileRepository } from '../../src';
+
+import type { DatabaseType, RequestContext, SchemaFileRepository } from '../../src';
+
+import { CubejsServerCore } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
@@ -8,25 +11,25 @@ import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 const schemaContent = `
 cube('Foo', {
   sql: \`select * from foo_\${SECURITY_CONTEXT.tenantId.unsafeValue()}\`,
-  
+
   measures: {
     count: {
       type: 'count'
     },
-    
+
     total: {
       sql: 'amount',
       type: 'sum'
     },
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
       type: 'time'
     }
   },
-  
+
   preAggregations: {
     main: {
       type: 'originalSql'
@@ -89,20 +92,20 @@ cube('Foo', {
 
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
       type: 'time'
     }
   },
-  
+
   preAggregations: {
     first: {
       type: 'rollup',
@@ -135,13 +138,13 @@ const repositoryWithoutPreAggregations: SchemaFileRepository = {
       fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
@@ -257,7 +260,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
   const compilerApi = new CompilerApi(repository, 'postgres', {
     compileContext: {
       useOriginalSqlPreAggregations,
-    },
+    } as RequestContext,
     logger: (msg, params) => {
       console.log(msg, params);
     },

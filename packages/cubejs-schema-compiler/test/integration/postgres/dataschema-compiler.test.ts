@@ -1,3 +1,5 @@
+import type { SchemaFileRepository } from '../../../src/types';
+
 import { CompileError } from '../../../src/compiler/CompileError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
@@ -419,7 +421,7 @@ describe('DataSchemaCompiler', () => {
           `
         }
       ])
-    }, { adapter: 'postgres' });
+    } as SchemaFileRepository, { adapter: 'postgres' });
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

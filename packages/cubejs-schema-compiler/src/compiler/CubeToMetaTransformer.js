@@ -6,6 +6,13 @@ import { UserError } from './UserError';
 import { BaseMeasure } from '../adapter';
 
 export class CubeToMetaTransformer {
+  /**
+   *
+   * @param {CubeValidator} cubeValidator
+   * @param {CubeEvaluator} cubeEvaluator
+   * @param {ContextEvaluator} contextEvaluator
+   * @param {JoinGraph} joinGraph
+   */
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
@@ -24,7 +31,7 @@ export class CubeToMetaTransformer {
 
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
-    
+
     return {
       config: {
         name: cube.name,

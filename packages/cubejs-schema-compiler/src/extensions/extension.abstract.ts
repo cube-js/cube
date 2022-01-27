@@ -7,3 +7,8 @@ export abstract class AbstractExtension {
   ) {
   }
 }
+
+export type AbstractExtensionConstructorFn = new (
+  cubeFactory: any,
+  compiler: DataSchemaCompiler,
+) => AbstractExtension;

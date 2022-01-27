@@ -5,6 +5,10 @@ import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
 
 export class CubeEvaluator extends CubeSymbols {
+  /**
+   *
+   * @param {CubeValidator} cubeValidator
+   */
   constructor(cubeValidator) {
     super(cubeValidator);
     this.cubeValidator = cubeValidator;

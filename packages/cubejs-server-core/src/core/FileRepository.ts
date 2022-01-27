@@ -1,16 +1,12 @@
+import type { FileContent as _FileContent, SchemaFileRepository as _SchemaFileRepository } from '@cubejs-backend/schema-compiler';
+
 import path from 'path';
 import fs from 'fs-extra';
 import R from 'ramda';
 
-export interface FileContent {
-  fileName: string;
-  content: string;
-}
-
-export interface SchemaFileRepository {
-  localPath: () => string;
-  dataSchemaFiles: (includeDependencies?: boolean) => Promise<FileContent[]>;
-}
+// Re-exporting these for backwards-compatibility
+export type FileContent = _FileContent;
+export type SchemaFileRepository = _SchemaFileRepository;
 
 export class FileRepository implements SchemaFileRepository {
   public constructor(

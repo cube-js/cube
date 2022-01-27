@@ -1,3 +1,5 @@
+import type { RequestContext as _RequestContext, SchemaFileRepository } from '@cubejs-backend/schema-compiler';
+
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -9,7 +11,6 @@ import {
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
-import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -39,12 +40,9 @@ export interface OrchestratorOptions {
   rollupOnlyMode?: boolean;
 }
 
-export interface RequestContext {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo: any;
-  securityContext: any;
-  requestId: string;
-}
+export type RequestContext = _RequestContext & {
+  useOriginalSqlPreAggregations?: boolean;
+};
 
 export interface DriverContext extends RequestContext {
   dataSource: string;
@@ -95,6 +93,8 @@ export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
+export type SchemaVersionFn = (context?: RequestContext) => string | Promise<string>;
+
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
@@ -119,7 +119,7 @@ export interface CreateOptions {
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  schemaVersion?: (context: RequestContext) => string | Promise<string>;
+  schemaVersion?: SchemaVersionFn;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];
@@ -145,3 +145,9 @@ export interface CreateOptions {
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
 };
+
+export interface PreAggregationFilter {
+  scheduled?: boolean;
+  cubes?: any[];
+  preAggregationIds: string[];
+}
