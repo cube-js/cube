@@ -1,16 +1,26 @@
 import yargs from 'yargs/yargs';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from "@jest/globals";
-import { BirdBox, startBirdBoxFromContainer } from "../src";
+import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from "../src";
 
-export type DbType = 'athena' | 'bigquery';
+const DB_TYPES = ['athena', 'bigquery'];
+type DbType = typeof DB_TYPES[number];
 
-const { name, envFile } = yargs(process.argv.slice(2))
+const SERVER_MODES = ['cli', 'docker', 'local'];
+type ServerMode = typeof SERVER_MODES[number];
+
+interface Args {
+  type: DbType
+  envFile: string
+  mode: ServerMode
+}
+
+const args: Args = yargs(process.argv.slice(2))
   .exitProcess(false)
   .options(
     {
-      name: {
-        choices: ['athena', 'bigquery'],
+      type: {
+        choices: DB_TYPES,
         demandOption: true,
         describe: 'db type',
       },
@@ -20,9 +30,16 @@ const { name, envFile } = yargs(process.argv.slice(2))
         describe: 'path to .env file with db config & auth env variables',
         type: 'string',
       },
+      mode: {
+        choices: SERVER_MODES,
+        default: 'docker',
+        describe: 'how to stand up the server',
+      }
     }
   )
-  .argv;
+  .argv as Args;
+
+const name = `${args.type}`;
 
 describe(name, () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -32,7 +49,33 @@ describe(name, () => {
 
   beforeAll(async () => {
     try {
-      birdbox = await startBirdBoxFromContainer({ name, envFile });
+      switch (args.mode) {
+        case 'cli':
+        case 'local': {
+          birdbox = await startBirdBoxFromCli(
+            {
+              cubejsConfig: 'single/cube.js',
+              dbType: args.type,
+              useCubejsServerBinary: args.mode === 'local',
+            }
+          );
+          break;
+        }
+
+        case 'docker': {
+          birdbox = await startBirdBoxFromContainer(
+            {
+              name,
+              envFile: args.envFile
+            }
+          );
+          break;
+        }
+
+        default: {
+          throw new Error(`Bad serverMode ${args.mode}`);
+        }
+      }
 
       httpClient = cubejs(async () => 'test', {
         apiUrl: birdbox.configuration.apiUrl,
