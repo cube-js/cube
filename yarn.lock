@@ -2831,6 +2831,16 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.0.tgz#c3c5ae543c897caa9c2a68630bed355be5f9990f"
   integrity sha512-JZButFdZ1+/xAfpguQHoabIXkcqRRKpMrWKBkpEZZyxfY9C1DpADFB8PEqGSTeFr135SaTRfKqGKx5xSCLI7ZQ==
 
+"@cubejs-backend/athena-driver@^0.29.23":
+  version "0.29.23"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/athena-driver/-/athena-driver-0.29.23.tgz#238181a9ab900a79305ced8144ea297b43f27077"
+  integrity sha512-ITWRZCApo+oHzMntjY/4g5uh7br6Y41aLJ0mpXkUZVsrRAdh9OaxeTud5YyZCdIhO//VkRTt7kaf0Ix53rt1Fg==
+  dependencies:
+    "@aws-sdk/client-athena" "^3.22.0"
+    "@cubejs-backend/query-orchestrator" "^0.29.23"
+    "@cubejs-backend/shared" "^0.29.23"
+    sqlstring "^2.3.1"
+
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"

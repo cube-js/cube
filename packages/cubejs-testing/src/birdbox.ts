@@ -5,6 +5,7 @@ import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
+import dotenv from '@cubejs-backend/dotenv';
 
 import { PostgresDBRunner } from './db/postgres';
 import { getLocalHostnameByOs } from './utils';
@@ -12,6 +13,7 @@ import { getLocalHostnameByOs } from './utils';
 export interface BirdBoxTestCaseOptions {
   name: string;
   loadScript?: string;
+  envPath?: string;
 }
 
 export interface BirdBox {
@@ -42,10 +44,17 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   }
 
   const composeFile = `${options.name}.yml`;
-  const dc = new DockerComposeEnvironment(
+  let dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
     composeFile
   );
+
+  if (options.envPath) {
+    const env = dotenv.parse(fs.readFileSync(options.envPath));
+    for (const k of Object.keys(env)) {
+      dc = dc.withEnv(k, env[k]);
+    }
+  }
 
   console.log(`[Birdbox] Using ${composeFile} compose file`);
 
@@ -77,8 +86,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     });
   }
 
-  {
-    const loadScript = options.loadScript || 'load.sh';
+  if (options.loadScript) {
+    const { loadScript } = options;
     console.log(`[Birdbox] Executing ${loadScript} script`);
 
     const { output, exitCode } = await env.getContainer('birdbox-db').exec([`/scripts/${loadScript}`]);
@@ -143,10 +152,10 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     ],
   });
 
-  {
+  if (options.loadScript) {
     console.log('[Birdbox] Executing load.sh script');
 
-    const loadScript = `/scripts/${options.loadScript || 'load.sh'}`;
+    const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
     if (exitCode === 0) {

@@ -22,6 +22,8 @@
     "birdbox:start": "node dist/test/bin/start-birdbox.js",
     "birdbox:postgresql": "jest --verbose -i dist/test/birdbox-postgresql.test.js",
     "birdbox:postgresql:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql.test.js",
+    "birdbox:bigquery": "jest --verbose -i dist/test/birdbox-bigquery.test.js",
+    "birdbox:bigquery:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-bigquery.test.js",
     "birdbox:postgresql-pre-aggregations": "jest --verbose -i dist/test/birdbox-postgresql-pre-aggregations.test.js",
     "birdbox:postgresql-pre-aggregations:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-pre-aggregations.test.js",
     "birdbox:postgresql-cubestore": "jest --verbose -i dist/test/birdbox-postgresql-cubestore.test.js",
@@ -40,6 +42,7 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.29.23",
     "@cubejs-backend/schema-compiler": "^0.29.23",
     "@cubejs-backend/shared": "^0.29.23",
