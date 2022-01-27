@@ -13,7 +13,7 @@ import { getLocalHostnameByOs } from './utils';
 export interface BirdBoxTestCaseOptions {
   name: string;
   loadScript?: string;
-  envPath?: string;
+  envFile?: string;
 }
 
 export interface BirdBox {
@@ -49,8 +49,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     composeFile
   );
 
-  if (options.envPath) {
-    const env = dotenv.parse(fs.readFileSync(options.envPath));
+  if (options.envFile) {
+    const env = dotenv.parse(fs.readFileSync(options.envFile));
     for (const k of Object.keys(env)) {
       dc = dc.withEnv(k, env[k]);
     }
