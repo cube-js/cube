@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/athena-driver",
   "description": "Cube.js Athena database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.22",
+  "version": "0.29.23",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -12,31 +12,18 @@
     "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "scripts": {
-    "build": "rm -rf dist && npm run tsc",
-    "tsc": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "lint": "eslint src/index.d.ts"
   },
-  "files": [
-    "dist/src",
-    "index.js"
-  ],
-  "main": "index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "src/AthenaDriver.ts",
+  "types": "src/index.d.ts",
   "dependencies": {
     "@aws-sdk/client-athena": "^3.22.0",
-    "@cubejs-backend/query-orchestrator": "^0.29.21",
-    "@cubejs-backend/shared": "^0.29.21",
+    "@cubejs-backend/query-orchestrator": "^0.29.23",
+    "@cubejs-backend/shared": "^0.29.23",
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.29.21",
-    "@types/ramda": "^0.27.40",
-    "typescript": "~4.1.5"
-  },
-  "publishConfig": {
-    "access": "public"
+    "@cubejs-backend/linter": "^0.29.23"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
