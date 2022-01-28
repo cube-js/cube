@@ -3,6 +3,7 @@ use std::env;
 use std::fmt::Debug;
 use std::io;
 
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -33,18 +34,11 @@ use crate::schema::V1CubeMetaExt;
 use crate::CubeError;
 use sqlparser::ast;
 
-pub mod dataframe;
+use self::connection::Connection;
+use self::connection::ConnectionsManager;
 
-struct Connection {
-    auth: Arc<dyn SqlAuthService>,
-    schema: Arc<dyn SchemaService>,
-    props: QueryPlannerExecutionProps,
-    server: Arc<ServerManager>,
-    // statements1: Option<Box<Statements>>,
-    // statements2: Statements,
-    // Auth result from SqlAuthService
-    context: Option<AuthContext>,
-}
+pub mod connection;
+pub mod dataframe;
 
 enum QueryResponse {
     Ok(StatusFlags),
@@ -185,7 +179,7 @@ impl Connection {
                         return Err(CubeError::user("must be auth".to_string()))
                     };
 
-                    let ctx = self.schema
+                    let ctx = self.server.schema
                         .get_ctx_for_tenant(ctx)
                         .await?;
 
@@ -248,7 +242,7 @@ impl Connection {
                         return Err(CubeError::user("must be auth".to_string()))
                     };
 
-                    let ctx = self.schema
+                    let ctx = self.server.schema
                         .get_ctx_for_tenant(auth_ctx)
                     .await?;
 
@@ -280,7 +274,7 @@ impl Connection {
                 return Err(CubeError::user("must be auth".to_string()))
             };
 
-            let ctx = self.schema
+            let ctx = self.server.schema
                 .get_ctx_for_tenant(auth_ctx)
                 .await?;
 
@@ -314,7 +308,7 @@ impl Connection {
                 return Err(CubeError::user("must be auth".to_string()))
             };
 
-            let ctx = self.schema
+            let ctx = self.server.schema
                 .get_ctx_for_tenant(auth_ctx)
                 .await?;
 
@@ -340,7 +334,7 @@ impl Connection {
                     debug!("Request {}", json!(plan.request).to_string());
                     debug!("Meta {:?}", plan.meta);
 
-                    let response = self.schema
+                    let response = self.server.schema
                         .request(plan.request, auth_ctx)
                         .await?;
 
@@ -396,8 +390,22 @@ impl Connection {
     }
 }
 
+struct ConnectionWorker<W: std::io::Write> {
+    connection: Arc<Connection>,
+    mysql_shim_generic_marker: PhantomData<W>,
+}
+
+impl<W: std::io::Write> ConnectionWorker<W> {
+    pub fn new(connection: Arc<Connection>) -> Self {
+        Self {
+            connection,
+            mysql_shim_generic_marker: PhantomData::default(),
+        }
+    }
+}
+
 #[async_trait]
-impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
+impl<W: io::Write + Send> AsyncMysqlShim<W> for ConnectionWorker<W> {
     type Error = io::Error;
 
     fn server_version(&self) -> &str {
@@ -405,7 +413,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     }
 
     fn connection_id(&self) -> u32 {
-        self.props.connection_id()
+        self.connection.props.connection_id()
     }
 
     async fn on_prepare<'a>(
@@ -413,9 +421,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         query: &'a str,
         info: StatementMetaWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        let statement_id = self.server.insert_prepared_statement(query.to_string());
-
-        info.reply(statement_id, &[], &[])
+        info.reply(42, &[], &[])
     }
 
     async fn on_execute<'a>(
@@ -424,12 +430,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         _params: ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        let statement_opt = self.server.get_prepared_statement(id);
-        if let Some(statement) = statement_opt {
-            results.completed(0, 0, StatusFlags::empty())
-        } else {
-            results.error(ErrorKind::ER_INTERNAL_ERROR, b"Unknown prepared statement")
-        }
+        results.completed(0, 0, StatusFlags::empty())
     }
 
     async fn on_close<'a>(&'a mut self, _stmt: u32)
@@ -443,7 +444,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         query: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        match self.execute_query(query).await {
+        match self.connection.execute_query(query).await {
             Err(e) => {
                 error!("Error during processing {}: {}", query, e.to_string());
                 results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
@@ -500,7 +501,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
             None
         };
 
-        let ctx = self.auth.authenticate(user.clone()).await.map_err(|e| {
+        let ctx = self.connection.server.auth.authenticate(user.clone()).await.map_err(|e| {
             if e.message != *"Incorrect user name or password" {
                 error!("Error during authentication MySQL connection: {}", e);
             };
@@ -510,8 +511,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
 
         let passwd = ctx.password.clone().map(|p| p.as_bytes().to_vec());
 
-        self.props.set_user(user.clone());
-        self.context = Some(ctx);
+        self.connection.props.set_user(user.clone());
+        self.connection.context = Some(ctx);
 
         Ok(passwd)
     }
@@ -521,8 +522,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     where
         W: 'async_trait,
     {
-        Ok(self
-            .server
+        Ok(self.connection.server
             .get_nonce()
             .unwrap_or_else(|| (0..20).map(|_| rand::random::<u8>()).collect()))
     }
@@ -533,7 +533,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        self.props.set_database(Some(database.to_string()));
+        self.connection.props.set_database(Some(database.to_string()));
 
         writter.ok()?;
 
@@ -543,8 +543,6 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
 
 pub struct MySqlServer {
     address: String,
-    auth: Arc<dyn SqlAuthService>,
-    schema: Arc<dyn SchemaService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
     server: Arc<ServerManager>,
@@ -582,8 +580,6 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
-            let auth = self.auth.clone();
-            let schema = self.schema.clone();
             let server = self.server.clone();
 
             let connection_id = if connection_id_incr > 100_000_u32 {
@@ -597,14 +593,12 @@ impl ProcessingLoop for MySqlServer {
             };
 
             tokio::spawn(async move {
+                let connection = server.connections.create(server).await;
+
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
-                    Connection {
-                        auth,
-                        schema,
-                        props: QueryPlannerExecutionProps::new(connection_id, None, None),
-                        context: None,
-                        server,
-                    },
+                    ConnectionWorker::new(
+                        connection
+                    ),
                     socket,
                 )
                 .await
@@ -621,47 +615,26 @@ impl ProcessingLoop for MySqlServer {
     }
 }
 
-struct CyclicTable<Item: Debug + ToOwned> {
-    id: u32 // Atomic,
-    items: std::sync::RwLock<HashMap<u32, Item>>,
-}
-
-impl<Item: Debug + ToOwned> CyclicTable<Item> {
-    pub fn new() -> Self {
-        Self {
-            id: 1,
-            items: std::sync::RwLock::new(HashMap::new()),
-        }
-    }
-
-    pub fn insert(&self, item: Item) -> u32 {
-        // self.id = self.id + 1;
-
-        let mut items = self.items.write().expect("getting write lock on insert");
-        items.insert(self.id, item);
-
-        self.id
-    }
-
-    // Get & remove
-    pub fn get_and_remove(&self, key: u32) -> Option<Item> {
-        let mut items = self.items.write().expect("getting write lock on insert");
-        let item = self.items.write().unwrap().remove(&key);
-
-        item
-    }
-}
-
 struct ServerManager {
-    pub(crate) prepared_statements: CyclicTable<String>,
+    // References
+    auth: Arc<dyn SqlAuthService>,
+    schema: Arc<dyn SchemaService>,
+    // Connections manager store references for all connections
+    pub (crate) connections: ConnectionsManager,
     nonce: Option<Vec<u8>>,
 }
 
 impl ServerManager {
-    pub fn new(nonce: Option<Vec<u8>>) -> Self {
+    pub fn new(
+        auth: Arc<dyn SqlAuthService>,
+        schema: Arc<dyn SchemaService>,
+        nonce: Option<Vec<u8>>,
+    ) -> Self {
         Self {
-            prepared_statements: CyclicTable::new(),
-            nonce
+            connections: ConnectionsManager::new(),
+            auth,
+            schema,
+            nonce,
         }
     }
 
@@ -680,9 +653,7 @@ impl MySqlServer {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
             address,
-            auth,
-            schema,
-            server: Arc::new(ServerManager::new(nonce)),
+            server: Arc::new(ServerManager::new(auth, schema, nonce)),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })
