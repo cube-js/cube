@@ -38,13 +38,13 @@ import {
   Request,
   RequestContext,
   RequestLoggerMiddlewareFn,
-  SecurityContextExtractorFn,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
 
 import { makeSchema } from './graphql';
+import { SecurityContextExtractor } from "./SecurityContextExtractor";
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -239,7 +239,7 @@ export class ApiGateway {
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
-  protected readonly securityContextExtractor: SecurityContextExtractorFn;
+  protected readonly securityContextExtractor: SecurityContextExtractor;
 
   protected readonly releaseListeners: (() => any)[] = [];
 
@@ -270,7 +270,7 @@ export class ApiGateway {
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
-    this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
+    this.securityContextExtractor = new SecurityContextExtractor(logger, options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
   }
 
@@ -353,7 +353,10 @@ export class ApiGateway {
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
-        context: req.context,
+        context: {
+          ...req.context,
+          securityContext: this.securityContextExtractor.extract(req.context)
+        },
         res: this.resToResultFn(res)
       });
     }));
@@ -748,58 +751,12 @@ export class ApiGateway {
     }
   }
 
-  protected createSecurityContextExtractor(options?: JWTOptions): SecurityContextExtractorFn {
-    if (options?.claimsNamespace) {
-      return (ctx: Readonly<RequestContext>) => {
-        if (typeof ctx.securityContext === 'object' && ctx.securityContext !== null) {
-          if (<string>options.claimsNamespace in ctx.securityContext) {
-            return ctx.securityContext[<string>options.claimsNamespace];
-          }
-        }
-
-        return {};
-      };
-    }
-
-    let checkAuthDeprecationShown: boolean = false;
-
-    return (ctx: Readonly<RequestContext>) => {
-      let securityContext: any = {};
-
-      if (typeof ctx.securityContext === 'object' && ctx.securityContext !== null) {
-        if (ctx.securityContext.u) {
-          if (!checkAuthDeprecationShown) {
-            this.logger('JWT U Property Deprecation', {
-              warning: (
-                'Storing security context in the u property within the payload is now deprecated, please migrate: ' +
-                'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#authinfo'
-              )
-            });
-
-            checkAuthDeprecationShown = true;
-          }
-
-          securityContext = {
-            ...ctx.securityContext,
-            ...ctx.securityContext.u,
-          };
-
-          delete securityContext.u;
-        } else {
-          securityContext = ctx.securityContext;
-        }
-      }
-
-      return securityContext;
-    };
-  }
-
   protected coerceForSqlQuery(query, context: Readonly<RequestContext>) {
     return {
       ...query,
       timeDimensions: query.timeDimensions || [],
       contextSymbols: {
-        securityContext: this.securityContextExtractor(context),
+        securityContext: this.securityContextExtractor.extract(context),
       },
       requestId: context.requestId
     };

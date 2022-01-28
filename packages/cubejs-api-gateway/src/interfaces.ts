@@ -99,8 +99,6 @@ export type QueryRewriteFn = (query: Query, context: RequestContext) => Promise<
 // @deprecated
 export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void;
 
-export type SecurityContextExtractorFn = (ctx: Readonly<RequestContext>) => any;
-
 // @deprecated
 export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void;
 
