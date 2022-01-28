@@ -57,6 +57,11 @@ describe(name, () => {
               cubejsConfig: 'single/cube.js',
               dbType: args.type,
               useCubejsServerBinary: args.mode === 'local',
+              envFile: args.envFile,
+              extraEnv: {
+                CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
+                CUBEJS_REFRESH_WORKER: 'false',
+              }
             }
           );
           break;
