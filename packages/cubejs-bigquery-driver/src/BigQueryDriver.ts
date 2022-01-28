@@ -75,6 +75,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+    console.log('qqq');
     const data = await this.runQueryJob({
       query,
       params: values,
@@ -161,6 +162,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[]
   ): Promise<StreamTableData> {
+    console.log('sss');
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
@@ -177,6 +179,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async unload(table: string): Promise<DownloadTableCSVData> {
+    console.log('uuu');
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }

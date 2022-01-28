@@ -35,6 +35,8 @@ export class QueryQueue {
   }
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
+    console.log('queue', new Error('hi'), query);
+
     options = options || {};
     if (this.skipQueue) {
       const queryDef = {
@@ -329,6 +331,7 @@ export class QueryQueue {
   }
 
   async processQuerySkipQueue(query) {
+    console.log('skip', new Error('hi'), query);
     const startQueryTime = (new Date()).getTime();
     this.logger('Performing query', {
       queueSize: 0,

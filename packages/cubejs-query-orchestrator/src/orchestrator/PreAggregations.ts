@@ -707,6 +707,8 @@ export class PreAggregationLoader {
   }
 
   public refresh(preAggregation: any, newVersionEntry, invalidationKeys) {
+    console.log('rrr2', new Error('hi'), preAggregation, newVersionEntry, invalidationKeys);
+
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
@@ -909,6 +911,8 @@ export class PreAggregationLoader {
       const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
       let tableData: DownloadTableData;
+
+      console.log('ccc', capabilities, Object.keys(client));
 
       if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
         tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
