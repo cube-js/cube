@@ -10,7 +10,7 @@ use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
-use sqlparser::ast::{self, DateTimeField, Ident, ObjectName};
+use sqlparser::ast::{self, escape_single_quote_string, DateTimeField, Ident, ObjectName};
 
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
@@ -1530,7 +1530,12 @@ impl QueryPlanner {
             ast::Statement::ShowCreate { obj_name, obj_type } => {
                 self.show_create_to_plan(&obj_name, &obj_type)
             }
-            ast::Statement::ShowColumns { .. } => self.create_df_logical_plan(stmt.clone(), props),
+            ast::Statement::ShowColumns {
+                extended,
+                full,
+                filter,
+                table_name,
+            } => self.show_columns_to_plan(*extended, *full, &filter, &table_name, props),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1692,6 +1697,73 @@ impl QueryPlanner {
                 table_name_filter
             ))
         )
+    }
+
+    fn show_columns_to_plan(
+        &self,
+        extended: bool,
+        full: bool,
+        filter: &Option<ast::ShowStatementFilter>,
+        table_name: &ast::ObjectName,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let extended = match extended {
+            false => "".to_string(),
+            // The planner is unable to correctly process queries with UNION ALL in subqueries as of writing this.
+            // Uncomment this to enable EXTENDED support once such queries can be processed.
+            /*true => {
+                let extended_columns = "'' AS `Type`, NULL AS `Collation`, 'NO' AS `Null`, '' AS `Key`, NULL AS `Default`, '' AS `Extra`, 'select' AS `Privileges`, '' AS `Comment`";
+                format!("UNION ALL SELECT 'DB_TRX_ID' AS `Field`, 2 AS `Order`, {} UNION ALL SELECT 'DB_ROLL_PTR' AS `Field`, 3 AS `Order`, {}", extended_columns, extended_columns)
+            }*/
+            true => {
+                return Err(CompilationError::Unsupported(
+                    "SHOW COLUMNS: EXTENDED is not implemented".to_string(),
+                ))
+            }
+        };
+
+        let columns = match full {
+            false => "`Field`, `Type`, `Null`, `Key`, `Default`, `Extra`",
+            true => "`Field`, `Type`, `Collation`, `Null`, `Key`, `Default`, `Extra`, `Privileges`, `Comment`",
+        };
+
+        let mut object_name = table_name.0.clone();
+        let table_name = match object_name.pop() {
+            Some(table_name) => escape_single_quote_string(&table_name.value).to_string(),
+            None => {
+                return Err(CompilationError::Internal(format!(
+                    "Unexpected lack of table name"
+                )))
+            }
+        };
+        let db_name = match object_name.pop() {
+            Some(db_name) => escape_single_quote_string(&db_name.value).to_string(),
+            None => props.database.as_ref().unwrap_or(&"db".to_string()).clone(),
+        };
+
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE `Field` {}", stmt.to_string())
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                format!("{}", stmt.to_string())
+            }
+            Some(stmt) => {
+                return Err(CompilationError::User(format!(
+                    "SHOW COLUMNS doesn't support requested filter: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let information_schema_sql = format!("SELECT `COLUMN_NAME` AS `Field`, 1 AS `Order`, `COLUMN_TYPE` AS `Type`, IF(`DATA_TYPE` = 'varchar', 'utf8mb4_0900_ai_ci', NULL) AS `Collation`, `IS_NULLABLE` AS `Null`, `COLUMN_KEY` AS `Key`, NULL AS `Default`, `EXTRA` AS `Extra`, 'select' AS `Privileges`, `COLUMN_COMMENT` AS `Comment` FROM `information_schema`.`COLUMNS` WHERE `TABLE_NAME` = '{}' AND `TABLE_SCHEMA` = '{}' {}", table_name, db_name, extended);
+        let stmt = parse_sql_to_statement(&format!(
+            "SELECT {} FROM ({}) AS `COLUMNS` {}",
+            columns, information_schema_sql, filter
+        ))?;
+
+        self.create_df_logical_plan(stmt, props)
     }
 
     fn create_df_logical_plan(
@@ -3864,6 +3936,108 @@ mod tests {
             | max_allowed_packet     | 67108864                                                                                                              |\n\
             | lower_case_table_names | 0                                                                                                                     |\n\
             +------------------------+-----------------------------------------------------------------------------------------------------------------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_columns() -> Result<(), CubeError> {
+        // Simplest syntax
+        assert_eq!(
+            execute_query("show columns from KibanaSampleDataEcommerce;".to_string()).await?,
+            "+--------------------+--------------+------+-----+---------+-------+\n\
+            | Field              | Type         | Null | Key | Default | Extra |\n\
+            +--------------------+--------------+------+-----+---------+-------+\n\
+            | count              | int          | NO   |     | NULL    |       |\n\
+            | maxPrice           | int          | NO   |     | NULL    |       |\n\
+            | minPrice           | int          | NO   |     | NULL    |       |\n\
+            | avgPrice           | int          | NO   |     | NULL    |       |\n\
+            | order_date         | datetime     | YES  |     | NULL    |       |\n\
+            | customer_gender    | varchar(255) | YES  |     | NULL    |       |\n\
+            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
+            | is_male            | boolean      | NO   |     | NULL    |       |\n\
+            | is_female          | boolean      | NO   |     | NULL    |       |\n\
+            +--------------------+--------------+------+-----+---------+-------+"
+        );
+
+        // FULL
+        assert_eq!(
+            execute_query("show full columns from KibanaSampleDataEcommerce;".to_string()).await?,
+            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
+            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        );
+
+        // LIKE
+        assert_eq!(
+            execute_query("show columns from KibanaSampleDataEcommerce like '%ice%';".to_string())
+                .await?,
+            "+--------------------+--------------+------+-----+---------+-------+\n\
+            | Field              | Type         | Null | Key | Default | Extra |\n\
+            +--------------------+--------------+------+-----+---------+-------+\n\
+            | maxPrice           | int          | NO   |     | NULL    |       |\n\
+            | minPrice           | int          | NO   |     | NULL    |       |\n\
+            | avgPrice           | int          | NO   |     | NULL    |       |\n\
+            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
+            +--------------------+--------------+------+-----+---------+-------+"
+        );
+
+        // WHERE
+        assert_eq!(
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string()
+            )
+            .await?,
+            "+----------+------+------+-----+---------+-------+\n\
+            | Field    | Type | Null | Key | Default | Extra |\n\
+            +----------+------+------+-----+---------+-------+\n\
+            | count    | int  | NO   |     | NULL    |       |\n\
+            | maxPrice | int  | NO   |     | NULL    |       |\n\
+            | minPrice | int  | NO   |     | NULL    |       |\n\
+            | avgPrice | int  | NO   |     | NULL    |       |\n\
+            +----------+------+------+-----+---------+-------+"
+        );
+
+        // FROM db FROM tbl
+        assert_eq!(
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string()
+            )
+            .await?,
+            "+-------+------+------+-----+---------+-------+\n\
+            | Field | Type | Null | Key | Default | Extra |\n\
+            +-------+------+------+-----+---------+-------+\n\
+            | count | int  | NO   |     | NULL    |       |\n\
+            +-------+------+------+-----+---------+-------+"
+        );
+
+        // Everything
+        assert_eq!(
+            execute_query("show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()).await?,
+            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
+            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
         );
 
         Ok(())
