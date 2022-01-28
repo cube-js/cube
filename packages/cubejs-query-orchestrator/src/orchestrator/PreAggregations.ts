@@ -763,17 +763,23 @@ export class PreAggregationLoader {
       );
     const queryOptions = this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry);
     this.logExecutingSql(queryOptions);
-    // TODO move index creation to the driver
-    await saveCancelFn(client.loadPreAggregationIntoTable(
-      targetTableName,
-      query,
-      params,
-      queryOptions
-    ));
-    await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
-    await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
-    await this.loadCache.fetchTables(this.preAggregation);
+
+    try {
+      // TODO move index creation to the driver
+      await saveCancelFn(client.loadPreAggregationIntoTable(
+        targetTableName,
+        query,
+        params,
+        queryOptions
+      ));
+
+      await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
+      await this.loadCache.fetchTables(this.preAggregation);
+    } finally {
+      // We must clean orphaned in any cases: success or exception
+      await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
+      await this.loadCache.fetchTables(this.preAggregation);
+    }
   }
 
   /**
@@ -804,24 +810,27 @@ export class PreAggregationLoader {
       queryOptions
     ));
 
-    const tableData = await this.downloadTempExternalPreAggregation(
-      client,
-      newVersionEntry,
-      preAggregation,
-      saveCancelFn,
-      queryOptions
-    );
-
     try {
-      await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
-    } finally {
-      if (tableData.release) {
-        await tableData.release();
-      }
-    }
+      const tableData = await this.downloadTempExternalPreAggregation(
+        client,
+        newVersionEntry,
+        preAggregation,
+        saveCancelFn,
+        queryOptions
+      );
 
-    await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
+      try {
+        await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
+      } finally {
+        if (tableData && tableData.release) {
+          await tableData.release();
+        }
+      }
+    } finally {
+      // We must clean orphaned in any cases: success or exception
+      await this.loadCache.fetchTables(this.preAggregation);
+      await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
+    }
   }
 
   /**
