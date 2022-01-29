@@ -1795,13 +1795,10 @@ export class BaseQuery {
   aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
-      debugger;
       const cubeName = path[0];
       path.splice(0, 1);
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
-    } else {
-      debugger;
     }
     // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');

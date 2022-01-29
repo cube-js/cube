@@ -27,7 +27,6 @@ export class CubeEvaluator extends CubeSymbols {
         primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
       ];
     }));
-    debugger;
   }
 
   /**
