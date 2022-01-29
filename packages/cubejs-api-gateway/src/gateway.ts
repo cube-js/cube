@@ -117,59 +117,72 @@ const transformValue = (value, type) => {
 };
 
 const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
-  const row = R.pipe(
-    // @ts-ignore
-    R.toPairs,
-    R.map(p => {
-      const memberName = aliasToMemberNameMap[p[0]];
-      const annotationForMember = annotation[memberName];
-
-      if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
-      }
-
-      const transformResult = [
-        memberName,
-        transformValue(p[1], annotationForMember.type)
-      ];
-
-      const path = memberName.split('.');
-
-      // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-      const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-      if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-        return [
-          transformResult,
-          [
-            memberNameWithoutGranularity,
-            transformResult[1]
-          ]
+  const compact = true;
+  let row;
+  if (compact) {
+    row = R.pipe(
+      // @ts-ignore
+      R.toPairs,
+      R.map(p => {
+        const memberName = aliasToMemberNameMap[p[0]];
+        const annotationForMember = annotation[memberName];
+        return transformValue(p[1], annotationForMember.type);
+      })
+    )(r);
+  } else {
+    row = R.pipe(
+      // @ts-ignore
+      R.toPairs,
+      R.map(p => {
+        const memberName = aliasToMemberNameMap[p[0]];
+        const annotationForMember = annotation[memberName];
+  
+        if (!annotationForMember) {
+          throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
+        }
+  
+        const transformResult = [
+          memberName,
+          transformValue(p[1], annotationForMember.type)
         ];
-      }
-
-      return [transformResult];
-    }),
+  
+        const path = memberName.split('.');
+  
+        // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
+        const memberNameWithoutGranularity = [path[0], path[1]].join('.');
+        if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
+          return [
+            transformResult,
+            [
+              memberNameWithoutGranularity,
+              transformResult[1]
+            ]
+          ];
+        }
+  
+        return [transformResult];
+      }),
+      // @ts-ignore
+      R.unnest,
+      R.fromPairs
     // @ts-ignore
-    R.unnest,
-    R.fromPairs
-  // @ts-ignore
-  )(r);
-
-  // @ts-ignore
-  const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
-
-  if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
-    return {
-      ...row,
-      compareDateRange: dateRange.join(' - ')
-    };
-  } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
-    return {
-      ...row,
-      [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
-    };
+    )(r);
+  
+    // @ts-ignore
+    const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
+  
+    if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+      return {
+        ...row,
+        compareDateRange: dateRange.join(' - ')
+      };
+    } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+      return {
+        ...row,
+        [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
+      };
+    }
   }
-
   return row;
 }));
 
