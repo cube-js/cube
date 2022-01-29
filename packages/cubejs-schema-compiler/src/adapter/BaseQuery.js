@@ -578,7 +578,7 @@ export class BaseQuery {
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
-                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${this.aliasName(keyCubeName)}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
               )
             )(multipliedMeasures)
           ).concat(
@@ -1520,7 +1520,13 @@ export class BaseQuery {
 
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
-    return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
+    return this.escapeColumnName(
+      this.aliasName(
+        `${prefix
+          ? prefix + '__' + this.aliasName(cubeName)
+          : cubeName}`
+      )
+    );
   }
 
   collectCubeNamesFor(fn) {
@@ -1789,10 +1795,13 @@ export class BaseQuery {
   aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
+      debugger;
       const cubeName = path[0];
       path.splice(0, 1);
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
+    } else {
+      debugger;
     }
     // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');

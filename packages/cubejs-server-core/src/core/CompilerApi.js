@@ -98,18 +98,18 @@ export class CompilerApi {
     }
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
-      external: sqlGenerator.externalPreAggregationQuery(),
+      //external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
-      timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
-      timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
-      order: sqlGenerator.order,
-      cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
-      preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
-      dataSource: sqlGenerator.dataSource,
-      aliasNameToMember: sqlGenerator.aliasNameToMember,
-      rollupMatchResults: includeDebugInfo ?
-        sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
+      // timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
+      // timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
+      // order: sqlGenerator.order,
+      // cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
+      // preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
+      // dataSource: sqlGenerator.dataSource,
+      // aliasNameToMember: sqlGenerator.aliasNameToMember,
+      // rollupMatchResults: includeDebugInfo ?
+      //   sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
+      // canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
     }));
 
     if (this.sqlCache) {

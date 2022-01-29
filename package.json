@@ -23,7 +23,8 @@
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "lerna link && patch-package"
+    "postinstall": "lerna link && patch-package",
+    "link:core": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
