@@ -21,10 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "npm run integration:mysql",
-    "integration:mysql": "jest --verbose dist/test",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint src/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* --ext .ts,.js"
   },
   "dependencies": {
     "@cubejs-backend/schema-compiler": "^0.29.24",
