@@ -22,7 +22,7 @@ services:
       - db
       - cubestore
     volumes:
-      - - ./postgresql:/cube/conf
+      - ./postgresql:/cube/conf
       - ./postgresql/cubestore/cube.js:/cube/conf/cube.js
     ports:
       - "4000"
