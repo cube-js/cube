@@ -55,6 +55,16 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ]
     }
   ],
+  [
+    {
+      name: 'Dbt orders count'
+    },
+    {
+      measures: [
+        'MyNewProjectOrdersFiltered.ordersCount'
+      ]
+    }
+  ],
 ];
 
 // eslint-disable-next-line import/prefer-default-export

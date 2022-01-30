@@ -16,18 +16,7 @@ import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
 
-type PrepareCompilerOptions = {
-  maxQueryCacheSize?: number;
-  maxQueryCacheAge?: number;
-  allowJsDuplicatePropsInSchema?: boolean;
-  standalone?: boolean;
-  extensions?: any;
-  compileContext?: any;
-  headCommitId?: string;
-  adapter?: string;
-};
-
-export const prepareCompiler = (repo, options: PrepareCompilerOptions) => {
+export const prepareCompiler = (repo, options) => {
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
   const cubeValidator = new CubeValidator(cubeSymbols);
@@ -57,7 +46,6 @@ export const prepareCompiler = (repo, options: PrepareCompilerOptions) => {
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     extensions: {
-      ...options.extensions,
       Funnels,
       RefreshKeys,
       Reflection

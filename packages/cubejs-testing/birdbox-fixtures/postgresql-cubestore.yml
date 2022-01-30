@@ -22,8 +22,8 @@ services:
       - db
       - cubestore
     volumes:
+      - - ./postgresql:/cube/conf
       - ./postgresql/cubestore/cube.js:/cube/conf/cube.js
-      - ./postgresql/schema:/cube/conf/schema
     ports:
       - "4000"
     restart: always

@@ -174,8 +174,8 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
   }
 
   fsExtra.copySync(
-    path.join(process.cwd(), 'birdbox-fixtures', options.dbType, 'schema'),
-    path.join(testDir, 'schema')
+    path.join(process.cwd(), 'birdbox-fixtures', options.dbType),
+    path.join(testDir)
   );
 
   if (options.cubejsConfig) {
