@@ -140,6 +140,7 @@ export interface CreateOptions {
   livePreview?: boolean;
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
+  schemaExtensions?: string[];
 }
 
 export type SystemOptions = {

@@ -26,6 +26,7 @@ import agentCollect from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import DriverDependencies from './DriverDependencies';
+import SchemaExtensions from './SchemaExtensions';
 import optionsValidate from './optionsValidate';
 
 import type {
@@ -109,6 +110,8 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
+  protected schemaExtensions: { [name: string]: any };
+
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
 
@@ -128,6 +131,10 @@ export class CubejsServerCore {
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
     this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
+
+    this.schemaExtensions = (opts.schemaExtensions || []).map(name => ({
+      [name]: CubejsServerCore.lookupSchemaExtension(name)
+    })).reduce((a, b) => ({ ...a, ...b }), {});
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
@@ -751,7 +758,8 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
-      standalone: this.standalone
+      standalone: this.standalone,
+      schemaExtensions: this.schemaExtensions,
     });
   }
 
@@ -868,6 +876,15 @@ export class CubejsServerCore {
     }
 
     throw new Error(`Unsupported db type: ${dbType}`);
+  }
+
+  public static lookupSchemaExtension(schemaExtensionName: string) {
+    if (SchemaExtensions[schemaExtensionName]) {
+      // eslint-disable-next-line import/no-dynamic-require
+      return require(SchemaExtensions[schemaExtensionName]);
+    }
+
+    throw new Error(`Unknown schema extension '${schemaExtensionName}'`);
   }
 
   public async testConnections() {

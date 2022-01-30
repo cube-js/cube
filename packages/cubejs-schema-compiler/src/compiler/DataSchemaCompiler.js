@@ -182,7 +182,7 @@ export class DataSchemaCompiler {
         },
         require: (extensionName) => {
           if (this.extensions[extensionName]) {
-            return new (this.extensions[extensionName])(this.cubeFactory, this);
+            return new (this.extensions[extensionName])(this.cubeFactory, this, cubes);
           } else {
             const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
             if (!foundFile && this.allowNodeRequire) {
