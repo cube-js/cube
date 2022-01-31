@@ -1,4 +1,3 @@
-use std::env;
 use std::io;
 
 use std::sync::Arc;
@@ -30,13 +29,16 @@ use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use sqlparser::ast;
 
-pub mod dataframe;
+use super::dataframe;
+use super::AuthContext;
+use super::SqlAuthService;
 
 struct Backend {
     auth: Arc<dyn SqlAuthService>,
     transport: Arc<dyn TransportService>,
+    // Props for execution queries
     props: QueryPlannerExecutionProps,
-    // Auth result from SqlAuthService
+    // Context for Transport
     context: Option<AuthContext>,
     // From MysqlServerOptions
     nonce: Arc<Option<Vec<u8>>>,
@@ -175,14 +177,8 @@ impl Backend {
                         &table_name.0[0].value
                     };
 
-                    let ctx = if self.context.is_some() {
-                        self.context.as_ref().unwrap()
-                    } else {
-                        return Err(CubeError::user("must be auth".to_string()))
-                    };
-
                     let ctx = self.transport
-                        .meta(ctx)
+                        .meta(self.auth_context()?)
                         .await?;
 
                     if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
@@ -238,14 +234,8 @@ impl Backend {
                     }
                 },
                 ast::Statement::Explain { statement, .. } => {
-                    let auth_ctx = if self.context.is_some() {
-                        self.context.as_ref().unwrap()
-                    } else {
-                        return Err(CubeError::user("must be auth".to_string()))
-                    };
-
                     let ctx = self.transport
-                        .meta(auth_ctx)
+                        .meta(self.auth_context()?)
                     .await?;
 
                     let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
@@ -272,14 +262,8 @@ impl Backend {
         } else if !ignore {
             trace!("query was not detected");
 
-            let auth_ctx = if self.context.is_some() {
-                self.context.as_ref().unwrap()
-            } else {
-                return Err(CubeError::user("must be auth".to_string()))
-            };
-
             let ctx = self.transport
-                .meta(auth_ctx)
+                .meta(self.auth_context()?)
                 .await?;
 
             let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
@@ -305,7 +289,7 @@ impl Backend {
                     debug!("Meta {:?}", plan.meta);
 
                     let response = self.transport
-                        .load(plan.request, auth_ctx)
+                        .load(plan.request, self.auth_context()?)
                         .await?;
 
                     let mut columns: Vec<dataframe::Column> = vec![];
@@ -356,6 +340,14 @@ impl Backend {
             ))
         } else {
             Err(CubeError::internal("Unsupported query".to_string()))
+        }
+    }
+
+    pub(crate) fn auth_context(&self) -> Result<&AuthContext, CubeError> {
+        if self.context.is_some() {
+            Ok(self.context.as_ref().unwrap())
+        } else {
+            Err(CubeError::internal("must be auth".to_string()))
         }
     }
 }
@@ -457,7 +449,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             None
         };
 
-        let ctx = self.auth.authenticate(user.clone()).await.map_err(|e| {
+        let auth_response = self.auth.authenticate(user.clone()).await.map_err(|e| {
             if e.message != *"Incorrect user name or password" {
                 error!("Error during authentication MySQL connection: {}", e);
             };
@@ -465,10 +457,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             io::Error::new(io::ErrorKind::Other, e.to_string())
         })?;
 
-        let passwd = ctx.password.clone().map(|p| p.as_bytes().to_vec());
+        let passwd = auth_response.password.map(|p| p.as_bytes().to_vec());
 
         self.props.set_user(user.clone());
-        self.context = Some(ctx);
+        self.context = Some(auth_response.context);
 
         Ok(passwd)
     }
@@ -595,37 +587,6 @@ impl MySqlServer {
             nonce: Arc::new(nonce),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct AuthContext {
-    pub password: Option<String>,
-    pub access_token: String,
-    pub base_path: String,
-}
-
-#[async_trait]
-pub trait SqlAuthService: Send + Sync {
-    async fn authenticate(&self, user: Option<String>) -> Result<AuthContext, CubeError>;
-}
-
-pub struct SqlAuthDefaultImpl;
-
-crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
-
-#[async_trait]
-impl SqlAuthService for SqlAuthDefaultImpl {
-    async fn authenticate(&self, _user: Option<String>) -> Result<AuthContext, CubeError> {
-        Ok(AuthContext {
-            password: None,
-            access_token: env::var("CUBESQL_CUBE_TOKEN")
-                .ok()
-                .unwrap_or_else(|| panic!("CUBESQL_CUBE_TOKEN is a required ENV variable")),
-            base_path: env::var("CUBESQL_CUBE_URL")
-                .ok()
-                .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
         })
     }
 }
