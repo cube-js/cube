@@ -2527,6 +2527,26 @@ mod tests {
                 },
             ),
             (
+                "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
+                CompiledQuery {
+                    request: V1LoadRequestQuery {
+                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                        dimensions: Some(vec![]),
+                        segments: Some(vec![]),
+                        time_dimensions: None,
+                        order: None,
+                        limit: None,
+                        offset: None,
+                        filters: None,
+                    },
+                    meta: vec![CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.count".to_string(),
+                        column_to: "count".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_LONGLONG,
+                    }],
+                },
+            ),
+            (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
                 CompiledQuery {
                     request: V1LoadRequestQuery {
@@ -2626,6 +2646,18 @@ mod tests {
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
                 CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
+            ),
+            (
+                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
+            ),
+            (
+                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use 'unknownIdentifier' as argument to aggregation function 'COUNT()'".to_string()),
+            ),
+            (
+                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
             ),
         ];
 
