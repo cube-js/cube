@@ -30,18 +30,16 @@ use crate::CubeError;
 use sqlparser::ast;
 
 use super::dataframe;
+use super::server_manager::ServerManager;
 use super::AuthContext;
 use super::SqlAuthService;
 
 struct Backend {
-    auth: Arc<dyn SqlAuthService>,
-    transport: Arc<dyn TransportService>,
+    server: Arc<ServerManager>,
     // Props for execution queries
     props: QueryPlannerExecutionProps,
     // Context for Transport
     context: Option<AuthContext>,
-    // From MysqlServerOptions
-    nonce: Arc<Option<Vec<u8>>>,
 }
 
 enum QueryResponse {
@@ -177,7 +175,7 @@ impl Backend {
                         &table_name.0[0].value
                     };
 
-                    let ctx = self.transport
+                    let ctx = self.server.transport
                         .meta(self.auth_context()?)
                         .await?;
 
@@ -234,7 +232,7 @@ impl Backend {
                     }
                 },
                 ast::Statement::Explain { statement, .. } => {
-                    let ctx = self.transport
+                    let ctx = self.server.transport
                         .meta(self.auth_context()?)
                     .await?;
 
@@ -262,7 +260,7 @@ impl Backend {
         } else if !ignore {
             trace!("query was not detected");
 
-            let ctx = self.transport
+            let ctx = self.server.transport
                 .meta(self.auth_context()?)
                 .await?;
 
@@ -288,7 +286,7 @@ impl Backend {
                     debug!("Request {}", json!(plan.request).to_string());
                     debug!("Meta {:?}", plan.meta);
 
-                    let response = self.transport
+                    let response = self.server.transport
                         .load(plan.request, self.auth_context()?)
                         .await?;
 
@@ -449,13 +447,18 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             None
         };
 
-        let auth_response = self.auth.authenticate(user.clone()).await.map_err(|e| {
-            if e.message != *"Incorrect user name or password" {
-                error!("Error during authentication MySQL connection: {}", e);
-            };
+        let auth_response = self
+            .server
+            .auth
+            .authenticate(user.clone())
+            .await
+            .map_err(|e| {
+                if e.message != *"Incorrect user name or password" {
+                    error!("Error during authentication MySQL connection: {}", e);
+                };
 
-            io::Error::new(io::ErrorKind::Other, e.to_string())
-        })?;
+                io::Error::new(io::ErrorKind::Other, e.to_string())
+            })?;
 
         let passwd = auth_response.password.map(|p| p.as_bytes().to_vec());
 
@@ -470,12 +473,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
     where
         W: 'async_trait,
     {
-        if let Some(n) = &*self.nonce {
-            Ok(n.clone())
-        } else {
-            let random_bytes: Vec<u8> = (0..20).map(|_| rand::random::<u8>()).collect();
-            Ok(random_bytes)
-        }
+        Ok(self
+            .server
+            .get_nonce()
+            .unwrap_or_else(|| (0..20).map(|_| rand::random::<u8>()).collect()))
     }
 
     /// Called when client switches database: USE `db`;
@@ -494,11 +495,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 
 pub struct MySqlServer {
     address: String,
-    auth: Arc<dyn SqlAuthService>,
-    transport: Arc<dyn TransportService>,
+    server: Arc<ServerManager>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
-    nonce: Arc<Option<Vec<u8>>>,
 }
 
 crate::di_service!(MySqlServer, []);
@@ -533,9 +532,7 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
-            let auth = self.auth.clone();
-            let transport = self.transport.clone();
-            let nonce = self.nonce.clone();
+            let server = self.server.clone();
 
             let connection_id = if connection_id_incr > 100_000_u32 {
                 connection_id_incr = 1;
@@ -550,11 +547,9 @@ impl ProcessingLoop for MySqlServer {
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
-                        auth,
-                        transport,
+                        server,
                         props: QueryPlannerExecutionProps::new(connection_id, None, None),
                         context: None,
-                        nonce,
                     },
                     socket,
                 )
@@ -582,9 +577,7 @@ impl MySqlServer {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
             address,
-            auth,
-            transport,
-            nonce: Arc::new(nonce),
+            server: Arc::new(ServerManager::new(auth, transport, nonce)),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })
