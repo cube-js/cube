@@ -1536,6 +1536,12 @@ impl QueryPlanner {
                 filter,
                 table_name,
             } => self.show_columns_to_plan(*extended, *full, &filter, &table_name, props),
+            ast::Statement::ShowTables {
+                extended,
+                full,
+                filter,
+                db_name,
+            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name, props),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1760,6 +1766,61 @@ impl QueryPlanner {
         let information_schema_sql = format!("SELECT `COLUMN_NAME` AS `Field`, 1 AS `Order`, `COLUMN_TYPE` AS `Type`, IF(`DATA_TYPE` = 'varchar', 'utf8mb4_0900_ai_ci', NULL) AS `Collation`, `IS_NULLABLE` AS `Null`, `COLUMN_KEY` AS `Key`, NULL AS `Default`, `EXTRA` AS `Extra`, 'select' AS `Privileges`, `COLUMN_COMMENT` AS `Comment` FROM `information_schema`.`COLUMNS` WHERE `TABLE_NAME` = '{}' AND `TABLE_SCHEMA` = '{}' {}", table_name, db_name, extended);
         let stmt = parse_sql_to_statement(&format!(
             "SELECT {} FROM ({}) AS `COLUMNS` {}",
+            columns, information_schema_sql, filter
+        ))?;
+
+        self.create_df_logical_plan(stmt, props)
+    }
+
+    fn show_tables_to_plan(
+        &self,
+        // EXTENDED is accepted but does not alter the result
+        _extended: bool,
+        full: bool,
+        filter: &Option<ast::ShowStatementFilter>,
+        db_name: &Option<ast::Ident>,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let db_name = match db_name {
+            Some(db_name) => db_name.clone(),
+            None => Ident::new(props.database.as_ref().unwrap_or(&"db".to_string())),
+        };
+
+        let column_name = format!("Tables_in_{}", db_name.value);
+        let column_name = match db_name.quote_style {
+            Some(quote_style) => Ident::with_quote(quote_style, column_name),
+            None => Ident::new(column_name),
+        };
+
+        let columns = match full {
+            false => format!("{}", column_name),
+            true => format!("{}, `Table_type`", column_name),
+        };
+
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE {} {}", column_name, stmt)
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                format!("{}", stmt)
+            }
+            Some(stmt) => {
+                return Err(CompilationError::User(format!(
+                    "SHOW TABLES doesn't support requested filter: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let information_schema_sql = format!(
+            "SELECT `TABLE_NAME` AS {}, `TABLE_TYPE` AS `Table_type` FROM `information_schema`.`TABLES`
+WHERE `TABLE_SCHEMA` = '{}'",
+            column_name,
+            escape_single_quote_string(&db_name.value),
+        );
+        let stmt = parse_sql_to_statement(&format!(
+            "SELECT {} FROM ({}) AS `TABLES` {}",
             columns, information_schema_sql, filter
         ))?;
 
@@ -4038,6 +4099,75 @@ mod tests {
             | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
             | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
             +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_tables() -> Result<(), CubeError> {
+        // Simplest syntax
+        assert_eq!(
+            execute_query("show tables;".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            | Logs                      |\n\
+            +---------------------------+"
+        );
+
+        // FULL
+        assert_eq!(
+            execute_query("show full tables;".to_string()).await?,
+            "+---------------------------+------------+\n\
+            | Tables_in_db              | Table_type |\n\
+            +---------------------------+------------+\n\
+            | KibanaSampleDataEcommerce | BASE TABLE |\n\
+            | Logs                      | BASE TABLE |\n\
+            +---------------------------+------------+"
+        );
+
+        // LIKE
+        assert_eq!(
+            execute_query("show tables like '%ban%';".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            +---------------------------+"
+        );
+
+        // WHERE
+        assert_eq!(
+            execute_query("show tables where Tables_in_db = 'Logs';".to_string()).await?,
+            "+--------------+\n\
+            | Tables_in_db |\n\
+            +--------------+\n\
+            | Logs         |\n\
+            +--------------+"
+        );
+
+        // FROM db
+        assert_eq!(
+            execute_query("show tables from db;".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            | Logs                      |\n\
+            +---------------------------+"
+        );
+
+        // Everything
+        assert_eq!(
+            execute_query("show full tables from db like '%';".to_string()).await?,
+            "+---------------------------+------------+\n\
+            | Tables_in_db              | Table_type |\n\
+            +---------------------------+------------+\n\
+            | KibanaSampleDataEcommerce | BASE TABLE |\n\
+            | Logs                      | BASE TABLE |\n\
+            +---------------------------+------------+"
         );
 
         Ok(())

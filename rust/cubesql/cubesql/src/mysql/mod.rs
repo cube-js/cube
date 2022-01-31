@@ -269,38 +269,6 @@ impl Backend {
                     return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
                 }
             }
-        } else if query_lower.starts_with("show full tables from") {
-            let auth_ctx = if self.context.is_some() {
-                self.context.as_ref().unwrap()
-            } else {
-                return Err(CubeError::user("must be auth".to_string()))
-            };
-
-            let ctx = self.schema
-                .get_ctx_for_tenant(auth_ctx)
-                .await?;
-
-            let values = ctx.cubes.iter()
-                .map(|cube| dataframe::Row::new(vec![
-                    dataframe::TableValue::String(cube.name.clone()),
-                    dataframe::TableValue::String("BASE TABLE".to_string()),
-                ])).collect();
-
-            return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                vec![
-                    dataframe::Column::new(
-                        "Tables_in_db".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
-                        ColumnFlags::empty(),
-                    ),
-                    dataframe::Column::new(
-                        "Table_type".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
-                        ColumnFlags::empty(),
-                    )
-                ],
-                values
-            ))))
         } else if !ignore {
             trace!("query was not detected");
 
