@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -9,62 +10,71 @@ use cubeclient::models::{
 };
 use msql_srv::ColumnType;
 
-use crate::compile::TenantContext;
-use crate::mysql::AuthContext;
 use crate::CubeError;
+
+use self::ctx::MetaContext;
 
 pub mod ctx;
 
 #[async_trait]
-pub trait SchemaService: Send + Sync {
-    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError>;
+pub trait TransportService: Send + Sync {
+    // Send meta request
+    async fn meta(&self) -> Result<MetaContext, CubeError>;
 
-    async fn request(
-        &self,
-        query: V1LoadRequestQuery,
-        ctx: &AuthContext,
-    ) -> Result<V1LoadResponse, CubeError>;
+    // Send load request
+    async fn load(&self, query: V1LoadRequestQuery) -> Result<V1LoadResponse, CubeError>;
 }
 
-pub struct SchemaServiceDefaultImpl;
+pub struct HttpTransportService {
+    access_token: String,
+    base_path: String,
+}
 
-impl SchemaServiceDefaultImpl {
-    fn get_client_config_for_ctx(&self, ctx: &AuthContext) -> Configuration {
+impl Default for HttpTransportService {
+    fn default() -> Self {
+        Self {
+            access_token: env::var("CUBESQL_CUBE_TOKEN")
+                .ok()
+                .unwrap_or_else(|| panic!("CUBESQL_CUBE_TOKEN is a required ENV variable")),
+            base_path: env::var("CUBESQL_CUBE_URL")
+                .ok()
+                .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
+        }
+    }
+}
+
+impl HttpTransportService {
+    fn get_client_config_for_ctx(&self) -> Configuration {
         let mut cube_config = Configuration::default();
-        cube_config.bearer_access_token = Some(ctx.access_token.clone());
-        cube_config.base_path = ctx.base_path.clone();
+        cube_config.bearer_access_token = Some(self.access_token.clone());
+        cube_config.base_path = self.base_path.clone();
 
         cube_config
     }
 }
 
-crate::di_service!(SchemaServiceDefaultImpl, [SchemaService]);
+crate::di_service!(HttpTransportService, [TransportService]);
 
 #[async_trait]
-impl SchemaService for SchemaServiceDefaultImpl {
-    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
-        let response = cube_api::meta_v1(&self.get_client_config_for_ctx(ctx)).await?;
+impl TransportService for HttpTransportService {
+    async fn meta(&self) -> Result<MetaContext, CubeError> {
+        let response = cube_api::meta_v1(&self.get_client_config_for_ctx()).await?;
 
         let ctx = if let Some(cubes) = response.cubes {
-            TenantContext { cubes }
+            MetaContext { cubes }
         } else {
-            TenantContext { cubes: vec![] }
+            MetaContext { cubes: vec![] }
         };
 
         Ok(ctx)
     }
 
-    async fn request(
-        &self,
-        query: V1LoadRequestQuery,
-        ctx: &AuthContext,
-    ) -> Result<V1LoadResponse, CubeError> {
+    async fn load(&self, query: V1LoadRequestQuery) -> Result<V1LoadResponse, CubeError> {
         let request = V1LoadRequest {
             query: Some(query),
             query_type: Some("multi".to_string()),
         };
-        let response =
-            cube_api::load_v1(&self.get_client_config_for_ctx(ctx), Some(request)).await?;
+        let response = cube_api::load_v1(&self.get_client_config_for_ctx(), Some(request)).await?;
 
         Ok(response)
     }

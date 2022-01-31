@@ -14,7 +14,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::schema::{CubeColumn, V1CubeMetaExt};
+use crate::transport::{CubeColumn, V1CubeMetaExt};
 
 use super::tables::new_string_array_with_placeholder;
 

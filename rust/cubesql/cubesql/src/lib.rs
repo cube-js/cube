@@ -34,8 +34,8 @@ use tokio::time::error::Elapsed;
 pub mod compile;
 pub mod config;
 pub mod mysql;
-pub mod schema;
 pub mod telemetry;
+pub mod transport;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {

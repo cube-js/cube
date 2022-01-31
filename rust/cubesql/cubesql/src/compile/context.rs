@@ -6,7 +6,7 @@ use sqlparser::ast;
 
 use crate::{
     compile::CompilationError,
-    schema::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
 
 use super::CompilationResult;
