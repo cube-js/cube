@@ -80,7 +80,7 @@ Array [
 exports[`postgresql HTTP Transport Dbt orders count: Dbt orders count 1`] = `
 Array [
   Object {
-    "MyNewProjectOrdersFiltered.ordersCount": "171334",
+    "OrdersFiltered.ordersCount": "171334",
   },
 ]
 `;

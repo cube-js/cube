@@ -61,7 +61,7 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
     },
     {
       measures: [
-        'MyNewProjectOrdersFiltered.ordersCount'
+        'OrdersFiltered.ordersCount'
       ]
     }
   ],

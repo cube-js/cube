@@ -35,10 +35,11 @@ type ModelCubeDef = {
 
 type DbtLoadOptions = {
   cubePerMetric?: boolean;
+  toExtend?: string[];
 };
 
 export class Dbt extends AbstractExtension {
-  public async loadMetricCubesFromDbtProject(projectPath: string, options: DbtLoadOptions) {
+  public async loadMetricCubesFromDbtProject(projectPath: string, options: DbtLoadOptions): Promise<{ [cubeName: string]: any }> {
     const dbtProjectPath = path.join(projectPath, 'dbt_project.yml');
     if (!(await fs.pathExists(dbtProjectPath))) {
       throw new UserError(`'${dbtProjectPath}' was not found. Please make sure '${projectPath}' is a path to the dbt project`);
@@ -77,8 +78,10 @@ export class Dbt extends AbstractExtension {
       }
     );
 
+    const toExtend: { [cubeName: string]: any } = {};
+
     Object.keys(cubeDefs).forEach(model => {
-      this.addCubeDefinition(cubeDefs[model].cubeName, {
+      const cubeDef = {
         sql: () => `SELECT * FROM ${manifest.nodes[`model.${model}`].relation_name}`,
         fileName: manifestPath,
 
@@ -104,7 +107,14 @@ export class Dbt extends AbstractExtension {
             }
           })).reduce((a, b) => ({ ...a, ...b }), {}))
         }
-      });
+      };
+      if (options.toExtend && options.toExtend.indexOf(cubeDefs[model].cubeName) !== -1) {
+        toExtend[cubeDefs[model].cubeName] = this.cubeFactory(cubeDef);
+      } else {
+        this.addCubeDefinition(cubeDefs[model].cubeName, cubeDef);
+      }
     });
+
+    return toExtend;
   }
 }

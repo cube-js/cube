@@ -1,5 +1,12 @@
 import Dbt from '@cubejs-backend/dbt-schema-extension';
 
 asyncModule(async () => {
-  await Dbt.loadMetricCubesFromDbtProject('dbt-project');
+  const { MyNewProjectOrdersFiltered } = await Dbt.loadMetricCubesFromDbtProject(
+    'dbt-project',
+    { toExtend: ['MyNewProjectOrdersFiltered'] }
+  );
+
+  cube('OrdersFiltered', {
+    extends: MyNewProjectOrdersFiltered
+  });
 });
