@@ -183,6 +183,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   protected mapFields(fields: FieldDef[]) {
     return fields.map((f) => {
+      console.log(f);
       const postgresType = this.getPostgresTypeForField(f.dataTypeID);
       if (!postgresType) {
         throw new Error(
