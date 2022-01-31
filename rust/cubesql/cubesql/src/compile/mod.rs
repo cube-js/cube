@@ -17,13 +17,13 @@ use cubeclient::models::{
 };
 
 use crate::mysql::dataframe;
-pub use crate::schema::ctx::*;
-use crate::schema::V1CubeMetaExt;
+pub use crate::transport::ctx::*;
+use crate::transport::V1CubeMetaExt;
 
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
-    schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    transport::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
 use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 
@@ -1333,11 +1333,11 @@ impl QueryPlannerExecutionProps {
 }
 
 struct QueryPlanner {
-    context: Arc<ctx::TenantContext>,
+    context: Arc<ctx::MetaContext>,
 }
 
 impl QueryPlanner {
-    pub fn new(context: Arc<ctx::TenantContext>) -> Self {
+    pub fn new(context: Arc<ctx::MetaContext>) -> Self {
         Self { context }
     }
 
@@ -1878,7 +1878,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
-    tenant_ctx: Arc<ctx::TenantContext>,
+    tenant_ctx: Arc<ctx::MetaContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     let planner = QueryPlanner::new(tenant_ctx);
@@ -1929,7 +1929,7 @@ impl QueryPlan {
 
 pub fn convert_sql_to_cube_query(
     query: &String,
-    tenant: Arc<ctx::TenantContext>,
+    tenant: Arc<ctx::MetaContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
@@ -2044,8 +2044,8 @@ mod tests {
         ]
     }
 
-    fn get_test_tenant_ctx() -> Arc<ctx::TenantContext> {
-        Arc::new(ctx::TenantContext {
+    fn get_test_tenant_ctx() -> Arc<ctx::MetaContext> {
+        Arc::new(ctx::MetaContext {
             cubes: get_test_meta(),
         })
     }

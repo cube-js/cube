@@ -25,8 +25,8 @@ use crate::compile::parser::parse_sql_to_statement;
 use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
-use crate::schema::SchemaService;
-use crate::schema::V1CubeMetaExt;
+use crate::transport::TransportService;
+use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use sqlparser::ast;
 
@@ -34,7 +34,7 @@ pub mod dataframe;
 
 struct Backend {
     auth: Arc<dyn SqlAuthService>,
-    schema: Arc<dyn SchemaService>,
+    transport: Arc<dyn TransportService>,
     props: QueryPlannerExecutionProps,
     // Auth result from SqlAuthService
     context: Option<AuthContext>,
@@ -181,8 +181,8 @@ impl Backend {
                         return Err(CubeError::user("must be auth".to_string()))
                     };
 
-                    let ctx = self.schema
-                        .get_ctx_for_tenant(ctx)
+                    let ctx = self.transport
+                        .meta(ctx)
                         .await?;
 
                     if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
@@ -244,8 +244,8 @@ impl Backend {
                         return Err(CubeError::user("must be auth".to_string()))
                     };
 
-                    let ctx = self.schema
-                        .get_ctx_for_tenant(auth_ctx)
+                    let ctx = self.transport
+                        .meta(auth_ctx)
                     .await?;
 
                     let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
@@ -278,8 +278,8 @@ impl Backend {
                 return Err(CubeError::user("must be auth".to_string()))
             };
 
-            let ctx = self.schema
-                .get_ctx_for_tenant(auth_ctx)
+            let ctx = self.transport
+                .meta(auth_ctx)
                 .await?;
 
             let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
@@ -304,8 +304,8 @@ impl Backend {
                     debug!("Request {}", json!(plan.request).to_string());
                     debug!("Meta {:?}", plan.meta);
 
-                    let response = self.schema
-                        .request(plan.request, auth_ctx)
+                    let response = self.transport
+                        .load(plan.request, auth_ctx)
                         .await?;
 
                     let mut columns: Vec<dataframe::Column> = vec![];
@@ -503,7 +503,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
 pub struct MySqlServer {
     address: String,
     auth: Arc<dyn SqlAuthService>,
-    schema: Arc<dyn SchemaService>,
+    transport: Arc<dyn TransportService>,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
     nonce: Arc<Option<Vec<u8>>>,
@@ -542,7 +542,7 @@ impl ProcessingLoop for MySqlServer {
             };
 
             let auth = self.auth.clone();
-            let schema = self.schema.clone();
+            let transport = self.transport.clone();
             let nonce = self.nonce.clone();
 
             let connection_id = if connection_id_incr > 100_000_u32 {
@@ -559,7 +559,7 @@ impl ProcessingLoop for MySqlServer {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Backend {
                         auth,
-                        schema,
+                        transport,
                         props: QueryPlannerExecutionProps::new(connection_id, None, None),
                         context: None,
                         nonce,
@@ -584,14 +584,14 @@ impl MySqlServer {
     pub fn new(
         address: String,
         auth: Arc<dyn SqlAuthService>,
-        schema: Arc<dyn SchemaService>,
+        transport: Arc<dyn TransportService>,
         nonce: Option<Vec<u8>>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
         Arc::new(Self {
             address,
             auth,
-            schema,
+            transport,
             nonce: Arc::new(nonce),
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
