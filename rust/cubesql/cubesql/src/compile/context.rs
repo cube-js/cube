@@ -411,6 +411,24 @@ impl QueryContext {
 
         let measure_name = match argument {
             ast::Expr::Wildcard => "*".to_string(),
+            ast::Expr::Value(ast::Value::Number(n, is_negative)) => {
+                let prefix = if *is_negative {
+                    "-".to_string()
+                } else {
+                    "".to_string()
+                };
+
+                let number = prefix + n;
+
+                if &number != "1" {
+                    return Err(CompilationError::User(format!(
+                        "Unable to use number '{}' as argument to aggregation function",
+                        number
+                    )));
+                }
+
+                "*".to_string()
+            }
             ast::Expr::Identifier(i) => i.value.to_string(),
             ast::Expr::CompoundIdentifier(i) => {
                 // @todo We need a context with main table rel
@@ -432,21 +450,15 @@ impl QueryContext {
         };
 
         let fn_name = f.name.to_string().to_ascii_lowercase();
+        if fn_name.eq(&"count".to_string()) && !f.distinct {
+            if measure_name != "*" {
+                return Err(CompilationError::User(format!(
+                    "Unable to use '{}' as argument to aggregation function '{}()'",
+                    measure_name,
+                    f.name.to_string(),
+                )));
+            }
 
-        if measure_name == "*" && !(fn_name.eq(&"count".to_string()) && !f.distinct) {
-            return Err(CompilationError::User(format!(
-                "Unable to use '*' as argument to aggregation function '{}()' (only COUNT() supported)",
-                f.name.to_string(),
-            )));
-        }
-
-        let mut call_agg_type = fn_name;
-
-        if f.distinct {
-            call_agg_type += &"Distinct".to_string();
-        };
-
-        if call_agg_type.eq(&"count".to_string()) {
             let measure_for_argument = self.meta.measures.iter().find(|measure| {
                 if measure.agg_type.is_some() {
                     let agg_type = measure.agg_type.clone().unwrap();
@@ -465,6 +477,20 @@ impl QueryContext {
                 )))
             }
         } else {
+            let mut call_agg_type = fn_name;
+
+            if f.distinct {
+                call_agg_type += &"Distinct".to_string();
+            };
+
+            if measure_name == "*" {
+                return Err(CompilationError::User(format!(
+                    "Unable to use '{}' as argument to aggregation function '{}()' (only COUNT() supported)",
+                    measure_name,
+                    f.name.to_string(),
+                )));
+            }
+
             let selection_opt = self.find_selection_for_identifier(&measure_name, true);
             if let Some(selection) = selection_opt {
                 match selection {
