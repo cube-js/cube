@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use cubesql::{
     di_service,
-    mysql::{AuthContext, SqlAuthService},
+    mysql::{AuthContext, auth::SqlAuthService},
     CubeError,
 };
 use log::trace;

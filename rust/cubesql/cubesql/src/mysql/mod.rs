@@ -1,4 +1,4 @@
-use std::env;
+
 use std::io;
 
 use std::sync::Arc;
@@ -30,7 +30,7 @@ use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use sqlparser::ast;
 
-use self::auth::AuthContext;
+
 use self::auth::SqlAuthService;
 
 pub mod auth;

@@ -4,7 +4,7 @@ use neon::prelude::*;
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
-    compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
+    compile::MetaContext, di_service, transport::TransportService, CubeError,
 };
 use serde_derive::Serialize;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ struct MetaRequest {
 
 #[async_trait]
 impl SchemaService for NodeBridgeTransport {
-    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
+    async fn meta(&self) -> Result<MetaContext, CubeError> {
         trace!("[transport] Meta ->");
 
         let request_id = Uuid::new_v4().to_string();
@@ -62,15 +62,14 @@ impl SchemaService for NodeBridgeTransport {
         .await?;
         trace!("[transport] Meta <- {:?}", response);
 
-        Ok(TenantContext {
+        Ok(MetaContext {
             cubes: response.cubes.unwrap_or_default(),
         })
     }
 
-    async fn request(
+    async fn load(
         &self,
-        query: V1LoadRequestQuery,
-        ctx: &AuthContext,
+        query: V1LoadRequestQuery
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
