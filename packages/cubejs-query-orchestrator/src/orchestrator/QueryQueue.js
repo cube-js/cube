@@ -35,8 +35,6 @@ export class QueryQueue {
   }
 
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
-    console.log('queue', new Error('hi'), query);
-
     options = options || {};
     if (this.skipQueue) {
       const queryDef = {
@@ -137,6 +135,7 @@ export class QueryQueue {
       return;
     }
     if (result.error) {
+      console.log('eee', result)
       throw new Error(result.error); // TODO
     } else {
       // eslint-disable-next-line consistent-return
@@ -331,7 +330,6 @@ export class QueryQueue {
   }
 
   async processQuerySkipQueue(query) {
-    console.log('skip', new Error('hi'), query);
     const startQueryTime = (new Date()).getTime();
     this.logger('Performing query', {
       queueSize: 0,
