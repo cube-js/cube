@@ -155,15 +155,30 @@ export class BaseFilter extends BaseDimension {
   }
 
   containsWhere(column) {
-    return this.likeOr(column);
+    return this.likeOr(column, false, 'contains');
   }
 
   notContainsWhere(column) {
-    return this.likeOr(column, true);
+    return this.likeOr(column, true, 'contains');
   }
 
-  likeOr(column, not) {
-    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(p => this.likeIgnoreCase(column, not, p)))}${this.orIsNullCheck(column, not)}`;
+  startsWithWhere(column) {
+    return this.likeOr(column, false, 'starts');
+  }
+
+  endsWithWhere(column) {
+    return this.likeOr(column, false, 'ends');
+  }
+
+  likeOr(column, not, type) {
+    type = type || 'contains';
+    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(p => this.likeIgnoreCase(column, not, p, type)))}${this.orIsNullCheck(column, not)}`;
+  }
+
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s}`;
   }
 
   orIsNullCheck(column, not) {
@@ -172,10 +187,6 @@ export class BaseFilter extends BaseDimension {
 
   shouldAddOrIsNull(not) {
     return not ? !this.valuesContainNull() : this.valuesContainNull();
-  }
-
-  likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} ILIKE '%' || ${this.allocateParam(param)} || '%'`;
   }
 
   allocateParam(param) {
