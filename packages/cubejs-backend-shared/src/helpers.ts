@@ -1,4 +1,5 @@
 import spawn from 'cross-spawn';
+import stream from 'stream';
 
 export function getRealType(value: any): string {
   if (value === null) {
@@ -33,4 +34,16 @@ export async function executeCommand(
       resolve();
     });
   });
+}
+
+export async function streamToArray<T>(xstream: stream.Readable): Promise<T[]> {
+  const result: T[] = [];
+  for await (const x of xstream) {
+    result.push(x);
+  }
+  return result;
+}
+
+export async function oldStreamToArray<T>(xstream: NodeJS.ReadableStream): Promise<T[]> {
+  return streamToArray(new stream.Readable().wrap(xstream));
 }

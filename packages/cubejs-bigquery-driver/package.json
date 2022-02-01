@@ -15,6 +15,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "npm run integration2",
+    "integration2": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -33,7 +35,6 @@
   },
   "devDependencies": {
     "@types/ramda": "^0.27.40",
-    "@types/stream-to-array": "^2.3.0",
     "typescript": "~4.1.5"
   },
   "license": "Apache-2.0",

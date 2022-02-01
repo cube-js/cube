@@ -75,7 +75,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
-    console.log('qqq');
     const data = await this.runQueryJob({
       query,
       params: values,
