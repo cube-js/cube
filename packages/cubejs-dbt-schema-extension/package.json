@@ -31,7 +31,7 @@
     "node-fetch": "^2.6.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.29.24",
+    "@cubejs-backend/linter": "^0.29.23",
     "@cubejs-backend/testing": "^0.29.24",
     "@types/generic-pool": "^3.1.9",
     "@types/jest": "^26.0.24",
