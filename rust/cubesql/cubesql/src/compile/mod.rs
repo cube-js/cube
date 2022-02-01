@@ -558,11 +558,11 @@ fn compiled_binary_op_expr(
     right: &Box<ast::Expr>,
     ctx: &QueryContext,
 ) -> CompilationResult<CompiledFilterTree> {
-    let left = compile_expression(left, ctx)?;
-    let right = compile_expression(right, ctx)?;
+    let left_ce = compile_expression(left, ctx)?;
+    let right_ce = compile_expression(right, ctx)?;
 
     // Group selection to left, expr for filtering to right
-    let (selection_to_filter, filter_expr) = match (left, right) {
+    let (selection_to_filter, filter_expr) = match (left_ce, right_ce) {
         (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
         (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
         // CubeSQL doesnt support BinaryExpression with literals in both sides
@@ -582,6 +582,31 @@ fn compiled_binary_op_expr(
     };
 
     let compiled_filter = match selection_to_filter {
+        // Compile to CompiledFilter::Filter
+        Selection::Measure(_measure) => {
+            let (value, operator) = match op {
+                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
+                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
+                ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
+                ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
+                ast::BinaryOperator::GtEq => (filter_expr, "gte".to_string()),
+                ast::BinaryOperator::Gt => (filter_expr, "gt".to_string()),
+                ast::BinaryOperator::Lt => (filter_expr, "lt".to_string()),
+                ast::BinaryOperator::LtEq => (filter_expr, "lte".to_string()),
+                _ => {
+                    return Err(CompilationError::Unsupported(format!(
+                        "Operator in binary expression for measure: {} {} {}",
+                        left, op, right
+                    )))
+                }
+            };
+
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values: Some(vec![value.to_value_as_str()?]),
+            }
+        }
         // Compile to CompiledFilter::Filter
         Selection::Dimension(dim) => {
             let filter_expr = if dim.is_time() {
@@ -604,12 +629,10 @@ fn compiled_binary_op_expr(
                 ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
-                // >=
                 ast::BinaryOperator::GtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
                     _ => (filter_expr, "gte".to_string()),
                 },
-                // >
                 ast::BinaryOperator::Gt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt + Duration::milliseconds(1)),
@@ -617,7 +640,6 @@ fn compiled_binary_op_expr(
                     ),
                     _ => (filter_expr, "gt".to_string()),
                 },
-                // <
                 ast::BinaryOperator::Lt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
@@ -625,15 +647,14 @@ fn compiled_binary_op_expr(
                     ),
                     _ => (filter_expr, "lt".to_string()),
                 },
-                // <=
                 ast::BinaryOperator::LtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
-                        "Operator in binary expression: {:?}",
-                        op
+                        "Operator in binary expression for dimension: {} {} {}",
+                        left, op, right
                     )))
                 }
             };
@@ -664,16 +685,16 @@ fn compiled_binary_op_expr(
                 }
             },
             _ => {
-                return Err(CompilationError::Unsupported(format!(
-                    "Unable to use operator {} with segment",
-                    op
+                return Err(CompilationError::User(format!(
+                    "Unable to use operator {} with segment: {} {} {}",
+                    op, left, op, right
                 )));
             }
         },
         _ => {
             return Err(CompilationError::Unsupported(format!(
-                "Unable to compile binary expression: {:?}",
-                op
+                "Binary expression: {} {} {}",
+                left, op, right
             )))
         }
     };
@@ -2948,6 +2969,30 @@ mod tests {
     #[test]
     fn test_where_filter_simple() {
         let to_check = vec![
+            // Binary expression with Measures
+            (
+                "maxPrice = 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "maxPrice > 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                    operator: Some("gt".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            // Binary expression with Dimensions
             (
                 "customer_gender = 'FEMALE'".to_string(),
                 Some(vec![V1LoadRequestQueryFilterItem {
