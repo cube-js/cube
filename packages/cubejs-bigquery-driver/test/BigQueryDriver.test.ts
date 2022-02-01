@@ -1,39 +1,22 @@
-import { PostgresDBRunner } from '@cubejs-backend/testing';
-
-import { StartedTestContainer } from 'testcontainers';
-
-import { PostgresDriver } from '../src';
+import { BigQueryDriver } from '../src';
 
 import * as streamToArray from 'stream-to-array';
 
-describe('PostgresDriver', () => {
-  let container: StartedTestContainer;
-  let driver: PostgresDriver;
+describe('BigQueryDriver', () => {
+  let driver: BigQueryDriver;
 
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    container = await PostgresDBRunner.startContainer({ volumes: [] });
-    driver = new PostgresDriver({
-      host: container.getHost(),
-      port: container.getMappedPort(5432),
-      user: 'test',
-      password: 'test',
-      database: 'test',
-    });
-    await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
+    driver = new BigQueryDriver({});
   });
 
   afterAll(async () => {
     await driver.release();
-
-    if (container) {
-      await container.stop();
-    }
   });
 
   test('type coercion', async () => {
-    await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\');', []);
+    // await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\');', []);
 
     const data = await driver.query(
       `
@@ -42,8 +25,8 @@ describe('PostgresDriver', () => {
           CAST('2020-01-01 00:00:00' as TIMESTAMP) as timestamp,
           CAST('2020-01-01 00:00:00+02' as TIMESTAMPTZ) as timestamptz,
           CAST('1.0' as DECIMAL(10,2)) as decimal,
-          CAST('FOO' as CUBEJS_TEST_ENUM) as enum
       `,
+      // CAST('FOO' as CUBEJS_TEST_ENUM) as enum
       []
     );
 
@@ -57,7 +40,7 @@ describe('PostgresDriver', () => {
         // Numerics as string
         decimal: '1.00',
         // Enum datatypes as string
-        enum: 'FOO',
+        // enum: 'FOO',
       }
     ]);
   });
@@ -79,9 +62,7 @@ describe('PostgresDriver', () => {
       }
     );
 
-    const tableData = await driver.stream('select * from test.streaming_test', [], {
-      highWaterMark: 1000,
-    });
+    const tableData = await driver.stream('select * from test.streaming_test', []);
 
     try {
       expect(await tableData.types).toEqual([
@@ -110,9 +91,7 @@ describe('PostgresDriver', () => {
 
   test('stream (exception)', async () => {
     try {
-      await driver.stream('select * from test.random_name_for_table_that_doesnot_exist_sql_must_fail', [], {
-        highWaterMark: 1000,
-      });
+      await driver.stream('select * from test.random_name_for_table_that_doesnot_exist_sql_must_fail', []);
 
       throw new Error('stream must throw an exception');
     } catch (e) {

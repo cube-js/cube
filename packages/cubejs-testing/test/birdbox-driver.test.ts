@@ -1,8 +1,7 @@
 import yargs from 'yargs/yargs';
-import cubejs, {CubejsApi, HttpTransport} from '@cubejs-client/core';
+import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from "@jest/globals";
 import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from "../src";
-import {identity} from "ramda";
 
 const DB_TYPES = ['athena', 'bigquery'];
 type DbType = typeof DB_TYPES[number];
