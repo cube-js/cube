@@ -353,7 +353,10 @@ export class ApiGateway {
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
-        context: req.context,
+        context: {
+          ...req.context,
+          securityContext: this.securityContextExtractor(req.context)
+        },
         res: this.resToResultFn(res)
       });
     }));

@@ -1,0 +1,24 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`bigquery Driver.query: Driver.query 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": 800,
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": 600,
+  },
+  Object {
+    "Orders.status": "new",
+    "Orders.totalAmount": 300,
+  },
+]
+`;
+
+exports[`bigquery Driver.stream: Driver.stream 1`] = `
+Object {
+  "subscribe": [Function],
+}
+`;
