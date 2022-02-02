@@ -75,7 +75,7 @@ export
 class BaseQuery {
   /**
    * BaseQuery class constructor.
-   * @param {Compilers} compilers
+   * @param {Compilers|*} compilers
    * @param {*} options
    */
   constructor(compilers, options) {
