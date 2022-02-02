@@ -65,6 +65,60 @@ enum QueryResponse {
 }
 
 impl Connection {
+    // This method write response back to client after execution
+    async fn handle_query<'a, W: io::Write + Send>(
+        &'a mut self,
+        query: &'a str,
+        results: QueryResultWriter<'a, W>,
+    ) -> Result<(), io::Error> {
+        match self.execute_query(query).await {
+            Err(e) => {
+                error!("Error during processing {}: {}", query, e.to_string());
+                results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
+
+                Ok(())
+            }
+            Ok(QueryResponse::Ok(status)) => {
+                results.completed(0, 0, status)?;
+                Ok(())
+            }
+            Ok(QueryResponse::ResultSet(_, data_frame)) => {
+                let columns = data_frame
+                    .get_columns()
+                    .iter()
+                    .map(|c| Column {
+                        table: "result".to_string(), // TODO
+                        column: c.get_name(),
+                        coltype: c.get_type(),
+                        colflags: c.get_flags(),
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut rw = results.start(&columns)?;
+
+                for row in data_frame.get_rows().iter() {
+                    for (_i, value) in row.values().iter().enumerate() {
+                        match value {
+                            dataframe::TableValue::String(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
+                            dataframe::TableValue::Boolean(s) => rw.write_col(s.to_string())?,
+                            dataframe::TableValue::Float64(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int64(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
+                        }
+                    }
+
+                    rw.end_row()?;
+                }
+
+                rw.finish()?;
+
+                Ok(())
+            }
+        }
+    }
+
+    // This method executes query and return it as DataFrame
     async fn execute_query<'a>(&'a mut self, query: &'a str) -> Result<QueryResponse, CubeError> {
         let _start = SystemTime::now();
 
@@ -413,52 +467,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
             possible_statement.unwrap()
         };
 
-        let query = statement.as_str();
-        match self.execute_query(query).await {
-            Err(e) => {
-                error!("Error during processing {}: {}", query, e.to_string());
-                results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
-
-                Ok(())
-            }
-            Ok(QueryResponse::Ok(status)) => {
-                results.completed(0, 0, status)?;
-                Ok(())
-            }
-            Ok(QueryResponse::ResultSet(_, data_frame)) => {
-                let columns = data_frame
-                    .get_columns()
-                    .iter()
-                    .map(|c| Column {
-                        table: "result".to_string(), // TODO
-                        column: c.get_name(),
-                        coltype: c.get_type(),
-                        colflags: c.get_flags(),
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut rw = results.start(&columns)?;
-
-                for row in data_frame.get_rows().iter() {
-                    for (_i, value) in row.values().iter().enumerate() {
-                        match value {
-                            dataframe::TableValue::String(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
-                            dataframe::TableValue::Boolean(s) => rw.write_col(s.to_string())?,
-                            dataframe::TableValue::Float64(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Int64(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
-                        }
-                    }
-
-                    rw.end_row()?;
-                }
-
-                rw.finish()?;
-
-                Ok(())
-            }
-        }
+        self.handle_query(statement.as_str(), results).await
     }
 
     async fn on_close<'a>(&'a mut self, _stmt: u32)
@@ -475,51 +484,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     ) -> Result<(), Self::Error> {
         debug!("on_query: {}", query);
 
-        match self.execute_query(query).await {
-            Err(e) => {
-                error!("Error during processing {}: {}", query, e.to_string());
-                results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
-
-                Ok(())
-            }
-            Ok(QueryResponse::Ok(status)) => {
-                results.completed(0, 0, status)?;
-                Ok(())
-            }
-            Ok(QueryResponse::ResultSet(_, data_frame)) => {
-                let columns = data_frame
-                    .get_columns()
-                    .iter()
-                    .map(|c| Column {
-                        table: "result".to_string(), // TODO
-                        column: c.get_name(),
-                        coltype: c.get_type(),
-                        colflags: c.get_flags(),
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut rw = results.start(&columns)?;
-
-                for row in data_frame.get_rows().iter() {
-                    for (_i, value) in row.values().iter().enumerate() {
-                        match value {
-                            dataframe::TableValue::String(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
-                            dataframe::TableValue::Boolean(s) => rw.write_col(s.to_string())?,
-                            dataframe::TableValue::Float64(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Int64(s) => rw.write_col(s)?,
-                            dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
-                        }
-                    }
-
-                    rw.end_row()?;
-                }
-
-                rw.finish()?;
-
-                Ok(())
-            }
-        }
+        self.handle_query(query, results).await
     }
 
     async fn on_auth<'a>(&'a mut self, user: Vec<u8>) -> Result<Option<Vec<u8>>, Self::Error>
