@@ -9,7 +9,8 @@ use datafusion::{
 };
 
 use super::information_schema::{
-    columns::InfoSchemaColumnsProvider, key_column_usage::InfoSchemaKeyColumnUsageProvider,
+    collations::InfoSchemaCollationsProvider, columns::InfoSchemaColumnsProvider,
+    key_column_usage::InfoSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider,
     schemata::InfoSchemaSchemataProvider, statistics::InfoSchemaStatisticsProvider,
     tables::InfoSchemaTableProvider, variables::PerfSchemaVariablesProvider,
@@ -68,6 +69,10 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
             if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {
                 return Some(Arc::new(InfoSchemaReferentialConstraintsProvider::new()));
+            }
+
+            if tp.eq_ignore_ascii_case("information_schema.collations") {
+                return Some(Arc::new(InfoSchemaCollationsProvider::new()));
             }
 
             if tp.eq_ignore_ascii_case("performance_schema.global_variables") {
