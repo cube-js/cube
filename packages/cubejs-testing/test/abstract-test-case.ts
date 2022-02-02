@@ -95,8 +95,9 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           transport: wsTransport,
         });
       } catch (e) {
-        console.log(e);
-        process.exit(1);
+        console.log('qqq', e);
+        throw e;
+        // process.exit(1);
       }
     });
 

@@ -15,6 +15,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "test": "yarn integration",
+    "integration": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-backend/testing": "^0.29.24",
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"
   },

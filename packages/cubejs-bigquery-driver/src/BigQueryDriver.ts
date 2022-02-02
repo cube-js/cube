@@ -7,7 +7,6 @@ import {
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
-import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 
@@ -75,6 +74,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+    console.log('qqq', query, values, options);
+
     const data = await this.runQueryJob({
       query,
       params: values,
@@ -157,10 +158,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return this.bucket !== null;
   }
 
-  public async stream(
-    query: string,
-    values: unknown[]
-  ): Promise<StreamTableData> {
+  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+    console.log('sss', query, values);
+
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
@@ -177,6 +177,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async unload(table: string): Promise<DownloadTableCSVData> {
+    console.log('uuu', table);
+
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }
@@ -204,6 +206,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     params: any,
     options: any
   ): Promise<any> {
+    console.log('ttt', preAggregationTableName, loadSql, params, options);
+
     const [dataSet, tableName] = preAggregationTableName.split('.');
 
     const bigQueryQuery: Query = {

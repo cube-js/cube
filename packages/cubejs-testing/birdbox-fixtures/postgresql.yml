@@ -21,7 +21,7 @@ services:
       - ./postgresql:/cube/conf
       - ./postgresql/single/cube.js:/cube/conf/cube.js
     ports:
-      - "4000"
+      - "4000:4000"
     restart: always
 
   db:

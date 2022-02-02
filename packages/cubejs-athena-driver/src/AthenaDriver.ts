@@ -51,7 +51,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
-      region: process.env.CUBEJS_AWS_REGION,
+      region: config.region || process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
       workGroup: config.workGroup || process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
       ...config,
