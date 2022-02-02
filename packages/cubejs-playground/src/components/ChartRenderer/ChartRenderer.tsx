@@ -102,7 +102,7 @@ export default function ChartRenderer({
   const { cubejsApi } = useContext(CubeContext);
   const [containerSize, setContainerSize] = useState('auto');
 
-  useWindowSize(); // triggers useEffect() on window size change
+  useWindowSize(); // triggers the following useEffect() on window size change
 
   useEffect(() => {
     if (iframeRef?.current) {
