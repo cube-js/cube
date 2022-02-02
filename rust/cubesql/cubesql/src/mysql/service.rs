@@ -440,12 +440,21 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         debug!("on_execute: {}", query);
 
         let mut state = self.statements.write().await;
-        state.id = state.id + 1;
+        if state.statements.len() > self.server.configuration.connection_max_prepared_statements {
+            let message = format!(
+                "Unable to allocate new prepared statement, max allocation reached, actual: {}, max: {}",
+                state.statements.len(),
+                self.server.configuration.connection_max_prepared_statements
+            );
+            info.error(ErrorKind::ER_INTERNAL_ERROR, message.as_bytes())
+        } else {
+            state.id = state.id + 1;
 
-        let next_id = state.id;
-        state.statements.insert(next_id, query.to_string());
+            let next_id = state.id;
+            state.statements.insert(next_id, query.to_string());
 
-        info.reply(state.id, &[], &[])
+            info.reply(state.id, &[], &[])
+        }
     }
 
     async fn on_execute<'a>(
@@ -525,7 +534,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     {
         Ok(self
             .server
-            .get_nonce()
+            .nonce
+            .clone()
             .unwrap_or_else(|| (0..20).map(|_| rand::random::<u8>()).collect()))
     }
 
@@ -535,6 +545,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
+        debug!("on_init: {}", database);
+
         self.props.set_database(Some(database.to_string()));
 
         writter.ok()?;
