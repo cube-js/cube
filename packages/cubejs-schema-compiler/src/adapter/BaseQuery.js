@@ -1557,6 +1557,12 @@ class BaseQuery {
     return this.evaluateSymbolSqlWithContext(fn, { cubeAliasPrefix });
   }
 
+  /**
+   * Evaluate escaped SQL-alias for cube or cube's property
+   * (measure, dimention).
+   * @param {string} cubeName
+   * @returns string
+   */
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
     return this.escapeColumnName(
