@@ -18,8 +18,8 @@ services:
     links:
       - db
     volumes:
+      - ./postgresql:/cube/conf
       - ./postgresql/single/cube.js:/cube/conf/cube.js
-      - ./postgresql/schema:/cube/conf/schema
     ports:
       - "4000:4000"
     restart: always
