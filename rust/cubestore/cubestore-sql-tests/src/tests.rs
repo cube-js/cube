@@ -30,6 +30,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("insert", insert),
         t("select_test", select_test),
         t("negative_numbers", negative_numbers),
+        t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
@@ -254,6 +255,33 @@ async fn negative_numbers(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
+}
+
+async fn negative_decimal(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.values (decimal_value decimal)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.values (decimal_value) VALUES (-0.12345)")
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * from foo.values")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        match &result.get_rows()[0].values()[0] {
+            TableValue::Decimal(d) => d.to_string(5),
+            x => panic!("Expected decimal but found: {:?}", x),
+        },
+        "-0.12345"
+    );
 }
 
 async fn custom_types(service: Box<dyn SqlClient>) {
