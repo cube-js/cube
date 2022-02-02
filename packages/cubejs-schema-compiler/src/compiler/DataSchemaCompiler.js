@@ -6,6 +6,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
+import { AbstractExtension } from '../extensions';
 
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
@@ -182,7 +183,7 @@ export class DataSchemaCompiler {
         },
         require: (extensionName) => {
           if (this.extensions[extensionName]) {
-            return new (this.extensions[extensionName])(this.cubeFactory, this);
+            return new (this.extensions[extensionName])(this.cubeFactory, this, cubes);
           } else {
             const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
             if (!foundFile && this.allowNodeRequire) {
@@ -190,7 +191,14 @@ export class DataSchemaCompiler {
                 extensionName = path.resolve(this.repository.localPath(), extensionName);
               }
               // eslint-disable-next-line global-require,import/no-dynamic-require
-              return require(extensionName);
+              const Extension = require(extensionName);
+              if (Object.getPrototypeOf(Extension) === AbstractExtension) {
+                return new Extension(this.cubeFactory, this, cubes);
+              }
+              if (Object.getPrototypeOf(Extension).name === 'AbstractExtension') {
+                throw new UserError(`${extensionName} has version mismatch with @cubejs-backend/schema-compiler. Please upgrade all dependencies to the latest version.`);
+              }
+              return Extension;
             }
             this.compileFile(
               foundFile,
