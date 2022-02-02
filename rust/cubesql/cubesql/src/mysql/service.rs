@@ -20,14 +20,10 @@ use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
-use crate::compile::convert_statement_to_cube_query;
-use crate::compile::parser::parse_sql_to_statement;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::transport::TransportService;
-use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
-use sqlparser::ast;
 
 use super::dataframe;
 use super::server_manager::ServerManager;
@@ -274,98 +270,6 @@ impl Connection {
                     )
                 ),)
             )
-        } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
-            let stmt = parse_sql_to_statement(&query)?;
-            match stmt {
-                ast::Statement::ExplainTable { table_name, .. } => {
-                    let table_name_filter = if table_name.0.len() == 2 {
-                        &table_name.0[1].value
-                    } else {
-                        &table_name.0[0].value
-                    };
-
-                    let ctx = self.server.transport
-                        .meta(&self.auth_context()?)
-                        .await?;
-
-                    if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
-                        let rows = cube.get_columns().iter().map(|column| dataframe::Row::new(
-                            vec![
-                                dataframe::TableValue::String(column.get_name().clone()),
-                                dataframe::TableValue::String(column.get_column_type().clone()),
-                                dataframe::TableValue::String(if column.mysql_can_be_null() { "Yes".to_string() } else { "No".to_string() }),
-                                dataframe::TableValue::String("".to_string()),
-                                dataframe::TableValue::Null,
-                                dataframe::TableValue::String("".to_string()),
-                            ]
-                        )).collect();
-
-
-                        return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                            vec![
-                                dataframe::Column::new(
-                                    "Field".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Type".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Null".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Key".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Default".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Extra".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                )
-                            ],
-                            rows
-                        ))))
-                    } else {
-                        return Err(CubeError::internal("Unknown table".to_string()))
-                    }
-                },
-                ast::Statement::Explain { statement, .. } => {
-                    let ctx = self.server.transport
-                        .meta(&self.auth_context()?)
-                    .await?;
-
-                    let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), self.state.clone())?;
-
-                    return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                        vec![
-                            dataframe::Column::new(
-                                "Execution Plan".to_string(),
-                                ColumnType::MYSQL_TYPE_STRING,
-                                ColumnFlags::empty(),
-                            ),
-                        ],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String(
-                                plan.print(true)?
-                            )
-                        ])]
-                    ))))
-                },
-                _ => {
-                    return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
-                }
-            }
         } else if !ignore {
             trace!("query was not detected");
 
