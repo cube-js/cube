@@ -460,7 +460,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     async fn on_execute<'a>(
         &'a mut self,
         id: u32,
-        _params: ParamParser<'a>,
+        params_parser: ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
         debug!("on_execute: {}", id);
@@ -475,6 +475,16 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         } else {
             possible_statement.unwrap()
         };
+
+        let params_iter: Params = params_parser.into_iter();
+
+        for _ in params_iter {
+            // @todo Support params injection to query with escaping.
+            return results.error(
+                ErrorKind::ER_UNSUPPORTED_PS,
+                b"Execution of prepared statement with parameters is not supported",
+            );
+        }
 
         self.handle_query(statement.as_str(), results).await
     }
