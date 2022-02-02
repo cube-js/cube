@@ -100,8 +100,9 @@ export default function ChartRenderer({
   onRunButtonClick,
 }: ChartRendererProps) {
   const { cubejsApi } = useContext(CubeContext);
-  const windowSize = useWindowSize();
   const [containerSize, setContainerSize] = useState('auto');
+
+  useWindowSize(); // triggers useEffect() on window size change
 
   useEffect(() => {
     if (iframeRef?.current) {
@@ -110,7 +111,7 @@ export default function ChartRenderer({
 
       setContainerSize(`${height}px`);
     }
-  }, [windowSize, iframeRef?.current]);
+  }); // no deps, it's better to re-check position on every render
 
   const {
     isChartRendererReady,
