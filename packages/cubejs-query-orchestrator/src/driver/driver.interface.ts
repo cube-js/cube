@@ -115,4 +115,6 @@ export interface DriverInterface {
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
+  // Shutdown the driver
+  release(): Promise<void>
 }

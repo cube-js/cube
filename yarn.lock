@@ -2836,6 +2836,61 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
+"@cubejs-backend/query-orchestrator@^0.29.24":
+  version "0.29.24"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.29.24.tgz#33809485b092503e7d7ff29878d1952890e29396"
+  integrity sha512-MFlKnuWJG9s78tiKxKSNJ2OrZzeYIXmzoNUyQvoSWJUQt7Q2R/YH39VjzT7weq/j8gGIIkITeTpb/bGmIaZHew==
+  dependencies:
+    "@cubejs-backend/shared" "^0.29.23"
+    generic-pool "^3.7.1"
+    ioredis "^4.27.8"
+    lru-cache "^6.0.0"
+    moment-range "^4.0.2"
+    moment-timezone "^0.5.33"
+    ramda "^0.27.0"
+    redis "^3.0.2"
+
+"@cubejs-backend/schema-compiler@^0.29.24":
+  version "0.29.24"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/schema-compiler/-/schema-compiler-0.29.24.tgz#ad7c862190c7e02d44d7da996d2c1f00097e6627"
+  integrity sha512-2h1pspzK/NQXPgZxWZ1h55Q4ebQsnt2FHg+u8L/a0rTtkw0y4Qr3C54HtbZWKOfB7ZB1tva9WFMQk0LhMLnZrQ==
+  dependencies:
+    "@babel/code-frame" "^7.12.11"
+    "@babel/core" "^7.12.10"
+    "@babel/generator" "^7.12.10"
+    "@babel/parser" "^7.12.10"
+    "@babel/preset-env" "^7.12.10"
+    "@babel/standalone" "^7.12.10"
+    "@babel/traverse" "^7.12.10"
+    "@babel/types" "^7.12.12"
+    "@cubejs-backend/shared" "^0.29.23"
+    "@hapi/joi" "^17.1.1"
+    antlr4ts "0.5.0-alpha.4"
+    camelcase "^6.2.0"
+    cron-parser "^3.5.0"
+    humps "^2.0.1"
+    inflection "^1.12.0"
+    lru-cache "^5.1.1"
+    moment-range "^4.0.1"
+    moment-timezone "^0.5.33"
+    node-dijkstra "^2.5.0"
+    ramda "^0.27.0"
+    syntax-error "^1.3.0"
+
+"@cubejs-backend/testing@^0.29.24":
+  version "0.29.24"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/testing/-/testing-0.29.24.tgz#4e6e370aeb69cdd37b8e16149cb17cbb9fcb8e46"
+  integrity sha512-IlPkUO/xkFsO2++BAT7KsPI01TYfdHNSHuROKjgkuHU/SeYO/tR+IsHwJLqTKd/wpkv7/H2iXSjC23fnR2PsEA==
+  dependencies:
+    "@cubejs-backend/query-orchestrator" "^0.29.24"
+    "@cubejs-backend/schema-compiler" "^0.29.24"
+    "@cubejs-backend/shared" "^0.29.23"
+    "@cubejs-client/ws-transport" "^0.29.23"
+    fs-extra "^8.1.0"
+    http-proxy "^1.18.1"
+    node-fetch "^2.6.1"
+    testcontainers "^7.5.0"
+
 "@cubejs-infra/node-pre-gyp-github@^1.0.3":
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/@cubejs-infra/node-pre-gyp-github/-/node-pre-gyp-github-1.0.3.tgz#5385b5f3ed4225b3e3664db8a4be37883fce0362"
@@ -6360,6 +6415,11 @@
   version "8.3.3"
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.3.tgz#c6a60686d953dbd1b1d45e66f4ecdbd5d471b4d0"
   integrity sha512-0LbEEx1zxrYB3pgpd1M5lEhLcXjKJnYghvhTRgaBeUivLHMDM1TzF3IJ6hXU2+8uA4Xz+5BA63mtZo5DjVT8iA==
+
+"@types/uuid@^8.3.4":
+  version "8.3.4"
+  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.4.tgz#bd86a43617df0594787d38b735f55c805becf1bc"
+  integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
 "@types/webpack-dev-server@^3.11.0":
   version "3.11.6"

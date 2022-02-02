@@ -9,7 +9,7 @@ on:
       - '.prettierrc'
       - 'lerna.json'
       - 'package.json'
-      - 'rollup.config.js'
+      - 'rollup.config.ts'
       - 'yarn.lock'
       - 'docs-gen/**'
       - 'docs/**'

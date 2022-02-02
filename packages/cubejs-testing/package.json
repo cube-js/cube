@@ -47,6 +47,8 @@
     "@cubejs-backend/schema-compiler": "^0.29.23",
     "@cubejs-backend/shared": "^0.29.23",
     "@cubejs-client/ws-transport": "^0.29.23",
+    "@types/dedent": "^0.7.0",
+    "@types/uuid": "^8.3.4",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
