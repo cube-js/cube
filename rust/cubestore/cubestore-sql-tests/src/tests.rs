@@ -55,6 +55,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("date_trunc", date_trunc),
         t("coalesce", coalesce),
         t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
@@ -1142,6 +1143,56 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
             TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
             TableValue::Int(3)
         ])]
+    );
+}
+
+async fn date_trunc(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.timestamps (t) VALUES \
+            ('2020-01-01T00:00:00.000Z'), \
+            ('2020-03-01T00:00:00.000Z'), \
+            ('2020-04-01T00:00:00.000Z'), \
+            ('2020-07-01T00:00:00.000Z'), \
+            ('2020-09-01T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "SELECT date_trunc('quarter', `t`) `quarter` \
+            FROM foo.timestamps `timestamp`",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1585699200000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),])
+        ]
     );
 }
 
