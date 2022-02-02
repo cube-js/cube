@@ -18,14 +18,14 @@ describe('BigQueryDriver', () => {
   });
 
   test('query', async () => {
-    tests.testQuery();
+    await tests.testQuery();
   });
 
   test('stream', async () => {
-    tests.testStream();
+    await tests.testStream();
   });
 
   test('unload', async () => {
-    tests.testUnload();
+    await tests.testUnload();
   });
 });

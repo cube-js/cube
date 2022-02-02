@@ -18,6 +18,10 @@ describe('AthenaDriver', () => {
   });
 
   test('query', async () => {
-    tests.testQuery();
+    await tests.testQuery();
+  });
+
+  test('stream', async () => {
+    await tests.testStream();
   });
 });

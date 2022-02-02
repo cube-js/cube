@@ -25,11 +25,15 @@ export class DriverTests {
   }
 
   public readonly QUERY = `
-    SELECT 1 AS id, 100 AS amount, 'new' AS status
-    UNION ALL
-    SELECT 2 AS id, 200 AS amount, 'new' AS status
-    UNION ALL
-    SELECT 3 AS id, 400 AS amount, 'processed' AS status
+    SELECT id, amount, status
+    FROM (
+      SELECT 1 AS id, 100 AS amount, 'new' AS status
+      UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'new' AS status
+      UNION ALL
+      SELECT 3 AS id, 400 AS amount, 'processed' AS status
+    )
+    ORDER BY 1
   `;
 
   public async testQuery() {
@@ -44,6 +48,7 @@ export class DriverTests {
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
     const tableData = await this.driver.stream!(this.QUERY, [], { highWaterMark: 100 });
+    expect(tableData.types).toEqual(123);
     expect(await streamToArray(tableData.rowStream)).toEqual([
       { id: 1, amount: 100, status: 'new' },
       { id: 2, amount: 200, status: 'new' },
