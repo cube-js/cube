@@ -29,10 +29,6 @@ impl SystemVar {
             ScalarValue::Utf8(Some("UTC".to_string())),
         );
         variables.insert(
-            "@@globaltime_zone".to_string(),
-            ScalarValue::Utf8(Some("SYSTEM".to_string())),
-        );
-        variables.insert(
             "@@time_zone".to_string(),
             ScalarValue::Utf8(Some("SYSTEM".to_string())),
         );
@@ -127,8 +123,18 @@ impl SystemVar {
 
 impl VarProvider for SystemVar {
     /// get system variable value
-    fn get_value(&self, var_names: Vec<String>) -> Result<ScalarValue> {
-        let key = var_names.concat().to_lowercase();
+    fn get_value(&self, identifier: Vec<String>) -> Result<ScalarValue> {
+        let key = if identifier.len() > 1 {
+            let ignore_first = identifier[0].to_ascii_lowercase() == "@@global".to_owned();
+
+            if ignore_first {
+                "@@".to_string() + &identifier[1..].concat()
+            } else {
+                identifier.concat()
+            }
+        } else {
+            identifier.concat()
+        };
 
         if let Some(value) = self.variables.get(&key) {
             Ok(value.clone())

@@ -4,8 +4,8 @@ pub mod processing_loop;
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
-use crate::schema::{SchemaService, SchemaServiceDefaultImpl};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
+use crate::transport::{HttpTransport, TransportService};
 use crate::CubeError;
 use futures::future::join_all;
 use log::error;
@@ -184,9 +184,7 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn SchemaService, _, _, _>(async move |_| {
-                Arc::new(SchemaServiceDefaultImpl)
-            })
+            .register_typed::<dyn TransportService, _, _, _>(async move |_| Arc::new(HttpTransport))
             .await;
 
         if self.config_obj.bind_address().is_some() {

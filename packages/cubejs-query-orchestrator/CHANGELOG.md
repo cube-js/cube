@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
+
+
+### Bug Fixes
+
+* Correct error message on missing partitions ([e953296](https://github.com/cube-js/cube.js/commit/e953296ff4258023a601ea5d5ab91dc8cda4ff14))
+* Remove orphaned tables on error while pre-aggregation creation ([#3996](https://github.com/cube-js/cube.js/issues/3996)) ([0548435](https://github.com/cube-js/cube.js/commit/054843533b2421d87874fa25adf3a94892f24bd4))
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+
+### Bug Fixes
+
+* Cannot read property ‘last_updated_at’ of undefined ([#3980](https://github.com/cube-js/cube.js/issues/3980)) ([74d75e7](https://github.com/cube-js/cube.js/commit/74d75e743eb0549eea443e84d7278e7b8f78e6af))
+
+
+
+
+
 ## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
 
 
