@@ -36,6 +36,17 @@ export async function executeCommand(
   });
 }
 
+export function assertNonNullable<T>(name: string, x: T): asserts x is NonNullable<T> {
+  if (x === undefined || x === null) {
+    throw new Error(`${name} is not defined.`);
+  }
+}
+
+export function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
+  assertNonNullable(name, x);
+  return x!;
+}
+
 export async function streamToArray<T>(xstream: stream.Readable): Promise<T[]> {
   const result: T[] = [];
   for await (const x of xstream) {
