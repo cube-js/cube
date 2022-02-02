@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use cubesql::{
     di_service,
-    mysql::{AuthContext, SqlAuthService},
+    mysql::{AuthContext, AuthenticateResponse, SqlAuthService},
     CubeError,
 };
 use log::trace;
@@ -46,7 +46,7 @@ struct CheckAuthResponse {
 
 #[async_trait]
 impl SqlAuthService for NodeBridgeAuthService {
-    async fn authenticate(&self, user: Option<String>) -> Result<AuthContext, CubeError> {
+    async fn authenticate(&self, user: Option<String>) -> Result<AuthenticateResponse, CubeError> {
         trace!("[auth] Request ->");
 
         let request_id = Uuid::new_v4().to_string();
@@ -65,11 +65,13 @@ impl SqlAuthService for NodeBridgeAuthService {
         .await?;
         trace!("[auth] Request <- {:?}", response);
 
-        Ok(AuthContext {
-            password: response.password,
-            access_token: user.unwrap_or_else(|| "fake".to_string()),
-            base_path: "fake".to_string(),
-        })
+        Ok(AuthenticateResponse::new(
+            AuthContext {
+                access_token: user.unwrap_or_else(|| "fake".to_string()),
+                base_path: "fake".to_string(),
+            },
+            response.password,
+        ))
     }
 }
 
