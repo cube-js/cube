@@ -1,16 +1,20 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { DriverInterface, PreAggregations } from "@cubejs-backend/query-orchestrator";
-import {downloadAndGunzip, streamToArray} from "@cubejs-backend/shared";
-import { v4 } from "uuid";
-import fetch from "node-fetch";
-import { gunzipSync } from "zlib";
-import dedent from "dedent";
-import dotenv from "@cubejs-backend/dotenv";
+import { DriverInterface, PreAggregations } from '@cubejs-backend/query-orchestrator';
+import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
+import { v4 } from 'uuid';
+import dedent from 'dedent';
+import dotenv from '@cubejs-backend/dotenv';
+
+export interface DriverTestsOptions {
+  // Athena driver treats all fields as strings.
+  expectStringFields?: boolean
+}
 
 export class DriverTests {
   public constructor(
-    private readonly driver: DriverInterface
+    private readonly driver: DriverInterface,
+    private readonly options: DriverTestsOptions = {}
   ) {
   }
 
@@ -36,23 +40,31 @@ export class DriverTests {
     ORDER BY 1
   `;
 
+  public readonly ROWS = [
+    { id: 1, amount: 100, status: 'new' },
+    { id: 2, amount: 200, status: 'new' },
+    { id: 3, amount: 400, status: 'processed' },
+  ];
+
   public async testQuery() {
-    const data = await this.driver.query(this.QUERY, []);
-    expect(data).toEqual([
-      { id: 1, amount: 100, status: 'new' },
-      { id: 2, amount: 200, status: 'new' },
-      { id: 3, amount: 400, status: 'processed' },
-    ]);
+    console.log('qqq', this.options)
+    const rows = await this.driver.query(this.QUERY, []);
+    if (this.options.expectStringFields) {
+      expect(rows).toEqual(this.rowsToString(this.ROWS));
+    } else {
+      expect(rows).toEqual(this.ROWS);
+    }
   }
 
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
     const tableData = await this.driver.stream!(this.QUERY, [], { highWaterMark: 100 });
-    expect(await streamToArray(tableData.rowStream)).toEqual([
-      { id: 1, amount: 100, status: 'new' },
-      { id: 2, amount: 200, status: 'new' },
-      { id: 3, amount: 400, status: 'processed' },
-    ]);
+    const rows = await streamToArray(tableData.rowStream);
+    if (this.options.expectStringFields) {
+      expect(rows).toEqual(this.rowsToString(this.ROWS));
+    } else {
+      expect(rows).toEqual(this.ROWS);
+    }
   }
 
   public async testUnload() {
@@ -87,5 +99,13 @@ export class DriverTests {
       new,300
       processed,400
     `);
+  }
+
+  private rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
+    const result: Record<string, string>[] = [];
+    for (const row of rows) {
+      result.push(row.map((x: any) => x.toString()));
+    }
+    return result;
   }
 }

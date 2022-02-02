@@ -10,7 +10,10 @@ describe('AthenaDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    tests = new DriverTests(new AthenaDriver({}));
+    tests = new DriverTests(
+      new AthenaDriver({}),
+      { expectStringFields: true }
+    );
   });
 
   afterAll(async () => {

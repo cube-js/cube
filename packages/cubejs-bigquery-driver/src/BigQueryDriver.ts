@@ -200,8 +200,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     params: any,
     options: any
   ): Promise<any> {
-    console.log('ttt', preAggregationTableName, loadSql, params, options);
-
     const [dataSet, tableName] = preAggregationTableName.split('.');
 
     const bigQueryQuery: Query = {
