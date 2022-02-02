@@ -12,7 +12,10 @@
     "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "scripts": {
-    "lint": "eslint src/index.d.ts"
+    "test": "yarn integration",
+    "integration": "jest --verbose dist/test",
+    "lint": "eslint src/index.d.ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "main": "src/AthenaDriver.ts",
   "types": "src/index.d.ts",
@@ -23,7 +26,8 @@
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.29.23"
+    "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-backend/testing": "^0.29.24"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
