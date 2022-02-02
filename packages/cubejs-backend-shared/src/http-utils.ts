@@ -110,7 +110,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   bar.stop();
 }
 
-export async function downloadAndExtract(url: string): Promise<string> {
+export async function downloadAndGunzip(url: string): Promise<string> {
   const response = await fetch(url);
   const gz = await response.arrayBuffer();
   const buffer = await gunzipSync(gz);

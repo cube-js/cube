@@ -1,7 +1,7 @@
 import * as AWS from '@aws-sdk/client-athena';
 import * as stream from 'stream';
 import { BaseDriver, DriverInterface, QueryOptions, StreamTableData } from '@cubejs-backend/query-orchestrator';
-import { assertNonNullable, checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 

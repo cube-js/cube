@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
 import { DriverInterface, PreAggregations } from "@cubejs-backend/query-orchestrator";
-import { streamToArray } from "@cubejs-backend/shared";
+import {downloadAndGunzip, streamToArray} from "@cubejs-backend/shared";
 import { v4 } from "uuid";
 import fetch from "node-fetch";
 import { gunzipSync } from "zlib";
@@ -48,7 +48,6 @@ export class DriverTests {
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
     const tableData = await this.driver.stream!(this.QUERY, [], { highWaterMark: 100 });
-    expect(tableData.types).toEqual(123);
     expect(await streamToArray(tableData.rowStream)).toEqual([
       { id: 1, amount: 100, status: 'new' },
       { id: 2, amount: 200, status: 'new' },
@@ -82,10 +81,7 @@ export class DriverTests {
     );
     const data = await this.driver.unload!(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
-    const response = await fetch(data.csvFile[0]);
-    const gz = await response.arrayBuffer();
-    const bytes = await gunzipSync(gz);
-    const string = bytes.toString();
+    const string = await downloadAndGunzip(data.csvFile[0]);
     expect(string.trim()).toEqual(dedent`
       orders__status,orders__amount
       new,300
