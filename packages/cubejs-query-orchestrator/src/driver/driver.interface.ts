@@ -1,4 +1,5 @@
 /* eslint-disable max-len */
+import stream from 'stream';
 
 export type GenericDataBaseType = string;
 
@@ -33,7 +34,8 @@ export interface DownloadTableCSVData extends DownloadTableBase {
 }
 
 export interface StreamTableData extends DownloadTableBase {
-  rowStream: NodeJS.ReadableStream;
+  // rowStream: NodeJS.ReadableStream;
+  rowStream: stream.Readable
   /**
    * Some drivers know types of response
    */
@@ -113,4 +115,6 @@ export interface DriverInterface {
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
+  // Shutdown the driver
+  release(): Promise<void>
 }

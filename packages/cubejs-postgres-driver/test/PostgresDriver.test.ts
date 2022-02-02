@@ -1,10 +1,9 @@
 import { PostgresDBRunner } from '@cubejs-backend/testing';
-
+import { streamToArray } from "@cubejs-backend/shared";
 import { StartedTestContainer } from 'testcontainers';
+import stream from 'stream';
 
 import { PostgresDriver } from '../src';
-
-const streamToArray = require('stream-to-array');
 
 describe('PostgresDriver', () => {
   let container: StartedTestContainer;

@@ -14,3 +14,19 @@ Internal package for testing.
 ### License
 
 Cube.js Client Core is [MIT licensed](./LICENSE).
+
+### Convert Postgres dump into csv
+
+$ yarn dataset:minimal
+$ psql template1 -c 'drop database test;'  
+$ psql template1 -c 'create database test with owner test;'
+$ psql -U test -d test -f birdbox-fixtures/datasets/test.sql
+$ psql -U test -d test -c "\copy (SELECT * FROM public.events) to 'github-events-2015-01-01.csv' with csv header"
+
+### Setup BQ data
+
+```shell
+$ gsutil cp github-events-2015-01-01.csv gs://cube-cloud-staging-export-bucket/test/github-events-2015-01-01.csv
+$ bq mk public
+$ bq load --autodetect --source_format=CSV public.events gs://cube-cloud-staging-export-bucket/test/github-events-2015-01-01.csv
+```
