@@ -16,6 +16,7 @@ describe('SQL Generation', () => {
             every: '10 minute',
           },
         `,
+        alias: 't1',
       })
     );
 
@@ -604,6 +605,8 @@ describe('Class unit tests', () => {
       expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
       expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('camel_case_cube__description');
       expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('camel_case_cube__grant_total');
+      
+      // aliasName for pre-agg
       expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('camel_case_cube');
       expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('camel_case_cube_id');
       expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('camel_case_cube_description');
@@ -650,6 +653,8 @@ describe('Class unit tests', () => {
       expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('t1__id');
       expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('t1__description');
       expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('t1__grant_total');
+      
+      // aliasName for pre-agg
       expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('t1');
       expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('t1_id');
       expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('t1_description');
@@ -657,7 +662,6 @@ describe('Class unit tests', () => {
 
       // cubeAlias
       expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"t1"');
-      expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"t1__id"');
       expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"t1__id"');
       expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
       expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
