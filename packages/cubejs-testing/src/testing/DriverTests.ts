@@ -20,7 +20,7 @@ export class DriverTests {
     }
   }
 
-  public async release() {
+  public release(): Promise<void> {
     return this.driver.release();
   }
 
