@@ -20,8 +20,8 @@ export class DriverTests {
     }
   }
 
-  public release() {
-    this.driver.release();
+  public async release() {
+    return this.driver.release();
   }
 
   public readonly QUERY = `
