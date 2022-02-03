@@ -617,7 +617,11 @@ class BaseQuery {
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
-                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${this.aliasName(keyCubeName)}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+                ([keyCubeName, measures]) => this
+                  .withCubeAliasPrefix(
+                    `${this.aliasName(keyCubeName)}_key`,
+                    () => this.aggregateSubQuery(keyCubeName, measures)
+                  )
               )
             )(multipliedMeasures)
           ).concat(
