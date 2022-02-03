@@ -1,41 +1,16 @@
 import R from 'ramda';
 import { UserError } from '../UserError';
-import { QUERY_TYPE } from '../query';
 import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
-
-/**
- * User's query decorated by ./../query.js:normalizeQuery().
- * TODO: Provide type definition.
- */
-type NormalizedQuery = any;
+import NormalizedQuery from '../type/NormalizedQuery';
+import QueryType from '../enum/QueryType';
+import ResultType from '../enum/ResultType';
 
 /**
  * SQL aliases to cube properties hash map.
  */
 type AliasToMemberMap = { [alias: string]: string };
 
-export
-/**
- * String that represent query type.
- */
-enum QueryType {
-  REGULAR_QUERY = 'regularQuery',
-  COMPARE_DATE_RANGE_QUERY = 'compareDateRangeQuery',
-  BLENDING_QUERY = 'blendingQuery',
-}
-
-export
-/**
- * String that represent required dataset format.
- */
-enum ResultType {
-  DEFAULT = 'default',
-  COMPACT = 'compact',
-  ARROW = 'arrow'
-}
-
-export
 /**
  * Transforms queried data set to the output network format.
  */
@@ -51,7 +26,6 @@ function transformData(
     let row;
     if (resType === ResultType.COMPACT) {
       row = R.pipe(
-        // @ts-ignore
         R.toPairs,
         R.map(p => {
           const memberName = aliasToMemberNameMap[p[0]];
@@ -61,7 +35,6 @@ function transformData(
       )(r);
     } else {
       row = R.pipe(
-        // @ts-ignore
         R.toPairs,
         R.map(p => {
           const memberName = aliasToMemberNameMap[p[0]];
@@ -110,12 +83,12 @@ function transformData(
       const [{ dimension, granularity, dateRange } = {}]
         = query.timeDimensions;
     
-      if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+      if (queryType === QueryType.COMPARE_DATE_RANGE_QUERY) {
         return {
           ...row,
           compareDateRange: dateRange.join(' - ')
         };
-      } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+      } else if (queryType === QueryType.BLENDING_QUERY) {
         return {
           ...row,
           [['time', granularity].join('.')]:
@@ -126,3 +99,5 @@ function transformData(
     return row;
   });
 }
+
+export default transformData;

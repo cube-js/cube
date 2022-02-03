@@ -46,7 +46,8 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
-import { ResultType, transformData } from './helpers/transformData';
+import ResultType from './enum/ResultType';
+import transformData from './helpers/transformData';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -587,7 +588,14 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
+      queries.map(
+        async (currentQuery) => validatePostRewrite(
+          await this.queryRewrite(
+            normalizeQuery(currentQuery),
+            context
+          )
+        )
+      )
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {

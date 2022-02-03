@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './toConfigMap';
+import MemberType from '../enum/MemberType';
 
 export
 
@@ -24,7 +25,7 @@ export
  */
 const annotation = (
   configMap: MetaConfigMap,
-  memberType: 'measures' | 'dimensions' | 'segments'
+  memberType: MemberType,
 ) => (member: string): undefined | [string, ConfigItem] => {
   const [cubeName, fieldName] = member.split('.');
   const memberWithoutGranularity = [cubeName, fieldName].join('.');
@@ -41,7 +42,7 @@ const annotation = (
     type: config.type,
     format: config.format,
     meta: config.meta,
-    ...(memberType === 'measures' ? {
+    ...(memberType === MemberType.MEASURES ? {
       drillMembers: config.drillMembers,
       drillMembersGrouped: config.drillMembersGrouped
     } : {})
@@ -59,17 +60,17 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
   return {
     measures: R.fromPairs(
       (query.measures || []).map(
-        annotation(configMap, 'measures')
+        annotation(configMap, MemberType.MEASURES)
       ).filter(a => !!a)
     ),
     dimensions: R.fromPairs(
       dimensions
-        .map(annotation(configMap, 'dimensions'))
+        .map(annotation(configMap, MemberType.DIMENSIONS))
         .filter(a => !!a)
     ),
     segments: R.fromPairs(
       (query.segments || [])
-        .map(annotation(configMap, 'segments'))
+        .map(annotation(configMap, MemberType.SEGMENTS))
         .filter(a => !!a)
     ),
     timeDimensions: R.fromPairs(
@@ -80,7 +81,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
             td => [
               annotation(
                 configMap,
-                'dimensions'
+                MemberType.DIMENSIONS
               )(
                 `${td.dimension}.${td.granularity}`
               )
@@ -89,7 +90,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               // referencing time dimensions without granularity
               dimensions.indexOf(td.dimension) === -1
                 ? [
-                  annotation(configMap, 'dimensions')(td.dimension)
+                  annotation(configMap, MemberType.DIMENSIONS)(td.dimension)
                 ]
                 : []
             ).filter(a => !!a)

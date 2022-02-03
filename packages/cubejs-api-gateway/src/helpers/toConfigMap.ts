@@ -1,7 +1,5 @@
 import R from 'ramda';
 
-export
-
 /**
  * MetaConfig type.
  */
@@ -12,8 +10,6 @@ type MetaConfig = {
   }
 };
 
-export
-
 /**
  * MetaConfig Map type.
  */
@@ -23,8 +19,6 @@ type MetaConfigMap = {
     title: string,
   },
 };
-
-export
 
 /**
  * Convert cpecified array of MetaConfig objects to the
@@ -38,3 +32,10 @@ function toConfigMap(metaConfig: MetaConfig[]): MetaConfigMap {
     )
   );
 }
+
+export default toConfigMap;
+export {
+  MetaConfig,
+  MetaConfigMap,
+  toConfigMap,
+};

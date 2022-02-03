@@ -4,12 +4,10 @@ import Joi from '@hapi/joi';
 
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
+import Query from './type/Query';
+import QueryType from './enum/QueryType';
 
-export const QUERY_TYPE = {
-  REGULAR_QUERY: 'regularQuery',
-  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
-  BLENDING_QUERY: 'blendingQuery',
-};
+export const QUERY_TYPE = QueryType;
 
 export const getQueryGranularity = (queries) => R.pipe(
   R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
@@ -159,6 +157,12 @@ export const validatePostRewrite = (query) => {
   return query;
 };
 
+/**
+ * Normalize incoming network query.
+ * @param {Query} query
+ * @throws {UserError}
+ * @returns
+ */
 export const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
   if (error) {
