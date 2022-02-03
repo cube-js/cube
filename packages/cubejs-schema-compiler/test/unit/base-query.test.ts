@@ -16,7 +16,6 @@ describe('SQL Generation', () => {
             every: '10 minute',
           },
         `,
-        alias: 't1',
       })
     );
 
@@ -665,6 +664,98 @@ describe('Class unit tests', () => {
       expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"t1__id"');
       expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
       expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
+    });
+
+    it('Test BaseQuery with the join', async () => {
+      const comp = /** @type Compilers */ prepareCompiler(`
+        cube('LeftCube', {
+          sql: 'SELECT * FROM LEFT_TABLE',
+          sqlAlias: 'left',
+          measures: {
+            total_sum: {
+              format: 'currency',
+              sql: 'total',
+              type: 'sum'
+            },
+          },
+          dimensions: {
+            id: {
+              format: 'id',
+              primaryKey: true,
+              shown: true,
+              sql: 'id',
+              type: 'number'
+            },
+            description: {
+              sql: 'description',
+              type: 'string'
+            },
+          }
+        });
+
+        cube('RightCube', {
+          sql: 'SELECT * FROM RIGHT_TABLE',
+          sqlAlias: 'right',
+          measures: {
+            total_sum: {
+              format: 'currency',
+              sql: 'total',
+              type: 'sum'
+            },
+          },
+          dimensions: {
+            id: {
+              format: 'id',
+              primaryKey: true,
+              shown: true,
+              sql: 'id',
+              type: 'number'
+            },
+            description: {
+              sql: 'description',
+              type: 'string'
+            },
+          }
+        })
+
+        cube('MidCube', {
+          sql: 'SELECT * FROM MID_TABLE',
+          joins: {
+            LeftCube: {
+              relationship: 'hasMany',
+              sql: \`\${MidCube}.left_id = \${LeftCube}.id\`,
+            },
+            RightCube: {
+              relationship: 'hasMany',
+              sql: \`\${MidCube}.right_id = \${RightCube}.id\`,
+            },
+          },
+          dimensions: {
+            id: {
+              format: 'id',
+              primaryKey: true,
+              shown: true,
+              sql: 'id',
+              type: 'number'
+            },
+          }
+        })
+      `);
+      await comp.compiler.compile();
+      const query = new BaseQuery(comp, {
+        dimensions: [
+          'MidCube.id',
+          'LeftCube.description',
+        ],
+        measures: [
+          'RightCube.total_sum',
+        ]
+      });
+      expect(query.buildSqlAndParams()[0]).toEqual(`SELECT  "keys"."mid_cube__id", "keys"."left__description", sum("right_key__right".total) "right__total_sum" FROM (SELECT DISTINCT "right_key__mid_cube".id "mid_cube__id", "right_key__left".description "left__description", "right_key__right".id "right__id" FROM MID_TABLE AS "right_key__mid_cube"
+LEFT JOIN RIGHT_TABLE AS "right_key__right" ON "right_key__mid_cube".right_id = "right_key__right".id
+LEFT JOIN LEFT_TABLE AS "right_key__left" ON "right_key__mid_cube".left_id = "right_key__left".id ) AS "keys"
+LEFT JOIN RIGHT_TABLE AS "right_key__right" ON "keys"."right__id" = "right_key__right".id
+              GROUP BY 1, 2  ORDER BY 3 DESC LIMIT 10000`);
     });
   });
 });

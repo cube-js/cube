@@ -2,17 +2,19 @@ interface CreateCubeSchemaOptions {
   name: string,
   refreshKey?: string,
   preAggregations?: string,
-  alias?: string,
 }
 
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '', alias = undefined }: CreateCubeSchemaOptions) {
+/**
+ * Returns test cube schema based on incoming parameters.
+ * @param {CreateCubeSchemaOptions} param
+ * @returns {string}
+ */
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }: CreateCubeSchemaOptions) {
   return ` 
     cube('${name}', {
         sql: \`
         select * from cards
         \`,
-
-        ${alias ? '' : `        sqlAlias: '${alias}',`}
         
         ${refreshKey}
    
