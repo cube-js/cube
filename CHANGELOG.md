@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+
+### Bug Fixes
+
+* Out of memory in case of empty table has been used to build partitioned pre-aggregation ([#4021](https://github.com/cube-js/cube.js/issues/4021)) ([314cc3c](https://github.com/cube-js/cube.js/commit/314cc3c3f47d6ba9282a1bb969c2e27bdfb58a57))
+* **@cubejs-bacend/api-gateway:** fix a type issue where queries did not properly support logical and and logical or operators ([#4016](https://github.com/cube-js/cube.js/issues/4016)) Thanks [@rdwoodring](https://github.com/rdwoodring)! ([bb2d230](https://github.com/cube-js/cube.js/commit/bb2d230f0428e58e636dbde1caa5a3c08989f268))
+* **cubestore:** Decimals without integral part are ignoring sign during to_string() ([b02b1a6](https://github.com/cube-js/cube.js/commit/b02b1a6b9ffe101869e22e4e65065f017f929a30))
+
+
+### Features
+
+* **@cubejs-backend/snowflake-driver:** CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY env variable support ([38f4840](https://github.com/cube-js/cube.js/commit/38f484010f56ad44193147188f6993d6d1906ebe))
+* Load metrics from DBT project ([#4000](https://github.com/cube-js/cube.js/issues/4000)) ([2975d84](https://github.com/cube-js/cube.js/commit/2975d84cd2a2d3bba3c31a7744ab5a5fb3789b6e))
+* **cubestore:** Support quarter granularity for date_trunc fn ([#4011](https://github.com/cube-js/cube.js/issues/4011)) ([404482d](https://github.com/cube-js/cube.js/commit/404482def1f6ea7324d329a1943e6c8270518203))
+
+
+
+
+
 ## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
 
 
