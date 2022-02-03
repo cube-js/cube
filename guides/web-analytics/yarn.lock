@@ -4676,15 +4676,14 @@ csstype@^3.0.2:
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.0.2.tgz#ee5ff8f208c8cd613b389f7b222c9801ca62b3f7"
   integrity sha512-ofovWglpqoqbfLNOTBNZLSbMuGrblAf1efvvArGKOZMBrIoJeu5UsAipQolkijtyQx5MtAzT/J9IHj/CEY1mJw==
 
-cubedev-tracking@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.0.0.tgz#6a8bc81f0919970e49b7ab85f5fa876103ddf4d5"
-  integrity sha512-Agvvt/7fYqqRJ6JS6YyNcSh0azXj2KYj5s674/FILLw37e2XtODzEl6WZDt4UHaaTkCL+p0JsleRdBTXyZqfWg==
+cubedev-tracking@^1.0.1:
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.0.7.tgz#7cf7d2a608ed584f0769526f2e63abf9a8a678b9"
+  integrity sha512-ZtDJqdyR8K/Kr2YygnCocl9hrMv42knJs2fSi/15amCfg2llYFlkPBrn3EsWhGCzclAGa/JWt7WAljhU6Tvmfw==
   dependencies:
     "@babel/runtime" "^7.11.0"
     component-cookie "^1.1.4"
     uuid "^3.3.3"
-    whatwg-fetch "^3.2.0"
 
 currently-unhandled@^0.4.1:
   version "0.4.1"
@@ -7848,7 +7847,7 @@ gud@^1.0.0:
 "guides-base@file:../guides-base":
   version "1.0.0"
   dependencies:
-    cubedev-tracking "^1.0.0"
+    cubedev-tracking "^1.0.1"
     lodash "^4.17.15"
     react "^16.11.0"
     react-helmet "^5.2.1"
@@ -14176,9 +14175,9 @@ simple-concat@^1.0.0:
   integrity sha512-cSFtAPtRhljv69IK0hTVZQ+OfE9nePi/rtJmw5UjHeVyVroEqJXP1sFztKUy1qU+xvz3u/sfYJLa947b7nAN2Q==
 
 simple-get@^3.0.3:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/simple-get/-/simple-get-3.1.0.tgz#b45be062435e50d159540b576202ceec40b9c6b3"
-  integrity sha512-bCR6cP+aTdScaQCnQKbPKtJOKDp/hj9EDLJo3Nw4y1QksqaovlW/bnptB6/c1e+qmNIDHRK+oXFDdEqBT8WzUA==
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/simple-get/-/simple-get-3.1.1.tgz#cc7ba77cfbe761036fbfce3d021af25fc5584d55"
+  integrity sha512-CQ5LTKGfCpvE1K0n2us+kuMPbk/q0EKl82s4aheV9oXjFEz6W/Y7oQFVJuU6QG77hRT4Ghb5RURteF5vnWjupA==
   dependencies:
     decompress-response "^4.2.0"
     once "^1.3.1"
@@ -16607,7 +16606,7 @@ whatwg-fetch@2.0.4:
   resolved "https://registry.yarnpkg.com/whatwg-fetch/-/whatwg-fetch-2.0.4.tgz#dde6a5df315f9d39991aa17621853d720b85566f"
   integrity sha512-dcQ1GWpOD/eEQ97k66aiEVpNnapVj90/+R+SXTPYGHpYBBypfKJEQjLrvMZ7YXbKm21gXd4NcuxUTjiv1YtLng==
 
-whatwg-fetch@>=0.10.0, whatwg-fetch@^3.2.0:
+whatwg-fetch@>=0.10.0:
   version "3.3.1"
   resolved "https://registry.yarnpkg.com/whatwg-fetch/-/whatwg-fetch-3.3.1.tgz#6c1acf37dec176b0fd6bc9a74b616bec2f612935"
   integrity sha512-faXTmGDcLuEPBpJwb5LQfyxvubKiE+RlbmmweFGKjvIPFj4uHTTfdtTIkdTRhC6OSH9S9eyYbx8kZ0UEaQqYTA==
