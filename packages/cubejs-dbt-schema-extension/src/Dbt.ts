@@ -170,7 +170,6 @@ export class Dbt extends AbstractExtension {
   }
 
   private loadMetricCubesFromNormalizedManifest(manifest: DbtManifest, manifestPath: string, options?: DbtLoadOptions) {
-    console.log(manifest);
     const cubeDefs: { [model: string]: ModelCubeDef } = {};
     Object.keys(manifest.metrics || {}).forEach(
       metric => {
@@ -198,8 +197,6 @@ export class Dbt extends AbstractExtension {
         }
       },
     );
-
-    console.log(cubeDefs);
 
     const toExtend: { [cubeName: string]: any } = {};
 
