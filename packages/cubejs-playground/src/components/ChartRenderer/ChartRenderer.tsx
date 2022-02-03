@@ -2,7 +2,7 @@ import { PlaySquareOutlined } from '@ant-design/icons';
 import type { ChartType, PivotConfig, Query } from '@cubejs-client/core';
 import { ResultSet } from '@cubejs-client/core';
 import { Alert, Typography } from 'antd';
-import { RefObject, useContext, useEffect, useRef, useState } from 'react';
+import { RefObject, useContext, useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import styled from 'styled-components';
 import { CubeContext } from '@cubejs-client/react';
@@ -14,7 +14,6 @@ import {
   useChartRendererState,
   useChartRendererStateMethods,
 } from '../QueryTabs/ChartRendererStateProvider';
-import { useWindowSize } from '../../hooks/use-window-size';
 
 const { Text } = Typography;
 
@@ -100,18 +99,6 @@ export default function ChartRenderer({
   onRunButtonClick,
 }: ChartRendererProps) {
   const { cubejsApi } = useContext(CubeContext);
-  const [containerSize, setContainerSize] = useState('auto');
-
-  useWindowSize(); // triggers the following useEffect() on window size change
-
-  useEffect(() => {
-    if (iframeRef?.current) {
-      const container = iframeRef?.current;
-      const height = window.innerHeight - container.getBoundingClientRect().y - 40;
-
-      setContainerSize(`${height}px`);
-    }
-  }); // no deps, it's better to re-check position on every render
 
   const {
     isChartRendererReady,
@@ -242,7 +229,6 @@ export default function ChartRenderer({
             id={`iframe-${queryId}`}
             data-testid="chart-renderer"
             ref={iframeRef}
-            style={{ height: containerSize }}
             title="Chart renderer"
             src={`/chart-renderers/${framework}/index.html#queryId=${queryId}`}
           />
