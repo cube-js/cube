@@ -101,42 +101,25 @@ impl ImportFormat {
                         if value == "" || value == "\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
-                            row[*insert_pos] = match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value_buf.take_string()),
-                                ColumnType::Int => value
-                                    .parse()
-                                    .map(|v| TableValue::Int(v))
-                                    .unwrap_or(TableValue::Null),
-                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
-                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
-                                ),
-                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                    let hll = HllSketch::read_snowflake(value)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                                    let data = base64::decode(value)?;
-                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(
-                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
-                                ) => {
-                                    let data = base64::decode(value)?;
-                                    is_valid_plain_binary_hll(&data, *f)?;
-                                    TableValue::Bytes(data)
-                                }
-                                ColumnType::Timestamp => {
-                                    TableValue::Timestamp(timestamp_from_string(value)?)
-                                }
-                                ColumnType::Float => {
-                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                }
-                                ColumnType::Boolean => {
-                                    TableValue::Boolean(value.to_lowercase() == "true")
-                                }
-                            };
+                            let mut value_buf_opt = Some(value_buf);
+                            row[*insert_pos] =
+                                ImportFormat::parse_column_value(column, &mut value_buf_opt)
+                                    .map_err(|e| {
+                                        if let Some(value_buf) = value_buf_opt {
+                                            CubeError::user(format!(
+                                                "Can't parse '{}' column value for '{}' column: {}",
+                                                value_buf.as_ref(),
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        } else {
+                                            CubeError::user(format!(
+                                                "Can't parse column value for '{}' column: {}",
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        }
+                                    })?;
                         }
 
                         parser.advance()?;
@@ -146,6 +129,42 @@ impl ImportFormat {
                 Ok(rows.boxed())
             }
         }
+    }
+
+    fn parse_column_value(
+        column: &Column,
+        value_buf: &mut Option<MaybeOwnedStr>,
+    ) -> Result<TableValue, CubeError> {
+        let value = value_buf.as_ref().unwrap().as_ref();
+        Ok(match column.get_column_type() {
+            ColumnType::String => TableValue::String(value_buf.take().unwrap().take_string()),
+            ColumnType::Int => value
+                .parse()
+                .map(|v| TableValue::Int(v))
+                .unwrap_or(TableValue::Null),
+            t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                let hll = HllSketch::read_snowflake(value)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                let data = base64::decode(value)?;
+                let hll = HllSketch::read_hll_storage_spec(&data)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
+                let data = base64::decode(value)?;
+                is_valid_plain_binary_hll(&data, *f)?;
+                TableValue::Bytes(data)
+            }
+            ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
+            ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
+            ColumnType::Boolean => TableValue::Boolean(value.to_lowercase() == "true"),
+        })
     }
 }
 
@@ -649,5 +668,20 @@ impl Ingestion {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use crate::import::parse_decimal;
+
+    #[test]
+    fn parse_decimal_test() {
+        assert_eq!(
+            parse_decimal("-0.12345", 5).unwrap().to_string(5),
+            "-0.12345",
+        );
     }
 }

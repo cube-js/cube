@@ -30,6 +30,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("insert", insert),
         t("select_test", select_test),
         t("negative_numbers", negative_numbers),
+        t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
@@ -55,6 +56,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("date_trunc", date_trunc),
         t("coalesce", coalesce),
         t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
@@ -75,6 +77,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "create_table_with_location_messed_order",
             create_table_with_location_messed_order,
+        ),
+        t(
+            "create_table_with_location_invalid_digit",
+            create_table_with_location_invalid_digit,
         ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
@@ -249,6 +255,33 @@ async fn negative_numbers(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
+}
+
+async fn negative_decimal(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.values (decimal_value decimal)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.values (decimal_value) VALUES (-0.12345)")
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * from foo.values")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        match &result.get_rows()[0].values()[0] {
+            TableValue::Decimal(d) => d.to_string(5),
+            x => panic!("Expected decimal but found: {:?}", x),
+        },
+        "-0.12345"
+    );
 }
 
 async fn custom_types(service: Box<dyn SqlClient>) {
@@ -1141,6 +1174,56 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn date_trunc(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.timestamps (t) VALUES \
+            ('2020-01-01T00:00:00.000Z'), \
+            ('2020-03-01T00:00:00.000Z'), \
+            ('2020-04-01T00:00:00.000Z'), \
+            ('2020-07-01T00:00:00.000Z'), \
+            ('2020-09-01T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "SELECT date_trunc('quarter', `t`) `quarter` \
+            FROM foo.timestamps `timestamp`",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1585699200000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),])
+        ]
+    );
+}
+
 async fn ilike(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -1621,6 +1704,42 @@ async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+}
+
+async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("invalid_digit.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c1,c3\n".as_bytes()).unwrap();
+        file.write_all("foo,1a23\n".as_bytes()).unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let res = service
+        .exec_query(&format!(
+            "CREATE TABLE test.main (`c1` text, `c3` decimal)  LOCATION {}",
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await;
+
+    println!("Res: {:?}", res);
+
+    assert!(
+        res.is_err(),
+        "Expected invalid digit error but got {:?}",
+        res
+    );
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {

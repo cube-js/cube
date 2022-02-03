@@ -34,6 +34,14 @@ class MockDriver {
       promise = promise.then(() => [{ min: new Date('2021-05-01T00:00:00.000Z').toJSON() }]);
     }
 
+    if (query.match(/^SELECT MAX\(created_at\)/)) {
+      promise = promise.then(() => [{ max: null }]);
+    }
+
+    if (query.match(/^SELECT MIN\(created_at\)/)) {
+      promise = promise.then(() => [{ min: null }]);
+    }
+
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
       promise = promise.then(res => res.concat({ tableReady: true }));
     }
@@ -894,6 +902,44 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
+  });
+
+  test('empty partitions', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_empty',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_empty AS SELECT * FROM public.orders WHERE created_at >= ? AND created_at <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(created_at) FROM orders', []],
+          ['SELECT MAX(created_at) FROM orders', []],
+        ],
+        partitionGranularity: 'day',
+        timezone: 'UTC'
+      }],
+      requestId: 'empty partitions',
+    };
+    await queryOrchestrator.fetchQuery(query);
+    console.log(JSON.stringify(mockDriver.executedQueries));
+    expect(mockDriver.tables.length).toEqual(1);
   });
 
   test('empty intersection', async () => {

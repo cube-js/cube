@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+
+### Bug Fixes
+
+* **cubestore:** Decimals without integral part are ignoring sign during to_string() ([b02b1a6](https://github.com/cube-js/cube.js/commit/b02b1a6b9ffe101869e22e4e65065f017f929a30))
+
+
+### Features
+
+* **cubestore:** Support quarter granularity for date_trunc fn ([#4011](https://github.com/cube-js/cube.js/issues/4011)) ([404482d](https://github.com/cube-js/cube.js/commit/404482def1f6ea7324d329a1943e6c8270518203))
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+
+### Bug Fixes
+
+* Provide more readable message for CSV parsing error ([0b9a3f8](https://github.com/cube-js/cube.js/commit/0b9a3f897a88dce2ad4387990bd64e9e06624839))
+
+
+
+
+
 ## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
 
 

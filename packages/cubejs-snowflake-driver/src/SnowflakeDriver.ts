@@ -130,6 +130,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  privateKey?: string,
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
@@ -148,6 +149,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
     super();
 
+    let privateKey = process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY;
+    if (privateKey && !privateKey.endsWith('\n')) {
+      privateKey += '\n';
+    }
     this.config = {
       account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
@@ -160,6 +165,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      privateKey,
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout'),

@@ -10,19 +10,20 @@ use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
-use sqlparser::ast::{self, DateTimeField, Ident, ObjectName};
+use sqlparser::ast::{self, escape_single_quote_string, DateTimeField, Ident, ObjectName};
 
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
 use crate::mysql::dataframe;
-pub use crate::schema::ctx::*;
+pub use crate::transport::ctx::*;
+use crate::transport::V1CubeMetaExt;
 
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
-    schema::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    transport::{ctx, V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
 use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 
@@ -557,11 +558,11 @@ fn compiled_binary_op_expr(
     right: &Box<ast::Expr>,
     ctx: &QueryContext,
 ) -> CompilationResult<CompiledFilterTree> {
-    let left = compile_expression(left, ctx)?;
-    let right = compile_expression(right, ctx)?;
+    let left_ce = compile_expression(left, ctx)?;
+    let right_ce = compile_expression(right, ctx)?;
 
     // Group selection to left, expr for filtering to right
-    let (selection_to_filter, filter_expr) = match (left, right) {
+    let (selection_to_filter, filter_expr) = match (left_ce, right_ce) {
         (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
         (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
         // CubeSQL doesnt support BinaryExpression with literals in both sides
@@ -581,6 +582,31 @@ fn compiled_binary_op_expr(
     };
 
     let compiled_filter = match selection_to_filter {
+        // Compile to CompiledFilter::Filter
+        Selection::Measure(_measure) => {
+            let (value, operator) = match op {
+                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
+                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
+                ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
+                ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
+                ast::BinaryOperator::GtEq => (filter_expr, "gte".to_string()),
+                ast::BinaryOperator::Gt => (filter_expr, "gt".to_string()),
+                ast::BinaryOperator::Lt => (filter_expr, "lt".to_string()),
+                ast::BinaryOperator::LtEq => (filter_expr, "lte".to_string()),
+                _ => {
+                    return Err(CompilationError::Unsupported(format!(
+                        "Operator in binary expression for measure: {} {} {}",
+                        left, op, right
+                    )))
+                }
+            };
+
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values: Some(vec![value.to_value_as_str()?]),
+            }
+        }
         // Compile to CompiledFilter::Filter
         Selection::Dimension(dim) => {
             let filter_expr = if dim.is_time() {
@@ -603,12 +629,10 @@ fn compiled_binary_op_expr(
                 ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
-                // >=
                 ast::BinaryOperator::GtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
                     _ => (filter_expr, "gte".to_string()),
                 },
-                // >
                 ast::BinaryOperator::Gt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt + Duration::milliseconds(1)),
@@ -616,7 +640,6 @@ fn compiled_binary_op_expr(
                     ),
                     _ => (filter_expr, "gt".to_string()),
                 },
-                // <
                 ast::BinaryOperator::Lt => match filter_expr {
                     CompiledExpression::DateLiteral(dt) => (
                         CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
@@ -624,15 +647,14 @@ fn compiled_binary_op_expr(
                     ),
                     _ => (filter_expr, "lt".to_string()),
                 },
-                // <=
                 ast::BinaryOperator::LtEq => match filter_expr {
                     CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
                     return Err(CompilationError::Unsupported(format!(
-                        "Operator in binary expression: {:?}",
-                        op
+                        "Operator in binary expression for dimension: {} {} {}",
+                        left, op, right
                     )))
                 }
             };
@@ -663,16 +685,16 @@ fn compiled_binary_op_expr(
                 }
             },
             _ => {
-                return Err(CompilationError::Unsupported(format!(
-                    "Unable to use operator {} with segment",
-                    op
+                return Err(CompilationError::User(format!(
+                    "Unable to use operator {} with segment: {} {} {}",
+                    op, left, op, right
                 )));
             }
         },
         _ => {
             return Err(CompilationError::Unsupported(format!(
-                "Unable to compile binary expression: {:?}",
-                op
+                "Binary expression: {} {} {}",
+                left, op, right
             )))
         }
     };
@@ -1319,6 +1341,10 @@ impl QueryPlannerExecutionProps {
     pub fn set_user(&mut self, user: Option<String>) {
         self.user = user;
     }
+
+    pub fn set_database(&mut self, database: Option<String>) {
+        self.database = database;
+    }
 }
 
 impl QueryPlannerExecutionProps {
@@ -1328,11 +1354,11 @@ impl QueryPlannerExecutionProps {
 }
 
 struct QueryPlanner {
-    context: Arc<ctx::TenantContext>,
+    context: Arc<ctx::MetaContext>,
 }
 
 impl QueryPlanner {
-    pub fn new(context: Arc<ctx::TenantContext>) -> Self {
+    pub fn new(context: Arc<ctx::MetaContext>) -> Self {
         Self { context }
     }
 
@@ -1522,8 +1548,21 @@ impl QueryPlanner {
                 self.show_variable_to_plan(variable, props)
             }
             ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter, props),
-            // Proxy some queries to DF
-            ast::Statement::ShowColumns { .. } => self.create_df_logical_plan(stmt.clone(), props),
+            ast::Statement::ShowCreate { obj_name, obj_type } => {
+                self.show_create_to_plan(&obj_name, &obj_type)
+            }
+            ast::Statement::ShowColumns {
+                extended,
+                full,
+                filter,
+                table_name,
+            } => self.show_columns_to_plan(*extended, *full, &filter, &table_name, props),
+            ast::Statement::ShowTables {
+                extended,
+                full,
+                filter,
+                db_name,
+            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name, props),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1626,6 +1665,189 @@ impl QueryPlanner {
         self.create_df_logical_plan(stmt, props)
     }
 
+    fn show_create_to_plan(
+        &self,
+        obj_name: &ObjectName,
+        obj_type: &ast::ShowCreateObject,
+    ) -> Result<QueryPlan, CompilationError> {
+        match obj_type {
+            ast::ShowCreateObject::Table => {}
+            _ => {
+                return Err(CompilationError::User(format!(
+                    "SHOW CREATE doesn't support type: {}",
+                    obj_type
+                )))
+            }
+        };
+
+        let table_name_filter = if obj_name.0.len() == 2 {
+            &obj_name.0[1].value
+        } else {
+            &obj_name.0[0].value
+        };
+
+        self.context.cubes.iter().find(|c| c.name.eq(table_name_filter)).map(|cube| {
+            let mut fields: Vec<String> = vec![];
+
+            for column in &cube.get_columns() {
+                fields.push(format!(
+                    "`{}` {}{}",
+                    column.get_name(),
+                    column.get_column_type(),
+                    if column.mysql_can_be_null() { " NOT NULL" } else { "" }
+                ));
+            }
+
+            QueryPlan::MetaTabular(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
+                vec![
+                    dataframe::Column::new(
+                        "Table".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
+                    ),
+                    dataframe::Column::new(
+                        "Create Table".to_string(),
+                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnFlags::empty(),
+                    )
+                ],
+                vec![dataframe::Row::new(vec![
+                    dataframe::TableValue::String(cube.name.clone()),
+                    dataframe::TableValue::String(
+                        format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
+                    ),
+                ])]
+            )))
+        }).ok_or(
+            CompilationError::User(format!(
+                "Unknown table: {}",
+                table_name_filter
+            ))
+        )
+    }
+
+    fn show_columns_to_plan(
+        &self,
+        extended: bool,
+        full: bool,
+        filter: &Option<ast::ShowStatementFilter>,
+        table_name: &ast::ObjectName,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let extended = match extended {
+            false => "".to_string(),
+            // The planner is unable to correctly process queries with UNION ALL in subqueries as of writing this.
+            // Uncomment this to enable EXTENDED support once such queries can be processed.
+            /*true => {
+                let extended_columns = "'' AS `Type`, NULL AS `Collation`, 'NO' AS `Null`, '' AS `Key`, NULL AS `Default`, '' AS `Extra`, 'select' AS `Privileges`, '' AS `Comment`";
+                format!("UNION ALL SELECT 'DB_TRX_ID' AS `Field`, 2 AS `Order`, {} UNION ALL SELECT 'DB_ROLL_PTR' AS `Field`, 3 AS `Order`, {}", extended_columns, extended_columns)
+            }*/
+            true => {
+                return Err(CompilationError::Unsupported(
+                    "SHOW COLUMNS: EXTENDED is not implemented".to_string(),
+                ))
+            }
+        };
+
+        let columns = match full {
+            false => "`Field`, `Type`, `Null`, `Key`, `Default`, `Extra`",
+            true => "`Field`, `Type`, `Collation`, `Null`, `Key`, `Default`, `Extra`, `Privileges`, `Comment`",
+        };
+
+        let mut object_name = table_name.0.clone();
+        let table_name = match object_name.pop() {
+            Some(table_name) => escape_single_quote_string(&table_name.value).to_string(),
+            None => {
+                return Err(CompilationError::Internal(format!(
+                    "Unexpected lack of table name"
+                )))
+            }
+        };
+        let db_name = match object_name.pop() {
+            Some(db_name) => escape_single_quote_string(&db_name.value).to_string(),
+            None => props.database.as_ref().unwrap_or(&"db".to_string()).clone(),
+        };
+
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE `Field` {}", stmt.to_string())
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                format!("{}", stmt.to_string())
+            }
+            Some(stmt) => {
+                return Err(CompilationError::User(format!(
+                    "SHOW COLUMNS doesn't support requested filter: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let information_schema_sql = format!("SELECT `COLUMN_NAME` AS `Field`, 1 AS `Order`, `COLUMN_TYPE` AS `Type`, IF(`DATA_TYPE` = 'varchar', 'utf8mb4_0900_ai_ci', NULL) AS `Collation`, `IS_NULLABLE` AS `Null`, `COLUMN_KEY` AS `Key`, NULL AS `Default`, `EXTRA` AS `Extra`, 'select' AS `Privileges`, `COLUMN_COMMENT` AS `Comment` FROM `information_schema`.`COLUMNS` WHERE `TABLE_NAME` = '{}' AND `TABLE_SCHEMA` = '{}' {}", table_name, db_name, extended);
+        let stmt = parse_sql_to_statement(&format!(
+            "SELECT {} FROM ({}) AS `COLUMNS` {}",
+            columns, information_schema_sql, filter
+        ))?;
+
+        self.create_df_logical_plan(stmt, props)
+    }
+
+    fn show_tables_to_plan(
+        &self,
+        // EXTENDED is accepted but does not alter the result
+        _extended: bool,
+        full: bool,
+        filter: &Option<ast::ShowStatementFilter>,
+        db_name: &Option<ast::Ident>,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let db_name = match db_name {
+            Some(db_name) => db_name.clone(),
+            None => Ident::new(props.database.as_ref().unwrap_or(&"db".to_string())),
+        };
+
+        let column_name = format!("Tables_in_{}", db_name.value);
+        let column_name = match db_name.quote_style {
+            Some(quote_style) => Ident::with_quote(quote_style, column_name),
+            None => Ident::new(column_name),
+        };
+
+        let columns = match full {
+            false => format!("{}", column_name),
+            true => format!("{}, `Table_type`", column_name),
+        };
+
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE {} {}", column_name, stmt)
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                format!("{}", stmt)
+            }
+            Some(stmt) => {
+                return Err(CompilationError::User(format!(
+                    "SHOW TABLES doesn't support requested filter: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let information_schema_sql = format!(
+            "SELECT `TABLE_NAME` AS {}, `TABLE_TYPE` AS `Table_type` FROM `information_schema`.`TABLES`
+WHERE `TABLE_SCHEMA` = '{}'",
+            column_name,
+            escape_single_quote_string(&db_name.value),
+        );
+        let stmt = parse_sql_to_statement(&format!(
+            "SELECT {} FROM ({}) AS `TABLES` {}",
+            columns, information_schema_sql, filter
+        ))?;
+
+        self.create_df_logical_plan(stmt, props)
+    }
+
     fn create_df_logical_plan(
         &self,
         stmt: ast::Statement,
@@ -1677,7 +1899,7 @@ impl QueryPlanner {
 
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
-    tenant_ctx: Arc<ctx::TenantContext>,
+    tenant_ctx: Arc<ctx::MetaContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     let planner = QueryPlanner::new(tenant_ctx);
@@ -1728,7 +1950,7 @@ impl QueryPlan {
 
 pub fn convert_sql_to_cube_query(
     query: &String,
-    tenant: Arc<ctx::TenantContext>,
+    tenant: Arc<ctx::MetaContext>,
     props: &QueryPlannerExecutionProps,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
@@ -1843,8 +2065,8 @@ mod tests {
         ]
     }
 
-    fn get_test_tenant_ctx() -> Arc<ctx::TenantContext> {
-        Arc::new(ctx::TenantContext {
+    fn get_test_tenant_ctx() -> Arc<ctx::MetaContext> {
+        Arc::new(ctx::MetaContext {
             cubes: get_test_meta(),
         })
     }
@@ -2326,6 +2548,26 @@ mod tests {
                 },
             ),
             (
+                "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
+                CompiledQuery {
+                    request: V1LoadRequestQuery {
+                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                        dimensions: Some(vec![]),
+                        segments: Some(vec![]),
+                        time_dimensions: None,
+                        order: None,
+                        limit: None,
+                        offset: None,
+                        filters: None,
+                    },
+                    meta: vec![CompiledQueryFieldMeta {
+                        column_from: "KibanaSampleDataEcommerce.count".to_string(),
+                        column_to: "count".to_string(),
+                        column_type: ColumnType::MYSQL_TYPE_LONGLONG,
+                    }],
+                },
+            ),
+            (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
                 CompiledQuery {
                     request: V1LoadRequestQuery {
@@ -2425,6 +2667,18 @@ mod tests {
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
                 CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
+            ),
+            (
+                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
+            ),
+            (
+                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use 'unknownIdentifier' as argument to aggregation function 'COUNT()'".to_string()),
+            ),
+            (
+                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
             ),
         ];
 
@@ -2715,6 +2969,30 @@ mod tests {
     #[test]
     fn test_where_filter_simple() {
         let to_check = vec![
+            // Binary expression with Measures
+            (
+                "maxPrice = 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            (
+                "maxPrice > 5".to_string(),
+                Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                    operator: Some("gt".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                None,
+            ),
+            // Binary expression with Dimensions
             (
                 "customer_gender = 'FEMALE'".to_string(),
                 Some(vec![V1LoadRequestQueryFilterItem {
@@ -3398,7 +3676,7 @@ mod tests {
         );
     }
 
-    async fn execute_df_query(query: String) -> Result<String, CubeError> {
+    async fn execute_query(query: String) -> Result<String, CubeError> {
         let query = convert_sql_to_cube_query(
             &query,
             get_test_tenant_ctx(),
@@ -3412,18 +3690,54 @@ mod tests {
             QueryPlan::DataFushionSelect(_, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
                 let batches = df.collect().await?;
-                let response = batch_to_dataframe(&batches)?;
+                let frame = batch_to_dataframe(&batches)?;
 
-                return Ok(response.print());
+                return Ok(frame.print());
             }
-            _ => panic!("Must return DF plan"),
+            QueryPlan::MetaTabular(_, frame) => {
+                return Ok(frame.print());
+            }
+            _ => panic!("Unknown execution method"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_show_create_table() -> Result<(), CubeError> {
+        let exepected =
+            "+---------------------------+-----------------------------------------------+\n\
+        | Table                     | Create Table                                  |\n\
+        +---------------------------+-----------------------------------------------+\n\
+        | KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` (\r    |\n\
+        |                           |   `count` int,\r                                |\n\
+        |                           |   `maxPrice` int,\r                             |\n\
+        |                           |   `minPrice` int,\r                             |\n\
+        |                           |   `avgPrice` int,\r                             |\n\
+        |                           |   `order_date` datetime NOT NULL,\r             |\n\
+        |                           |   `customer_gender` varchar(255) NOT NULL,\r    |\n\
+        |                           |   `taxful_total_price` varchar(255) NOT NULL,\r |\n\
+        |                           |   `is_male` boolean,\r                          |\n\
+        |                           |   `is_female` boolean\r                         |\n\
+        |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4       |\n\
+        +---------------------------+-----------------------------------------------+";
+
+        assert_eq!(
+            execute_query("show create table KibanaSampleDataEcommerce;".to_string()).await?,
+            exepected.clone()
+        );
+
+        assert_eq!(
+            execute_query("show create table `db`.`KibanaSampleDataEcommerce`;".to_string())
+                .await?,
+            exepected
+        );
+
+        Ok(())
     }
 
     #[tokio::test]
     async fn test_information_schema_tables() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.tables".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.tables".to_string()).await?,
             "+---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
             | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |\n\
             +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
@@ -3444,7 +3758,7 @@ mod tests {
     #[tokio::test]
     async fn test_information_schema_columns() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
             "+---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
             | TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME                | COLUMN_NAME        | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE | CHARACTER_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | COLUMN_TYPE  | NUMERIC_PRECISION | DATETIME_PRECISION | COLUMN_KEY | EXTRA | COLUMN_COMMENT | GENERATION_EXPRESSION | SRS_ID |\n\
             +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
@@ -3468,7 +3782,7 @@ mod tests {
     #[tokio::test]
     async fn test_information_schema_schemata() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM information_schema.schemata".to_string()).await?,
+            execute_query("SELECT * FROM information_schema.schemata".to_string()).await?,
             "+--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
             | CATALOG_NAME | SCHEMA_NAME        | DEFAULT_CHARACTER_SET_NAME | DEFAULT_COLLATION_NAME | SQL_PATH | DEFAULT_ENCRYPTION |\n\
             +--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
@@ -3487,7 +3801,12 @@ mod tests {
     async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
         // This query is used by metabase for introspection
         assert_eq!(
-            execute_df_query("SELECT A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME  FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME  ORDER BY A.COLUMN_NAME".to_string()).await?,
+            execute_query("
+            SELECT
+                A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
+            WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
+            ORDER BY A.COLUMN_NAME".to_string()).await?,
             "++\n++\n++"
         );
 
@@ -3497,7 +3816,7 @@ mod tests {
     #[tokio::test]
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
             "+--------------------+----------------+\n\
             | VARIABLE_NAME      | VARIABLE_VALUE |\n\
             +--------------------+----------------+\n\
@@ -3506,7 +3825,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
+            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
             "+--------------------+----------------+\n\
             | VARIABLE_NAME      | VARIABLE_VALUE |\n\
             +--------------------+----------------+\n\
@@ -3520,7 +3839,7 @@ mod tests {
     #[tokio::test]
     async fn test_if() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 r#"select
                 if(null, true, false) as r1,
                 if(true, false, true) as r2,
@@ -3545,7 +3864,7 @@ mod tests {
     #[tokio::test]
     async fn test_least() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                 least(1, 2) as r1, \
                 least(2, 1) as r2, \
@@ -3568,7 +3887,7 @@ mod tests {
     #[tokio::test]
     async fn test_ucase() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                 ucase('super stroka') as r1
             "
@@ -3588,7 +3907,7 @@ mod tests {
     #[tokio::test]
     async fn test_convert_tz() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select convert_tz('2021-12-08T15:50:14.337Z'::timestamp, @@GLOBAL.time_zone, '+00:00') as r1;".to_string()
             )
             .await?,
@@ -3605,7 +3924,7 @@ mod tests {
     #[tokio::test]
     async fn test_timediff() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     timediff('1994-11-26T13:25:00.000Z'::timestamp, '1994-11-26T13:25:00.000Z'::timestamp) as r1
                 ".to_string()
@@ -3624,7 +3943,7 @@ mod tests {
     #[tokio::test]
     async fn test_instr() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     instr('rust is killing me', 'r') as r1,
                     instr('rust is killing me', 'e') as r2,
@@ -3646,7 +3965,7 @@ mod tests {
     #[tokio::test]
     async fn test_locate() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "select \
                     locate('r', 'rust is killing me') as r1,
                     locate('e', 'rust is killing me') as r2,
@@ -3666,10 +3985,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_select_variables() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                // This query I saw in Google Data Studio
+                "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
+                SELECT  \
+                    @@session.auto_increment_increment AS auto_increment_increment, \
+                    @@character_set_client AS character_set_client, \
+                    @@character_set_connection AS character_set_connection, \
+                    @@character_set_results AS character_set_results, \
+                    @@character_set_server AS character_set_server, \
+                    @@collation_server AS collation_server, \
+                    @@collation_connection AS collation_connection, \
+                    @@init_connect AS init_connect, \
+                    @@interactive_timeout AS interactive_timeout, \
+                    @@license AS license, \
+                    @@lower_case_table_names AS lower_case_table_names, \
+                    @@max_allowed_packet AS max_allowed_packet, \
+                    @@net_buffer_length AS net_buffer_length, \
+                    @@net_write_timeout AS net_write_timeout, \
+                    @@sql_mode AS sql_mode, \
+                    @@system_time_zone AS system_time_zone, \
+                    @@time_zone AS time_zone, \
+                    @@transaction_isolation AS transaction_isolation, \
+                    @@wait_timeout AS wait_timeout
+                "
+                .to_string()
+            )
+            .await?,
+            "+--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
+            | auto_increment_increment | character_set_client | character_set_connection | character_set_results | character_set_server | collation_server   | collation_connection | init_connect | interactive_timeout | license  | lower_case_table_names | max_allowed_packet | net_buffer_length | net_write_timeout | sql_mode                                                                                                              | system_time_zone | time_zone | transaction_isolation | wait_timeout |\n\
+            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
+            | 1                        | utf8mb4              | utf8mb4                  | utf8mb4               | utf8mb4              | utf8mb4_0900_ai_ci | utf8mb4_general_ci   |              | 28800               | Apache 2 | 0                      | 67108864           | 16384             | 600               | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION | UTC              | SYSTEM    | REPEATABLE-READ       | 28800        |\n\
+            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_show_variable() -> Result<(), CubeError> {
         // LIKE
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables like 'sql_mode';"
                 .to_string()
             )
@@ -3683,7 +4042,7 @@ mod tests {
 
         // LIKE pattern
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables like '%_mode';"
                 .to_string()
             )
@@ -3697,13 +4056,13 @@ mod tests {
 
         // Negative test, we dont define this variable
         assert_eq!(
-            execute_df_query("show variables like 'aurora_version';".to_string()).await?,
+            execute_query("show variables like 'aurora_version';".to_string()).await?,
             "++\n++\n++"
         );
 
         // All variables
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "show variables;"
                 .to_string()
             )
@@ -3721,9 +4080,180 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_show_columns() -> Result<(), CubeError> {
+        // Simplest syntax
+        assert_eq!(
+            execute_query("show columns from KibanaSampleDataEcommerce;".to_string()).await?,
+            "+--------------------+--------------+------+-----+---------+-------+\n\
+            | Field              | Type         | Null | Key | Default | Extra |\n\
+            +--------------------+--------------+------+-----+---------+-------+\n\
+            | count              | int          | NO   |     | NULL    |       |\n\
+            | maxPrice           | int          | NO   |     | NULL    |       |\n\
+            | minPrice           | int          | NO   |     | NULL    |       |\n\
+            | avgPrice           | int          | NO   |     | NULL    |       |\n\
+            | order_date         | datetime     | YES  |     | NULL    |       |\n\
+            | customer_gender    | varchar(255) | YES  |     | NULL    |       |\n\
+            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
+            | is_male            | boolean      | NO   |     | NULL    |       |\n\
+            | is_female          | boolean      | NO   |     | NULL    |       |\n\
+            +--------------------+--------------+------+-----+---------+-------+"
+        );
+
+        // FULL
+        assert_eq!(
+            execute_query("show full columns from KibanaSampleDataEcommerce;".to_string()).await?,
+            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
+            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        );
+
+        // LIKE
+        assert_eq!(
+            execute_query("show columns from KibanaSampleDataEcommerce like '%ice%';".to_string())
+                .await?,
+            "+--------------------+--------------+------+-----+---------+-------+\n\
+            | Field              | Type         | Null | Key | Default | Extra |\n\
+            +--------------------+--------------+------+-----+---------+-------+\n\
+            | maxPrice           | int          | NO   |     | NULL    |       |\n\
+            | minPrice           | int          | NO   |     | NULL    |       |\n\
+            | avgPrice           | int          | NO   |     | NULL    |       |\n\
+            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
+            +--------------------+--------------+------+-----+---------+-------+"
+        );
+
+        // WHERE
+        assert_eq!(
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string()
+            )
+            .await?,
+            "+----------+------+------+-----+---------+-------+\n\
+            | Field    | Type | Null | Key | Default | Extra |\n\
+            +----------+------+------+-----+---------+-------+\n\
+            | count    | int  | NO   |     | NULL    |       |\n\
+            | maxPrice | int  | NO   |     | NULL    |       |\n\
+            | minPrice | int  | NO   |     | NULL    |       |\n\
+            | avgPrice | int  | NO   |     | NULL    |       |\n\
+            +----------+------+------+-----+---------+-------+"
+        );
+
+        // FROM db FROM tbl
+        assert_eq!(
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string()
+            )
+            .await?,
+            "+-------+------+------+-----+---------+-------+\n\
+            | Field | Type | Null | Key | Default | Extra |\n\
+            +-------+------+------+-----+---------+-------+\n\
+            | count | int  | NO   |     | NULL    |       |\n\
+            +-------+------+------+-----+---------+-------+"
+        );
+
+        // Everything
+        assert_eq!(
+            execute_query("show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()).await?,
+            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
+            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
+            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
+            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
+            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_tables() -> Result<(), CubeError> {
+        // Simplest syntax
+        assert_eq!(
+            execute_query("show tables;".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            | Logs                      |\n\
+            +---------------------------+"
+        );
+
+        // FULL
+        assert_eq!(
+            execute_query("show full tables;".to_string()).await?,
+            "+---------------------------+------------+\n\
+            | Tables_in_db              | Table_type |\n\
+            +---------------------------+------------+\n\
+            | KibanaSampleDataEcommerce | BASE TABLE |\n\
+            | Logs                      | BASE TABLE |\n\
+            +---------------------------+------------+"
+        );
+
+        // LIKE
+        assert_eq!(
+            execute_query("show tables like '%ban%';".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            +---------------------------+"
+        );
+
+        // WHERE
+        assert_eq!(
+            execute_query("show tables where Tables_in_db = 'Logs';".to_string()).await?,
+            "+--------------+\n\
+            | Tables_in_db |\n\
+            +--------------+\n\
+            | Logs         |\n\
+            +--------------+"
+        );
+
+        // FROM db
+        assert_eq!(
+            execute_query("show tables from db;".to_string()).await?,
+            "+---------------------------+\n\
+            | Tables_in_db              |\n\
+            +---------------------------+\n\
+            | KibanaSampleDataEcommerce |\n\
+            | Logs                      |\n\
+            +---------------------------+"
+        );
+
+        // Everything
+        assert_eq!(
+            execute_query("show full tables from db like '%';".to_string()).await?,
+            "+---------------------------+------------+\n\
+            | Tables_in_db              | Table_type |\n\
+            +---------------------------+------------+\n\
+            | KibanaSampleDataEcommerce | BASE TABLE |\n\
+            | Logs                      | BASE TABLE |\n\
+            +---------------------------+------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase() -> Result<(), CubeError> {
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT \
                     @@GLOBAL.time_zone AS global_tz, \
                     @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'
@@ -3738,7 +4268,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT \
                 TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, \
                 CASE data_type WHEN 'bit' THEN -7 WHEN 'tinyblob' THEN -3 WHEN 'mediumblob' THEN -4 WHEN 'longblob' THEN -4 WHEN 'blob' THEN -4 WHEN 'tinytext' THEN 12 WHEN 'mediumtext' THEN -1 WHEN 'longtext' THEN -1 WHEN 'text' THEN -1 WHEN 'date' THEN 91 WHEN 'datetime' THEN 93 WHEN 'decimal' THEN 3 WHEN 'double' THEN 8 WHEN 'enum' THEN 12 WHEN 'float' THEN 7 WHEN 'int' THEN IF( COLUMN_TYPE like '%unsigned%', 4,4) WHEN 'bigint' THEN -5 WHEN 'mediumint' THEN 4 WHEN 'null' THEN 0 WHEN 'set' THEN 12 WHEN 'smallint' THEN IF( COLUMN_TYPE like '%unsigned%', 5,5) WHEN 'varchar' THEN 12 WHEN 'varbinary' THEN -3 WHEN 'char' THEN 1 WHEN 'binary' THEN -2 WHEN 'time' THEN 92 WHEN 'timestamp' THEN 93 WHEN 'tinyint' THEN IF(COLUMN_TYPE like 'tinyint(1)%',-7,-6)  WHEN 'year' THEN 91 ELSE 1111 END  DATA_TYPE, IF(COLUMN_TYPE like 'tinyint(1)%', 'BIT',  UCASE(IF( COLUMN_TYPE LIKE '%(%)%', CONCAT(SUBSTRING( COLUMN_TYPE,1, LOCATE('(',COLUMN_TYPE) - 1 ), SUBSTRING(COLUMN_TYPE ,1+locate(')', COLUMN_TYPE))), COLUMN_TYPE))) TYPE_NAME,  CASE DATA_TYPE  WHEN 'time' THEN IF(DATETIME_PRECISION = 0, 10, CAST(11 + DATETIME_PRECISION as signed integer))  WHEN 'date' THEN 10  WHEN 'datetime' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  WHEN 'timestamp' THEN IF(DATETIME_PRECISION = 0, 19, CAST(20 + DATETIME_PRECISION as signed integer))  ELSE   IF(NUMERIC_PRECISION IS NULL, LEAST(CHARACTER_MAXIMUM_LENGTH,2147483647), NUMERIC_PRECISION)  END COLUMN_SIZE, \
@@ -3778,7 +4308,7 @@ mod tests {
         );
 
         assert_eq!(
-            execute_df_query(
+            execute_query(
                 "SELECT
                     KCU.REFERENCED_TABLE_SCHEMA PKTABLE_CAT,
                     NULL PKTABLE_SCHEM,

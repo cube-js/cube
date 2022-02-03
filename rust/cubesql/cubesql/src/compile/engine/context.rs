@@ -29,10 +29,6 @@ impl SystemVar {
             ScalarValue::Utf8(Some("UTC".to_string())),
         );
         variables.insert(
-            "@@globaltime_zone".to_string(),
-            ScalarValue::Utf8(Some("SYSTEM".to_string())),
-        );
-        variables.insert(
             "@@time_zone".to_string(),
             ScalarValue::Utf8(Some("SYSTEM".to_string())),
         );
@@ -84,6 +80,42 @@ impl SystemVar {
             "@@collation_connection".to_string(),
             ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
         );
+        variables.insert(
+            "@@collation_server".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4_0900_ai_ci".to_string())),
+        );
+        variables.insert(
+            "@@init_connect".to_string(),
+            ScalarValue::Utf8(Some("".to_string())),
+        );
+        variables.insert(
+            "@@interactive_timeout".to_string(),
+            ScalarValue::UInt32(Some(28800)),
+        );
+        variables.insert(
+            "@@license".to_string(),
+            ScalarValue::Utf8(Some("Apache 2".to_string())),
+        );
+        variables.insert(
+            "@@lower_case_table_names".to_string(),
+            ScalarValue::UInt32(Some(0)),
+        );
+        variables.insert(
+            "@@net_buffer_length".to_string(),
+            ScalarValue::UInt32(Some(16384)),
+        );
+        variables.insert(
+            "@@net_write_timeout".to_string(),
+            ScalarValue::UInt32(Some(600)),
+        );
+        variables.insert(
+            "@@wait_timeout".to_string(),
+            ScalarValue::UInt32(Some(28800)),
+        );
+        variables.insert(
+            "@@sql_mode".to_string(),
+            ScalarValue::Utf8(Some("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string()))
+        );
 
         Self { variables }
     }
@@ -91,8 +123,18 @@ impl SystemVar {
 
 impl VarProvider for SystemVar {
     /// get system variable value
-    fn get_value(&self, var_names: Vec<String>) -> Result<ScalarValue> {
-        let key = var_names.concat().to_lowercase();
+    fn get_value(&self, identifier: Vec<String>) -> Result<ScalarValue> {
+        let key = if identifier.len() > 1 {
+            let ignore_first = identifier[0].to_ascii_lowercase() == "@@global".to_owned();
+
+            if ignore_first {
+                "@@".to_string() + &identifier[1..].concat()
+            } else {
+                identifier.concat()
+            }
+        } else {
+            identifier.concat()
+        };
 
         if let Some(value) = self.variables.get(&key) {
             Ok(value.clone())
