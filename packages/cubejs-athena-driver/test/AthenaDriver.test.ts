@@ -14,9 +14,7 @@ describe('AthenaDriver', () => {
       new AthenaDriver({}),
       {
         expectStringFields: true,
-        preAggregationWrapLoadSql: (tableName: string, query: string): string => {
-          return `CREATE TABLE ${tableName} AS ${query}`;
-        }
+        wrapLoadQueryWithCtas: true,
       }
     );
   });

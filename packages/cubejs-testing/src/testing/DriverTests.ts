@@ -5,7 +5,6 @@ import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import dedent from 'dedent';
 import dotenv from '@cubejs-backend/dotenv';
-import { BaseQuery } from "@cubejs-backend/schema-compiler";
 
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.
@@ -13,10 +12,8 @@ export interface DriverTestsOptions {
   // Athena does not write csv headers.
   // BigQuery writes csv headers.
   expectCsvHeader?: boolean
-  // Similar to BaseQuery.preAggregationLoadSql, but only wrapping the sql without also generating the sql from a cube.
-  // Tradeoff betweeen code duplication and minimization of the amount of input data required to write a test.
-  // TODO(cristipp) Figure out how to create a simple cube and simply delegate to BaseQuery.preAggregationLoadSql.
-  preAggregationWrapLoadSql?: (tableName: string, query: string) => string
+  // Some drivers unload from a CTAS query, others unload from a stream.
+  wrapLoadQueryWithCtas?: boolean
 }
 
 export class DriverTests {
@@ -36,7 +33,7 @@ export class DriverTests {
     return this.driver.release();
   }
 
-  public readonly QUERY = `
+  public static QUERY = `
     SELECT id, amount, status
     FROM (
       SELECT 1 AS id, 100 AS amount, 'new' AS status
@@ -48,30 +45,30 @@ export class DriverTests {
     ORDER BY 1
   `;
 
-  public readonly ROWS = [
+  public static ROWS = [
     { id: 1, amount: 100, status: 'new' },
     { id: 2, amount: 200, status: 'new' },
     { id: 3, amount: 400, status: 'processed' },
   ];
 
+  public static CSV_ROWS = dedent`
+    orders__status,orders__amount
+    new,300
+    processed,400
+  `;
+
   public async testQuery() {
-    const rows = await this.driver.query(this.QUERY, []);
-    if (this.options.expectStringFields) {
-      expect(rows).toEqual(this.rowsToString(this.ROWS));
-    } else {
-      expect(rows).toEqual(this.ROWS);
-    }
+    const rows = await this.driver.query(DriverTests.QUERY, []);
+    const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
+    expect(rows).toEqual(expectedRows);
   }
 
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
-    const tableData = await this.driver.stream!(this.QUERY, [], { highWaterMark: 100 });
+    const tableData = await this.driver.stream!(DriverTests.QUERY, [], { highWaterMark: 100 });
     const rows = await streamToArray(tableData.rowStream);
-    if (this.options.expectStringFields) {
-      expect(rows).toEqual(this.rowsToString(this.ROWS));
-    } else {
-      expect(rows).toEqual(this.ROWS);
-    }
+    const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
+    expect(rows).toEqual(expectedRows);
   }
 
   public async testUnload() {
@@ -86,11 +83,11 @@ export class DriverTests {
     const tableName = PreAggregations.targetTableName(versionEntry);
     const query = `
       SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
-      FROM (${this.QUERY}) AS orders
+      FROM (${DriverTests.QUERY}) AS orders
       GROUP BY 1
       ORDER BY 1
     `;
-    const loadQuery = (this.options.preAggregationWrapLoadSql ?? ((t: string, q: string) => q))(tableName, query);
+    const loadQuery = this.options.wrapLoadQueryWithCtas ? `CREATE TABLE ${tableName} AS ${query}` : query;
     await this.driver.loadPreAggregationIntoTable(
       tableName,
       loadQuery,
@@ -103,18 +100,14 @@ export class DriverTests {
     const data = await this.driver.unload!(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
-    if (this.options.expectCsvHeader) {
-      expect(string.trim()).toEqual(dedent`
-        orders__status,orders__amount
-        new,300
-        processed,400
-      `);
-    } else {
-      expect(string.trim()).toEqual(dedent`
-        new,300
-        processed,400
-      `);
-    }
+    const expectedRows = this.options.expectCsvHeader
+      ? DriverTests.CSV_ROWS
+      : this.skipFirstLine(DriverTests.CSV_ROWS);
+    expect(string.trim()).toEqual(expectedRows);
+  }
+
+  private skipFirstLine(text: string): string {
+    return text.split('\n').slice(1).join('\n');
   }
 
   private rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
