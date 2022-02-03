@@ -10,7 +10,7 @@ describe('BigQueryDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    tests = new DriverTests(new BigQueryDriver({}));
+    tests = new DriverTests(new BigQueryDriver({}), { expectCsvHeader: true });
   });
 
   afterAll(async () => {

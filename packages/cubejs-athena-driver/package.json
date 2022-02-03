@@ -28,6 +28,8 @@
   "types": "dist/src/index.d.ts",
   "dependencies": {
     "@aws-sdk/client-athena": "^3.22.0",
+    "@aws-sdk/client-s3": "^3.49.0",
+    "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@cubejs-backend/query-orchestrator": "^0.29.24",
     "@cubejs-backend/shared": "^0.29.23",
     "sqlstring": "^2.3.1"

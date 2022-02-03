@@ -1,9 +1,18 @@
-import * as AWS from '@aws-sdk/client-athena';
+import { Athena, GetQueryResultsCommandOutput } from '@aws-sdk/client-athena';
+import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as stream from 'stream';
-import { BaseDriver, DriverInterface, QueryOptions, StreamTableData } from '@cubejs-backend/query-orchestrator';
-import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import {
+  BaseDriver,
+  DownloadTableCSVData,
+  DriverInterface,
+  QueryOptions,
+  StreamTableData
+} from '@cubejs-backend/query-orchestrator';
+import { assertNonNullable, checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
+import { URL } from 'url';
 
 interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
@@ -41,7 +50,7 @@ function applyParams(query: string, params: any[]): string {
 export class AthenaDriver extends BaseDriver implements DriverInterface {
   private config: AthenaDriverOptionsInitialized;
 
-  private athena: AWS.Athena;
+  private athena: Athena;
 
   public constructor(config: AthenaDriverOptions = {}) {
     super();
@@ -59,7 +68,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
-    this.athena = new AWS.Athena(this.config);
+    this.athena = new Athena(this.config);
   }
 
   public readOnly(): boolean {
@@ -88,6 +97,56 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query));
     return {
       rowStream
+    };
+  }
+
+  // public async isUnloadSupported() {
+  //   return this.config.S3OutputLocation !== undefined;
+  // }
+
+  public async loadPreAggregationIntoTable(
+    preAggregationTableName: string,
+    loadSql: string,
+    params: any,
+  ): Promise<any> {
+    assertNonNullable('S3OutputLocation', this.config.S3OutputLocation);
+    const path = `${this.config.S3OutputLocation}/${preAggregationTableName}`;
+    const query = `
+      UNLOAD (${loadSql})
+      TO '${path}'
+      WITH (format = 'TEXTFILE', field_delimiter = ',', compression='GZIP')
+    `;
+    const qid = await this.startQuery(query, params);
+    await this.waitForSuccess(qid);
+  }
+
+  public async unload(tableName: string): Promise<DownloadTableCSVData> {
+    const client = new S3({
+      credentials: this.config.credentials,
+      region: this.config.region,
+    });
+    const path = `${this.config.S3OutputLocation}/${tableName}`;
+    const { bucket, prefix } = AthenaDriver.splitS3Path(path);
+    const list = await client.listObjectsV2({
+      Bucket: bucket,
+      // skip leading /
+      Prefix: prefix.slice(1),
+    });
+    if (list.Contents === undefined) {
+      throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
+    }
+    const csvFile = await Promise.all(
+      list.Contents.map(async (file) => {
+        const command = new GetObjectCommand({
+          Bucket: bucket,
+          Key: file.Key,
+        });
+        return getSignedUrl(client, command, { expiresIn: 3600 });
+      })
+    );
+
+    return {
+      csvFile,
     };
   }
 
@@ -151,7 +210,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     let isFirstBatch = true;
     let columnInfo: { Name: string }[] = [];
     for (
-      let results: AWS.GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
+      let results: GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
       results;
       results = results.NextToken
         ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
@@ -232,5 +291,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
 
     return result;
+  }
+
+  public static splitS3Path(path: string) {
+    const url = new URL(path);
+    return {
+      bucket: url.host,
+      prefix: url.pathname
+    };
   }
 }

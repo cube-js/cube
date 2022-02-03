@@ -9,6 +9,7 @@ import dotenv from '@cubejs-backend/dotenv';
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.
   expectStringFields?: boolean
+  expectCsvHeader?: boolean
 }
 
 export class DriverTests {
@@ -47,7 +48,6 @@ export class DriverTests {
   ];
 
   public async testQuery() {
-    console.log('qqq', this.options)
     const rows = await this.driver.query(this.QUERY, []);
     if (this.options.expectStringFields) {
       expect(rows).toEqual(this.rowsToString(this.ROWS));
@@ -73,7 +73,7 @@ export class DriverTests {
       table_name: 'test_pre_aggregations.orders_order_status',
       structure_version: v4(),
       content_version: v4(),
-      last_updated_at: 160000000000,
+      last_updated_at: new Date().getTime(),
       naming_version: 2
     };
     const tableName = PreAggregations.targetTableName(versionEntry);
@@ -94,17 +94,28 @@ export class DriverTests {
     const data = await this.driver.unload!(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
-    expect(string.trim()).toEqual(dedent`
-      orders__status,orders__amount
-      new,300
-      processed,400
-    `);
+    if (this.options.expectCsvHeader) {
+      expect(string.trim()).toEqual(dedent`
+        orders__status,orders__amount
+        new,300
+        processed,400
+      `);
+    } else {
+      expect(string.trim()).toEqual(dedent`
+        new,300
+        processed,400
+      `);
+    }
   }
 
   private rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
     const result: Record<string, string>[] = [];
     for (const row of rows) {
-      result.push(row.map((x: any) => x.toString()));
+      const newRow: Record<string, string> = {};
+      for (const k of Object.keys(row)) {
+        newRow[k] = row[k].toString();
+      }
+      result.push(newRow);
     }
     return result;
   }

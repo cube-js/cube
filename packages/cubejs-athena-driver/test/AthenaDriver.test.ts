@@ -27,4 +27,8 @@ describe('AthenaDriver', () => {
   test('stream', async () => {
     await tests.testStream();
   });
+
+  test('unload', async () => {
+    await tests.testUnload();
+  });
 });
