@@ -2,14 +2,21 @@
 import { expect } from '@jest/globals';
 import { DriverInterface, PreAggregations } from '@cubejs-backend/query-orchestrator';
 import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
-import { v4 } from 'uuid';
+import crypto from 'crypto';
 import dedent from 'dedent';
 import dotenv from '@cubejs-backend/dotenv';
+import { BaseQuery } from "@cubejs-backend/schema-compiler";
 
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.
   expectStringFields?: boolean
+  // Athena does not write csv headers.
+  // BigQuery writes csv headers.
   expectCsvHeader?: boolean
+  // Similar to BaseQuery.preAggregationLoadSql, but only wrapping the sql without also generating the sql from a cube.
+  // Tradeoff betweeen code duplication and minimization of the amount of input data required to write a test.
+  // TODO(cristipp) Figure out how to create a simple cube and simply delegate to BaseQuery.preAggregationLoadSql.
+  preAggregationWrapLoadSql?: (tableName: string, query: string) => string
 }
 
 export class DriverTests {
@@ -70,21 +77,23 @@ export class DriverTests {
   public async testUnload() {
     expect(this.driver.unload).toBeDefined();
     const versionEntry = {
-      table_name: 'test_pre_aggregations.orders_order_status',
-      structure_version: v4(),
-      content_version: v4(),
+      table_name: 'test.orders_order_status',
+      structure_version: crypto.randomBytes(10).toString('hex'),
+      content_version: crypto.randomBytes(10).toString('hex'),
       last_updated_at: new Date().getTime(),
       naming_version: 2
     };
     const tableName = PreAggregations.targetTableName(versionEntry);
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${this.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const loadQuery = (this.options.preAggregationWrapLoadSql ?? ((t: string, q: string) => q))(tableName, query);
     await this.driver.loadPreAggregationIntoTable(
       tableName,
-      `
-        SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
-        FROM (${this.QUERY}) AS orders
-        GROUP BY 1
-        ORDER BY 1
-      `,
+      loadQuery,
       [],
       {
         newVersionEntry: versionEntry,

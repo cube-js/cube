@@ -355,6 +355,7 @@ export class BaseDriver {
   }
 
   createTableSql(quotedTableName, columns) {
+    console.log('nnn', new Error('NOOOOOOO'));
     columns = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
     return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
   }

@@ -12,7 +12,12 @@ describe('AthenaDriver', () => {
   beforeAll(async () => {
     tests = new DriverTests(
       new AthenaDriver({}),
-      { expectStringFields: true }
+      {
+        expectStringFields: true,
+        preAggregationWrapLoadSql: (tableName: string, query: string): string => {
+          return `CREATE TABLE ${tableName} AS ${query}`;
+        }
+      }
     );
   });
 

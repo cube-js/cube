@@ -13,9 +13,9 @@ export * from './QueryCache';
 // Base queries that can be re-used across different drivers
 export * from './MysqlQuery';
 export * from './PostgresQuery';
+export * from './PrestodbQuery';
 
 // Candidates to move from this package to drivers packages
-// export * from './PrestodbQuery';
 // export * from './RedshiftQuery';
 // export * from './SnowflakeQuery';
 // export * from './SqliteQuery';

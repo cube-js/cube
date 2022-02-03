@@ -135,7 +135,6 @@ export class QueryQueue {
       return;
     }
     if (result.error) {
-      console.log('eee', result)
       throw new Error(result.error); // TODO
     } else {
       // eslint-disable-next-line consistent-return

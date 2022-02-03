@@ -921,8 +921,6 @@ export class PreAggregationLoader {
 
       let tableData: DownloadTableData;
 
-      console.log('ccc', capabilities, Object.keys(client));
-
       if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
         tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
       } else if (capabilities.streamImport && client.stream) {

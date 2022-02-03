@@ -9,7 +9,7 @@ import {
   QueryOptions,
   StreamTableData
 } from '@cubejs-backend/query-orchestrator';
-import { assertNonNullable, checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { URL } from 'url';
@@ -100,32 +100,51 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  // public async isUnloadSupported() {
-  //   return this.config.S3OutputLocation !== undefined;
-  // }
+  public async isUnloadSupported() {
+    // return this.config.S3OutputLocation !== undefined;
+    return false;
+  }
 
   public async loadPreAggregationIntoTable(
     preAggregationTableName: string,
     loadSql: string,
     params: any,
   ): Promise<any> {
-    assertNonNullable('S3OutputLocation', this.config.S3OutputLocation);
-    const path = `${this.config.S3OutputLocation}/${preAggregationTableName}`;
-    const query = `
-      UNLOAD (${loadSql})
-      TO '${path}'
-      WITH (format = 'TEXTFILE', field_delimiter = ',', compression='GZIP')
-    `;
-    const qid = await this.startQuery(query, params);
+    if (this.config.S3OutputLocation === undefined) {
+      throw new Error('Unload is not configured');
+    }
+
+    console.log('pppaaa', loadSql);
+
+    const qid = await this.startQuery(loadSql, params);
     await this.waitForSuccess(qid);
   }
 
   public async unload(tableName: string): Promise<DownloadTableCSVData> {
+    console.log('uuu', tableName);
+
+    if (this.config.S3OutputLocation === undefined) {
+      throw new Error('Unload is not configured');
+    }
+
+    const path = `${this.config.S3OutputLocation}/${tableName}`;
+
+    const unloadSql = `
+      UNLOAD (SELECT * FROM ${tableName})
+      TO '${path}'
+      WITH (format = 'TEXTFILE', field_delimiter = ',', compression='GZIP')
+    `;
+    const qid = await this.startQuery(unloadSql, []);
+    await this.waitForSuccess(qid);
+
+    const meta = await this.athena.getQueryResults(qid);
+    console.log('rrr', meta.ResultSet?.ResultSetMetadata?.ColumnInfo);
+
     const client = new S3({
       credentials: this.config.credentials,
       region: this.config.region,
     });
-    const path = `${this.config.S3OutputLocation}/${tableName}`;
+
     const { bucket, prefix } = AthenaDriver.splitS3Path(path);
     const list = await client.listObjectsV2({
       Bucket: bucket,
@@ -133,7 +152,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       Prefix: prefix.slice(1),
     });
     if (list.Contents === undefined) {
-      throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
+      throw new Error(`Unable to UNLOAD table ${path}`);
     }
     const csvFile = await Promise.all(
       list.Contents.map(async (file) => {
@@ -165,15 +184,20 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       } : s))
     );
 
-    const { QueryExecutionId } = await this.athena.startQueryExecution({
-      QueryString: queryString,
-      WorkGroup: this.config.workGroup,
-      ResultConfiguration: {
-        OutputLocation: this.config.S3OutputLocation
-      }
-    });
+    try {
+      const result = await this.athena.startQueryExecution({
+        QueryString: queryString,
+        WorkGroup: this.config.workGroup,
+        ResultConfiguration: {
+          OutputLocation: this.config.S3OutputLocation
+        }
+      });
 
-    return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
+      return { QueryExecutionId: checkNonNullable('StartQueryExecution', result.QueryExecutionId) };
+    } catch (ex) {
+      console.log('qqq', query, ex);
+      throw ex;
+    }
   }
 
   protected async checkStatus(qid: AthenaQueryId): Promise<boolean> {
@@ -216,6 +240,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
         : undefined
     ) {
+      console.log('rrr', results);
       let rows = results.ResultSet?.Rows ?? [];
       if (isFirstBatch) {
         isFirstBatch = false;
