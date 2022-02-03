@@ -1291,7 +1291,7 @@ export class PreAggregationPartitionRangeLoader {
     }
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
-      [startDate, endDate],
+      this.orNowIfEmpty([startDate, endDate]),
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
