@@ -360,7 +360,30 @@ impl CubeTable {
             partition_projection
         });
 
-        let partition_projected_schema = if let Some(p) = partition_projection.as_ref() {
+        let partition_projection_in_memory = projection_with_seq_column.as_ref().map(|p| {
+            let table = self.index_snapshot.table_path.table.get_row();
+            if let Some(mut key_columns) = table.unique_key_columns() {
+                key_columns.push(table.seq_column().expect(&format!(
+                    "Seq column is undefined for table: {}",
+                    table.get_table_name()
+                )));
+                let mut partition_projection_in_memory = Vec::with_capacity(p.len());
+                for column in key_columns {
+                    partition_projection_in_memory.push(column.get_index());
+                }
+                for index in p {
+                    if !partition_projection_in_memory.iter().any(|s| *s == index.clone()) {
+                        partition_projection_in_memory.push(index.clone());
+                    }
+                }
+
+                partition_projection_in_memory
+            } else {
+                p.clone()
+            }
+        });
+
+        let partition_projected_in_memory_schema = if let Some(p) = partition_projection_in_memory.as_ref() {
             Arc::new(Schema::new(
                 p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
@@ -410,7 +433,7 @@ impl CubeTable {
                         )))?;
                     Arc::new(MemoryExec::try_new(
                         &[record_batches.clone()],
-                        partition_projected_schema.clone(),
+                        partition_projected_in_memory_schema.clone(),
                         partition_projection.clone(),
                     )?)
                 } else {
