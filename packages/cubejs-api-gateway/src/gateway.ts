@@ -1,7 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
-import moment from 'moment';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
@@ -46,145 +45,14 @@ import { SQLServer } from './sql-server';
 
 import { makeSchema } from './graphql';
 
-type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
+import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
+import { ResultType, transformData } from './helpers/transformData';
 
-type MetaConfig = {
-  config: {
-    name: string,
-    title: string
-  }
-};
+type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
 type CheckAuthInternalOptions = {
   isPlaygroundCheckAuth: boolean;
 };
-
-const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
-  R.map((c) => [c.config.name, c.config], metaConfig)
-);
-
-const prepareAnnotation = (metaConfig: MetaConfig[], query: any) => {
-  const configMap = toConfigMap(metaConfig);
-
-  const annotation = (memberType) => (member) => {
-    const [cubeName, fieldName] = member.split('.');
-    const memberWithoutGranularity = [cubeName, fieldName].join('.');
-    const config = configMap[cubeName][memberType].find(m => m.name === memberWithoutGranularity);
-
-    if (!config) {
-      return undefined;
-    }
-
-    return [member, {
-      title: config.title,
-      shortTitle: config.shortTitle,
-      description: config.description,
-      type: config.type,
-      format: config.format,
-      meta: config.meta,
-      ...(memberType === 'measures' ? {
-        drillMembers: config.drillMembers,
-        drillMembersGrouped: config.drillMembersGrouped
-      } : {})
-    }];
-  };
-
-  const dimensions = (query.dimensions || []);
-  return {
-    measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
-    dimensions: R.fromPairs(dimensions.map(annotation('dimensions')).filter(a => !!a)),
-    segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
-    timeDimensions: R.fromPairs(
-      R.unnest(
-        (query.timeDimensions || [])
-          .filter(td => !!td.granularity)
-          .map(
-            td => [annotation('dimensions')(`${td.dimension}.${td.granularity}`)].concat(
-              // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-              dimensions.indexOf(td.dimension) === -1 ? [annotation('dimensions')(td.dimension)] : []
-            ).filter(a => !!a)
-          )
-      )
-    ),
-  };
-};
-
-const transformValue = (value, type) => {
-  if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
-    return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-  }
-  return value && value.value ? value.value : value; // TODO move to sql adapter
-};
-
-const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
-  const compact = true;
-  let row;
-  if (compact) {
-    row = R.pipe(
-      // @ts-ignore
-      R.toPairs,
-      R.map(p => {
-        const memberName = aliasToMemberNameMap[p[0]];
-        const annotationForMember = annotation[memberName];
-        return transformValue(p[1], annotationForMember.type);
-      })
-    )(r);
-  } else {
-    row = R.pipe(
-      // @ts-ignore
-      R.toPairs,
-      R.map(p => {
-        const memberName = aliasToMemberNameMap[p[0]];
-        const annotationForMember = annotation[memberName];
-  
-        if (!annotationForMember) {
-          throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
-        }
-  
-        const transformResult = [
-          memberName,
-          transformValue(p[1], annotationForMember.type)
-        ];
-  
-        const path = memberName.split('.');
-  
-        // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-        const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-        if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-          return [
-            transformResult,
-            [
-              memberNameWithoutGranularity,
-              transformResult[1]
-            ]
-          ];
-        }
-  
-        return [transformResult];
-      }),
-      // @ts-ignore
-      R.unnest,
-      R.fromPairs
-    // @ts-ignore
-    )(r);
-  
-    // @ts-ignore
-    const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
-  
-    if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
-      return {
-        ...row,
-        compareDateRange: dateRange.join(' - ')
-      };
-    } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
-      return {
-        ...row,
-        [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
-      };
-    }
-  }
-  return row;
-}));
 
 export type UserBackgroundContext = {
   // @deprecated Renamed to securityContext, please use securityContext.
@@ -201,6 +69,7 @@ type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
   queryType?: 'multi';
   apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
+  resType?: ResultType
 };
 
 export interface ApiGatewayOptions {
@@ -321,25 +190,30 @@ export class ApiGateway {
     app.use(this.logNetworkUsage);
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
+      // resType parameter
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.query.queryType
+        resType: req.query.resType,
+        queryType: req.query.queryType,
       });
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
     app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, (async (req, res) => {
+      // resType parameter
       await this.load({
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
+        resType: req.query.resType,
         queryType: req.body.queryType
       });
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
+      // resultFormat parameter
       await this.load({
         query: req.query.query,
         context: req.context,
@@ -349,6 +223,7 @@ export class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      // resultFormat parameter
       await this.sql({
         query: req.query.query,
         context: req.context,
@@ -372,6 +247,7 @@ export class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, (async (req, res) => {
+      // resultFormat parameter
       await this.dryRun({
         query: req.query.query,
         context: req.context,
@@ -849,11 +725,19 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
+  public async load(request: QueryRequest) {
+    let query;
+    const {
+      context,
+      res,
+      apiType = 'rest',
+      resType = ResultType.DEFAULT,
+      ...props
+    } = request;
     const requestStarted = new Date();
 
     try {
-      query = this.parseQueryParam(query);
+      query = this.parseQueryParam(request.query);
       this.log({
         type: 'Load Request',
         query
@@ -905,7 +789,7 @@ export class ApiGateway {
           ...annotation.measures,
           ...annotation.dimensions,
           ...annotation.timeDimensions
-        };
+        } as { [member: string]: ConfigItem };
 
         slowQuery = slowQuery || Boolean(response.slowQuery);
 
@@ -916,7 +800,8 @@ export class ApiGateway {
             flattenAnnotation,
             response.data,
             normalizedQuery,
-            queryType
+            queryType,
+            resType
           ),
           lastRefreshTime: response.lastRefreshTime?.toISOString(),
           ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
