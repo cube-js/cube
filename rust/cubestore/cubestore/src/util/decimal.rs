@@ -27,9 +27,14 @@ impl Decimal {
     pub fn to_string(&self, scale: u8) -> String {
         let n = 10_i64.pow(scale as u32);
         let v = self.raw_value();
-        let integral = v / n;
+        let integral = (v / n).abs();
         let fractional = (v % n).abs();
-        format!("{}.{}", integral, fractional)
+        format!(
+            "{}{}.{}",
+            if v.signum() < 0 { "-" } else { "" },
+            integral,
+            fractional
+        )
     }
 }
 
