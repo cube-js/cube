@@ -1959,9 +1959,6 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo Case intensive mode
-    let query = query.replace("CASE data_type", "CASE DATA_TYPE");
-    let query = query.replace("CASE update_rule    WHEN", "CASE UPDATE_RULE WHEN");
     // @todo problem with parser, space in types
     let query = query.replace("signed integer", "bigint");
     let query = query.replace("SIGNED INTEGER", "bigint");
@@ -4333,6 +4330,22 @@ mod tests {
             | KibanaSampleDataEcommerce | BASE TABLE |\n\
             | Logs                      | BASE TABLE |\n\
             +---------------------------+------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_tableau() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "SELECT `table_name`, `column_name`
+                FROM `information_schema`.`columns`
+                WHERE `data_type`='enum' AND `table_schema`='db'"
+                    .to_string()
+            )
+            .await?,
+            "++\n++\n++"
         );
 
         Ok(())
