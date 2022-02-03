@@ -4496,7 +4496,11 @@ mod tests {
 
         // Superset query
         assert_eq!(
-            execute_query("show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';".to_string()).await?,
+            execute_query(
+                "show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';"
+                    .to_string()
+            )
+            .await?,
             "+-------------+---------+----+---------+----------+---------+---------------+\n\
             | Collation   | Charset | Id | Default | Compiled | Sortlen | Pad_attribute |\n\
             +-------------+---------+----+---------+----------+---------+---------------+\n\
