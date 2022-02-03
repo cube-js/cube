@@ -3,12 +3,13 @@ use cubeclient::apis::{
     configuration::Configuration as ClientConfiguration, default_api as cube_api,
 };
 use cubeclient::models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::{compile::MetaContext, mysql::AuthContext, CubeError};
 
 #[async_trait]
-pub trait TransportService: Send + Sync {
+pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
     async fn meta(&self, ctx: &AuthContext) -> Result<MetaContext, CubeError>;
 
@@ -20,6 +21,7 @@ pub trait TransportService: Send + Sync {
     ) -> Result<V1LoadResponse, CubeError>;
 }
 
+#[derive(Debug)]
 pub struct HttpTransport;
 
 impl HttpTransport {

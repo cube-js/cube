@@ -4,6 +4,7 @@ use crate::transport::TransportService;
 
 use super::SqlAuthService;
 
+#[derive(Debug)]
 pub struct ServerConfiguration {
     /// Max number of prepared statements which can be allocated per connection
     pub connection_max_prepared_statements: usize,
@@ -17,6 +18,7 @@ impl Default for ServerConfiguration {
     }
 }
 
+#[derive(Debug)]
 pub struct ServerManager {
     // References to shared things
     pub auth: Arc<dyn SqlAuthService>,
