@@ -145,51 +145,6 @@ impl Connection {
             return Ok(QueryResponse::Ok(
                 StatusFlags::SERVER_STATUS_AUTOCOMMIT | StatusFlags::SERVER_SESSION_STATE_CHANGED,
             ));
-        } else if query_lower.eq("show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin'") {
-            return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
-                    dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "Collation".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Charset".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Id".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Default".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Compiled".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Sortlen".to_string(),
-                            ColumnType::MYSQL_TYPE_LONGLONG,
-                            ColumnFlags::empty(),
-                        ), dataframe::Column::new(
-                            "Pad_attribute".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String("utf8mb4_bin".to_string()),
-                            dataframe::TableValue::String("utf8mb4".to_string()),
-                            dataframe::TableValue::Int64(46),
-                            dataframe::TableValue::String("".to_string()),
-                            dataframe::TableValue::String("YES".to_string()),
-                            dataframe::TableValue::Int64(1),
-                            dataframe::TableValue::String("PAD SPACE".to_string()),
-                        ])]
-                    )
-                )),
-            )
         } else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
                 QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
