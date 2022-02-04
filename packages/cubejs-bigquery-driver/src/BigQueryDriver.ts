@@ -7,6 +7,7 @@ import {
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 
@@ -156,7 +157,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return this.bucket !== null;
   }
 
-  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+  public async stream(
+    query: string,
+    values: unknown[]
+  ): Promise<StreamTableData> {
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
