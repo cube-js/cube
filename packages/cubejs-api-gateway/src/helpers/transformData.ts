@@ -2,9 +2,9 @@ import R from 'ramda';
 import { UserError } from '../UserError';
 import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
-import NormalizedQuery from '../type/NormalizedQuery';
+import { NormalizedQuery } from '../type/query';
 import QueryType from '../enum/QueryType';
-import ResultType from '../enum/ResultType';
+import { ResultType } from '../type/strings';
 
 /**
  * SQL aliases to cube properties hash map.
@@ -24,7 +24,7 @@ function transformData(
 ) {
   return data.map(r => {
     let row;
-    if (resType === ResultType.COMPACT) {
+    if (resType === 'compact') {
       row = R.pipe(
         R.toPairs,
         R.map(p => {

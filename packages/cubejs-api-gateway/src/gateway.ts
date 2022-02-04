@@ -4,7 +4,6 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
-
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -12,7 +11,29 @@ import type {
   RequestHandler,
   Response,
 } from 'express';
-
+import {
+  RequestContext,
+  ExtendedRequestContext,
+  Request,
+  QueryRewriteFn,
+  SecurityContextExtractorFn,
+  ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
+} from './type/request';
+import {
+  CheckAuthInternalOptions,
+  JWTOptions,
+  CheckAuthFn,
+} from './type/auth';
+import {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+} from './type/gateway';
+import {
+  CheckAuthMiddlewareFn,
+  RequestLoggerMiddlewareFn,
+} from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
@@ -27,73 +48,17 @@ import {
   normalizeQueryPreAggregations,
   QUERY_TYPE, validatePostRewrite,
 } from './query';
-import {
-  CheckAuthFn,
-  CheckAuthMiddlewareFn,
-  ExtendContextFn,
-  ExtendedRequestContext,
-  JWTOptions,
-  QueryRewriteFn,
-  Request,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  SecurityContextExtractorFn,
-} from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
-
 import { makeSchema } from './graphql';
-
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
-import ResultType from './enum/ResultType';
 import transformData from './helpers/transformData';
 
-type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
-
-type CheckAuthInternalOptions = {
-  isPlaygroundCheckAuth: boolean;
-};
-
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
-
-type BaseRequest = {
- context: RequestContext;
- res: ResponseResultFn
-};
-
-type QueryRequest = BaseRequest & {
-  query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi';
-  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
-  resType?: ResultType
-};
-
-export interface ApiGatewayOptions {
-  standalone: boolean;
-  dataSourceStorage: any;
-  refreshScheduler: any;
-  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
-  scheduledRefreshTimeZones?: String[];
-  basePath: string;
-  extendContext?: ExtendContextFn;
-  checkAuth?: CheckAuthFn;
-  // @deprecated Please use checkAuth
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
-  jwt?: JWTOptions;
-  requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
-  queryRewrite?: QueryRewriteFn;
-  subscriptionStore?: any;
-  enforceSecurityChecks?: boolean;
-  playgroundAuthSecret?: string;
-  serverCoreVersion?: string;
-}
-
-export class ApiGateway {
+/**
+ * API gateway server class.
+ */
+class ApiGateway {
   protected readonly refreshScheduler: any;
 
   protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
@@ -739,7 +704,7 @@ export class ApiGateway {
       context,
       res,
       apiType = 'rest',
-      resType = ResultType.DEFAULT,
+      resType = 'default',
       ...props
     } = request;
     const requestStarted = new Date();
@@ -809,7 +774,7 @@ export class ApiGateway {
             response.data,
             normalizedQuery,
             queryType,
-            resType
+            resType,
           ),
           lastRefreshTime: response.lastRefreshTime?.toISOString(),
           ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
@@ -1178,9 +1143,9 @@ export class ApiGateway {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
           } else {
             this.log({
-              type: e.message,
+              type: (e as Error).message,
               token: auth,
-              error: e.stack || e.toString()
+              error: (e as Error).stack || (e as Error).toString()
             }, <any>req);
           }
         }
@@ -1252,9 +1217,9 @@ export class ApiGateway {
         this.log({
           type: 'Auth Error',
           token,
-          error: e.stack || e.toString()
+          error: (e as Error).stack || (e as Error).toString()
         }, <any>req);
-        res.status(500).json({ error: e.toString() });
+        res.status(500).json({ error: (e as Error).toString() });
       }
     }
   }
@@ -1381,7 +1346,7 @@ export class ApiGateway {
       } catch (e) {
         this.log({
           type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
+          error: (e as Error).stack || (e as Error).toString(),
         });
 
         return this.healthResponse(res, 'DOWN');
@@ -1392,7 +1357,7 @@ export class ApiGateway {
       } catch (e) {
         this.log({
           type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
+          error: (e as Error).stack || (e as Error).toString(),
         });
 
         health = 'DOWN';
@@ -1410,7 +1375,7 @@ export class ApiGateway {
     } catch (e) {
       this.log({
         type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
+        error: (e as Error).stack || (e as Error).toString(),
       });
 
       return this.healthResponse(res, 'DOWN');
@@ -1422,7 +1387,7 @@ export class ApiGateway {
     } catch (e) {
       this.log({
         type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
+        error: (e as Error).stack || (e as Error).toString(),
       });
 
       health = 'DOWN';
@@ -1437,3 +1402,8 @@ export class ApiGateway {
     }
   }
 }
+export {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+  ApiGateway,
+};

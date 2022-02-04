@@ -4,7 +4,6 @@ import Joi from '@hapi/joi';
 
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
-import Query from './type/Query';
 import QueryType from './enum/QueryType';
 
 export const QUERY_TYPE = QueryType;
@@ -161,7 +160,7 @@ export const validatePostRewrite = (query) => {
  * Normalize incoming network query.
  * @param {Query} query
  * @throws {UserError}
- * @returns
+ * @returns {NormalizedQuery}
  */
 export const normalizeQuery = (query) => {
   const { error } = Joi.validate(query, querySchema);
