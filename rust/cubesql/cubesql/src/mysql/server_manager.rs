@@ -4,12 +4,26 @@ use crate::transport::TransportService;
 
 use super::SqlAuthService;
 
+pub struct ServerConfiguration {
+    /// Max number of prepared statements which can be allocated per connection
+    pub connection_max_prepared_statements: usize,
+}
+
+impl Default for ServerConfiguration {
+    fn default() -> Self {
+        Self {
+            connection_max_prepared_statements: 50,
+        }
+    }
+}
+
 pub struct ServerManager {
     // References to shared things
     pub auth: Arc<dyn SqlAuthService>,
     pub transport: Arc<dyn TransportService>,
     // Non references
-    nonce: Option<Vec<u8>>,
+    pub configuration: ServerConfiguration,
+    pub nonce: Option<Vec<u8>>,
 }
 
 impl ServerManager {
@@ -22,10 +36,7 @@ impl ServerManager {
             auth,
             transport,
             nonce,
+            configuration: ServerConfiguration::default(),
         }
-    }
-
-    pub fn get_nonce(&self) -> Option<Vec<u8>> {
-        self.nonce.clone()
     }
 }

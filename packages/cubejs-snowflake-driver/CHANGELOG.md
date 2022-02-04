@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+
+### Features
+
+* **@cubejs-backend/snowflake-driver:** CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY env variable support ([38f4840](https://github.com/cube-js/cube.js/commit/38f484010f56ad44193147188f6993d6d1906ebe))
+
+
+
+
+
 ## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver
