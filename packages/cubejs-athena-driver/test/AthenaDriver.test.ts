@@ -1,4 +1,4 @@
-import { DriverTests } from '@cubejs-backend/testing';
+import { DriverTests } from '@cubejs-backend/testing/dist/src/testing';
 
 import { AthenaDriver } from '../src';
 
