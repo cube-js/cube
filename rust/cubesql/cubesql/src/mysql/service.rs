@@ -86,32 +86,50 @@ impl ConnectionState {
     }
 
     pub fn user(&self) -> Option<String> {
-        let guard = self.properties.read().expect("test");
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading user");
         guard.user.clone()
     }
 
     pub fn set_user(&self, user: Option<String>) {
-        let mut guard = self.properties.write().expect("test");
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting user");
         guard.user = user;
     }
 
     pub fn database(&self) -> Option<String> {
-        let guard = self.properties.read().expect("test");
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading database");
         guard.database.clone()
     }
 
     pub fn set_database(&self, database: Option<String>) {
-        let mut guard = self.properties.write().expect("test");
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting database");
         guard.database = database;
     }
 
     pub fn auth_context(&self) -> Option<AuthContext> {
-        let guard = self.auth_context.read().expect("test");
+        let guard = self
+            .auth_context
+            .read()
+            .expect("failed to unlock auth_context for reading");
         guard.clone()
     }
 
     pub fn set_auth_context(&self, auth_context: Option<AuthContext>) {
-        let mut guard = self.auth_context.write().expect("test");
+        let mut guard = self
+            .auth_context
+            .write()
+            .expect("failed to auth_context properties for writting");
         *guard = auth_context;
     }
 }
