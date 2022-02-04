@@ -14,7 +14,7 @@ on:
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
-      - 'rollup.config.ts'
+      - 'rollup.config.js'
       - 'yarn.lock'
     branches:
       - 'master'
@@ -31,7 +31,7 @@ on:
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
-      - 'rollup.config.ts'
+      - 'rollup.config.js'
       - 'yarn.lock'
 
 jobs:

@@ -17,7 +17,7 @@ $ git commit -m "Initial"
 $ yarn eject
 ```
 
-Once you’ve run it, you can find a new folder called `config`. Inside the config folder, you can find all the project configuration files, but today we only need the `webpack.config.ts` file.
+Once you’ve run it, you can find a new folder called `config`. Inside the config folder, you can find all the project configuration files, but today we only need the `webpack.config.js` file.
 
 Now let’s install Less.
 
@@ -25,7 +25,7 @@ Now let’s install Less.
 $ yarn add less less-loader
 ```
 
-Next, we need to modify the webpack configuration file.  Open `config/webpack.config.ts` and
+Next, we need to modify the webpack configuration file.  Open `config/webpack.config.js` and
 Find the `cssRegex` constant and change it:
 
 ```diff
