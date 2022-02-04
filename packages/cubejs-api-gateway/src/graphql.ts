@@ -29,7 +29,7 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
-import { QUERY_TYPE } from './query';
+import { QueryType } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -573,7 +573,7 @@ export function makeSchema(metaConfig: any) {
             try {
               await apiGateway.load({
                 query,
-                queryType: QUERY_TYPE.REGULAR_QUERY,
+                queryType: QueryType.REGULAR_QUERY,
                 context: req.context,
                 res: (message) => {
                   if (message.error) {

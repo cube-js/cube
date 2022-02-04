@@ -37,6 +37,14 @@ type QueryType =
   'blendingQuery';
 
 /**
+ * String that represent query member type.
+ */
+type MemberType =
+  'measures' |
+  'dimensions' |
+  'segments';
+
+/**
  * Member identifier. Should satisfy to the following regexp: /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/
  */
 type Member = string;
@@ -95,6 +103,7 @@ export {
   ResultType,
   ApiType,
   QueryType,
+  MemberType,
   Member,
   TimeMember,
   FilterOperator,

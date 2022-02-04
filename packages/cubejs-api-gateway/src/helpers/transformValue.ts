@@ -1,6 +1,5 @@
 import moment from 'moment';
 
-export
 /**
  * Transform cpecified `value` with specified `type` to the network
  * protocol type.
@@ -17,3 +16,8 @@ function transformValue(value: any, type: string) {
   // TODO: move to sql adapter
   return value && value.value ? value.value : value;
 }
+
+export default transformValue;
+export {
+  transformValue,
+};

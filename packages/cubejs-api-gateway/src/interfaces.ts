@@ -6,7 +6,11 @@ import type {
 
 import {
   QueryTimeDimensionGranularity
-} from './type/strings';
+} from './types/strings';
+
+import {
+  QueryType,
+} from './types/enums';
 
 import {
   QueryFilter,
@@ -16,14 +20,14 @@ import {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
-} from './type/query';
+} from './types/query';
 
 import {
   JWTOptions,
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
-} from './type/auth';
+} from './types/auth';
 
 import {
   RequestContext,
@@ -33,10 +37,11 @@ import {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
-} from './type/request';
+} from './types/request';
 
 export {
   QueryTimeDimensionGranularity,
+  QueryType,
   QueryFilter,
   LogicalAndFilter,
   LogicalOrFilter,

@@ -1,8 +1,6 @@
 import R from 'ramda';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './toConfigMap';
-import MemberType from '../enum/MemberType';
-
-export
+import { MemberType } from '../types/strings';
 
 /**
  * Annotation item for cube's member.
@@ -17,8 +15,6 @@ type ConfigItem = {
   drillMembers?: any[];
   drillMembersGrouped?: any;
 };
-
-export
 
 /**
  * Returns annotations by MetaConfigMap and cube's member type.
@@ -42,14 +38,12 @@ const annotation = (
     type: config.type,
     format: config.format,
     meta: config.meta,
-    ...(memberType === MemberType.MEASURES ? {
+    ...(memberType === 'measures' ? {
       drillMembers: config.drillMembers,
       drillMembersGrouped: config.drillMembersGrouped
     } : {})
   }];
 };
-
-export
 
 /**
  * Returns annotations object by MetaConfigs and query.
@@ -60,17 +54,17 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
   return {
     measures: R.fromPairs(
       (query.measures || []).map(
-        annotation(configMap, MemberType.MEASURES)
+        annotation(configMap, 'measures')
       ).filter(a => !!a)
     ),
     dimensions: R.fromPairs(
       dimensions
-        .map(annotation(configMap, MemberType.DIMENSIONS))
+        .map(annotation(configMap, 'dimensions'))
         .filter(a => !!a)
     ),
     segments: R.fromPairs(
       (query.segments || [])
-        .map(annotation(configMap, MemberType.SEGMENTS))
+        .map(annotation(configMap, 'segments'))
         .filter(a => !!a)
     ),
     timeDimensions: R.fromPairs(
@@ -81,7 +75,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
             td => [
               annotation(
                 configMap,
-                MemberType.DIMENSIONS
+                'dimensions'
               )(
                 `${td.dimension}.${td.granularity}`
               )
@@ -90,7 +84,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               // referencing time dimensions without granularity
               dimensions.indexOf(td.dimension) === -1
                 ? [
-                  annotation(configMap, MemberType.DIMENSIONS)(td.dimension)
+                  annotation(configMap, 'dimensions')(td.dimension)
                 ]
                 : []
             ).filter(a => !!a)
@@ -99,3 +93,10 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
     ),
   };
 }
+
+export default prepareAnnotation;
+export {
+  ConfigItem,
+  annotation,
+  prepareAnnotation,
+};

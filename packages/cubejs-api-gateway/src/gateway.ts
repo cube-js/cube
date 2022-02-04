@@ -12,6 +12,12 @@ import type {
   Response,
 } from 'express';
 import {
+  QueryType
+} from './types/strings';
+import {
+  QueryType as QueryTypeEnum
+} from './types/enums';
+import {
   RequestContext,
   ExtendedRequestContext,
   Request,
@@ -20,16 +26,20 @@ import {
   ExtendContextFn,
   ResponseResultFn,
   QueryRequest,
-} from './type/request';
+} from './types/request';
 import {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
-} from './type/auth';
+} from './types/auth';
+import {
+  Query,
+  NormalizedQuery,
+} from './types/query';
 import {
   UserBackgroundContext,
   ApiGatewayOptions,
-} from './type/gateway';
+} from './types/gateway';
 import {
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
@@ -46,7 +56,7 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
-  QUERY_TYPE, validatePostRewrite,
+  validatePostRewrite,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -538,21 +548,24 @@ class ApiGateway {
     }
   }
 
-  protected async getNormalizedQueries(query, context: RequestContext): Promise<any> {
+  protected async getNormalizedQueries(
+    query: Record<string, any> | Record<string, any>[],
+    context: RequestContext,
+  ): Promise<[QueryType, NormalizedQuery[]]> {
     query = this.parseQueryParam(query);
-    let queryType = QUERY_TYPE.REGULAR_QUERY;
+    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
 
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
-        queryType = QUERY_TYPE.COMPARE_DATE_RANGE_QUERY;
+        queryType = QueryTypeEnum.COMPARE_DATE_RANGE_QUERY;
       }
     } else {
-      queryType = QUERY_TYPE.BLENDING_QUERY;
+      queryType = QueryTypeEnum.BLENDING_QUERY;
     }
 
     const queries = Array.isArray(query) ? query : [query];
-    const normalizedQueries = await Promise.all(
+    const normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => validatePostRewrite(
           await this.queryRewrite(
@@ -567,7 +580,7 @@ class ApiGateway {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
 
-    if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    if (queryType === QueryTypeEnum.BLENDING_QUERY) {
       const queryGranularity = getQueryGranularity(normalizedQueries);
 
       if (queryGranularity.length > 1) {
@@ -600,7 +613,7 @@ class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
-      res(queryType === QUERY_TYPE.REGULAR_QUERY ?
+      res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
     } catch (e) {
@@ -741,7 +754,7 @@ class ApiGateway {
       );
 
       let slowQuery = false;
-      const results = await Promise.all<any[]>(normalizedQueries.map(async (normalizedQuery, index) => {
+      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
         const sqlQuery = sqlQueries[index];
         const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
         const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
@@ -806,7 +819,7 @@ class ApiGateway {
         context
       );
 
-      if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
+      if (queryType !== QueryTypeEnum.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
       }
 
@@ -892,14 +905,14 @@ class ApiGateway {
     return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
-  protected parseQueryParam(query) {
+  protected parseQueryParam(query): Query | Query[] {
     if (!query || query === 'undefined') {
       throw new UserError('query param is required');
     }
     if (typeof query === 'string') {
       query = JSON.parse(query);
     }
-    return query;
+    return query as Query | Query[];
   }
 
   protected getCompilerApi(context) {

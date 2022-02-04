@@ -1,16 +1,19 @@
 /**
- * @fileoverview Network query type enum definition.
- * @copyright Cube Dev, Inc.
  * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview
+ * API Gateway enums definition.
  */
 
 /**
- * String that represent query type.
+ * Query type enum.
  */
-enum QueryType {
+ enum QueryType {
   REGULAR_QUERY = 'regularQuery',
   COMPARE_DATE_RANGE_QUERY = 'compareDateRangeQuery',
   BLENDING_QUERY = 'blendingQuery',
 }
 
-export default QueryType;
+export {
+  QueryType,
+};

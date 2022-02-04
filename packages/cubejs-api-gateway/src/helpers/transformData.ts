@@ -2,9 +2,8 @@ import R from 'ramda';
 import { UserError } from '../UserError';
 import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
-import { NormalizedQuery } from '../type/query';
-import QueryType from '../enum/QueryType';
-import { ResultType } from '../type/strings';
+import { NormalizedQuery } from '../types/query';
+import { ResultType, QueryType } from '../types/strings';
 
 /**
  * SQL aliases to cube properties hash map.
@@ -17,7 +16,7 @@ type AliasToMemberMap = { [alias: string]: string };
 function transformData(
   aliasToMemberNameMap: AliasToMemberMap,
   annotation: { [member: string]: ConfigItem },
-  data: { [alias: string]: unknown }[],
+  data: { [sqlAlias: string]: unknown }[],
   query: NormalizedQuery,
   queryType: QueryType,
   resType: ResultType
@@ -83,12 +82,12 @@ function transformData(
       const [{ dimension, granularity, dateRange } = {}]
         = query.timeDimensions;
     
-      if (queryType === QueryType.COMPARE_DATE_RANGE_QUERY) {
+      if (queryType === 'compareDateRangeQuery') {
         return {
           ...row,
           compareDateRange: dateRange.join(' - ')
         };
-      } else if (queryType === QueryType.BLENDING_QUERY) {
+      } else if (queryType === 'blendingQuery') {
         return {
           ...row,
           [['time', granularity].join('.')]:
@@ -101,3 +100,7 @@ function transformData(
 }
 
 export default transformData;
+export {
+  AliasToMemberMap,
+  transformData,
+};
