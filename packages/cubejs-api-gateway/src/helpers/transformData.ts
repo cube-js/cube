@@ -1,9 +1,17 @@
+/**
+ * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview
+ * transformData function and related types definition.
+ */
+
 import R from 'ramda';
 import { UserError } from '../UserError';
 import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
 import { NormalizedQuery } from '../types/query';
 import { ResultType, QueryType } from '../types/strings';
+import { ResultType as ResultTypeEnum } from '../types/enums';
 
 /**
  * SQL aliases to cube properties hash map.
@@ -23,7 +31,7 @@ function transformData(
 ) {
   return data.map(r => {
     let row;
-    if (resType === 'compact') {
+    if (resType === ResultTypeEnum.COMPACT) {
       row = R.pipe(
         R.toPairs,
         R.map(p => {

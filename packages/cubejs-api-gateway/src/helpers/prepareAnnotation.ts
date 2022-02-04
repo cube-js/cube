@@ -1,6 +1,14 @@
+/**
+ * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview
+ * prepareAnnotation function and related types definition.
+ */
+
 import R from 'ramda';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './toConfigMap';
 import { MemberType } from '../types/strings';
+import { MemberType as MemberTypeEnum } from '../types/enums';
 
 /**
  * Annotation item for cube's member.
@@ -38,7 +46,7 @@ const annotation = (
     type: config.type,
     format: config.format,
     meta: config.meta,
-    ...(memberType === 'measures' ? {
+    ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,
       drillMembersGrouped: config.drillMembersGrouped
     } : {})

@@ -1,3 +1,10 @@
+/**
+ * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview
+ * toConfigMap function and related types definition.
+ */
+
 import R from 'ramda';
 
 /**
