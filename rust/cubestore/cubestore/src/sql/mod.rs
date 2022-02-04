@@ -633,8 +633,12 @@ impl SqlService for SqlServiceImpl {
                 let table_name = &nv[1].value;
                 let import_format = if with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "skip_header" && opt.value == Value::SingleQuotedString("true".to_string()))
-                    .is_some() {
+                    .find(|&opt| {
+                        opt.name.value == "skip_header"
+                            && opt.value == Value::SingleQuotedString("true".to_string())
+                    })
+                    .is_some()
+                {
                     ImportFormat::CSVSkipHeader
                 } else {
                     ImportFormat::CSV
