@@ -1,6 +1,4 @@
 /* eslint-disable max-len */
-import stream from 'stream';
-
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
@@ -39,7 +37,7 @@ export interface DownloadTableCSVData extends DownloadTableBase {
 }
 
 export interface StreamTableData extends DownloadTableBase {
-  rowStream: stream.Readable
+  rowStream: NodeJS.ReadableStream;
   /**
    * Some drivers know types of response
    */
