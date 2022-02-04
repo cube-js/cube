@@ -707,8 +707,6 @@ export class PreAggregationLoader {
   }
 
   public refresh(preAggregation: any, newVersionEntry, invalidationKeys) {
-    // console.log('rrr2', new Error('hi'), preAggregation, newVersionEntry, invalidationKeys);
-
     return (client) => {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
