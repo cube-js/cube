@@ -2,7 +2,6 @@ import { PostgresQuery } from './PostgresQuery';
 import { MysqlQuery } from './MysqlQuery';
 import { MongoBiQuery } from './MongoBiQuery';
 import { MssqlQuery } from './MssqlQuery';
-import { AthenaQuery } from './AthenaQuery';
 import { BigqueryQuery } from './BigqueryQuery';
 import { RedshiftQuery } from './RedshiftQuery';
 import { PrestodbQuery } from './PrestodbQuery';
@@ -25,7 +24,7 @@ const ADAPTERS = {
   bigquery: BigqueryQuery,
   prestodb: PrestodbQuery,
   qubole_prestodb: PrestodbQuery,
-  athena: AthenaQuery,
+  athena: PrestodbQuery,
   vertica: VerticaQuery,
   snowflake: SnowflakeQuery,
   clickhouse: ClickHouseQuery,
