@@ -1,8 +1,10 @@
 import { PostgresDBRunner } from '@cubejs-backend/testing';
-import { streamToArray } from "@cubejs-backend/shared";
+
 import { StartedTestContainer } from 'testcontainers';
 
 import { PostgresDriver } from '../src';
+
+const streamToArray = require('stream-to-array');
 
 describe('PostgresDriver', () => {
   let container: StartedTestContainer;
@@ -96,7 +98,6 @@ describe('PostgresDriver', () => {
           type: 'decimal'
         },
       ]);
-      // @ts-ignore
       expect(await streamToArray(tableData.rowStream)).toEqual([
         { id: '1', created: '2020-01-01T00:00:00.000', price: '100' },
         { id: '2', created: '2020-01-02T00:00:00.000', price: '200' },

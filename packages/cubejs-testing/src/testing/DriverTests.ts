@@ -5,6 +5,7 @@ import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import dedent from 'dedent';
 import dotenv from '@cubejs-backend/dotenv';
+import { Readable } from "stream";
 
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.
@@ -66,9 +67,8 @@ export class DriverTests {
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
     const tableData = await this.driver.stream!(DriverTests.QUERY, [], { highWaterMark: 100 });
-    // Strangely, using tableData.rowStream as a stream.Readable instead of NodeJS.ReadableStream works.
-    // @ts-ignore
-    const rows = await streamToArray(tableData.rowStream);
+    expect(tableData.rowStream instanceof Readable);
+    const rows = await streamToArray(tableData.rowStream as Readable);
     const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
     expect(rows).toEqual(expectedRows);
   }
