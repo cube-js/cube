@@ -1,5 +1,5 @@
 import spawn from 'cross-spawn';
-import stream from 'stream';
+import { Readable } from 'stream';
 
 export function getRealType(value: any): string {
   if (value === null) {
@@ -48,14 +48,16 @@ export function checkNonNullable<T>(name: string, x: T): NonNullable<T> {
   return x;
 }
 
-export async function streamToArray<T>(xstream: stream.Readable): Promise<T[]> {
+export async function streamToArray<T>(stream: Readable): Promise<T[]> {
   const result: T[] = [];
-  for await (const x of xstream) {
+  for await (const x of stream) {
     result.push(x);
   }
   return result;
 }
 
-export async function nodeStreamToArray<T>(nodeStream: NodeJS.ReadableStream): Promise<T[]> {
-  return streamToArray(new stream.Readable().wrap(nodeStream));
+// https://nodejs.org/api/stream.html#readablewrapstream
+// https://nodejs.org/api/stream.html#compatibility-with-older-nodejs-versions
+export async function oldStreamToArray<T>(stream: NodeJS.ReadableStream): Promise<T[]> {
+  return streamToArray(new Readable().wrap(stream));
 }
