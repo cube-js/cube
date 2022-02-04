@@ -34,7 +34,7 @@ fn main() {
     init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
     init_cube_logger(true);
 
-    log::info!("Cube Store !!! version {}", version);
+    log::info!("Cube Store version {}", version);
 
     let config = Config::default();
     Config::configure_worker_services();
