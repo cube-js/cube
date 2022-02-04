@@ -55,6 +55,7 @@ COPY packages/cubejs-mysql-driver/package.json packages/cubejs-mysql-driver/pack
 COPY packages/cubejs-cubestore-driver/package.json packages/cubejs-cubestore-driver/package.json
 COPY packages/cubejs-oracle-driver/package.json packages/cubejs-oracle-driver/package.json
 COPY packages/cubejs-postgres-driver/package.json packages/cubejs-postgres-driver/package.json
+COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/package.json
 COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
 COPY packages/cubejs-query-orchestrator/package.json packages/cubejs-query-orchestrator/package.json
 COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compiler/package.json
@@ -110,6 +111,7 @@ COPY packages/cubejs-mysql-driver/ packages/cubejs-mysql-driver/
 COPY packages/cubejs-cubestore-driver/ packages/cubejs-cubestore-driver/
 COPY packages/cubejs-oracle-driver/ packages/cubejs-oracle-driver/
 COPY packages/cubejs-postgres-driver/ packages/cubejs-postgres-driver/
+COPY packages/cubejs-questdb-driver/ packages/cubejs-questdb-driver/
 COPY packages/cubejs-prestodb-driver/ packages/cubejs-prestodb-driver/
 COPY packages/cubejs-query-orchestrator/ packages/cubejs-query-orchestrator/
 COPY packages/cubejs-schema-compiler/ packages/cubejs-schema-compiler/
