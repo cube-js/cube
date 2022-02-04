@@ -178,6 +178,7 @@ impl SqlServiceImpl {
         columns: &Vec<ColumnDef>,
         external: bool,
         locations: Option<Vec<String>>,
+        import_format: Option<ImportFormat>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         partitioned_index: Option<PartitionedIndexRef>,
@@ -293,7 +294,7 @@ impl SqlServiceImpl {
                 table_name,
                 columns_to_set,
                 locations,
-                Some(ImportFormat::CSV),
+                import_format,
                 indexes_to_create,
                 false,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
@@ -613,6 +614,7 @@ impl SqlService for SqlServiceImpl {
                         name,
                         columns,
                         external,
+                        with_options,
                         ..
                     },
                 indexes,
@@ -629,6 +631,14 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
+                let import_format = if with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "skip_header" && opt.value == Value::SingleQuotedString("true".to_string()))
+                    .is_some() {
+                    ImportFormat::CSVSkipHeader
+                } else {
+                    ImportFormat::CSV
+                };
 
                 let res = self
                     .create_table(
@@ -637,6 +647,7 @@ impl SqlService for SqlServiceImpl {
                         &columns,
                         external,
                         locations,
+                        Some(import_format),
                         indexes,
                         unique_key,
                         partitioned_index,

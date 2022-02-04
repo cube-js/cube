@@ -82,6 +82,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+    console.log('qqq', query);
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const rows: R[] = [];
@@ -92,6 +93,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+    console.log('sss', query);
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query));
@@ -101,8 +103,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async isUnloadSupported() {
-    // return this.config.S3OutputLocation !== undefined;
-    return false;
+    return this.config.S3OutputLocation !== undefined;
   }
 
   public async loadPreAggregationIntoTable(
@@ -113,8 +114,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     if (this.config.S3OutputLocation === undefined) {
       throw new Error('Unload is not configured');
     }
-
-    console.log('pppaaa', loadSql);
 
     const qid = await this.startQuery(loadSql, params);
     await this.waitForSuccess(qid);
@@ -136,9 +135,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     `;
     const qid = await this.startQuery(unloadSql, []);
     await this.waitForSuccess(qid);
-
-    const meta = await this.athena.getQueryResults(qid);
-    console.log('rrr', meta.ResultSet?.ResultSetMetadata?.ColumnInfo);
 
     const client = new S3({
       credentials: this.config.credentials,
@@ -166,14 +162,23 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     return {
       csvFile,
+      skipHeader: true
     };
   }
 
   public async tablesSchema(): Promise<AthenaSchema> {
+    console.log('tttsss');
+
     const tablesSchema = await super.tablesSchema();
     const viewsSchema = await this.viewsSchema(tablesSchema);
 
     return this.mergeSchemas([tablesSchema, viewsSchema]);
+  }
+
+  public async tableColumnTypes(table: string) {
+    const result = await super.tableColumnTypes(table);
+    console.log('ccc', table, result);
+    return result;
   }
 
   protected async startQuery(query: string, values: unknown[]): Promise<AthenaQueryId> {
@@ -240,7 +245,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
         : undefined
     ) {
-      console.log('rrr', results);
       let rows = results.ResultSet?.Rows ?? [];
       if (isFirstBatch) {
         isFirstBatch = false;

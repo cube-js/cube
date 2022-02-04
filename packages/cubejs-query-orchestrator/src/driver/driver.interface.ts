@@ -31,6 +31,11 @@ export interface DownloadTableCSVData extends DownloadTableBase {
    * Some drivers know types of response
    */
   types?: TableStructure;
+
+  /**
+   * Some drivers export csv files with no header row.
+   */
+  skipHeader?: boolean;
 }
 
 export interface StreamTableData extends DownloadTableBase {
