@@ -39,7 +39,7 @@ $ cd packages/cubejs-bigquery-driver
 $ CUBEJS_TEST_ENV=${HOME}/.env yarn test
 ```
 
-Run end2end tests:
+Run e2e tests:
 
 ```shell
 $ cd packages/cubejs-testing
