@@ -1,5 +1,5 @@
 import yargs from 'yargs/yargs';
-import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
+import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
 
@@ -48,7 +48,6 @@ describe(name, () => {
 
   let birdbox: BirdBox;
   let httpClient: CubejsApi;
-  let transport: HttpTransport;
 
   beforeAll(async () => {
     try {
