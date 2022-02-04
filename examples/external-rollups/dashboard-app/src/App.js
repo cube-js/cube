@@ -42,7 +42,7 @@ const AppLayout = ({ children }) => (
             marginRight: "1em"
           }}
         >
-          Cube Store pre-aggregations Example
+          Cube Pre-Aggregations Example
         </h2>
       </div>
       <div
@@ -94,7 +94,7 @@ const Dashboard = ({ children, onPreAggChange, onDateRangeChange, onCategoryChan
     <Col span={24} lg={12} align="left">
       <Switch
         onChange={checked => onPreAggChange(checked ? "PreAgg" : "")}
-      /> Use Cube Store pre-aggregations
+      /> Use pre-aggregations in Cube Store
     </Col>
     <Col span={24} lg={6} align="right">
       <Radio.Group
