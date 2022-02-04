@@ -61,7 +61,7 @@ describe(name, () => {
               envFile: args.envFile,
               extraEnv: {
                 CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
-                CUBEJS_REFRESH_WORKER: 'false',
+                CUBEJS_EXTERNAL_DEFAULT: 'true',
               }
             }
           );

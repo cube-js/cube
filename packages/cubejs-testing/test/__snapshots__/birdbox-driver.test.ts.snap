@@ -16,9 +16,3 @@ Array [
   },
 ]
 `;
-
-exports[`bigquery Driver.stream: Driver.stream 1`] = `
-Object {
-  "subscribe": [Function],
-}
-`;
