@@ -76,7 +76,7 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
-type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 export const setLogLevel = (level: LogLevel): void => {
     const native = loadNative();
