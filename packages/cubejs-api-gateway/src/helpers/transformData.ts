@@ -11,7 +11,10 @@ import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
 import { NormalizedQuery } from '../types/query';
 import { ResultType, QueryType } from '../types/strings';
-import { ResultType as ResultTypeEnum } from '../types/enums';
+import {
+  ResultType as ResultTypeEnum,
+  QueryType as QueryTypeEnum
+} from '../types/enums';
 
 /**
  * SQL aliases to cube properties hash map.
@@ -40,28 +43,39 @@ function transformData(
           return transformValue(p[1], annotationForMember.type);
         })
       )(r);
+      if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
+        // Pushing QueryTypeEnum.COMPARE_DATE_RANGE_QUERY value to
+        // the final dataset row to make it possible to determine
+        // the query type on the client side.
+        (row as any[]).push(QueryTypeEnum.COMPARE_DATE_RANGE_QUERY);
+      } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
+        // Pushing QueryTypeEnum.BLENDING_QUERY value to the final
+        // dataset row to make it possible to determine the query
+        // type on the client side.
+        (row as any[]).push(QueryTypeEnum.BLENDING_QUERY);
+      }
     } else {
       row = R.pipe(
         R.toPairs,
         R.map(p => {
           const memberName = aliasToMemberNameMap[p[0]];
           const annotationForMember = annotation[memberName];
-    
           if (!annotationForMember) {
             throw new UserError(
               `You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`
             );
           }
-    
           const transformResult = [
             memberName,
             transformValue(p[1], annotationForMember.type)
           ];
-    
           const path = memberName.split('.');
-    
-          // TODO: deprecated: backward compatibility for referencing
-          // time dimensions without granularity
+
+          /**
+           * Time dimensions without granularity.
+           * @deprecated
+           * @todo backward compatibility for referencing
+           */
           const memberNameWithoutGranularity =
             [path[0], path[1]].join('.');
           if (
@@ -85,7 +99,7 @@ function transformData(
         R.fromPairs
       // @ts-ignore
       )(r);
-    
+
       // @ts-ignore
       const [{ dimension, granularity, dateRange } = {}]
         = query.timeDimensions;

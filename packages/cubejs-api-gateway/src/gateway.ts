@@ -548,6 +548,10 @@ class ApiGateway {
     }
   }
 
+  /**
+   * Convert incoming query parameter (JSON fetched from the HTTP) to
+   * an array of query type and array of normalized queries.
+   */
   protected async getNormalizedQueries(
     query: Record<string, any> | Record<string, any>[],
     context: RequestContext,
