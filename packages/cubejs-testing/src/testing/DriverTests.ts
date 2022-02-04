@@ -66,6 +66,8 @@ export class DriverTests {
   public async testStream() {
     expect(this.driver.stream).toBeDefined();
     const tableData = await this.driver.stream!(DriverTests.QUERY, [], { highWaterMark: 100 });
+    // Strangely, using tableData.rowStream as a stream.Readable instead of NodeJS.ReadableStream works.
+    // @ts-ignore
     const rows = await streamToArray(tableData.rowStream);
     const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
     expect(rows).toEqual(expectedRows);

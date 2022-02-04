@@ -3,6 +3,8 @@ import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
 
+require('jest-specific-snapshot');
+
 const DB_TYPES = ['athena', 'bigquery'];
 type DbType = typeof DB_TYPES[number];
 
@@ -108,6 +110,8 @@ describe(name, () => {
         dimensions: ['Orders.status'],
       }
     );
-    expect(response.rawData()).toMatchSnapshot('Driver.query');
+    // ../.. to move out of dist/test directory
+    // @ts-ignore
+    expect(response.rawData()).toMatchSpecificSnapshot(`../../test/__snapshots__/${name}.query.snapshot`);
   });
 });
