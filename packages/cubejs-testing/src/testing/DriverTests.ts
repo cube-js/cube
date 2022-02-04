@@ -11,7 +11,7 @@ export interface DriverTestsOptions {
   expectStringFields?: boolean
   // Athena does not write csv headers.
   // BigQuery writes csv headers.
-  expectCsvHeader?: boolean
+  skipHeader?: boolean
   // Some drivers unload from a CTAS query, others unload from a stream.
   wrapLoadQueryWithCtas?: boolean
 }
@@ -100,9 +100,9 @@ export class DriverTests {
     const data = await this.driver.unload!(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
-    const expectedRows = this.options.expectCsvHeader
-      ? DriverTests.CSV_ROWS
-      : this.skipFirstLine(DriverTests.CSV_ROWS);
+    const expectedRows = this.options.skipHeader
+      ? this.skipFirstLine(DriverTests.CSV_ROWS)
+      : DriverTests.CSV_ROWS;
     expect(string.trim()).toEqual(expectedRows);
   }
 

@@ -200,8 +200,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     params: any,
     options: any
   ): Promise<any> {
-    console.log('ppp', preAggregationTableName, loadSql, new Error('ppp'));
-
     const [dataSet, tableName] = preAggregationTableName.split('.');
 
     const bigQueryQuery: Query = {
