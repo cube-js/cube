@@ -1,7 +1,6 @@
 import { PostgresDBRunner } from '@cubejs-backend/testing';
 import { streamToArray } from "@cubejs-backend/shared";
 import { StartedTestContainer } from 'testcontainers';
-import stream from 'stream';
 
 import { PostgresDriver } from '../src';
 
