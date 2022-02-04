@@ -1,7 +1,7 @@
 import yargs from 'yargs/yargs';
 import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
-import { afterAll, beforeAll, expect, jest } from "@jest/globals";
-import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from "../src";
+import { afterAll, beforeAll, expect, jest } from '@jest/globals';
+import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
 
 const DB_TYPES = ['athena', 'bigquery'];
 type DbType = typeof DB_TYPES[number];
@@ -110,11 +110,4 @@ describe(name, () => {
     );
     expect(response.rawData()).toMatchSnapshot('Driver.query');
   });
-
-  // it('Driver.stream', async () => {
-  //   const response = await transport.request('run-scheduled-refresh', {});
-  //   const result = await response.subscribe(identity);
-  //   console.log('zzz', result);
-  //   // expect(response).toMatchSnapshot('Driver.stream');
-  // });
 });
