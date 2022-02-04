@@ -57,17 +57,34 @@ impl TransportService for NodeBridgeTransport {
             },
             user: Some(ctx.access_token.clone()),
         })?;
-        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+
+        let response: serde_json::Value = call_js_with_channel_as_callback(
             self.channel.clone(),
             self.on_meta.clone(),
             Some(extra),
         )
         .await?;
+
         trace!("[transport] Meta <- {:?}", response);
 
-        Ok(MetaContext {
-            cubes: response.cubes.unwrap_or_default(),
-        })
+        let meta_response = match serde_json::from_value::<V1MetaResponse>(response.clone()) {
+            Ok(r) => {
+                // If `r.cubes` is `None`, then assume response includes an error
+                let cubes = r.cubes.unwrap_or_default();
+                if cubes.is_empty() {
+                    if let Ok(res) = serde_json::from_value::<V1Error>(response) {
+                        error!("[transport] meta - error: {:?}", res);
+
+                        return Err(CubeError::internal(res.error));
+                    };
+                }
+
+                return Ok(MetaContext { cubes });
+            }
+            Err(err) => err,
+        };
+
+        return Err(CubeError::user(meta_response.to_string()));
     }
 
     async fn load(
