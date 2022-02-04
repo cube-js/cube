@@ -177,7 +177,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       } : s))
     );
 
-    const result = await this.athena.startQueryExecution({
+    const { QueryExecutionId } = await this.athena.startQueryExecution({
       QueryString: queryString,
       WorkGroup: this.config.workGroup,
       ResultConfiguration: {
@@ -185,7 +185,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       }
     });
 
-    return { QueryExecutionId: checkNonNullable('StartQueryExecution', result.QueryExecutionId) };
+    return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
   }
 
   protected async checkStatus(qid: AthenaQueryId): Promise<boolean> {
