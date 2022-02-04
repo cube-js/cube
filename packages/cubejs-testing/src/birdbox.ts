@@ -204,13 +204,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        ...options.dbType !== 'postgresql'
-          ? {
-            CUBEJS_DB_TYPE: options.dbType
-          }
-          : {
-            CUBEJS_DB_TYPE: 'postgres',
-          },
+        CUBEJS_DB_TYPE: options.dbType === 'postgresql' ? 'postgres' : options.dbType,
         CUBEJS_DEV_MODE: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
         ...options.extraEnv

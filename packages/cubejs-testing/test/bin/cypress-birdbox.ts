@@ -11,6 +11,7 @@ import { startBirdBoxFromContainer } from '../../src';
   try {
     birdbox = await startBirdBoxFromContainer({
       name,
+      loadScript: 'load.sh'
     });
   } catch (e) {
     console.log(e);
