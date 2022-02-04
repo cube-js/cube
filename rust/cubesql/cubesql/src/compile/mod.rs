@@ -1563,6 +1563,7 @@ impl QueryPlanner {
                 filter,
                 db_name,
             } => self.show_tables_to_plan(*extended, *full, &filter, &db_name, props),
+            ast::Statement::ShowCollation { filter } => self.show_collation_to_plan(&filter, props),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1848,6 +1849,36 @@ WHERE `TABLE_SCHEMA` = '{}'",
         self.create_df_logical_plan(stmt, props)
     }
 
+    fn show_collation_to_plan(
+        &self,
+        filter: &Option<ast::ShowStatementFilter>,
+        props: &QueryPlannerExecutionProps,
+    ) -> Result<QueryPlan, CompilationError> {
+        let filter = match filter {
+            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
+                format!("WHERE `Collation` {}", stmt)
+            }
+            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
+                format!("{}", stmt)
+            }
+            Some(stmt) => {
+                return Err(CompilationError::User(format!(
+                    "SHOW COLLATION doesn't support requested filter: {}",
+                    stmt
+                )))
+            }
+            None => "".to_string(),
+        };
+
+        let information_schema_sql = "SELECT `COLLATION_NAME` AS `Collation`, `CHARACTER_SET_NAME` AS `Charset`, `ID` AS `Id`, `IS_DEFAULT` AS `Default`, `IS_COMPILED` AS `Compiled`, `SORTLEN` AS `Sortlen`, `PAD_ATTRIBUTE` AS `Pad_attribute` FROM `information_schema`.`COLLATIONS` ORDER BY `Collation`";
+        let stmt = parse_sql_to_statement(&format!(
+            "SELECT * FROM ({}) AS `COLLATIONS` {}",
+            information_schema_sql, filter
+        ))?;
+
+        self.create_df_logical_plan(stmt, props)
+    }
+
     fn create_df_logical_plan(
         &self,
         stmt: ast::Statement,
@@ -1959,9 +1990,6 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo Case intensive mode
-    let query = query.replace("CASE data_type", "CASE DATA_TYPE");
-    let query = query.replace("CASE update_rule    WHEN", "CASE UPDATE_RULE WHEN");
     // @todo problem with parser, space in types
     let query = query.replace("signed integer", "bigint");
     let query = query.replace("SIGNED INTEGER", "bigint");
@@ -3837,6 +3865,94 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_information_schema_collations() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query("SELECT * FROM information_schema.collations".to_string()).await?,
+            "+----------------------------+--------------------+-----+------------+-------------+---------+---------------+\n\
+            | COLLATION_NAME             | CHARACTER_SET_NAME | ID  | IS_DEFAULT | IS_COMPILED | SORTLEN | PAD_ATTRIBUTE |\n\
+            +----------------------------+--------------------+-----+------------+-------------+---------+---------------+\n\
+            | utf8mb4_general_ci         | utf8mb4            | 45  |            | Yes         | 1       | PAD SPACE     |\n\
+            | utf8mb4_bin                | utf8mb4            | 46  |            | Yes         | 1       | PAD SPACE     |\n\
+            | utf8mb4_unicode_ci         | utf8mb4            | 224 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_icelandic_ci       | utf8mb4            | 225 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_latvian_ci         | utf8mb4            | 226 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_romanian_ci        | utf8mb4            | 227 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_slovenian_ci       | utf8mb4            | 228 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_polish_ci          | utf8mb4            | 229 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_estonian_ci        | utf8mb4            | 230 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_spanish_ci         | utf8mb4            | 231 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_swedish_ci         | utf8mb4            | 232 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_turkish_ci         | utf8mb4            | 233 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_czech_ci           | utf8mb4            | 234 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_danish_ci          | utf8mb4            | 235 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_lithuanian_ci      | utf8mb4            | 236 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_slovak_ci          | utf8mb4            | 237 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_spanish2_ci        | utf8mb4            | 238 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_roman_ci           | utf8mb4            | 239 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_persian_ci         | utf8mb4            | 240 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_esperanto_ci       | utf8mb4            | 241 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_hungarian_ci       | utf8mb4            | 242 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_sinhala_ci         | utf8mb4            | 243 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_german2_ci         | utf8mb4            | 244 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_croatian_ci        | utf8mb4            | 245 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_unicode_520_ci     | utf8mb4            | 246 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_vietnamese_ci      | utf8mb4            | 247 |            | Yes         | 8       | PAD SPACE     |\n\
+            | utf8mb4_0900_ai_ci         | utf8mb4            | 255 | Yes        | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_de_pb_0900_ai_ci   | utf8mb4            | 256 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_is_0900_ai_ci      | utf8mb4            | 257 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_lv_0900_ai_ci      | utf8mb4            | 258 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ro_0900_ai_ci      | utf8mb4            | 259 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sl_0900_ai_ci      | utf8mb4            | 260 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_pl_0900_ai_ci      | utf8mb4            | 261 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_et_0900_ai_ci      | utf8mb4            | 262 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_es_0900_ai_ci      | utf8mb4            | 263 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sv_0900_ai_ci      | utf8mb4            | 264 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_tr_0900_ai_ci      | utf8mb4            | 265 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_cs_0900_ai_ci      | utf8mb4            | 266 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_da_0900_ai_ci      | utf8mb4            | 267 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_lt_0900_ai_ci      | utf8mb4            | 268 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sk_0900_ai_ci      | utf8mb4            | 269 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_es_trad_0900_ai_ci | utf8mb4            | 270 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_la_0900_ai_ci      | utf8mb4            | 271 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_eo_0900_ai_ci      | utf8mb4            | 273 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_hu_0900_ai_ci      | utf8mb4            | 274 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_hr_0900_ai_ci      | utf8mb4            | 275 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_vi_0900_ai_ci      | utf8mb4            | 277 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_0900_as_cs         | utf8mb4            | 278 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_de_pb_0900_as_cs   | utf8mb4            | 279 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_is_0900_as_cs      | utf8mb4            | 280 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_lv_0900_as_cs      | utf8mb4            | 281 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ro_0900_as_cs      | utf8mb4            | 282 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sl_0900_as_cs      | utf8mb4            | 283 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_pl_0900_as_cs      | utf8mb4            | 284 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_et_0900_as_cs      | utf8mb4            | 285 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_es_0900_as_cs      | utf8mb4            | 286 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sv_0900_as_cs      | utf8mb4            | 287 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_tr_0900_as_cs      | utf8mb4            | 288 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_cs_0900_as_cs      | utf8mb4            | 289 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_da_0900_as_cs      | utf8mb4            | 290 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_lt_0900_as_cs      | utf8mb4            | 291 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_sk_0900_as_cs      | utf8mb4            | 292 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_es_trad_0900_as_cs | utf8mb4            | 293 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_la_0900_as_cs      | utf8mb4            | 294 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_eo_0900_as_cs      | utf8mb4            | 296 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_hu_0900_as_cs      | utf8mb4            | 297 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_hr_0900_as_cs      | utf8mb4            | 298 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_vi_0900_as_cs      | utf8mb4            | 300 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ja_0900_as_cs      | utf8mb4            | 303 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ja_0900_as_cs_ks   | utf8mb4            | 304 |            | Yes         | 24      | NO PAD        |\n\
+            | utf8mb4_0900_as_ci         | utf8mb4            | 305 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ru_0900_ai_ci      | utf8mb4            | 306 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_ru_0900_as_cs      | utf8mb4            | 307 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_zh_0900_as_cs      | utf8mb4            | 308 |            | Yes         | 0       | NO PAD        |\n\
+            | utf8mb4_0900_bin           | utf8mb4            | 309 |            | Yes         | 1       | NO PAD        |\n\
+            +----------------------------+--------------------+-----+------------+-------------+---------+---------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_if() -> Result<(), CubeError> {
         assert_eq!(
             execute_query(
@@ -4245,6 +4361,151 @@ mod tests {
             | KibanaSampleDataEcommerce | BASE TABLE |\n\
             | Logs                      | BASE TABLE |\n\
             +---------------------------+------------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_tableau() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "SELECT `table_name`, `column_name`
+                FROM `information_schema`.`columns`
+                WHERE `data_type`='enum' AND `table_schema`='db'"
+                    .to_string()
+            )
+            .await?,
+            "++\n++\n++"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_collation() -> Result<(), CubeError> {
+        // Simplest syntax
+        assert_eq!(
+            execute_query("show collation;".to_string()).await?,
+            "+----------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | Collation                  | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
+            +----------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | utf8mb4_0900_ai_ci         | utf8mb4 | 255 | Yes     | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_0900_as_ci         | utf8mb4 | 305 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_0900_as_cs         | utf8mb4 | 278 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_0900_bin           | utf8mb4 | 309 |         | Yes      | 1       | NO PAD        |\n\
+            | utf8mb4_bin                | utf8mb4 | 46  |         | Yes      | 1       | PAD SPACE     |\n\
+            | utf8mb4_croatian_ci        | utf8mb4 | 245 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_cs_0900_ai_ci      | utf8mb4 | 266 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_cs_0900_as_cs      | utf8mb4 | 289 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_czech_ci           | utf8mb4 | 234 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_da_0900_ai_ci      | utf8mb4 | 267 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_da_0900_as_cs      | utf8mb4 | 290 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_danish_ci          | utf8mb4 | 235 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_de_pb_0900_ai_ci   | utf8mb4 | 256 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_de_pb_0900_as_cs   | utf8mb4 | 279 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_eo_0900_ai_ci      | utf8mb4 | 273 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_eo_0900_as_cs      | utf8mb4 | 296 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_es_0900_ai_ci      | utf8mb4 | 263 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_es_0900_as_cs      | utf8mb4 | 286 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_es_trad_0900_ai_ci | utf8mb4 | 270 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_es_trad_0900_as_cs | utf8mb4 | 293 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_esperanto_ci       | utf8mb4 | 241 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_estonian_ci        | utf8mb4 | 230 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_et_0900_ai_ci      | utf8mb4 | 262 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_et_0900_as_cs      | utf8mb4 | 285 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_general_ci         | utf8mb4 | 45  |         | Yes      | 1       | PAD SPACE     |\n\
+            | utf8mb4_german2_ci         | utf8mb4 | 244 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_hr_0900_ai_ci      | utf8mb4 | 275 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_hr_0900_as_cs      | utf8mb4 | 298 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_hu_0900_ai_ci      | utf8mb4 | 274 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_hu_0900_as_cs      | utf8mb4 | 297 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_hungarian_ci       | utf8mb4 | 242 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_icelandic_ci       | utf8mb4 | 225 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_is_0900_ai_ci      | utf8mb4 | 257 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_is_0900_as_cs      | utf8mb4 | 280 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_ja_0900_as_cs      | utf8mb4 | 303 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_ja_0900_as_cs_ks   | utf8mb4 | 304 |         | Yes      | 24      | NO PAD        |\n\
+            | utf8mb4_la_0900_ai_ci      | utf8mb4 | 271 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_la_0900_as_cs      | utf8mb4 | 294 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_latvian_ci         | utf8mb4 | 226 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_lithuanian_ci      | utf8mb4 | 236 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_lt_0900_ai_ci      | utf8mb4 | 268 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_lt_0900_as_cs      | utf8mb4 | 291 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_lv_0900_ai_ci      | utf8mb4 | 258 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_lv_0900_as_cs      | utf8mb4 | 281 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_persian_ci         | utf8mb4 | 240 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_pl_0900_ai_ci      | utf8mb4 | 261 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_pl_0900_as_cs      | utf8mb4 | 284 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_polish_ci          | utf8mb4 | 229 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_ro_0900_ai_ci      | utf8mb4 | 259 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_ro_0900_as_cs      | utf8mb4 | 282 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_roman_ci           | utf8mb4 | 239 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_romanian_ci        | utf8mb4 | 227 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_ru_0900_ai_ci      | utf8mb4 | 306 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_ru_0900_as_cs      | utf8mb4 | 307 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sinhala_ci         | utf8mb4 | 243 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_sk_0900_ai_ci      | utf8mb4 | 269 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sk_0900_as_cs      | utf8mb4 | 292 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sl_0900_ai_ci      | utf8mb4 | 260 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sl_0900_as_cs      | utf8mb4 | 283 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_slovak_ci          | utf8mb4 | 237 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_slovenian_ci       | utf8mb4 | 228 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_spanish2_ci        | utf8mb4 | 238 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_spanish_ci         | utf8mb4 | 231 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_sv_0900_ai_ci      | utf8mb4 | 264 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sv_0900_as_cs      | utf8mb4 | 287 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_swedish_ci         | utf8mb4 | 232 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_tr_0900_ai_ci      | utf8mb4 | 265 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_tr_0900_as_cs      | utf8mb4 | 288 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_turkish_ci         | utf8mb4 | 233 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_unicode_520_ci     | utf8mb4 | 246 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_unicode_ci         | utf8mb4 | 224 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_vi_0900_ai_ci      | utf8mb4 | 277 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_vi_0900_as_cs      | utf8mb4 | 300 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_vietnamese_ci      | utf8mb4 | 247 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_zh_0900_as_cs      | utf8mb4 | 308 |         | Yes      | 0       | NO PAD        |\n\
+            +----------------------------+---------+-----+---------+----------+---------+---------------+"
+        );
+
+        // LIKE
+        assert_eq!(
+            execute_query("show collation like '%unicode%';".to_string()).await?,
+            "+------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | Collation              | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
+            +------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | utf8mb4_unicode_520_ci | utf8mb4 | 246 |         | Yes      | 8       | PAD SPACE     |\n\
+            | utf8mb4_unicode_ci     | utf8mb4 | 224 |         | Yes      | 8       | PAD SPACE     |\n\
+            +------------------------+---------+-----+---------+----------+---------+---------------+"
+        );
+
+        // WHERE
+        assert_eq!(
+            execute_query("show collation where Id between 255 and 260;".to_string()).await?,
+            "+--------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | Collation                | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
+            +--------------------------+---------+-----+---------+----------+---------+---------------+\n\
+            | utf8mb4_0900_ai_ci       | utf8mb4 | 255 | Yes     | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_de_pb_0900_ai_ci | utf8mb4 | 256 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_is_0900_ai_ci    | utf8mb4 | 257 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_lv_0900_ai_ci    | utf8mb4 | 258 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_ro_0900_ai_ci    | utf8mb4 | 259 |         | Yes      | 0       | NO PAD        |\n\
+            | utf8mb4_sl_0900_ai_ci    | utf8mb4 | 260 |         | Yes      | 0       | NO PAD        |\n\
+            +--------------------------+---------+-----+---------+----------+---------+---------------+"
+        );
+
+        // Superset query
+        assert_eq!(
+            execute_query(
+                "show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';"
+                    .to_string()
+            )
+            .await?,
+            "+-------------+---------+----+---------+----------+---------+---------------+\n\
+            | Collation   | Charset | Id | Default | Compiled | Sortlen | Pad_attribute |\n\
+            +-------------+---------+----+---------+----------+---------+---------------+\n\
+            | utf8mb4_bin | utf8mb4 | 46 |         | Yes      | 1       | PAD SPACE     |\n\
+            +-------------+---------+----+---------+----------+---------+---------------+"
         );
 
         Ok(())
