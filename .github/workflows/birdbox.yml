@@ -13,7 +13,6 @@ on:
   push:
     paths:
       - '.github/workflows/birdbox.yml'
-      - 'packages/cubejs-testing/**'
     branches:
       - 'master'
 

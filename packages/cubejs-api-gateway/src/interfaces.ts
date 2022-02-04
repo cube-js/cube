@@ -24,6 +24,16 @@ export interface QueryFilter {
   values?: string[];
 }
 
+export type LogicalAndFilter = {
+  and: (QueryFilter | {
+    or: (QueryFilter | LogicalAndFilter)[]
+  })[]
+};
+
+export type LogicalOrFilter = {
+  or: (QueryFilter | LogicalAndFilter)[]
+};
+
 export type QueryTimeDimensionGranularity =
   | 'hour'
   | 'day'
@@ -41,7 +51,7 @@ export interface QueryTimeDimension {
 export interface Query {
   measures: string[];
   dimensions?: string[];
-  filters?: QueryFilter[];
+  filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
   segments?: string[];
   limit?: number;

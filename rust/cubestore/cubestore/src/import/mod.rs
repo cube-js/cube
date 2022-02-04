@@ -670,3 +670,18 @@ impl Ingestion {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use crate::import::parse_decimal;
+
+    #[test]
+    fn parse_decimal_test() {
+        assert_eq!(
+            parse_decimal("-0.12345", 5).unwrap().to_string(5),
+            "-0.12345",
+        );
+    }
+}
