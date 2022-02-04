@@ -55,3 +55,7 @@ export async function streamToArray<T>(xstream: stream.Readable): Promise<T[]> {
   }
   return result;
 }
+
+export async function nodeStreamToArray<T>(nodeStream: NodeJS.ReadableStream): Promise<T[]> {
+  return streamToArray(new stream.Readable().wrap(nodeStream));
+}
