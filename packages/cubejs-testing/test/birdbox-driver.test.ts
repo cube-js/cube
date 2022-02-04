@@ -87,11 +87,6 @@ describe(name, () => {
       httpClient = cubejs(async () => 'test', {
         apiUrl: birdbox.configuration.apiUrl,
       });
-
-      transport = new HttpTransport({
-        authorization: 'test',
-        apiUrl: birdbox.configuration.apiUrl,
-      });
     } catch (e) {
       console.log(e);
       throw e;
