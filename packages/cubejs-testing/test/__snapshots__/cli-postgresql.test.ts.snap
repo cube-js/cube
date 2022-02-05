@@ -77,6 +77,14 @@ Array [
 ]
 `;
 
+exports[`postgresql HTTP Transport Dbt orders count: Dbt orders count 1`] = `
+Array [
+  Object {
+    "OrdersFiltered.ordersCount": "171334",
+  },
+]
+`;
+
 exports[`postgresql WS Transport #1 Orders.totalAmount: #1 Orders.totalAmount 1`] = `
 Array [
   Object {

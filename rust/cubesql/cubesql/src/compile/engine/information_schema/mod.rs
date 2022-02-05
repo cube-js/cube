@@ -1,3 +1,4 @@
+pub mod collations;
 pub mod columns;
 pub mod key_column_usage;
 pub mod referential_constraints;

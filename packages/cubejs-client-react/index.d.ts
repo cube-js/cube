@@ -405,7 +405,7 @@ declare module '@cubejs-client/react' {
    *   });
    *
    *   if (isLoading) {
-   *     return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
+   *     return <div>{progress?.stage || 'Loading...'}</div>;
    *   }
    *
    *   if (error) {

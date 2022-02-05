@@ -75,6 +75,9 @@
     },
     {
       "path": "packages/cubejs-cli"
+    },
+    {
+      "path": "packages/cubejs-dbt-schema-extension"
     }
   ]
 }
