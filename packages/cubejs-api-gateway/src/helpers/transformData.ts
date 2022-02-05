@@ -43,17 +43,6 @@ function transformData(
           return transformValue(p[1], annotationForMember.type);
         })
       )(r);
-      if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
-        // Pushing QueryTypeEnum.COMPARE_DATE_RANGE_QUERY value to
-        // the final dataset row to make it possible to determine
-        // the query type on the client side.
-        (row as any[]).push(QueryTypeEnum.COMPARE_DATE_RANGE_QUERY);
-      } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
-        // Pushing QueryTypeEnum.BLENDING_QUERY value to the final
-        // dataset row to make it possible to determine the query
-        // type on the client side.
-        (row as any[]).push(QueryTypeEnum.BLENDING_QUERY);
-      }
     } else {
       row = R.pipe(
         R.toPairs,
