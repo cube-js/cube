@@ -76,3 +76,6 @@ Cube.js Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
 
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_large)
+
+sudo docker build -t shlokkapoor/cubejs:latest -f ./packages/cubejs-docker/dev.Dockerfile .
+sudo docker push shlokkapoor/cubejs:latest

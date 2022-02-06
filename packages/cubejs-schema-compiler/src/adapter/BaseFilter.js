@@ -254,6 +254,10 @@ export class BaseFilter extends BaseDimension {
     return `${column} @> ${this.firstParameter()}`;
   }
 
+  arrayStringContains(column) {
+    return `${column} @> ARRAY[${this.firstParameter()}]`;
+  }
+
   expressionEqualsWhere(column) {
     return `${column} = ${this.values[0]}`;
   }
