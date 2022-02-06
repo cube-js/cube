@@ -247,13 +247,13 @@ export class BaseFilter extends BaseDimension {
   }
 
   arrayContainsWhere(column) {
-    return `array_agg(${column}) @> '${this.firstParameter()}'`;
+    return `${column} @> ARRAY['${this.firstParameter()}']`;
   }
 
   fieldContainsWhere(column) {
     return `${column} @> ${this.firstParameter()}`;
   }
-  
+
   arrayStringContainsWhere(column) {
     return `${column} @> ARRAY[${this.firstParameter()}]`;
   }
