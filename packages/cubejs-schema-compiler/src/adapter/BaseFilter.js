@@ -250,6 +250,10 @@ export class BaseFilter extends BaseDimension {
     return `array_agg(${column}) @> '${this.firstParameter()}'`;
   }
 
+  fieldContainsWhere(column) {
+    return `${column} @> ${this.firstParameter()}`;
+  }
+
   expressionEqualsWhere(column) {
     return `${column} = ${this.values[0]}`;
   }

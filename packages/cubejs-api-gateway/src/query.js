@@ -59,6 +59,7 @@ const operators = [
   'set',
   'tsQuery',
   'arrayContains',
+  'fieldContains',
   'notSet',
   'inDateRange',
   'notInDateRange',
