@@ -148,6 +148,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
         ),
+        t(
+            "unique_key_and_multi_measures_for_stream_table",
+            unique_key_and_multi_measures_for_stream_table,
+        ),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4393,6 +4397,30 @@ async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
+}
+
+async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int, measure2 text) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, measure2, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, '{}', {})", i, j, "text_value", i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT bar_id, measure1, measure2 FROM test.events_by_type as `events` LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
