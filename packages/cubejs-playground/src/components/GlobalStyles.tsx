@@ -275,6 +275,7 @@ const GlobalStyles = createGlobalStyle`
     
     & button.ant-tabs-dropdown-menu-item-remove {
       -webkit-appearance: none;
+      padding: 0;
       border: none;
       border-radius: var(--border-radius-base);
       background: transparent;
