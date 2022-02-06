@@ -247,7 +247,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   arrayContainsWhere(column) {
-    return `${column} @> ARRAY['${this.firstParameter()}']`;
+    return `${column} @> ARRAY[${this.firstParameter()}]`;
   }
 
   fieldContainsWhere(column) {
