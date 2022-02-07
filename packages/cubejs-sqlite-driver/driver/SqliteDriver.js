@@ -33,13 +33,24 @@ class SqliteDriver extends BaseDriver {
 
   informationSchemaQuery() {
     return `
-      SELECT m.name AS table_name,
-             p.name AS column_name,
-             p.type AS column_type
-        FROM sqlite_master AS m
-        JOIN pragma_table_info(m.name) AS p
-       WHERE m.name NOT IN ('sqlite_sequence', 'sqlite_stat1')
-       ORDER BY m.name, p.cid
+      WITH column_schema
+           AS (SELECT m.name AS table_name,
+                      p.name AS column_name,
+                      p.type AS column_type
+                 FROM sqlite_master AS m
+                 JOIN pragma_table_info(m.name) AS p
+                WHERE m.name NOT IN ('sqlite_sequence', 'sqlite_stat1')
+                ORDER BY m.name, p.cid
+              ),
+           table_schema
+           AS (SELECT table_name,
+                      JSON_GROUP_ARRAY(JSON_OBJECT('name', column_name, 'type', column_type)) AS columns_as_json
+                 FROM column_schema
+                GROUP BY table_name
+                ORDER BY table_name
+              )
+      SELECT JSON_GROUP_OBJECT(table_name, JSON(columns_as_json)) AS schema_as_json
+        FROM table_schema
    `;
   }
 
@@ -48,18 +59,13 @@ class SqliteDriver extends BaseDriver {
 
     const tables = await this.query(query);
 
-    return {
-      main: tables.reduce((acc, curr) => {
-        if (!acc[curr.table_name]) {
-          acc[curr.table_name] = [];
-        }
-        acc[curr.table_name].push({
-          name: curr.column_name,
-          type: curr.column_type
-        });
-        return acc;
-      }, {})
-    };
+    if (1 === tables.length && Object.prototype.hasOwnProperty.call(tables[0], 'schema_as_json')) {
+      return {
+        main: JSON.parse(tables[0].schema_as_json)
+      };
+    } else {
+      throw new Error(`Unable to extract schema from SQLite database.`, JSON.stringify(tables));
+    }
   }
 
   createSchemaIfNotExists(schemaName) {
@@ -80,7 +86,7 @@ class SqliteDriver extends BaseDriver {
     if (!attachedDatabases.find(s => s.name === schemaName)) {
       return [];
     }
-    return this.query(`SELECT name as table_name FROM ${schemaName}.sqlite_master WHERE type='table' ORDER BY name`);
+    return this.query(`SELECT name AS table_name FROM ${schemaName}.sqlite_master WHERE type = 'table' ORDER BY name`);
   }
 }
 
