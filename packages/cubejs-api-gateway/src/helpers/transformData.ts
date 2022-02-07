@@ -11,10 +11,7 @@ import { ConfigItem } from './prepareAnnotation';
 import { transformValue } from './transformValue';
 import { NormalizedQuery } from '../types/query';
 import { ResultType, QueryType } from '../types/strings';
-import {
-  ResultType as ResultTypeEnum,
-  QueryType as QueryTypeEnum
-} from '../types/enums';
+import { ResultType as ResultTypeEnum } from '../types/enums';
 
 /**
  * SQL aliases to cube properties hash map.
