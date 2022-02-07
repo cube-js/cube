@@ -304,7 +304,83 @@ describe('SQL Generation', () => {
         }
       }
     });
-    `);
+  `);
+
+  const aliasedCubesCompilers = /** @type Compilers */ prepareCompiler(`
+    cube('LeftLongLongLongLongLongLongLongLongLongLongNameCube', {
+      sql: 'SELECT * FROM LEFT_TABLE',
+      sqlAlias: 'left',
+      measures: {
+        total_sum: {
+          format: 'currency',
+          sql: 'total',
+          type: 'sum'
+        },
+      },
+      dimensions: {
+        id: {
+          format: 'id',
+          primaryKey: true,
+          shown: true,
+          sql: 'id',
+          type: 'number'
+        },
+        description: {
+          sql: 'description',
+          type: 'string'
+        },
+      }
+    });
+
+    cube('RightLongLongLongLongLongLongLongLongLongLongNameCube', {
+      sql: 'SELECT * FROM RIGHT_TABLE',
+      sqlAlias: 'right',
+      measures: {
+        total_sum: {
+          format: 'currency',
+          sql: 'total',
+          type: 'sum'
+        },
+      },
+      dimensions: {
+        id: {
+          format: 'id',
+          primaryKey: true,
+          shown: true,
+          sql: 'id',
+          type: 'number'
+        },
+        description: {
+          sql: 'description',
+          type: 'string'
+        },
+      }
+    })
+
+    cube('MidLongLongLongLongLongLongLongLongLongLongNameCube', {
+      sql: 'SELECT * FROM MID_TABLE',
+      sqlAlias: 'mid',
+      joins: {
+        LeftLongLongLongLongLongLongLongLongLongLongNameCube: {
+          relationship: 'hasMany',
+          sql: \`\${MidLongLongLongLongLongLongLongLongLongLongNameCube}.left_id = \${LeftLongLongLongLongLongLongLongLongLongLongNameCube}.id\`,
+        },
+        RightLongLongLongLongLongLongLongLongLongLongNameCube: {
+          relationship: 'hasMany',
+          sql: \`\${MidLongLongLongLongLongLongLongLongLongLongNameCube}.right_id = \${RightLongLongLongLongLongLongLongLongLongLongNameCube}.id\`,
+        },
+      },
+      dimensions: {
+        id: {
+          format: 'id',
+          primaryKey: true,
+          shown: true,
+          sql: 'id',
+          type: 'number'
+        },
+      }
+    })
+  `);
 
   it('filter with operator OR', async () => {
     await compiler.compile();
@@ -916,6 +992,26 @@ describe('SQL Generation', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(UserError);
     }
+  });
+
+  it('long named aliaced cubes doesn\'t throws', async () => {
+    await aliasedCubesCompilers.compiler.compile();
+    const aliasedQuery = new PostgresQuery(aliasedCubesCompilers, {
+      dimensions: [
+        'MidLongLongLongLongLongLongLongLongLongLongNameCube.id',
+        'LeftLongLongLongLongLongLongLongLongLongLongNameCube.description',
+      ],
+      measures: [
+        'RightLongLongLongLongLongLongLongLongLongLongNameCube.total_sum',
+      ],
+      order: [
+        ['MidLongLongLongLongLongLongLongLongLongLongNameCube.id', 'asc'],
+      ],
+    });
+
+    return dbRunner.testQuery(aliasedQuery.buildSqlAndParams()).then(res => {
+      expect(res.length).toEqual(6);
+    });
   });
 
   // end of tests

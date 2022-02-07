@@ -1,4 +1,6 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 const pgPromise = require('pg-promise');
+// eslint-disable-next-line import/no-extraneous-dependencies
 const { GenericContainer } = require('testcontainers');
 const { BaseDbRunner } = require('./BaseDbRunner');
 
@@ -40,36 +42,72 @@ export class PostgresDBRunner extends BaseDbRunner {
       tx.query('CREATE TEMPORARY TABLE visitors (id INT, amount INT, created_at TIMESTAMP, updated_at TIMESTAMP, status INT, source TEXT, latitude DECIMAL, longitude DECIMAL) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE visitor_checkins (id INT, visitor_id INT, created_at TIMESTAMP, source TEXT) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE cards (id INT, visitor_id INT, visitor_checkin_id INT) ON COMMIT DROP'),
+      tx.query('CREATE TEMPORARY TABLE left_table (id INT, total DOUBLE PRECISION, description character varying) ON COMMIT DROP'),
+      tx.query('CREATE TEMPORARY TABLE right_table (id INT, total DOUBLE PRECISION, description character varying) ON COMMIT DROP'),
+      tx.query('CREATE TEMPORARY TABLE mid_table (id INT, left_id INT, right_id INT) ON COMMIT DROP'),
       tx.query(`
-    INSERT INTO
-    visitors
-    (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
-    (1, 100, '2017-01-03', '2017-01-30', 1, 'some', 120.120, 40.60),
-    (2, 200, '2017-01-05', '2017-01-15', 1, 'some', 120.120, 58.60),
-    (3, 300, '2017-01-06', '2017-01-20', 2, 'google', 120.120, 70.60),
-    (4, 400, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 10.60),
-    (5, 500, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 58.10),
-    (6, 500, '2016-09-07', '2016-09-07', 2, NULL, 120.120, 58.10)
-    `),
+        INSERT INTO
+        visitors
+        (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
+        (1, 100, '2017-01-03', '2017-01-30', 1, 'some', 120.120, 40.60),
+        (2, 200, '2017-01-05', '2017-01-15', 1, 'some', 120.120, 58.60),
+        (3, 300, '2017-01-06', '2017-01-20', 2, 'google', 120.120, 70.60),
+        (4, 400, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 10.60),
+        (5, 500, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 58.10),
+        (6, 500, '2016-09-07', '2016-09-07', 2, NULL, 120.120, 58.10)
+      `),
       tx.query(`
-    INSERT INTO
-    visitor_checkins
-    (id, visitor_id, created_at, source) VALUES
-    (1, 1, '2017-01-03', NULL),
-    (2, 1, '2017-01-04', NULL),
-    (3, 1, '2017-01-05', 'google'),
-    (4, 2, '2017-01-05', NULL),
-    (5, 2, '2017-01-05', NULL),
-    (6, 3, '2017-01-06', NULL)
-    `),
+        INSERT INTO
+        visitor_checkins
+        (id, visitor_id, created_at, source) VALUES
+        (1, 1, '2017-01-03', NULL),
+        (2, 1, '2017-01-04', NULL),
+        (3, 1, '2017-01-05', 'google'),
+        (4, 2, '2017-01-05', NULL),
+        (5, 2, '2017-01-05', NULL),
+        (6, 3, '2017-01-06', NULL)
+      `),
       tx.query(`
-    INSERT INTO
-    cards
-    (id, visitor_id, visitor_checkin_id) VALUES
-    (1, 1, 1),
-    (2, 1, 2),
-    (3, 3, 6)
-    `)
+        INSERT INTO
+        cards
+        (id, visitor_id, visitor_checkin_id) VALUES
+        (1, 1, 1),
+        (2, 1, 2),
+        (3, 3, 6)
+      `),
+      tx.query(`
+        INSERT INTO
+        left_table
+        (id, total, description) VALUES
+        (1, 2.5, 'ABC'),
+        (2, 2.5, 'BAC'),
+        (3, 2.5, 'BCA'),
+        (4, 2.5, 'CBA'),
+        (5, 2.5, 'CAB'),
+        (6, 2.5, 'ACB')
+      `),
+      tx.query(`
+        INSERT INTO
+        right_table
+        (id, total, description) VALUES
+        (1, 2.5, 'ABC'),
+        (2, 2.5, 'BAC'),
+        (3, 2.5, 'BCA'),
+        (4, 2.5, 'CBA'),
+        (5, 2.5, 'CAB'),
+        (6, 2.5, 'ACB')
+      `),
+      tx.query(`
+        INSERT INTO
+        mid_table
+        (id, left_id, right_id) VALUES
+        (1, 1, 1),
+        (2, 2, 2),
+        (3, 3, 3),
+        (4, 4, 4),
+        (5, 5, 5),
+        (6, 6, 6)
+      `),
     ]);
   }
 
