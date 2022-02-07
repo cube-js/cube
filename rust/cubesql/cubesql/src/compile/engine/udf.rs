@@ -21,12 +21,12 @@ use datafusion::{
     },
 };
 
-use crate::compile::{
-    engine::df::{
+use crate::{
+    compile::engine::df::{
         coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
-    QueryPlannerExecutionProps,
+    mysql::ConnectionState,
 };
 
 pub fn create_version_udf() -> ScalarUDF {
@@ -46,9 +46,8 @@ pub fn create_version_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_db_udf(name: String, props: &QueryPlannerExecutionProps) -> ScalarUDF {
-    // Due our requirements it's more easy to clone this variable rather then Arc
-    let db_state = props.database.clone().unwrap_or("db".to_string());
+pub fn create_db_udf(name: String, state: Arc<ConnectionState>) -> ScalarUDF {
+    let db_state = state.database().unwrap_or("db".to_string());
 
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
@@ -66,13 +65,10 @@ pub fn create_db_udf(name: String, props: &QueryPlannerExecutionProps) -> Scalar
     )
 }
 
-pub fn create_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
-    // Due our requirements it's more easy to clone this variable rather then Arc
-    let state_user = props.user.clone();
-
+pub fn create_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
-        if let Some(user) = &state_user {
+        if let Some(user) = &state.user() {
             builder.append_value(user.clone() + "@127.0.0.1").unwrap();
         } else {
             builder.append_null()?;
@@ -90,13 +86,10 @@ pub fn create_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
-    // Due our requirements it's more easy to clone this variable rather then Arc
-    let state_user = props.user.clone();
-
+pub fn create_current_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
-        if let Some(user) = &state_user {
+        if let Some(user) = &state.user() {
             builder.append_value(user.clone() + "@%").unwrap();
         } else {
             builder.append_null()?;
@@ -114,13 +107,10 @@ pub fn create_current_user_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF 
     )
 }
 
-pub fn create_connection_id_udf(props: &QueryPlannerExecutionProps) -> ScalarUDF {
-    // Due our requirements it's more easy to clone this variable rather then Arc
-    let state_connection_id = props.connection_id;
-
+pub fn create_connection_id_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
-        builder.append_value(state_connection_id).unwrap();
+        builder.append_value(state.connection_id).unwrap();
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });

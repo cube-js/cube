@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock as RwLockSync};
 use std::time::SystemTime;
 
 use async_trait::async_trait;
@@ -22,7 +22,6 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::compile::convert_statement_to_cube_query;
 use crate::compile::parser::parse_sql_to_statement;
-use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::transport::TransportService;
@@ -35,6 +34,7 @@ use super::server_manager::ServerManager;
 use super::AuthContext;
 use super::SqlAuthService;
 
+#[derive(Debug)]
 struct PreparedStatements {
     id: u32,
     statements: HashMap<u32, String>,
@@ -49,12 +49,96 @@ impl PreparedStatements {
     }
 }
 
+#[derive(Debug)]
+pub struct ConnectionProperties {
+    user: Option<String>,
+    database: Option<String>,
+}
+
+impl ConnectionProperties {
+    pub fn new(user: Option<String>, database: Option<String>) -> Self {
+        Self { user, database }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConnectionState {
+    // connection id, it's immutable
+    pub connection_id: u32,
+    // Connection properties
+    properties: RwLockSync<ConnectionProperties>,
+    // @todo Remove RWLock after split of Connection & SQLWorker
+    // Context for Transport
+    auth_context: RwLockSync<Option<AuthContext>>,
+}
+
+impl ConnectionState {
+    pub fn new(
+        connection_id: u32,
+        properties: ConnectionProperties,
+        auth_context: Option<AuthContext>,
+    ) -> Self {
+        Self {
+            connection_id,
+            properties: RwLockSync::new(properties),
+            auth_context: RwLockSync::new(auth_context),
+        }
+    }
+
+    pub fn user(&self) -> Option<String> {
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading user");
+        guard.user.clone()
+    }
+
+    pub fn set_user(&self, user: Option<String>) {
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting user");
+        guard.user = user;
+    }
+
+    pub fn database(&self) -> Option<String> {
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading database");
+        guard.database.clone()
+    }
+
+    pub fn set_database(&self, database: Option<String>) {
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting database");
+        guard.database = database;
+    }
+
+    pub fn auth_context(&self) -> Option<AuthContext> {
+        let guard = self
+            .auth_context
+            .read()
+            .expect("failed to unlock auth_context for reading");
+        guard.clone()
+    }
+
+    pub fn set_auth_context(&self, auth_context: Option<AuthContext>) {
+        let mut guard = self
+            .auth_context
+            .write()
+            .expect("failed to auth_context properties for writting");
+        *guard = auth_context;
+    }
+}
+
+#[derive(Debug)]
 struct Connection {
     server: Arc<ServerManager>,
     // Props for execution queries
-    props: QueryPlannerExecutionProps,
-    // Context for Transport
-    context: Option<AuthContext>,
+    state: Arc<ConnectionState>,
     // Prepared statements
     statements: Arc<RwLock<PreparedStatements>>,
 }
@@ -201,7 +285,7 @@ impl Connection {
                     };
 
                     let ctx = self.server.transport
-                        .meta(self.auth_context()?)
+                        .meta(&self.auth_context()?)
                         .await?;
 
                     if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
@@ -258,10 +342,10 @@ impl Connection {
                 },
                 ast::Statement::Explain { statement, .. } => {
                     let ctx = self.server.transport
-                        .meta(self.auth_context()?)
+                        .meta(&self.auth_context()?)
                     .await?;
 
-                    let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
+                    let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), self.state.clone())?;
 
                     return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
                         vec![
@@ -286,10 +370,10 @@ impl Connection {
             trace!("query was not detected");
 
             let ctx = self.server.transport
-                .meta(self.auth_context()?)
+                .meta(&self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx),self.state.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));
@@ -312,7 +396,7 @@ impl Connection {
                     debug!("Meta {:?}", plan.meta);
 
                     let response = self.server.transport
-                        .load(plan.request, self.auth_context()?)
+                        .load(plan.request, &self.auth_context()?)
                         .await?;
 
                     let mut columns: Vec<dataframe::Column> = vec![];
@@ -366,9 +450,9 @@ impl Connection {
         }
     }
 
-    pub(crate) fn auth_context(&self) -> Result<&AuthContext, CubeError> {
-        if self.context.is_some() {
-            Ok(self.context.as_ref().unwrap())
+    pub(crate) fn auth_context(&self) -> Result<AuthContext, CubeError> {
+        if let Some(ctx) = self.state.auth_context() {
+            Ok(ctx)
         } else {
             Err(CubeError::internal("must be auth".to_string()))
         }
@@ -384,7 +468,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     }
 
     fn connection_id(&self) -> u32 {
-        self.props.connection_id()
+        self.state.connection_id
     }
 
     async fn on_prepare<'a>(
@@ -486,8 +570,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
 
         let passwd = auth_response.password.map(|p| p.as_bytes().to_vec());
 
-        self.props.set_user(user.clone());
-        self.context = Some(auth_response.context);
+        self.state.set_user(user.clone());
+        self.state.set_auth_context(Some(auth_response.context));
 
         Ok(passwd)
     }
@@ -512,7 +596,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     ) -> Result<(), Self::Error> {
         debug!("on_init: {}", database);
 
-        self.props.set_database(Some(database.to_string()));
+        self.state.set_database(Some(database.to_string()));
 
         writter.ok()?;
 
@@ -575,8 +659,11 @@ impl ProcessingLoop for MySqlServer {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Connection {
                         server,
-                        props: QueryPlannerExecutionProps::new(connection_id, None, None),
-                        context: None,
+                        state: Arc::new(ConnectionState::new(
+                            connection_id,
+                            ConnectionProperties::new(None, None),
+                            None,
+                        )),
                         statements: Arc::new(RwLock::new(PreparedStatements::new())),
                     },
                     socket,

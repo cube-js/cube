@@ -1,10 +1,10 @@
-use std::{env, sync::Arc};
+use std::{env, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
 use crate::CubeError;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuthContext {
     pub access_token: String,
     pub base_path: String,
@@ -23,10 +23,11 @@ impl AuthenticateResponse {
 }
 
 #[async_trait]
-pub trait SqlAuthService: Send + Sync {
+pub trait SqlAuthService: Send + Sync + Debug {
     async fn authenticate(&self, user: Option<String>) -> Result<AuthenticateResponse, CubeError>;
 }
 
+#[derive(Debug)]
 pub struct SqlAuthDefaultImpl;
 
 crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
