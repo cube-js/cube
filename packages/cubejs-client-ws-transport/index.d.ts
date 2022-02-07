@@ -13,7 +13,7 @@
  * In the feature we should support doing it without declare module, but for now I didnt find how to do it
  */
 
- declare module '@cubejs-client/ws-transport' {
+declare module '@cubejs-client/ws-transport' {
     import type { ITransport, ITransportResponse } from '@cubejs-client/core';
 
     class WebSocketTransportResult {
