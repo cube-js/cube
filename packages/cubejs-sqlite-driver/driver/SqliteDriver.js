@@ -36,10 +36,21 @@ class SqliteDriver extends BaseDriver {
       WITH column_schema
            AS (SELECT m.name AS table_name,
                       p.name AS column_name,
-                      p.type AS column_type
+                      CASE
+                        WHEN UPPER(p.type) LIKE '%INT%' THEN 'bigint'
+                        WHEN UPPER(p.type) LIKE '%CHAR%' THEN 'text'
+                        WHEN UPPER(p.type) LIKE '%CLOB%' THEN 'text'
+                        WHEN UPPER(p.type) LIKE '%TEXT%' THEN 'text'
+                        WHEN UPPER(p.type) LIKE '%BLOB%' THEN 'blob'
+                        WHEN UPPER(p.type) LIKE '%REAL%' THEN 'double'
+                        WHEN UPPER(p.type) LIKE '%FLOA%' THEN 'double'
+                        WHEN UPPER(p.type) LIKE '%DOUB%' THEN 'double'
+                        ELSE 'double'
+                      END AS column_type
                  FROM sqlite_master AS m
                  JOIN pragma_table_info(m.name) AS p
                 WHERE m.name NOT IN ('sqlite_sequence', 'sqlite_stat1')
+                      AND m.type IN ('table', 'view')
                 ORDER BY m.name, p.cid
               ),
            table_schema
@@ -56,15 +67,14 @@ class SqliteDriver extends BaseDriver {
 
   async tablesSchema() {
     const query = this.informationSchemaQuery();
-
     const tables = await this.query(query);
 
-    if (1 === tables.length && Object.prototype.hasOwnProperty.call(tables[0], 'schema_as_json')) {
+    if (tables.length === 1 && Object.prototype.hasOwnProperty.call(tables[0], 'schema_as_json')) {
       return {
         main: JSON.parse(tables[0].schema_as_json)
       };
     } else {
-      throw new Error(`Unable to extract schema from SQLite database.`, JSON.stringify(tables));
+      throw new Error('Unable to extract schema from SQLite database.', JSON.stringify(tables));
     }
   }
 
