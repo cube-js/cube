@@ -155,10 +155,16 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     if (files.length > 0) {
       // eslint-disable-next-line no-unused-vars
       const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-      return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
+      console.log('ttt', createTableSqlWithLocation, files);
+      try {
+        const result = await this.query(createTableSqlWithLocation, files, queryTracingObj);
+        console.log('ggg', result);
+        return result;
+      } catch (e) {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+        console.log('eee', e);
         throw e;
-      });
+      }
     }
 
     const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;

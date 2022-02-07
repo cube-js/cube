@@ -44,7 +44,7 @@ COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/pa
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
 COPY packages/cubejs-cli/package.json packages/cubejs-cli/package.json
 COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-driver/package.json
-COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
+# COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
 COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
@@ -99,7 +99,7 @@ COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/
 COPY packages/cubejs-cli/ packages/cubejs-cli/
 COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
-COPY packages/cubejs-docker/ packages/cubejs-docker/
+# COPY packages/cubejs-docker/ packages/cubejs-docker/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
 COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
@@ -140,6 +140,7 @@ COPY --from=build /cubejs .
 COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
+COPY packages/cubejs-docker/bin/start.sh /usr/local/bin/start.sh
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
@@ -150,4 +151,5 @@ WORKDIR /cube/conf
 
 EXPOSE 4000
 
-CMD ["cubejs", "server"]
+# CMD ["cubejs", "server"]
+CMD ["start.sh"]

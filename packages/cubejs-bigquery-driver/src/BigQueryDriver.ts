@@ -49,6 +49,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
 
+    console.log('www', `@${this.options.credentials}@`, this.options);
+
     getEnv('dbExportBucketType', {
       supported: ['gcp'],
     });

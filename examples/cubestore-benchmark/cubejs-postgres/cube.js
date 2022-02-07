@@ -6,8 +6,8 @@ module.exports = {
         concurrency: 20
       }
     },
-    preAggregationsOptions: {
-      externalRefresh: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER !== 'true'
-    }
+    // preAggregationsOptions: {
+    //   externalRefresh: process.env.CUBEJS_SCHEDULED_REFRESH_TIMER !== 'true'
+    // }
   }
 }
