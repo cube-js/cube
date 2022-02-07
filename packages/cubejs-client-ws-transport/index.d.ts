@@ -13,16 +13,20 @@
  * In the feature we should support doing it without declare module, but for now I didnt find how to do it
  */
 
-declare module '@cubejs-client/ws-transport' {
+ declare module '@cubejs-client/ws-transport' {
     import type { ITransport, ITransportResponse } from '@cubejs-client/core';
+
     class WebSocketTransportResult {
         protected readonly status: unknown;
+
         protected readonly result: unknown;
-        constructor({ status, message }: {
-            status: unknown;
-            message: unknown;
+
+        public constructor({ status, message }: {
+          status: unknown;
+          message: unknown;
         });
-        json(): Promise<unknown>;
+
+        public json(): Promise<unknown>;
     }
     type WebSocketTransportOptions = {
         authorization?: string;
@@ -41,21 +45,40 @@ declare module '@cubejs-client/ws-transport' {
         message: Message;
         callback: (result: WebSocketTransportResult) => void;
     };
-    class WebSocketTransport implements ITransport<WebSocketTransportResult> {
+    class WebSocketTransport
+    implements ITransport<WebSocketTransportResult> {
         protected readonly apiUrl: string;
+
         protected readonly heartBeatInterval: number;
+
         protected token: string | undefined;
+
         protected ws: any;
+
         protected messageCounter: number;
+
         protected messageIdToSubscription: Record<number, Subscription>;
+
         protected messageQueue: Message[];
-        constructor({ authorization, apiUrl, heartBeatInterval, hearBeatInterval }: WebSocketTransportOptions);
-        set authorization(token: string | undefined);
-        close(): Promise<void>;
-        get authorization(): string | undefined;
+
+        public set authorization(token: string | undefined);
+
+        public get authorization(): string | undefined;
+
+        public constructor({
+          authorization,
+          apiUrl,
+          heartBeatInterval,
+          hearBeatInterval
+        }: WebSocketTransportOptions);
+
         protected initSocket(): any;
+
         protected sendMessage(message: any): void;
-        request(method: string, { baseRequestId, ...params }: Record<string, unknown>): ITransportResponse<WebSocketTransportResult>;
+
+        public close(): Promise<void>;
+
+        public request(method: string, { baseRequestId, ...params }: Record<string, unknown>): ITransportResponse<WebSocketTransportResult>;
     }
     export default WebSocketTransport;
 }

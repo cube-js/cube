@@ -85,9 +85,9 @@ type ExtendContextFn =
     Promise<RequestExtension> | RequestExtension;
 
 /**
- * Function that should provides a logic for the respone result
+ * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
- * server-core to provide extendabillity this logic.
+ * server-core to provide extendabillity for this logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
  */
