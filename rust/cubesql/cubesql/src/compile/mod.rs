@@ -1512,7 +1512,7 @@ impl QueryPlanner {
                 ))
             }
             ast::Statement::Kill { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
-            ast::Statement::SetVariable { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
+            ast::Statement::SetVariable { key_values } => self.set_variable_to_plan(&key_values),
             ast::Statement::ShowVariable { variable } => {
                 self.show_variable_to_plan(variable, connection_state)
             }
@@ -1894,6 +1894,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 )])],
             )),
         ));
+    }
+
+    fn set_variable_to_plan(
+        &self,
+        key_values: &Vec<ast::SetVariableKeyValue>,
+    ) -> Result<QueryPlan, CompilationError> {
+        let mut flags = StatusFlags::SERVER_SESSION_STATE_CHANGED;
+
+        if key_values
+            .iter()
+            .any(|set| set.key.value.to_lowercase() == "autocommit".to_string())
+        {
+            flags |= StatusFlags::SERVER_STATUS_AUTOCOMMIT;
+        }
+
+        Ok(QueryPlan::MetaTabular(
+            flags,
+            Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+        ))
     }
 
     fn create_df_logical_plan(
@@ -3724,18 +3743,22 @@ mod tests {
     }
 
     async fn execute_query(query: String) -> Result<String, CubeError> {
+        Ok(execute_query_with_flags(query).await?.0)
+    }
+
+    async fn execute_query_with_flags(query: String) -> Result<(String, StatusFlags), CubeError> {
         let query =
             convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_connection_state());
         match query.unwrap() {
-            QueryPlan::DataFushionSelect(_, plan, ctx) => {
+            QueryPlan::DataFushionSelect(flags, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let frame = batch_to_dataframe(&batches)?;
 
-                return Ok(frame.print());
+                return Ok((frame.print(), flags));
             }
-            QueryPlan::MetaTabular(_, frame) => {
-                return Ok(frame.print());
+            QueryPlan::MetaTabular(flags, frame) => {
+                return Ok((frame.print(), flags));
             }
             _ => panic!("Unknown execution method"),
         }
@@ -4411,6 +4434,39 @@ mod tests {
             | is_male            | boolean      | NO   |     | NULL    |       |\n\
             | is_female          | boolean      | NO   |     | NULL    |       |\n\
             +--------------------+--------------+------+-----+---------+-------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_variable() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query_with_flags("set autocommit=1;".to_string()).await?,
+            (
+                "++\n++\n++".to_string(),
+                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
+            )
+        );
+
+        assert_eq!(
+            execute_query_with_flags("set character_set_results = utf8;".to_string()).await?,
+            (
+                "++\n++\n++".to_string(),
+                StatusFlags::SERVER_SESSION_STATE_CHANGED
+            )
+        );
+
+        assert_eq!(
+            execute_query_with_flags(
+                "set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables');"
+                    .to_string()
+            )
+            .await?,
+            (
+                "++\n++\n++".to_string(),
+                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
+            )
         );
 
         Ok(())
