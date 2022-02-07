@@ -211,21 +211,10 @@ impl Connection {
         let ignore = match query_lower.as_str() {
             "rollback" => true,
             "commit" => true,
-            // DataGrip workaround
-            "set character_set_results = utf8" => true,
-            "set character_set_results = latin1" => true,
-            "set autocommit=1" => true,
-            "set sql_mode='strict_trans_tables'" => true,
-            "set sql_select_limit=501" => true,
             _ => false,
         };
 
-        if query_lower.eq("set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables')")
-        {
-            return Ok(QueryResponse::Ok(
-                StatusFlags::SERVER_STATUS_AUTOCOMMIT | StatusFlags::SERVER_SESSION_STATE_CHANGED,
-            ));
-        } else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
+        if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
                 QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
