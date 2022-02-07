@@ -33,11 +33,13 @@ class SqliteDriver extends BaseDriver {
 
   informationSchemaQuery() {
     return `
-      SELECT name, sql
-      FROM sqlite_master
-      WHERE type='table'
-      AND name!='sqlite_sequence'
-      ORDER BY name
+      SELECT m.name AS table_name,
+             p.name AS column_name,
+             p.type AS column_type
+        FROM sqlite_master AS m
+        JOIN pragma_table_info(m.name) AS p
+       WHERE m.name NOT IN ('sqlite_sequence', 'sqlite_stat1')
+       ORDER BY m.name, p.cid
    `;
   }
 
@@ -47,25 +49,16 @@ class SqliteDriver extends BaseDriver {
     const tables = await this.query(query);
 
     return {
-      main: tables.reduce((acc, table) => ({
-        ...acc,
-        [table.name]: table.sql
-          // remove EOL for next .match to read full string
-          .replace(/\n/g, '')
-          // extract fields
-          .match(/\((.*)\)/)[1]
-          // split fields
-          .split(',')
-          .map((nameAndType) => {
-            const match = nameAndType
-              .trim()
-              // replace \t with whitespace
-              .replace(/\t/g, ' ')
-              // obtain "([|`|")?name(]|`|")? type"
-              .match(/([|`|"])?([^[\]"`]+)(]|`|")?\s+(\w+)/);
-            return { name: match[2], type: match[4] };
-          })
-      }), {}),
+      main: tables.reduce((acc, curr) => {
+        if (!acc[curr.table_name]) {
+          acc[curr.table_name] = [];
+        }
+        acc[curr.table_name].push({
+          name: curr.column_name,
+          type: curr.column_type
+        });
+        return acc;
+      }, {})
     };
   }
 
