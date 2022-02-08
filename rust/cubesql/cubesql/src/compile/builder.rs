@@ -1,6 +1,7 @@
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
+use itertools::Itertools;
 use msql_srv::ColumnType;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
@@ -134,31 +135,31 @@ impl QueryBuilder {
         self.filters.push(filter);
     }
 
-    pub fn build(&self) -> super::CompiledQuery {
+    pub fn build(self) -> super::CompiledQuery {
         CompiledQuery {
             request: V1LoadRequestQuery {
-                measures: Some(self.measures.clone()),
-                dimensions: Some(self.dimensions.clone()),
-                segments: Some(self.segments.clone()),
+                measures: Some(self.measures.into_iter().unique().collect()),
+                dimensions: Some(self.dimensions.into_iter().unique().collect()),
+                segments: Some(self.segments.into_iter().unique().collect()),
                 time_dimensions: if !self.time_dimensions.is_empty() {
-                    Some(self.time_dimensions.clone())
+                    Some(self.time_dimensions)
                 } else {
                     None
                 },
                 order: if !self.order.is_empty() {
-                    Some(self.order.clone())
+                    Some(self.order)
                 } else {
                     None
                 },
                 limit: self.limit,
                 offset: self.offset,
                 filters: if !self.filters.is_empty() {
-                    Some(self.filters.clone())
+                    Some(self.filters)
                 } else {
                     None
                 },
             },
-            meta: self.meta.clone(),
+            meta: self.meta,
         }
     }
 }
