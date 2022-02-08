@@ -1654,15 +1654,6 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
         .await
         .unwrap();
-    log::warn!(
-        "qqq {} {}",
-        env::current_dir().unwrap().display(),
-        paths
-            .clone()
-            .into_iter()
-            .map(|p| format!("'{}'", p.to_string_lossy()))
-            .join(",")
-    );
     let _ = service.exec_query(
             &format!(
                 "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
