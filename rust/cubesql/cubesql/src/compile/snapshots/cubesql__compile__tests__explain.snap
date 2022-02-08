@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4273
+expression: "execute_query(\"explain select 1+1;\".to_string()).await?"
+
+---
++---------------------------------+
+| Execution Plan                  |
++---------------------------------+
+| Projection: Int64(1) + Int64(1) |
+|   EmptyRelation                 |
++---------------------------------+

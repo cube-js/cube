@@ -3,6 +3,7 @@
 ## Prerequisites:
 
 - `rustup`
+- `cargo install cargo-insta`
 
 # Build and run
 

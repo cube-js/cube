@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4246
+expression: "execute_query(\"show collation like '%unicode%';\".to_string()).await?"
+
+---
++------------------------+---------+-----+---------+----------+---------+---------------+
+| Collation              | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |
++------------------------+---------+-----+---------+----------+---------+---------------+
+| utf8mb4_unicode_520_ci | utf8mb4 | 246 |         | Yes      | 8       | PAD SPACE     |
+| utf8mb4_unicode_ci     | utf8mb4 | 224 |         | Yes      | 8       | PAD SPACE     |
++------------------------+---------+-----+---------+----------+---------+---------------+
