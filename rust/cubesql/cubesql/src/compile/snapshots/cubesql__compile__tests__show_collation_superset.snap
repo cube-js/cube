@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4258
+expression: "execute_query(\"show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';\".to_string()).await?"
+
+---
++-------------+---------+----+---------+----------+---------+---------------+
+| Collation   | Charset | Id | Default | Compiled | Sortlen | Pad_attribute |
++-------------+---------+----+---------+----------+---------+---------------+
+| utf8mb4_bin | utf8mb4 | 46 |         | Yes      | 1       | PAD SPACE     |
++-------------+---------+----+---------+----------+---------+---------------+

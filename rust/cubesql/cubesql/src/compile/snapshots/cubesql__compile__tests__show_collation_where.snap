@@ -1,0 +1,16 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4252
+expression: "execute_query(\"show collation where Id between 255 and 260;\".to_string()).await?"
+
+---
++--------------------------+---------+-----+---------+----------+---------+---------------+
+| Collation                | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |
++--------------------------+---------+-----+---------+----------+---------+---------------+
+| utf8mb4_0900_ai_ci       | utf8mb4 | 255 | Yes     | Yes      | 0       | NO PAD        |
+| utf8mb4_de_pb_0900_ai_ci | utf8mb4 | 256 |         | Yes      | 0       | NO PAD        |
+| utf8mb4_is_0900_ai_ci    | utf8mb4 | 257 |         | Yes      | 0       | NO PAD        |
+| utf8mb4_lv_0900_ai_ci    | utf8mb4 | 258 |         | Yes      | 0       | NO PAD        |
+| utf8mb4_ro_0900_ai_ci    | utf8mb4 | 259 |         | Yes      | 0       | NO PAD        |
+| utf8mb4_sl_0900_ai_ci    | utf8mb4 | 260 |         | Yes      | 0       | NO PAD        |
++--------------------------+---------+-----+---------+----------+---------+---------------+

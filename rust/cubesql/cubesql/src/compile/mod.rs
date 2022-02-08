@@ -3799,20 +3799,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_schema_tables() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("SELECT * FROM information_schema.tables".to_string()).await?,
-            "+---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
-            | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |\n\
-            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+\n\
-            | def           | information_schema | tables                    | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | information_schema | columns                   | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | information_schema | key_column_usage          | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | information_schema | referential_constraints   | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | performance_schema | session_variables         | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | performance_schema | global_variables          | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | db                 | KibanaSampleDataEcommerce | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            | def           | db                 | Logs                      | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |\n\
-            +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+"
+        insta::assert_snapshot!(
+            "information_schema_tables",
+            execute_query("SELECT * FROM information_schema.tables".to_string()).await?
         );
 
         Ok(())
@@ -3820,23 +3809,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_schema_columns() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()).await?,
-            "+---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
-            | TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME                | COLUMN_NAME        | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE | CHARACTER_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | COLUMN_TYPE  | NUMERIC_PRECISION | DATETIME_PRECISION | COLUMN_KEY | EXTRA | COLUMN_COMMENT | GENERATION_EXPRESSION | SRS_ID |\n\
-            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+\n\
-            | def           | db           | KibanaSampleDataEcommerce | count              | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | maxPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | minPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | avgPrice           | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | order_date         | 0                |                | YES         | datetime  | NULL                     | NULL                   | datetime     | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | customer_gender    | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | taxful_total_price | 0                |                | YES         | varchar   | NULL                     | NULL                   | varchar(255) | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | is_male            | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | KibanaSampleDataEcommerce | is_female          | 0                |                | NO          | boolean   | NULL                     | NULL                   | boolean      | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | Logs                      | agentCount         | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            | def           | db           | Logs                      | agentCountApprox   | 0                |                | NO          | int       | NULL                     | NULL                   | int          | NULL              | NULL               |            |       |                |                       |        |\n\
-            +---------------+--------------+---------------------------+--------------------+------------------+----------------+-------------+-----------+--------------------------+------------------------+--------------+-------------------+--------------------+------------+-------+----------------+-----------------------+--------+"
+        insta::assert_snapshot!(
+            "information_schema_columns",
+            execute_query(
+                "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()
+            )
+            .await?
         );
 
         Ok(())
@@ -3844,17 +3822,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_schema_schemata() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("SELECT * FROM information_schema.schemata".to_string()).await?,
-            "+--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
-            | CATALOG_NAME | SCHEMA_NAME        | DEFAULT_CHARACTER_SET_NAME | DEFAULT_COLLATION_NAME | SQL_PATH | DEFAULT_ENCRYPTION |\n\
-            +--------------+--------------------+----------------------------+------------------------+----------+--------------------+\n\
-            | def          | information_schema | utf8                       | utf8_general_ci        | NULL     | NO                 |\n\
-            | def          | mysql              | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
-            | def          | performance_schema | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
-            | def          | sys                | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
-            | def          | test               | utf8mb4                    | utf8mb4_0900_ai_ci     | NULL     | NO                 |\n\
-            +--------------+--------------------+----------------------------+------------------------+----------+--------------------+"
+        insta::assert_snapshot!(
+            "information_schema_schemata",
+            execute_query("SELECT * FROM information_schema.schemata".to_string()).await?
         );
 
         Ok(())
@@ -3878,22 +3848,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
-            "+--------------------+----------------+\n\
-            | VARIABLE_NAME      | VARIABLE_VALUE |\n\
-            +--------------------+----------------+\n\
-            | max_allowed_packet | 67108864       |\n\
-            +--------------------+----------------+"
+        insta::assert_snapshot!(
+            "performance_schema_session_variables",
+            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?
         );
 
-        assert_eq!(
-            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?,
-            "+--------------------+----------------+\n\
-            | VARIABLE_NAME      | VARIABLE_VALUE |\n\
-            +--------------------+----------------+\n\
-            | max_allowed_packet | 67108864       |\n\
-            +--------------------+----------------+"
+        insta::assert_snapshot!(
+            "performance_schema_global_variables",
+            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?
         );
 
         Ok(())
@@ -3901,87 +3863,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_schema_collations() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("SELECT * FROM information_schema.collations".to_string()).await?,
-            "+----------------------------+--------------------+-----+------------+-------------+---------+---------------+\n\
-            | COLLATION_NAME             | CHARACTER_SET_NAME | ID  | IS_DEFAULT | IS_COMPILED | SORTLEN | PAD_ATTRIBUTE |\n\
-            +----------------------------+--------------------+-----+------------+-------------+---------+---------------+\n\
-            | utf8mb4_general_ci         | utf8mb4            | 45  |            | Yes         | 1       | PAD SPACE     |\n\
-            | utf8mb4_bin                | utf8mb4            | 46  |            | Yes         | 1       | PAD SPACE     |\n\
-            | utf8mb4_unicode_ci         | utf8mb4            | 224 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_icelandic_ci       | utf8mb4            | 225 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_latvian_ci         | utf8mb4            | 226 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_romanian_ci        | utf8mb4            | 227 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_slovenian_ci       | utf8mb4            | 228 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_polish_ci          | utf8mb4            | 229 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_estonian_ci        | utf8mb4            | 230 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_spanish_ci         | utf8mb4            | 231 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_swedish_ci         | utf8mb4            | 232 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_turkish_ci         | utf8mb4            | 233 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_czech_ci           | utf8mb4            | 234 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_danish_ci          | utf8mb4            | 235 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_lithuanian_ci      | utf8mb4            | 236 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_slovak_ci          | utf8mb4            | 237 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_spanish2_ci        | utf8mb4            | 238 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_roman_ci           | utf8mb4            | 239 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_persian_ci         | utf8mb4            | 240 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_esperanto_ci       | utf8mb4            | 241 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_hungarian_ci       | utf8mb4            | 242 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_sinhala_ci         | utf8mb4            | 243 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_german2_ci         | utf8mb4            | 244 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_croatian_ci        | utf8mb4            | 245 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_unicode_520_ci     | utf8mb4            | 246 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_vietnamese_ci      | utf8mb4            | 247 |            | Yes         | 8       | PAD SPACE     |\n\
-            | utf8mb4_0900_ai_ci         | utf8mb4            | 255 | Yes        | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_de_pb_0900_ai_ci   | utf8mb4            | 256 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_is_0900_ai_ci      | utf8mb4            | 257 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_lv_0900_ai_ci      | utf8mb4            | 258 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ro_0900_ai_ci      | utf8mb4            | 259 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sl_0900_ai_ci      | utf8mb4            | 260 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_pl_0900_ai_ci      | utf8mb4            | 261 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_et_0900_ai_ci      | utf8mb4            | 262 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_es_0900_ai_ci      | utf8mb4            | 263 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sv_0900_ai_ci      | utf8mb4            | 264 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_tr_0900_ai_ci      | utf8mb4            | 265 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_cs_0900_ai_ci      | utf8mb4            | 266 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_da_0900_ai_ci      | utf8mb4            | 267 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_lt_0900_ai_ci      | utf8mb4            | 268 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sk_0900_ai_ci      | utf8mb4            | 269 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_es_trad_0900_ai_ci | utf8mb4            | 270 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_la_0900_ai_ci      | utf8mb4            | 271 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_eo_0900_ai_ci      | utf8mb4            | 273 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_hu_0900_ai_ci      | utf8mb4            | 274 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_hr_0900_ai_ci      | utf8mb4            | 275 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_vi_0900_ai_ci      | utf8mb4            | 277 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_0900_as_cs         | utf8mb4            | 278 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_de_pb_0900_as_cs   | utf8mb4            | 279 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_is_0900_as_cs      | utf8mb4            | 280 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_lv_0900_as_cs      | utf8mb4            | 281 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ro_0900_as_cs      | utf8mb4            | 282 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sl_0900_as_cs      | utf8mb4            | 283 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_pl_0900_as_cs      | utf8mb4            | 284 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_et_0900_as_cs      | utf8mb4            | 285 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_es_0900_as_cs      | utf8mb4            | 286 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sv_0900_as_cs      | utf8mb4            | 287 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_tr_0900_as_cs      | utf8mb4            | 288 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_cs_0900_as_cs      | utf8mb4            | 289 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_da_0900_as_cs      | utf8mb4            | 290 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_lt_0900_as_cs      | utf8mb4            | 291 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_sk_0900_as_cs      | utf8mb4            | 292 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_es_trad_0900_as_cs | utf8mb4            | 293 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_la_0900_as_cs      | utf8mb4            | 294 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_eo_0900_as_cs      | utf8mb4            | 296 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_hu_0900_as_cs      | utf8mb4            | 297 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_hr_0900_as_cs      | utf8mb4            | 298 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_vi_0900_as_cs      | utf8mb4            | 300 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ja_0900_as_cs      | utf8mb4            | 303 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ja_0900_as_cs_ks   | utf8mb4            | 304 |            | Yes         | 24      | NO PAD        |\n\
-            | utf8mb4_0900_as_ci         | utf8mb4            | 305 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ru_0900_ai_ci      | utf8mb4            | 306 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_ru_0900_as_cs      | utf8mb4            | 307 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_zh_0900_as_cs      | utf8mb4            | 308 |            | Yes         | 0       | NO PAD        |\n\
-            | utf8mb4_0900_bin           | utf8mb4            | 309 |            | Yes         | 1       | NO PAD        |\n\
-            +----------------------------+--------------------+-----+------------+-------------+---------+---------------+"
+        insta::assert_snapshot!(
+            "information_schema_collations",
+            execute_query("SELECT * FROM information_schema.collations".to_string()).await?
         );
 
         Ok(())
@@ -4136,8 +4020,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_variables() -> Result<(), CubeError> {
-        assert_eq!(
+    async fn test_gdata_studio() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "test_gdata_studio",
             execute_query(
                 // This query I saw in Google Data Studio
                 "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
@@ -4164,12 +4049,7 @@ mod tests {
                 "
                 .to_string()
             )
-            .await?,
-            "+--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
-            | auto_increment_increment | character_set_client | character_set_connection | character_set_results | character_set_server | collation_server   | collation_connection | init_connect | interactive_timeout | license  | lower_case_table_names | max_allowed_packet | net_buffer_length | net_write_timeout | sql_mode                                                                                                              | system_time_zone | time_zone | transaction_isolation | wait_timeout |\n\
-            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+\n\
-            | 1                        | utf8mb4              | utf8mb4                  | utf8mb4               | utf8mb4              | utf8mb4_0900_ai_ci | utf8mb4_general_ci   |              | 28800               | Apache 2 | 0                      | 67108864           | 16384             | 600               | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION | UTC              | SYSTEM    | REPEATABLE-READ       | 28800        |\n\
-            +--------------------------+----------------------+--------------------------+-----------------------+----------------------+--------------------+----------------------+--------------+---------------------+----------+------------------------+--------------------+-------------------+-------------------+-----------------------------------------------------------------------------------------------------------------------+------------------+-----------+-----------------------+--------------+"
+            .await?
         );
 
         Ok(())
@@ -4178,31 +4058,15 @@ mod tests {
     #[tokio::test]
     async fn test_show_variable() -> Result<(), CubeError> {
         // LIKE
-        assert_eq!(
-            execute_query(
-                "show variables like 'sql_mode';"
-                .to_string()
-            )
-            .await?,
-            "+---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | Variable_name | Value                                                                                                                 |\n\
-            +---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | sql_mode      | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
-            +---------------+-----------------------------------------------------------------------------------------------------------------------+"
+        insta::assert_snapshot!(
+            "show_variables_like_sql_mode",
+            execute_query("show variables like 'sql_mode';".to_string()).await?
         );
 
         // LIKE pattern
-        assert_eq!(
-            execute_query(
-                "show variables like '%_mode';"
-                .to_string()
-            )
-            .await?,
-            "+---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | Variable_name | Value                                                                                                                 |\n\
-            +---------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | sql_mode      | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
-            +---------------+-----------------------------------------------------------------------------------------------------------------------+"
+        insta::assert_snapshot!(
+            "show_variables_like",
+            execute_query("show variables like '%_mode';".to_string()).await?
         );
 
         // Negative test, we dont define this variable
@@ -4212,19 +4076,9 @@ mod tests {
         );
 
         // All variables
-        assert_eq!(
-            execute_query(
-                "show variables;"
-                .to_string()
-            )
-            .await?,
-            "+------------------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | Variable_name          | Value                                                                                                                 |\n\
-            +------------------------+-----------------------------------------------------------------------------------------------------------------------+\n\
-            | sql_mode               | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |\n\
-            | max_allowed_packet     | 67108864                                                                                                              |\n\
-            | lower_case_table_names | 0                                                                                                                     |\n\
-            +------------------------+-----------------------------------------------------------------------------------------------------------------------+"
+        insta::assert_snapshot!(
+            "show_variables",
+            execute_query("show variables;".to_string()).await?
         );
 
         Ok(())
@@ -4233,100 +4087,49 @@ mod tests {
     #[tokio::test]
     async fn test_show_columns() -> Result<(), CubeError> {
         // Simplest syntax
-        assert_eq!(
-            execute_query("show columns from KibanaSampleDataEcommerce;".to_string()).await?,
-            "+--------------------+--------------+------+-----+---------+-------+\n\
-            | Field              | Type         | Null | Key | Default | Extra |\n\
-            +--------------------+--------------+------+-----+---------+-------+\n\
-            | count              | int          | NO   |     | NULL    |       |\n\
-            | maxPrice           | int          | NO   |     | NULL    |       |\n\
-            | minPrice           | int          | NO   |     | NULL    |       |\n\
-            | avgPrice           | int          | NO   |     | NULL    |       |\n\
-            | order_date         | datetime     | YES  |     | NULL    |       |\n\
-            | customer_gender    | varchar(255) | YES  |     | NULL    |       |\n\
-            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
-            | is_male            | boolean      | NO   |     | NULL    |       |\n\
-            | is_female          | boolean      | NO   |     | NULL    |       |\n\
-            +--------------------+--------------+------+-----+---------+-------+"
+        insta::assert_snapshot!(
+            "show_columns",
+            execute_query("show columns from KibanaSampleDataEcommerce;".to_string()).await?
         );
 
         // FULL
-        assert_eq!(
-            execute_query("show full columns from KibanaSampleDataEcommerce;".to_string()).await?,
-            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
-            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
-            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
-            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
-            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
-            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
-            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        insta::assert_snapshot!(
+            "show_columns_full",
+            execute_query("show full columns from KibanaSampleDataEcommerce;".to_string()).await?
         );
 
         // LIKE
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_columns_like",
             execute_query("show columns from KibanaSampleDataEcommerce like '%ice%';".to_string())
-                .await?,
-            "+--------------------+--------------+------+-----+---------+-------+\n\
-            | Field              | Type         | Null | Key | Default | Extra |\n\
-            +--------------------+--------------+------+-----+---------+-------+\n\
-            | maxPrice           | int          | NO   |     | NULL    |       |\n\
-            | minPrice           | int          | NO   |     | NULL    |       |\n\
-            | avgPrice           | int          | NO   |     | NULL    |       |\n\
-            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
-            +--------------------+--------------+------+-----+---------+-------+"
+                .await?
         );
 
         // WHERE
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_columns_where",
             execute_query(
                 "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string()
             )
-            .await?,
-            "+----------+------+------+-----+---------+-------+\n\
-            | Field    | Type | Null | Key | Default | Extra |\n\
-            +----------+------+------+-----+---------+-------+\n\
-            | count    | int  | NO   |     | NULL    |       |\n\
-            | maxPrice | int  | NO   |     | NULL    |       |\n\
-            | minPrice | int  | NO   |     | NULL    |       |\n\
-            | avgPrice | int  | NO   |     | NULL    |       |\n\
-            +----------+------+------+-----+---------+-------+"
+            .await?
         );
 
         // FROM db FROM tbl
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_columns_from_db",
             execute_query(
                 "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string()
             )
-            .await?,
-            "+-------+------+------+-----+---------+-------+\n\
-            | Field | Type | Null | Key | Default | Extra |\n\
-            +-------+------+------+-----+---------+-------+\n\
-            | count | int  | NO   |     | NULL    |       |\n\
-            +-------+------+------+-----+---------+-------+"
+            .await?
         );
 
         // Everything
-        assert_eq!(
-            execute_query("show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()).await?,
-            "+--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
-            | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |\n\
-            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+\n\
-            | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | maxPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | minPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | avgPrice           | int          | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |\n\
-            | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
-            | taxful_total_price | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |\n\
-            | is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            | is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |\n\
-            +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+"
+        insta::assert_snapshot!(
+            "show_columns_everything",
+            execute_query(
+                "show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()
+            )
+            .await?
         );
 
         Ok(())
@@ -4335,67 +4138,39 @@ mod tests {
     #[tokio::test]
     async fn test_show_tables() -> Result<(), CubeError> {
         // Simplest syntax
-        assert_eq!(
-            execute_query("show tables;".to_string()).await?,
-            "+---------------------------+\n\
-            | Tables_in_db              |\n\
-            +---------------------------+\n\
-            | KibanaSampleDataEcommerce |\n\
-            | Logs                      |\n\
-            +---------------------------+"
+        insta::assert_snapshot!(
+            "show_tables_simple",
+            execute_query("show tables;".to_string()).await?
         );
 
         // FULL
-        assert_eq!(
-            execute_query("show full tables;".to_string()).await?,
-            "+---------------------------+------------+\n\
-            | Tables_in_db              | Table_type |\n\
-            +---------------------------+------------+\n\
-            | KibanaSampleDataEcommerce | BASE TABLE |\n\
-            | Logs                      | BASE TABLE |\n\
-            +---------------------------+------------+"
+        insta::assert_snapshot!(
+            "show_tables_full",
+            execute_query("show full tables;".to_string()).await?
         );
 
         // LIKE
-        assert_eq!(
-            execute_query("show tables like '%ban%';".to_string()).await?,
-            "+---------------------------+\n\
-            | Tables_in_db              |\n\
-            +---------------------------+\n\
-            | KibanaSampleDataEcommerce |\n\
-            +---------------------------+"
+        insta::assert_snapshot!(
+            "show_tables_like",
+            execute_query("show tables like '%ban%';".to_string()).await?
         );
 
         // WHERE
-        assert_eq!(
-            execute_query("show tables where Tables_in_db = 'Logs';".to_string()).await?,
-            "+--------------+\n\
-            | Tables_in_db |\n\
-            +--------------+\n\
-            | Logs         |\n\
-            +--------------+"
+        insta::assert_snapshot!(
+            "show_tables_where",
+            execute_query("show tables where Tables_in_db = 'Logs';".to_string()).await?
         );
 
         // FROM db
-        assert_eq!(
-            execute_query("show tables from db;".to_string()).await?,
-            "+---------------------------+\n\
-            | Tables_in_db              |\n\
-            +---------------------------+\n\
-            | KibanaSampleDataEcommerce |\n\
-            | Logs                      |\n\
-            +---------------------------+"
+        insta::assert_snapshot!(
+            "show_tables_from_db",
+            execute_query("show tables from db;".to_string()).await?
         );
 
         // Everything
-        assert_eq!(
-            execute_query("show full tables from db like '%';".to_string()).await?,
-            "+---------------------------+------------+\n\
-            | Tables_in_db              | Table_type |\n\
-            +---------------------------+------------+\n\
-            | KibanaSampleDataEcommerce | BASE TABLE |\n\
-            | Logs                      | BASE TABLE |\n\
-            +---------------------------+------------+"
+        insta::assert_snapshot!(
+            "show_tables_everything",
+            execute_query("show full tables from db like '%';".to_string()).await?
         );
 
         Ok(())
@@ -4419,21 +4194,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_explain_table() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("explain KibanaSampleDataEcommerce;".to_string()).await?,
-            "+--------------------+--------------+------+-----+---------+-------+\n\
-            | Field              | Type         | Null | Key | Default | Extra |\n\
-            +--------------------+--------------+------+-----+---------+-------+\n\
-            | count              | int          | NO   |     | NULL    |       |\n\
-            | maxPrice           | int          | NO   |     | NULL    |       |\n\
-            | minPrice           | int          | NO   |     | NULL    |       |\n\
-            | avgPrice           | int          | NO   |     | NULL    |       |\n\
-            | order_date         | datetime     | YES  |     | NULL    |       |\n\
-            | customer_gender    | varchar(255) | YES  |     | NULL    |       |\n\
-            | taxful_total_price | varchar(255) | YES  |     | NULL    |       |\n\
-            | is_male            | boolean      | NO   |     | NULL    |       |\n\
-            | is_female          | boolean      | NO   |     | NULL    |       |\n\
-            +--------------------+--------------+------+-----+---------+-------+"
+        insta::assert_snapshot!(
+            execute_query("explain KibanaSampleDataEcommerce;".to_string()).await?
         );
 
         Ok(())
@@ -4475,127 +4237,31 @@ mod tests {
     #[tokio::test]
     async fn test_show_collation() -> Result<(), CubeError> {
         // Simplest syntax
-        assert_eq!(
-            execute_query("show collation;".to_string()).await?,
-            "+----------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | Collation                  | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
-            +----------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | utf8mb4_0900_ai_ci         | utf8mb4 | 255 | Yes     | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_0900_as_ci         | utf8mb4 | 305 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_0900_as_cs         | utf8mb4 | 278 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_0900_bin           | utf8mb4 | 309 |         | Yes      | 1       | NO PAD        |\n\
-            | utf8mb4_bin                | utf8mb4 | 46  |         | Yes      | 1       | PAD SPACE     |\n\
-            | utf8mb4_croatian_ci        | utf8mb4 | 245 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_cs_0900_ai_ci      | utf8mb4 | 266 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_cs_0900_as_cs      | utf8mb4 | 289 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_czech_ci           | utf8mb4 | 234 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_da_0900_ai_ci      | utf8mb4 | 267 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_da_0900_as_cs      | utf8mb4 | 290 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_danish_ci          | utf8mb4 | 235 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_de_pb_0900_ai_ci   | utf8mb4 | 256 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_de_pb_0900_as_cs   | utf8mb4 | 279 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_eo_0900_ai_ci      | utf8mb4 | 273 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_eo_0900_as_cs      | utf8mb4 | 296 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_es_0900_ai_ci      | utf8mb4 | 263 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_es_0900_as_cs      | utf8mb4 | 286 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_es_trad_0900_ai_ci | utf8mb4 | 270 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_es_trad_0900_as_cs | utf8mb4 | 293 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_esperanto_ci       | utf8mb4 | 241 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_estonian_ci        | utf8mb4 | 230 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_et_0900_ai_ci      | utf8mb4 | 262 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_et_0900_as_cs      | utf8mb4 | 285 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_general_ci         | utf8mb4 | 45  |         | Yes      | 1       | PAD SPACE     |\n\
-            | utf8mb4_german2_ci         | utf8mb4 | 244 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_hr_0900_ai_ci      | utf8mb4 | 275 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_hr_0900_as_cs      | utf8mb4 | 298 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_hu_0900_ai_ci      | utf8mb4 | 274 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_hu_0900_as_cs      | utf8mb4 | 297 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_hungarian_ci       | utf8mb4 | 242 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_icelandic_ci       | utf8mb4 | 225 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_is_0900_ai_ci      | utf8mb4 | 257 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_is_0900_as_cs      | utf8mb4 | 280 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_ja_0900_as_cs      | utf8mb4 | 303 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_ja_0900_as_cs_ks   | utf8mb4 | 304 |         | Yes      | 24      | NO PAD        |\n\
-            | utf8mb4_la_0900_ai_ci      | utf8mb4 | 271 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_la_0900_as_cs      | utf8mb4 | 294 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_latvian_ci         | utf8mb4 | 226 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_lithuanian_ci      | utf8mb4 | 236 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_lt_0900_ai_ci      | utf8mb4 | 268 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_lt_0900_as_cs      | utf8mb4 | 291 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_lv_0900_ai_ci      | utf8mb4 | 258 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_lv_0900_as_cs      | utf8mb4 | 281 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_persian_ci         | utf8mb4 | 240 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_pl_0900_ai_ci      | utf8mb4 | 261 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_pl_0900_as_cs      | utf8mb4 | 284 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_polish_ci          | utf8mb4 | 229 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_ro_0900_ai_ci      | utf8mb4 | 259 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_ro_0900_as_cs      | utf8mb4 | 282 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_roman_ci           | utf8mb4 | 239 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_romanian_ci        | utf8mb4 | 227 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_ru_0900_ai_ci      | utf8mb4 | 306 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_ru_0900_as_cs      | utf8mb4 | 307 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sinhala_ci         | utf8mb4 | 243 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_sk_0900_ai_ci      | utf8mb4 | 269 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sk_0900_as_cs      | utf8mb4 | 292 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sl_0900_ai_ci      | utf8mb4 | 260 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sl_0900_as_cs      | utf8mb4 | 283 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_slovak_ci          | utf8mb4 | 237 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_slovenian_ci       | utf8mb4 | 228 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_spanish2_ci        | utf8mb4 | 238 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_spanish_ci         | utf8mb4 | 231 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_sv_0900_ai_ci      | utf8mb4 | 264 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sv_0900_as_cs      | utf8mb4 | 287 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_swedish_ci         | utf8mb4 | 232 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_tr_0900_ai_ci      | utf8mb4 | 265 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_tr_0900_as_cs      | utf8mb4 | 288 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_turkish_ci         | utf8mb4 | 233 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_unicode_520_ci     | utf8mb4 | 246 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_unicode_ci         | utf8mb4 | 224 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_vi_0900_ai_ci      | utf8mb4 | 277 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_vi_0900_as_cs      | utf8mb4 | 300 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_vietnamese_ci      | utf8mb4 | 247 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_zh_0900_as_cs      | utf8mb4 | 308 |         | Yes      | 0       | NO PAD        |\n\
-            +----------------------------+---------+-----+---------+----------+---------+---------------+"
+        insta::assert_snapshot!(
+            "show_collation",
+            execute_query("show collation;".to_string()).await?
         );
 
         // LIKE
-        assert_eq!(
-            execute_query("show collation like '%unicode%';".to_string()).await?,
-            "+------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | Collation              | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
-            +------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | utf8mb4_unicode_520_ci | utf8mb4 | 246 |         | Yes      | 8       | PAD SPACE     |\n\
-            | utf8mb4_unicode_ci     | utf8mb4 | 224 |         | Yes      | 8       | PAD SPACE     |\n\
-            +------------------------+---------+-----+---------+----------+---------+---------------+"
+        insta::assert_snapshot!(
+            "show_collation_like",
+            execute_query("show collation like '%unicode%';".to_string()).await?
         );
 
         // WHERE
-        assert_eq!(
-            execute_query("show collation where Id between 255 and 260;".to_string()).await?,
-            "+--------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | Collation                | Charset | Id  | Default | Compiled | Sortlen | Pad_attribute |\n\
-            +--------------------------+---------+-----+---------+----------+---------+---------------+\n\
-            | utf8mb4_0900_ai_ci       | utf8mb4 | 255 | Yes     | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_de_pb_0900_ai_ci | utf8mb4 | 256 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_is_0900_ai_ci    | utf8mb4 | 257 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_lv_0900_ai_ci    | utf8mb4 | 258 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_ro_0900_ai_ci    | utf8mb4 | 259 |         | Yes      | 0       | NO PAD        |\n\
-            | utf8mb4_sl_0900_ai_ci    | utf8mb4 | 260 |         | Yes      | 0       | NO PAD        |\n\
-            +--------------------------+---------+-----+---------+----------+---------+---------------+"
+        insta::assert_snapshot!(
+            "show_collation_where",
+            execute_query("show collation where Id between 255 and 260;".to_string()).await?
         );
 
         // Superset query
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_collation_superset",
             execute_query(
                 "show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';"
                     .to_string()
             )
-            .await?,
-            "+-------------+---------+----+---------+----------+---------+---------------+\n\
-            | Collation   | Charset | Id | Default | Compiled | Sortlen | Pad_attribute |\n\
-            +-------------+---------+----+---------+----------+---------+---------------+\n\
-            | utf8mb4_bin | utf8mb4 | 46 |         | Yes      | 1       | PAD SPACE     |\n\
-            +-------------+---------+----+---------+----------+---------+---------------+"
+            .await?
         );
 
         Ok(())
@@ -4604,48 +4270,14 @@ mod tests {
     #[tokio::test]
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
-        assert_eq!(
-            execute_query("explain select 1+1;".to_string()).await?,
-            "+---------------------------------+\n\
-            | Execution Plan                  |\n\
-            +---------------------------------+\n\
-            | Projection: Int64(1) + Int64(1) |\n\
-            |   EmptyRelation                 |\n\
-            +---------------------------------+"
-        );
+        insta::assert_snapshot!(execute_query("explain select 1+1;".to_string()).await?);
 
         // SELECT with table and specific columns
-        assert_eq!(
+        insta::assert_snapshot!(
             execute_query(
                 "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string()
             )
-            .await?,
-            "+------------------------------------------------------------+\n\
-            | Execution Plan                                             |\n\
-            +------------------------------------------------------------+\n\
-            | {                                                          |\n\
-            |   \"request\": {                                             |\n\
-            |     \"measures\": [                                          |\n\
-            |       \"KibanaSampleDataEcommerce.count\",                   |\n\
-            |       \"KibanaSampleDataEcommerce.avgPrice\"                 |\n\
-            |     ],                                                     |\n\
-            |     \"dimensions\": [],                                      |\n\
-            |     \"segments\": []                                         |\n\
-            |   },                                                       |\n\
-            |   \"meta\": [                                                |\n\
-            |     {                                                      |\n\
-            |       \"column_from\": \"KibanaSampleDataEcommerce.count\",    |\n\
-            |       \"column_to\": \"count\",                                |\n\
-            |       \"column_type\": \"MYSQL_TYPE_LONGLONG\"                 |\n\
-            |     },                                                     |\n\
-            |     {                                                      |\n\
-            |       \"column_from\": \"KibanaSampleDataEcommerce.avgPrice\", |\n\
-            |       \"column_to\": \"avgPrice\",                             |\n\
-            |       \"column_type\": \"MYSQL_TYPE_DOUBLE\"                   |\n\
-            |     }                                                      |\n\
-            |   ]                                                        |\n\
-            | }                                                          |\n\
-            +------------------------------------------------------------+"
+            .await?
         );
 
         Ok(())
@@ -4653,22 +4285,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_metabase() -> Result<(), CubeError> {
-        assert_eq!(
+        insta::assert_snapshot!(
             execute_query(
                 "SELECT \
                     @@GLOBAL.time_zone AS global_tz, \
                     @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'
                 ".to_string()
             )
-            .await?,
-            "+-----------+-----------+--------+\n\
-            | global_tz | system_tz | offset |\n\
-            +-----------+-----------+--------+\n\
-            | SYSTEM    | UTC       | 00:00  |\n\
-            +-----------+-----------+--------+"
+            .await?
         );
 
-        assert_eq!(
+        insta::assert_snapshot!(
             execute_query(
                 "SELECT \
                 TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, \
@@ -4692,23 +4319,10 @@ mod tests {
                 FROM INFORMATION_SCHEMA.COLUMNS  WHERE (ISNULL(database()) OR (TABLE_SCHEMA = database())) AND TABLE_NAME = 'KibanaSampleDataEcommerce' \
                 ORDER BY TABLE_CAT, TABLE_SCHEM, TABLE_NAME, ORDINAL_POSITION;".to_string()
             )
-            .await?,
-            "+-----------+-------------+---------------------------+--------------------+-----------+-----------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+\n\
-            | TABLE_CAT | TABLE_SCHEM | TABLE_NAME                | COLUMN_NAME        | DATA_TYPE | TYPE_NAME | COLUMN_SIZE | BUFFER_LENGTH | DECIMAL_DIGITS | NUM_PREC_RADIX | NULLABLE | REMARKS | COLUMN_DEF | SQL_DATA_TYPE | SQL_DATETIME_SUB | CHAR_OCTET_LENGTH | ORDINAL_POSITION | IS_NULLABLE | SCOPE_CATALOG | SCOPE_SCHEMA | SCOPE_TABLE | SOURCE_DATA_TYPE | IS_AUTOINCREMENT | IS_GENERATEDCOLUMN |\n\
-            +-----------+-------------+---------------------------+--------------------+-----------+-----------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | count              | 4         | INT       | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | maxPrice           | 4         | INT       | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | minPrice           | 4         | INT       | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | avgPrice           | 4         | INT       | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | order_date         | 93        | DATETIME  | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | customer_gender    | 12        | VARCHAR   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | taxful_total_price | 12        | VARCHAR   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | YES         | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | is_male            | 1111      | BOOLEAN   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            | db        | NULL        | KibanaSampleDataEcommerce | is_female          | 1111      | BOOLEAN   | NULL        | 65535         | 0              | 10             | 0        |         |            | 0             | 0                | NULL              | 0                | NO          | NULL          | NULL         | NULL        | NULL             | NO               | NO                 |\n\
-            +-----------+-------------+---------------------------+--------------------+-----------+-----------+-------------+---------------+----------------+----------------+----------+---------+------------+---------------+------------------+-------------------+------------------+-------------+---------------+--------------+-------------+------------------+------------------+--------------------+"
+            .await?
         );
 
-        assert_eq!(
+        insta::assert_snapshot!(
             execute_query(
                 "SELECT
                     KCU.REFERENCED_TABLE_SCHEMA PKTABLE_CAT,
@@ -4730,10 +4344,7 @@ mod tests {
                 WHERE (ISNULL(database()) OR (KCU.TABLE_SCHEMA = database())) AND  KCU.TABLE_NAME = 'SlackMessages' ORDER BY PKTABLE_CAT, PKTABLE_SCHEM, PKTABLE_NAME, KEY_SEQ
                 ".to_string()
             )
-            .await?,
-            "++\n\
-            ++\n\
-            ++"
+            .await?
         );
 
         Ok(())
