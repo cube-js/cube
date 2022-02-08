@@ -4125,7 +4125,7 @@ mod tests {
 
         // Everything
         insta::assert_snapshot!(
-            "show_columns",
+            "show_columns_everything",
             execute_query(
                 "show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()
             )
