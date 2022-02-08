@@ -278,6 +278,9 @@ impl CubeTable {
         worker_partition_ids: Vec<(u64, RowFilter)>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
+            // Tables are always exposed only using table columns order instead of index one because
+            // index isn't selected until logical optimization plan is done.
+            // Projection indices would refer to these table columns
             index_snapshot
                 .table_path
                 .table
@@ -317,7 +320,7 @@ impl CubeTable {
 
     fn async_scan(
         &self,
-        projection: &Option<Vec<usize>>,
+        table_projection: &Option<Vec<usize>>,
         batch_size: usize,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
@@ -326,25 +329,36 @@ impl CubeTable {
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
-        let projection_with_seq_column = projection.as_ref().map(|p| {
+
+        // Prepare projection
+        // If it's non last row query just return projection itself
+        // If it's last row query re-project it as (key1, key2, __seq, col3, col4)
+        let table_projection_with_seq_column = table_projection.as_ref().map(|projection| {
             let table = self.index_snapshot.table_path.table.get_row();
             if let Some(mut key_columns) = table.unique_key_columns() {
                 key_columns.push(table.seq_column().expect(&format!(
                     "Seq column is undefined for table: {}",
                     table.get_table_name()
                 )));
-                let mut with_seq = p.clone();
+                let mut with_seq = Vec::new();
                 for column in key_columns {
                     if !with_seq.iter().any(|s| *s == column.get_index()) {
                         with_seq.push(column.get_index());
                     }
                 }
+                for original_projection_index in projection {
+                    if !with_seq.iter().any(|s| *s == *original_projection_index) {
+                        with_seq.push(*original_projection_index);
+                    }
+                }
                 with_seq
             } else {
-                p.clone()
+                projection.clone()
             }
         });
-        let partition_projection = projection_with_seq_column.as_ref().map(|p| {
+
+        // Remap table column indices to index ones
+        let index_projection = table_projection_with_seq_column.as_ref().map(|p| {
             let mut partition_projection = Vec::with_capacity(p.len());
             for table_col_i in p {
                 let name = table_cols[*table_col_i].get_name();
@@ -360,40 +374,31 @@ impl CubeTable {
             partition_projection
         });
 
-        let partition_projection_in_memory = projection_with_seq_column.as_ref().map(|p| {
-            let table = self.index_snapshot.table_path.table.get_row();
-            if let Some(mut key_columns) = table.unique_key_columns() {
-                key_columns.push(table.seq_column().expect(&format!(
-                    "Seq column is undefined for table: {}",
-                    table.get_table_name()
-                )));
-                let mut partition_projection_in_memory = Vec::with_capacity(p.len());
-                for column in key_columns {
-                    partition_projection_in_memory.push(column.get_index());
-                }
-                for index in p {
-                    if !partition_projection_in_memory
-                        .iter()
-                        .any(|s| *s == index.clone())
-                    {
-                        partition_projection_in_memory.push(index.clone());
-                    }
-                }
+        // All persisted and in memory data should be stored using this schema
+        let index_schema = Arc::new(Schema::new(
+            index_cols
+                .iter()
+                .map(|i| {
+                    self.schema
+                        .field(
+                            table_cols
+                                .iter()
+                                .find_position(|c| c.get_name() == i.get_name())
+                                .unwrap()
+                                .0,
+                        )
+                        .clone()
+                })
+                .collect(),
+        ));
 
-                partition_projection_in_memory
-            } else {
-                p.clone()
-            }
-        });
-
-        let partition_projected_in_memory_schema =
-            if let Some(p) = partition_projection_in_memory.as_ref() {
-                Arc::new(Schema::new(
-                    p.iter().map(|i| self.schema.field(*i).clone()).collect(),
-                ))
-            } else {
-                self.schema.clone()
-            };
+        let index_projection_schema = if let Some(p) = index_projection.as_ref() {
+            Arc::new(Schema::new(
+                p.iter().map(|i| index_schema.field(*i).clone()).collect(),
+            ))
+        } else {
+            index_schema.clone()
+        };
 
         let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {
@@ -415,7 +420,7 @@ impl CubeTable {
                     .expect(format!("Missing remote path {}", remote_path).as_str());
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
-                    partition_projection.clone(),
+                    index_projection.clone(),
                     predicate.clone(),
                     batch_size,
                     1,
@@ -435,10 +440,19 @@ impl CubeTable {
                             "Record batch for in memory chunk {:?} is not provided",
                             chunk
                         )))?;
+                    if let Some(batch) = record_batches.iter().next() {
+                        if batch.schema() != index_schema {
+                            return Err(CubeError::internal(format!(
+                                "Index schema {:?} and in memory chunk schema {:?} mismatch",
+                                index_schema,
+                                record_batches[0].schema()
+                            )));
+                        }
+                    }
                     Arc::new(MemoryExec::try_new(
                         &[record_batches.clone()],
-                        partition_projected_in_memory_schema.clone(),
-                        partition_projection.clone(),
+                        index_projection_schema.clone(),
+                        index_projection.clone(),
                     )?)
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
@@ -448,7 +462,7 @@ impl CubeTable {
                         .expect(format!("Missing remote path {}", remote_path).as_str());
                     Arc::new(ParquetExec::try_from_path(
                         local_path,
-                        partition_projection.clone(),
+                        index_projection.clone(),
                         predicate.clone(),
                         batch_size,
                         1,
@@ -461,9 +475,10 @@ impl CubeTable {
             }
         }
 
-        // We might need extra projection to re-order data.
-        if let Some(projection) = projection_with_seq_column.as_ref() {
-            let partition_projection = partition_projection.unwrap();
+        // We might need extra projection to re-order data because we used sorted indices projection version to workaround parquet bug.
+        // Please note for consistency reasons in memory chunks are also re-projected the same way even if it's not required to.
+        if let Some(projection) = table_projection_with_seq_column.as_ref() {
+            let partition_projection = index_projection.unwrap();
             let mut final_reorder = Vec::with_capacity(projection.len());
             for table_col_i in projection {
                 let name = table_cols[*table_col_i].get_name();
@@ -496,7 +511,8 @@ impl CubeTable {
             }
         }
 
-        let projected_schema = if let Some(p) = projection_with_seq_column.as_ref() {
+        // Schema for scan output and input to MergeSort and LastRowByUniqueKey
+        let table_projected_schema = if let Some(p) = table_projection_with_seq_column.as_ref() {
             Arc::new(Schema::new(
                 p.iter().map(|i| self.schema.field(*i).clone()).collect(),
             ))
@@ -509,10 +525,13 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(false, projected_schema.clone())));
+            partition_execs.push(Arc::new(EmptyExec::new(
+                false,
+                table_projected_schema.clone(),
+            )));
         }
 
-        let schema = projected_schema;
+        let schema = table_projected_schema;
         let read_data = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
@@ -555,7 +574,9 @@ impl CubeTable {
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             )?);
-            if let Some(projection) = projection.as_ref() {
+
+            // At this point data is projected for last row query and we need to re-project it to what actually queried
+            if let Some(projection) = table_projection.as_ref() {
                 let s = exec.schema();
                 let proj_exprs = projection
                     .iter()
