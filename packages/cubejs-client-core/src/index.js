@@ -244,30 +244,28 @@ class CubejsApi {
    */
   loadResponseInternal(response) {
     if (this.resType === ResultType.COMPACT) {
-      if (
-        !response.queryType ||
-        response.queryType === 'regularQuery'
-      ) {
-        const data = [];
-        response.results[0].data.dataset.forEach((r) => {
-          const row = {};
-          response.results[0].data.members.forEach((m, i) => {
-            row[m] = r[i];
-          });
-          data.push(row);
+      const data = [];
+      response.results[0].data.dataset.forEach((r) => {
+        const row = {};
+        response.results[0].data.members.forEach((m, i) => {
+          row[m] = r[i];
         });
-        response.results[0].data = data;
-      } else {
-        console.log('==================================================');
-        console.log(response);
-        console.log('==================================================');
-      }
+        data.push(row);
+      });
+      response.results[0].data = data;
     }
     return new ResultSet(response, {
       parseDateMeasures: this.parseDateMeasures
     });
   }
 
+  /**
+   *
+   * @param {*} query
+   * @param {*} options
+   * @param {*} callback
+   * @returns
+   */
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request('load', {
