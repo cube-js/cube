@@ -631,18 +631,22 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
-                let import_format = if with_options
+                let import_format = with_options
                     .iter()
                     .find(|&opt| {
-                        opt.name.value == "csv_no_header"
-                            && opt.value == Value::SingleQuotedString("true".to_string())
+                        opt.name.value == "input_format"
                     })
-                    .is_some()
-                {
-                    ImportFormat::CSVNoHeader
-                } else {
-                    ImportFormat::CSV
-                };
+                    .map_or(
+                        Result::Ok(ImportFormat::CSV),
+                        |option| match &option.value {
+                            Value::SingleQuotedString(input_format) => match input_format.as_str() {
+                                "csv" => Result::Ok(ImportFormat::CSV),
+                                "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                _ => Err(CubeError::user(format!("Bad input format {}", option.value))),
+                            }
+                            _ => Err(CubeError::user(format!("Bad input format {}", option.value))),
+                        }
+                    )?;
 
                 let res = self
                     .create_table(

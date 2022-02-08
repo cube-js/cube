@@ -151,10 +151,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
-    const csvNoHeader = tableData.csvNoHeader ? 'true' : 'false';
+    const inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
 
     if (files.length > 0) {
-      const createTableSqlWithLocation = `${createTableSql} ${indexes} WITH (csv_no_header = '${csvNoHeader}') LOCATION ${files.map(() => '?').join(', ')}`;
+      const createTableSqlWithLocation = `${createTableSql} ${indexes} WITH (input_format = '${inputFormat}') LOCATION ${files.map(() => '?').join(', ')}`;
       return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
