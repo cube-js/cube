@@ -260,11 +260,12 @@ class CubejsApi {
   }
 
   /**
-   *
-   * @param {*} query
-   * @param {*} options
-   * @param {*} callback
-   * @returns
+   * Fetch data for the passed `query`. Operates with the
+   * `ApiGateway#load` method to fetch the data.
+   * @param {Query | Query[]} query
+   * @param {LoadMethodOptions | undefined} options
+   * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @returns {undefined | Promise<ResultSet>}
    */
   load(query, options, callback) {
     return this.loadMethod(
@@ -279,6 +280,15 @@ class CubejsApi {
     );
   }
 
+  /**
+   * Allows you to fetch data and receive updates over time. Operates
+   * with the `ApiGateway#load` method to fetch the data.
+   * @link real-time-data-fetch
+   * @param {Query | Query[]} query
+   * @param {LoadMethodOptions | null} options
+   * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @returns {void}
+   */
   subscribe(query, options, callback) {
     return this.loadMethod(
       () => this.request('subscribe', {

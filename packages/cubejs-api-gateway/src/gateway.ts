@@ -714,6 +714,11 @@ class ApiGateway {
     }
   }
 
+  /**
+   * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
+   * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
+   * data.
+   */
   public async load(request: QueryRequest) {
     let query;
     const {
