@@ -1,0 +1,45 @@
+.root {
+  font-family: -apple-system, sans-serif;
+  box-sizing: border-box;
+  margin: auto;
+  padding: 50px 25px;
+  text-align: center;
+  width: 90%;
+}
+
+.root h1 {
+  color: #333;
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.root p {
+  margin: 3px auto;
+}
+
+.inputWrapper {
+  display: grid;
+  grid-template-columns: 1fr min-content;
+  margin: 40px auto;
+  width: 40%;
+  min-width: 300px;
+}
+
+.input {
+  border: 2px solid #ccc;
+  color: #333;
+  font-size: 20px;
+  padding: 7px 10px;
+  outline: none;
+}
+
+.enterSymbol {
+  font-size: 20px;
+  position: relative;
+  top: 30%;
+  left: 30%;
+}
+
+.chartWrapper {
+  height: 400px;
+}
