@@ -82,6 +82,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_invalid_digit",
             create_table_with_location_invalid_digit,
         ),
+        t("create_table_with_csv", create_table_with_csv),
         t("create_table_with_csv_no_header", create_table_with_csv_no_header),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
@@ -1741,6 +1742,28 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
         res.is_err(),
         "Expected invalid digit error but got {:?}",
         res
+    );
+}
+
+async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION './data/csv.csv'")
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
     );
 }
 
