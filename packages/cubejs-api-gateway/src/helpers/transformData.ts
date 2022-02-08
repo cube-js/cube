@@ -24,6 +24,10 @@ import {
 } from '../types/enums';
 
 const COMPARE_DATE_RANGE_FIELD = 'compareDateRange';
+const COMPARE_DATE_RANGE_SEPARATOR = ' - ';
+const BLENDING_QUERY_KEY_PREFIX = 'time.';
+const BLENDING_QUERY_RES_SEPARATOR = '.';
+const MEMBER_SEPARATOR = '.';
 
 /**
  * SQL aliases to cube properties hash map.
@@ -56,7 +60,7 @@ function getDateRangeValue(
         `compare date range query: ${dim.dateRange}`
       );
     } else {
-      return dim.dateRange.join(' - ');
+      return dim.dateRange.join(COMPARE_DATE_RANGE_SEPARATOR);
     }
   }
 }
@@ -81,7 +85,7 @@ function getBlendingQueryKey(
         `for the blending query, granularity required: ${dim}`
       );
     } else {
-      return `time.${dim.granularity}`;
+      return BLENDING_QUERY_KEY_PREFIX + dim.granularity;
     }
   }
 }
@@ -111,7 +115,9 @@ function getBlendingResponseKey(
         `for the blending query, dimension required: ${dim}`
       );
     } else {
-      return `${dim.dimension}.${dim.granularity}`;
+      return dim.dimension +
+        BLENDING_QUERY_RES_SEPARATOR +
+        dim.granularity;
     }
   }
 }
@@ -197,7 +203,7 @@ function getVanilaRow(
           annotationForMember.type
         )
       ];
-      const path = memberName.split('.');
+      const path = memberName.split(MEMBER_SEPARATOR);
 
       /**
        * Time dimensions without granularity.
@@ -205,7 +211,7 @@ function getVanilaRow(
        * @todo backward compatibility for referencing
        */
       const memberNameWithoutGranularity =
-        [path[0], path[1]].join('.');
+        [path[0], path[1]].join(MEMBER_SEPARATOR);
       if (
         path.length === 3 &&
         (query.dimensions || [])
@@ -227,21 +233,16 @@ function getVanilaRow(
     R.fromPairs
   // @ts-ignore
   )(item);
-
-  // @ts-ignore
-  const [{ dimension, granularity, dateRange } = {}]
-    = query.timeDimensions;
-
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
     return {
       ...row,
-      compareDateRange: dateRange.join(' - ')
+      compareDateRange: getDateRangeValue(query.timeDimensions)
     };
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
     return {
       ...row,
-      [['time', granularity].join('.')]:
-        row[[dimension, granularity].join('.')]
+      [getBlendingQueryKey(query.timeDimensions)]:
+        row[getBlendingResponseKey(query.timeDimensions)]
     };
   }
   return row as { [member: string]: DBResponsePrimitive; };
