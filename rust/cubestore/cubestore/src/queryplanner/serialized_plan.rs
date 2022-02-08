@@ -683,7 +683,7 @@ impl SerializedPlan {
         &self.schema_snapshot.index_snapshots
     }
 
-    pub fn files_to_download(&self) -> Vec<String> {
+    pub fn files_to_download(&self) -> Vec<(String, Option<u64>)> {
         self.list_files_to_download(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -692,11 +692,14 @@ impl SerializedPlan {
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<String> {
+    pub fn all_required_files(&self) -> Vec<(String, Option<u64>)> {
         self.list_files_to_download(|_| true)
     }
 
-    fn list_files_to_download(&self, include_partition: impl Fn(u64) -> bool) -> Vec<String> {
+    fn list_files_to_download(
+        &self,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<(String, Option<u64>)> {
         let indexes = self.index_snapshots();
 
         let mut files = Vec::new();
@@ -711,12 +714,15 @@ impl SerializedPlan {
                     .get_row()
                     .get_full_name(partition.partition.get_id())
                 {
-                    files.push(file);
+                    files.push((file, partition.partition.get_row().file_size()));
                 }
 
                 for chunk in partition.chunks() {
                     if !chunk.get_row().in_memory() {
-                        files.push(chunk.get_row().get_full_name(chunk.get_id()))
+                        files.push((
+                            chunk.get_row().get_full_name(chunk.get_id()),
+                            chunk.get_row().file_size(),
+                        ))
                     }
                 }
             }

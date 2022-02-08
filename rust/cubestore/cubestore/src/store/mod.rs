@@ -229,6 +229,7 @@ impl WALStore {
     }
 }
 
+// TODO remove as it isn't used anymore
 #[async_trait]
 impl WALDataStore for WALStore {
     async fn add_wal(&self, table: IdRow<Table>, data: DataFrame) -> Result<IdRow<WAL>, CubeError> {
@@ -260,7 +261,7 @@ impl WALDataStore for WALStore {
             )));
         }
         let remote_path = WALStore::wal_remote_path(wal_id);
-        self.remote_fs.download_file(&remote_path).await?;
+        self.remote_fs.download_file(&remote_path, None).await?;
         let local_file = self.remote_fs.local_file(&remote_path).await?;
         Ok(
             cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
@@ -376,10 +377,13 @@ impl ChunkDataStore for ChunkStore {
             );
         }
 
-        let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
+        let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
             .await
             .into_iter()
-            .map(|c| Ok(c??.get_id()))
+            .map(|c| {
+                let (c, file_size) = c??;
+                Ok((c.get_id(), file_size))
+            })
             .collect();
 
         self.meta_store
@@ -456,8 +460,11 @@ impl ChunkStore {
             .meta_store
             .get_index(partition.get_row().get_index_id())
             .await?;
+        let file_size = chunk.get_row().file_size();
         let remote_path = ChunkStore::chunk_file_name(chunk);
-        self.remote_fs.download_file(&remote_path).await?;
+        self.remote_fs
+            .download_file(&remote_path, file_size)
+            .await?;
         Ok((
             self.remote_fs.local_file(&remote_path).await?,
             index.into_row(),
@@ -629,7 +636,7 @@ mod tests {
             let partition = partitions[0].clone();
 
             let data = rows_to_columns(&col, data_frame.get_rows().as_slice());
-            let chunk = chunk_store
+            let (chunk, file_size) = chunk_store
                 .add_chunk_columns(index, partition, data.clone(), false)
                 .await
                 .unwrap()
@@ -637,7 +644,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             meta_store
-                .swap_chunks(Vec::new(), vec![chunk.get_id()])
+                .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)])
                 .await
                 .unwrap();
             let chunk = meta_store.get_chunk(1).await.unwrap();
@@ -653,7 +660,7 @@ mod tests {
     }
 }
 
-pub type ChunkUploadJob = JoinHandle<Result<IdRow<Chunk>, CubeError>>;
+pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
     async fn partition_rows(
@@ -661,7 +668,7 @@ impl ChunkStore {
         index_id: u64,
         mut columns: Vec<ArrayRef>,
         in_memory: bool,
-    ) -> Result<Vec<JoinHandle<Result<IdRow<Chunk>, CubeError>>>, CubeError> {
+    ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
         let partitions = self
             .meta_store
@@ -750,7 +757,7 @@ impl ChunkStore {
                 cluster
                     .add_memory_chunk(&node_name, chunk.get_id(), batch)
                     .await?;
-                Ok(chunk)
+                Ok((chunk, None))
             }))
         } else {
             trace!("New chunk allocated during partitioning: {:?}", chunk);
@@ -766,8 +773,8 @@ impl ChunkStore {
 
             let fs = self.remote_fs.clone();
             Ok(cube_ext::spawn(async move {
-                fs.upload_file(&local_file, &remote_path).await?;
-                Ok(chunk)
+                let file_size = fs.upload_file(&local_file, &remote_path).await?;
+                Ok((chunk, Some(file_size)))
             }))
         }
     }

@@ -687,7 +687,9 @@ impl SchedulerImpl {
         path: String,
     ) -> Result<(), CubeError> {
         let node_name = self.cluster.node_name_by_partition(p);
-        self.cluster.warmup_download(&node_name, path).await
+        self.cluster
+            .warmup_download(&node_name, path, p.get_row().file_size())
+            .await
     }
 }
 

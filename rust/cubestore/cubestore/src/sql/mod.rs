@@ -481,8 +481,8 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for f in p.all_required_files() {
-                    let f = self.remote_fs.download_file(&f).await?;
+                for (f, size) in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
                     })?;
@@ -893,7 +893,7 @@ impl SqlService for SqlServiceImpl {
                                 .collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for f in worker_plan.files_to_download() {
+                        for (f, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -936,6 +936,7 @@ impl SqlService for SqlServiceImpl {
         name: String,
         file_path: &Path,
     ) -> Result<(), CubeError> {
+        // TODO persist file size
         self.remote_fs
             .upload_file(
                 file_path.to_string_lossy().as_ref(),

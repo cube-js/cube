@@ -185,7 +185,11 @@ impl CompactionService for CompactionServiceImpl {
             None => partition.get_row().get_full_name(partition.get_id()),
         };
         let old_partition_local = if let Some(f) = old_partition_remote {
-            Some(self.remote_fs.download_file(&f).await?)
+            Some(
+                self.remote_fs
+                    .download_file(&f, partition.get_row().file_size())
+                    .await?,
+            )
         } else {
             None
         };
@@ -257,13 +261,14 @@ impl CompactionService for CompactionServiceImpl {
         if let Some(c) = &new_chunk {
             assert_eq!(new_local_files.len(), 1);
             let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
-            self.remote_fs
+            let file_size = self
+                .remote_fs
                 .upload_file(&new_local_files[0], &remote)
                 .await?;
             let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
             let swapped = self
                 .meta_store
-                .swap_compacted_chunks(partition_id, chunk_ids, c.get_id())
+                .swap_compacted_chunks(partition_id, chunk_ids, c.get_id(), file_size)
                 .await?;
             if !swapped {
                 log::debug!(
@@ -284,10 +289,11 @@ impl CompactionService for CompactionServiceImpl {
             match p {
                 EitherOrBoth::Both(p, _) => {
                     let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
-                    self.remote_fs
+                    let file_size = self
+                        .remote_fs
                         .upload_file(&new_local_files[i], new_remote_path.as_str())
                         .await?;
-                    filtered_partitions.push(p);
+                    filtered_partitions.push((p, file_size));
                 }
                 EitherOrBoth::Left(p) => {
                     self.meta_store.delete_partition(p.get_id()).await?;
@@ -568,16 +574,16 @@ async fn keys_with_counts(
     Ok(plan)
 }
 
-fn collect_remote_files(p: &PartitionData, out: &mut Vec<String>) {
+fn collect_remote_files(p: &PartitionData, out: &mut Vec<(String, Option<u64>)>) {
     if p.partition.get_row().is_active() {
         if let Some(f) = p.partition.get_row().get_full_name(p.partition.get_id()) {
-            out.push(f)
+            out.push((f, p.partition.get_row().file_size()))
         }
     }
     for c in &p.chunks {
-        out.push(ChunkStore::chunk_remote_path(
-            c.get_id(),
-            c.get_row().suffix(),
+        out.push((
+            ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix()),
+            c.get_row().file_size(),
         ));
     }
 }
@@ -591,9 +597,11 @@ async fn download_files(
     for p in ps {
         collect_remote_files(p, &mut remote_files);
         for f in &mut remote_files {
-            let f = take(f);
+            let (f, size) = take(f);
             let fs = fs.clone();
-            tasks.push(cube_ext::spawn(async move { fs.download_file(&f).await }))
+            tasks.push(cube_ext::spawn(
+                async move { fs.download_file(&f, size).await },
+            ))
         }
         remote_files.clear();
     }
@@ -1058,7 +1066,7 @@ struct MultiSplit {
     old_partitions: Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>,
     new_partitions: Vec<IdRow<Partition>>,
     new_partition_rows: Vec<u64>,
-    uploads: Vec<JoinHandle<Result<(), CubeError>>>,
+    uploads: Vec<JoinHandle<Result<u64, CubeError>>>,
 }
 
 impl MultiSplit {
@@ -1107,7 +1115,7 @@ impl MultiSplit {
 
         let mut in_files = Vec::new();
         collect_remote_files(&p, &mut in_files);
-        for f in &mut in_files {
+        for (f, _) in &mut in_files {
             *f = self.fs.local_file(f).await?;
         }
 
@@ -1121,10 +1129,14 @@ impl MultiSplit {
 
         let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE);
         let records = if !in_files.is_empty() {
-            read_files(&in_files, self.key_len, None)
-                .await?
-                .execute(0)
-                .await?
+            read_files(
+                &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
+                self.key_len,
+                None,
+            )
+            .await?
+            .execute(0)
+            .await?
         } else {
             EmptyExec::new(false, Arc::new(store.arrow_schema()))
                 .execute(0)
@@ -1155,8 +1167,9 @@ impl MultiSplit {
     }
 
     async fn finish(self, initial_split: bool) -> Result<(), CubeError> {
+        let mut upload_res = Vec::new();
         for u in self.uploads {
-            u.await??;
+            upload_res.push(u.await??);
         }
 
         let mids = self
@@ -1170,7 +1183,11 @@ impl MultiSplit {
                 mids,
                 self.new_multi_rows,
                 self.old_partitions,
-                self.new_partitions,
+                self.new_partitions
+                    .clone()
+                    .into_iter()
+                    .zip_eq(upload_res.into_iter())
+                    .collect(),
                 self.new_partition_rows,
                 initial_split,
             )
