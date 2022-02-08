@@ -268,35 +268,37 @@ function transformData(
   const dataset: DBResponsePrimitive[][] | {
     [member: string]: DBResponsePrimitive
   }[] = d.map((r) => {
-    let row;
-    if (resType === ResultTypeEnum.COMPACT) {
-      row = getCompactRow(
+    const row: DBResponsePrimitive[] | {
+      [member: string]: DBResponsePrimitive
+    } = resType === ResultTypeEnum.COMPACT
+      ? getCompactRow(
         aliasToMemberNameMap,
         annotation,
         queryType,
         members,
         query.timeDimensions,
         r,
-      );
-    } else {
-      row = getVanilaRow(
+      )
+      : getVanilaRow(
         aliasToMemberNameMap,
         annotation,
         queryType,
         query,
         r,
       );
-    }
     return row;
-  });
+  }) as DBResponsePrimitive[][] | {
+    [member: string]: DBResponsePrimitive
+  }[];
   return (resType === ResultTypeEnum.COMPACT
     ? { members, dataset }
-    : dataset) as {
-      members: string[],
-      dataset: DBResponsePrimitive[][]
-    } | {
-      [member: string]: DBResponsePrimitive
-    }[];
+    : dataset
+  ) as {
+    members: string[],
+    dataset: DBResponsePrimitive[][]
+  } | {
+    [member: string]: DBResponsePrimitive
+  }[];
 }
 
 export default transformData;
