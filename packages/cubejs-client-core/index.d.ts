@@ -27,13 +27,21 @@ declare module '@cubejs-client/core' {
   };
 
   export interface ITransportResponse<R> {
-    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+    subscribe: <CBResult>(
+      cb: (
+        result: R,
+        resubscribe: () => Promise<CBResult>
+      ) => CBResult
+    ) => Promise<CBResult>;
     // Optional, supported in WebSocketTransport
     unsubscribe?: () => Promise<void>;
   }
 
   export interface ITransport<R> {
-    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
+    request(
+      method: string,
+      params: Record<string, unknown>
+    ): ITransportResponse<R>;
   }
 
   /**

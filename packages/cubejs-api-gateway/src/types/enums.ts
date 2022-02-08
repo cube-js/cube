@@ -31,7 +31,7 @@ enum OrderType {
 }
 
 /**
- * String that represent query member type.
+ * Query members types enum.
  */
 enum MemberType {
   MEASURES = 'measures',
@@ -39,9 +39,24 @@ enum MemberType {
   SEGMENTS = 'segments',
 }
 
+/**
+ * Time dimension granularity data type.
+ */
+enum TimeGranularity {
+  QUARTER = 'quarter',
+  DAY = 'day',
+  MONTH = 'month',
+  YEAR = 'year',
+  WEEK = 'week',
+  HOUR = 'hour',
+  MINUTE = 'minute',
+  SECOND = 'second',
+}
+
 export {
   MemberType,
   OrderType,
   QueryType,
   ResultType,
+  TimeGranularity,
 };

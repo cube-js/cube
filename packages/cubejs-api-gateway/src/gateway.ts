@@ -189,17 +189,17 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
-      // resultFormat parameter
+      // resType parameter
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
+        resType: req.query.resType,
         queryType: req.query.queryType
       });
     }));
 
     app.get(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
-      // resultFormat parameter
       await this.sql({
         query: req.query.query,
         context: req.context,
@@ -223,7 +223,6 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, (async (req, res) => {
-      // resultFormat parameter
       await this.dryRun({
         query: req.query.query,
         context: req.context,

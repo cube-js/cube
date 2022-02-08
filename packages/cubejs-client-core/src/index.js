@@ -10,6 +10,14 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
+/**
+ * Query result dataset formats enum.
+ */
+const ResultType = {
+  DEFAULT: 'default',
+  COMPACT: 'compact'
+};
+
 function mutexPromise(promise) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -39,6 +47,12 @@ class CubejsApi {
     this.method = options.method;
     this.headers = options.headers || {};
     this.credentials = options.credentials;
+
+    /**
+     * Query result dataset format.
+     * @type {string} 'default' or 'compact'
+     */
+    this.resType = options.resType || ResultType.DEFAULT;
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
       apiUrl: this.apiUrl,
@@ -53,7 +67,10 @@ class CubejsApi {
   }
 
   request(method, params) {
-    return this.transport.request(method, { baseRequestId: uuidv4(), ...params });
+    return this.transport.request(method, {
+      baseRequestId: uuidv4(),
+      ...params
+    });
   }
 
   loadMethod(request, toResult, options, callback) {
@@ -70,7 +87,9 @@ class CubejsApi {
       options.mutexObj[mutexKey] = mutexValue;
     }
 
-    const requestPromise = this.updateTransportAuthorization().then(() => request());
+    const requestPromise = this
+      .updateTransportAuthorization()
+      .then(() => request());
 
     let skipAuthorizationUpdate = true;
     let unsubscribed = false;
@@ -78,7 +97,10 @@ class CubejsApi {
     const checkMutex = async () => {
       const requestInstance = await requestPromise;
 
-      if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+      if (
+        options.mutexObj &&
+        options.mutexObj[mutexKey] !== mutexValue
+      ) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
@@ -213,14 +235,61 @@ class CubejsApi {
     }
   }
 
+  /**
+   * Process result fetched from the gateway#load method according
+   * to the network protocol.
+   * @param {*} response
+   * @returns ResultSet
+   * @private
+   */
+  loadResponseInternal(response) {
+    if (this.resType === ResultType.COMPACT) {
+      if (
+        !response.queryType ||
+        response.queryType === 'regularQuery'
+      ) {
+        const data = [];
+        response.results[0].data.dataset.forEach((r) => {
+          const row = {};
+          response.results[0].data.members.forEach((m, i) => {
+            row[m] = r[i];
+          });
+          data.push(row);
+        });
+        response.results[0].data = data;
+      } else {
+        console.log('==================================================');
+        console.log(response);
+        console.log('==================================================');
+      }
+    }
+    return new ResultSet(response, {
+      parseDateMeasures: this.parseDateMeasures
+    });
+  }
+
   load(query, options, callback) {
     return this.loadMethod(
       () => this.request('load', {
         query,
-        queryType: 'multi'
+        queryType: 'multi',
+        resType: this.resType,
       }),
-      (response) => new ResultSet(response, { parseDateMeasures: this.parseDateMeasures }),
+      this.loadResponseInternal.bind(this),
       options,
+      callback
+    );
+  }
+
+  subscribe(query, options, callback) {
+    return this.loadMethod(
+      () => this.request('subscribe', {
+        query,
+        queryType: 'multi',
+        resType: this.resType,
+      }),
+      this.loadResponseInternal.bind(this),
+      { ...options, subscribe: true },
       callback
     );
   }
@@ -248,18 +317,6 @@ class CubejsApi {
       () => this.request('dry-run', { query }),
       (response) => response,
       options,
-      callback
-    );
-  }
-
-  subscribe(query, options, callback) {
-    return this.loadMethod(
-      () => this.request('subscribe', {
-        query,
-        queryType: 'multi'
-      }),
-      (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
-      { ...options, subscribe: true },
       callback
     );
   }
