@@ -53,9 +53,9 @@ impl S3RemoteFs {
         let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
         let region = region.parse::<Region>()?;
         let bucket = std::sync::RwLock::new(create_s3_bucket(
-            key_id.clone(),
-            access_key.clone(),
-            bucket_name.clone(),
+            key_id.as_deref(),
+            access_key.as_deref(),
+            &bucket_name,
             region.clone(),
         )?);
         let fs = Arc::new(Self {
@@ -70,27 +70,18 @@ impl S3RemoteFs {
 }
 
 fn create_s3_bucket(
-    key_id: Option<String>,
-    access_key: Option<String>,
-    bucket_name: String,
+    key_id: Option<&str>,
+    access_key: Option<&str>,
+    bucket_name: &str,
     region: Region,
 ) -> Result<Bucket, CubeError> {
-    let c = Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
+    let c = Credentials::new(key_id, access_key, None, None, None)?;
 
-    // Use path style buckets for custom regions
-    if let Region::Custom {
-        region: _,
-        endpoint: _,
-    } = region
-    {
+    if let Region::Custom { .. } = region {
         log::debug!("Using path style bucket for custom S3 region: {}", region);
-        Ok(Bucket::new_with_path_style(
-            &bucket_name,
-            region.clone(),
-            c,
-        )?)
+        Ok(Bucket::new_with_path_style(bucket_name, region, c)?)
     } else {
-        Ok(Bucket::new(&bucket_name, region.clone(), c)?)
+        Ok(Bucket::new(&bucket_name, region, c)?)
     }
 }
 
@@ -119,9 +110,9 @@ fn spawn_creds_refresh_loop(
                 Some(fs) => fs,
             };
             let b = match create_s3_bucket(
-                key_id.clone(),
-                access_key.clone(),
-                bucket_name.clone(),
+                key_id.as_deref(),
+                access_key.as_deref(),
+                &bucket_name,
                 region.clone(),
             ) {
                 Ok(b) => b,
