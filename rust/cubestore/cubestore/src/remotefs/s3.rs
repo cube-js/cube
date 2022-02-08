@@ -51,11 +51,13 @@ impl S3RemoteFs {
     ) -> Result<Arc<Self>, CubeError> {
         let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
         let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
-        let credentials =
-            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
         let region = region.parse::<Region>()?;
-        let bucket =
-            std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
+        let bucket = std::sync::RwLock::new(create_s3_bucket(
+            key_id.clone(),
+            access_key.clone(),
+            bucket_name.clone(),
+            region.clone(),
+        )?);
         let fs = Arc::new(Self {
             dir,
             bucket,
@@ -64,6 +66,31 @@ impl S3RemoteFs {
         });
         spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
         Ok(fs)
+    }
+}
+
+fn create_s3_bucket(
+    key_id: Option<String>,
+    access_key: Option<String>,
+    bucket_name: String,
+    region: Region,
+) -> Result<Bucket, CubeError> {
+    let c = Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
+
+    // Use path style buckets for custom regions
+    if let Region::Custom {
+        region: _,
+        endpoint: _,
+    } = region
+    {
+        log::debug!("Using path style bucket for custom S3 region: {}", region);
+        Ok(Bucket::new_with_path_style(
+            &bucket_name,
+            region.clone(),
+            c,
+        )?)
+    } else {
+        Ok(Bucket::new(&bucket_name, region.clone(), c)?)
     }
 }
 
@@ -91,20 +118,12 @@ fn spawn_creds_refresh_loop(
                 }
                 Some(fs) => fs,
             };
-            let c = match Credentials::new(
-                key_id.as_deref(),
-                access_key.as_deref(),
-                None,
-                None,
-                None,
+            let b = match create_s3_bucket(
+                key_id.clone(),
+                access_key.clone(),
+                bucket_name.clone(),
+                region.clone(),
             ) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("Failed to refresh S3 credentials: {}", e);
-                    continue;
-                }
-            };
-            let b = match Bucket::new(&bucket_name, region.clone(), c) {
                 Ok(b) => b,
                 Err(e) => {
                     log::error!("Failed to refresh S3 credentials: {}", e);
