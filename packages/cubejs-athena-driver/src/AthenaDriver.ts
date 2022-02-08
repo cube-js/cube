@@ -6,7 +6,7 @@ import {
   BaseDriver,
   DownloadTableCSVData,
   DriverInterface,
-  QueryOptions,
+  QueryOptions, StreamOptions,
   StreamTableData
 } from '@cubejs-backend/query-orchestrator';
 import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
@@ -95,10 +95,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return rows;
   }
 
-  public async stream(query: string, values: unknown[]): Promise<StreamTableData> {
+  public async stream(query: string, values: unknown[], options: StreamOptions): Promise<StreamTableData> {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
-    const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query));
+    const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query), { highWaterMark: options.highWaterMark });
     return {
       rowStream
     };
@@ -158,7 +158,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     return {
       csvFile,
-      skipHeader: true
+      csvNoHeader: true
     };
   }
 

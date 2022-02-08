@@ -14,7 +14,7 @@ describe('AthenaDriver', () => {
       new AthenaDriver({}),
       {
         expectStringFields: true,
-        skipHeader: true,
+        csvNoHeader: true,
         wrapLoadQueryWithCtas: true,
       }
     );

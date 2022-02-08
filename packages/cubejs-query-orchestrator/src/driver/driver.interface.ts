@@ -33,7 +33,7 @@ export interface DownloadTableCSVData extends DownloadTableBase {
   /**
    * Some drivers export csv files with no header row.
    */
-  skipHeader?: boolean;
+  csvNoHeader?: boolean;
 }
 
 export interface StreamTableData extends DownloadTableBase {

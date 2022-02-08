@@ -52,7 +52,7 @@ impl ImportFormat {
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
         match self {
-            ImportFormat::CSV | ImportFormat::CSVSkipHeader => {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
                     if location.contains(".gz") {
                         let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
@@ -64,7 +64,7 @@ impl ImportFormat {
 
                 let mut header_mapping = match self {
                     ImportFormat::CSV => None,
-                    ImportFormat::CSVSkipHeader => Some(
+                    ImportFormat::CSVNoHeader => Some(
                         columns
                             .iter()
                             .enumerate()
