@@ -13,7 +13,10 @@ import {
   DBResponseValue,
   transformValue,
 } from './transformValue';
-import { NormalizedQuery, QueryTimeDimension } from '../types/query';
+import {
+  NormalizedQuery,
+  QueryTimeDimension
+} from '../types/query';
 import {
   ResultType,
   QueryType,

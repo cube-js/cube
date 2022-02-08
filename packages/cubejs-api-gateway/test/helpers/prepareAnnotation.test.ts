@@ -82,7 +82,7 @@ describe('prepareAnnotation', () => {
       }) as { name: string; title: string; }
     }, MemberType.SEGMENTS)('cube_name.undefined')).toBeUndefined();
   });
-  test('prepareAnnotation without members', () => {
+  test('prepareAnnotation with empty parameters', () => {
     expect(
       Object.keys(prepareAnnotation([], {}).dimensions)
     ).toHaveLength(0);
@@ -96,7 +96,51 @@ describe('prepareAnnotation', () => {
       Object.keys(prepareAnnotation([], {}).timeDimensions)
     ).toHaveLength(0);
   });
-  test('prepareAnnotation', () => {
+  test('prepareAnnotation with unmapped parameters', () => {
+    // dimensions
+    expect(
+      prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          dimensions: [{
+            name: 'cube_name.member',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        dimensions: ['cube_name.undefined'],
+      }).dimensions
+    ).toEqual({});
+    // measures
+    expect(
+      prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          measures: [{
+            name: 'cube_name.member',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        measures: ['cube_name.undefined'],
+      }).measures
+    ).toEqual({});
+    // segments
+    expect(
+      prepareAnnotation([{
+        config: ({
+          name: 'cube_name',
+          title: 'cube name',
+          segments: [{
+            name: 'cube_name.member',
+          }],
+        }) as { name: string; title: string; },
+      }], {
+        segments: ['cube_name.undefined'],
+      }).segments
+    ).toEqual({});
+  });
+  test('prepareAnnotation with mapped parameters', () => {
     // query segments
     expect(
       prepareAnnotation([{

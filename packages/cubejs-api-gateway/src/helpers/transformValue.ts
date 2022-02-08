@@ -37,7 +37,7 @@ function transformValue(
         : moment.utc(value as MomentInput)
     ).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
-  // TODO: move to sql adapter
+  // TODO: move to sql adapter (BigQuery)
   return value && (value as { value: DBResponsePrimitive }).value
     ? (value as { value: DBResponsePrimitive }).value
     : value as DBResponsePrimitive;
