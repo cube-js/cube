@@ -633,20 +633,25 @@ impl SqlService for SqlServiceImpl {
                 let table_name = &nv[1].value;
                 let import_format = with_options
                     .iter()
-                    .find(|&opt| {
-                        opt.name.value == "input_format"
-                    })
-                    .map_or(
-                        Result::Ok(ImportFormat::CSV),
-                        |option| match &option.value {
-                            Value::SingleQuotedString(input_format) => match input_format.as_str() {
-                                "csv" => Result::Ok(ImportFormat::CSV),
-                                "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                _ => Err(CubeError::user(format!("Bad input format {}", option.value))),
+                    .find(|&opt| opt.name.value == "input_format")
+                    .map_or(Result::Ok(ImportFormat::CSV), |option| {
+                        match &option.value {
+                            Value::SingleQuotedString(input_format) => {
+                                match input_format.as_str() {
+                                    "csv" => Result::Ok(ImportFormat::CSV),
+                                    "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                    _ => Err(CubeError::user(format!(
+                                        "Bad input format {}",
+                                        option.value
+                                    ))),
+                                }
                             }
-                            _ => Err(CubeError::user(format!("Bad input format {}", option.value))),
+                            _ => Err(CubeError::user(format!(
+                                "Bad input format {}",
+                                option.value
+                            ))),
                         }
-                    )?;
+                    })?;
 
                 let res = self
                     .create_table(

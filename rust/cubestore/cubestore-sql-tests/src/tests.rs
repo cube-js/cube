@@ -83,7 +83,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             create_table_with_location_invalid_digit,
         ),
         t("create_table_with_csv", create_table_with_csv),
-        t("create_table_with_csv_no_header", create_table_with_csv_no_header),
+        t(
+            "create_table_with_csv_no_header",
+            create_table_with_csv_no_header,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -1651,7 +1654,15 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         .exec_query("CREATE SCHEMA IF NOT EXISTS Foo")
         .await
         .unwrap();
-    log::warn!("qqq {} {}", env::current_dir().unwrap().display(), paths.clone().into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(","));
+    log::warn!(
+        "qqq {} {}",
+        env::current_dir().unwrap().display(),
+        paths
+            .clone()
+            .into_iter()
+            .map(|p| format!("'{}'", p.to_string_lossy()))
+            .join(",")
+    );
     let _ = service.exec_query(
             &format!(
                 "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
