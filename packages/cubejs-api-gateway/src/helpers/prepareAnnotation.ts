@@ -62,17 +62,17 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
   return {
     measures: R.fromPairs(
       (query.measures || []).map(
-        annotation(configMap, 'measures')
+        annotation(configMap, MemberTypeEnum.MEASURES)
       ).filter(a => !!a)
     ),
     dimensions: R.fromPairs(
       dimensions
-        .map(annotation(configMap, 'dimensions'))
+        .map(annotation(configMap, MemberTypeEnum.DIMENSIONS))
         .filter(a => !!a)
     ),
     segments: R.fromPairs(
       (query.segments || [])
-        .map(annotation(configMap, 'segments'))
+        .map(annotation(configMap, MemberTypeEnum.SEGMENTS))
         .filter(a => !!a)
     ),
     timeDimensions: R.fromPairs(
@@ -83,7 +83,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
             td => [
               annotation(
                 configMap,
-                'dimensions'
+                MemberTypeEnum.DIMENSIONS,
               )(
                 `${td.dimension}.${td.granularity}`
               )
@@ -92,7 +92,10 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               // referencing time dimensions without granularity
               dimensions.indexOf(td.dimension) === -1
                 ? [
-                  annotation(configMap, 'dimensions')(td.dimension)
+                  annotation(
+                    configMap,
+                    MemberTypeEnum.DIMENSIONS
+                  )(td.dimension)
                 ]
                 : []
             ).filter(a => !!a)
