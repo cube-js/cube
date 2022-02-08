@@ -1730,6 +1730,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_size_consistency() {
+        Config::test("file_size_consistency")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                let _ = service
+                    .exec_query("CREATE TABLE foo.ints (value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query("INSERT INTO foo.ints (value) VALUES (42)")
+                    .await
+                    .unwrap();
+
+                let chunk = services.meta_store.get_chunk(1).await.unwrap();
+
+                let path = {
+                    let dir = env::temp_dir();
+
+                    let path = dir.clone().join("1.chunk.parquet");
+                    let mut file = File::create(path.clone()).unwrap();
+                    file.write_all("Malformed parquet".as_bytes()).unwrap();
+                    path
+                };
+
+                services
+                    .remote_fs
+                    .upload_file(
+                        path.to_str().unwrap(),
+                        &chunk.get_row().get_full_name(chunk.get_id()),
+                    )
+                    .await
+                    .unwrap();
+
+                let result = service.exec_query("SELECT count(*) from foo.ints").await;
+                println!("Result: {:?}", result);
+                assert!(result.is_err(), "Expected error but {:?} found", result);
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn high_frequency_inserts() {
         Config::test("high_frequency_inserts")
             .update_config(|mut c| {
