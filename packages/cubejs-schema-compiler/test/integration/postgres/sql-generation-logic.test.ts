@@ -994,7 +994,7 @@ describe('SQL Generation', () => {
     }
   });
 
-  it('long named aliaced cubes doesn\'t throws', async () => {
+  it('long named aliased cubes doesn\'t throws', async () => {
     await aliasedCubesCompilers.compiler.compile();
     const aliasedQuery = new PostgresQuery(aliasedCubesCompilers, {
       dimensions: [
