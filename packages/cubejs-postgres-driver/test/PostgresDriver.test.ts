@@ -3,8 +3,7 @@ import { PostgresDBRunner } from '@cubejs-backend/testing';
 import { StartedTestContainer } from 'testcontainers';
 
 import { PostgresDriver } from '../src';
-
-const streamToArray = require('stream-to-array');
+import {nodeStreamToArray, streamToArray} from "@cubejs-backend/shared";
 
 describe('PostgresDriver', () => {
   let container: StartedTestContainer;
@@ -98,6 +97,9 @@ describe('PostgresDriver', () => {
           type: 'decimal'
         },
       ]);
+      // Using nodeStremToArray gives "TypeError: The "chunk" argument must be of type string or an instance
+      // of Buffer or Uint8Array. Received an instance of Object"
+      // @ts-ignore
       expect(await streamToArray(tableData.rowStream)).toEqual([
         { id: '1', created: '2020-01-01T00:00:00.000', price: '100' },
         { id: '2', created: '2020-01-02T00:00:00.000', price: '200' },
