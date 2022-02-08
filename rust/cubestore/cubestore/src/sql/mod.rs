@@ -481,8 +481,8 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for f in p.all_required_files() {
-                    let f = self.remote_fs.download_file(&f).await?;
+                for (f, size) in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
                     })?;
@@ -893,7 +893,7 @@ impl SqlService for SqlServiceImpl {
                                 .collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for f in worker_plan.files_to_download() {
+                        for (f, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -936,6 +936,7 @@ impl SqlService for SqlServiceImpl {
         name: String,
         file_path: &Path,
     ) -> Result<(), CubeError> {
+        // TODO persist file size
         self.remote_fs
             .upload_file(
                 file_path.to_string_lossy().as_ref(),
@@ -1726,6 +1727,51 @@ mod tests {
                 assert_eq!(&result.get_rows()[i], &join_results[i]);
             }
         }).await;
+    }
+
+    #[tokio::test]
+    async fn file_size_consistency() {
+        Config::test("file_size_consistency")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                let _ = service
+                    .exec_query("CREATE TABLE foo.ints (value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query("INSERT INTO foo.ints (value) VALUES (42)")
+                    .await
+                    .unwrap();
+
+                let chunk = services.meta_store.get_chunk(1).await.unwrap();
+
+                let path = {
+                    let dir = env::temp_dir();
+
+                    let path = dir.clone().join("1.chunk.parquet");
+                    let mut file = File::create(path.clone()).unwrap();
+                    file.write_all("Malformed parquet".as_bytes()).unwrap();
+                    path
+                };
+
+                services
+                    .remote_fs
+                    .upload_file(
+                        path.to_str().unwrap(),
+                        &chunk.get_row().get_full_name(chunk.get_id()),
+                    )
+                    .await
+                    .unwrap();
+
+                let result = service.exec_query("SELECT count(*) from foo.ints").await;
+                println!("Result: {:?}", result);
+                assert!(result.is_err(), "Expected error but {:?} found", result);
+            })
+            .await;
     }
 
     #[tokio::test]

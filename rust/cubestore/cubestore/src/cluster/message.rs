@@ -25,7 +25,7 @@ pub enum NetworkMessage {
     /// [None] indicates the end of the stream.
     SelectResultBatch(Result<Option<SerializedRecordBatchStream>, CubeError>),
 
-    WarmupDownload(/*remote_path*/ String),
+    WarmupDownload(/*remote_path*/ String, Option<u64>),
     WarmupDownloadResult(Result<(), CubeError>),
 
     AddMemoryChunk {

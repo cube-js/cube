@@ -34,7 +34,6 @@ use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
-use chrono::Utc;
 use core::mem;
 use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
@@ -49,16 +48,12 @@ use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
 use std::sync::Weak;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
-use tokio::fs;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
@@ -100,7 +95,12 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn server_name(&self) -> &str;
 
-    async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError>;
+    async fn warmup_download(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+    ) -> Result<(), CubeError>;
 
     async fn warmup_partition(
         &self,
@@ -318,10 +318,18 @@ impl Cluster for ClusterImpl {
         self.server_name.as_str()
     }
 
-    async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError> {
+    async fn warmup_download(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+    ) -> Result<(), CubeError> {
         // We only wait for the result is to ensure our request is delivered.
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::WarmupDownload(remote_path))
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::WarmupDownload(remote_path, expected_file_size),
+            )
             .await?;
         match response {
             NetworkMessage::WarmupDownloadResult(r) => r,
@@ -398,11 +406,11 @@ impl Cluster for ClusterImpl {
         let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
-            futures.push(self.warmup_download(&node_name, name));
+            futures.push(self.warmup_download(&node_name, name, partition.get_row().file_size()));
         }
         for chunk in chunks.iter() {
             let name = chunk.get_row().get_full_name(chunk.get_id());
-            futures.push(self.warmup_download(&node_name, name));
+            futures.push(self.warmup_download(&node_name, name, chunk.get_row().file_size()));
         }
         join_all(futures)
             .await
@@ -429,8 +437,11 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::WarmupDownload(remote_path) => {
-                let res = self.remote_fs.download_file(&remote_path).await;
+            NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
+                let res = self
+                    .remote_fs
+                    .download_file(&remote_path, expected_file_size)
+                    .await;
                 NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
             }
             NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
@@ -1089,7 +1100,7 @@ impl ClusterImpl {
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
-            .map(|remote| self.remote_fs.download_file(remote))
+            .map(|(remote, file_size)| self.remote_fs.download_file(remote, file_size.clone()))
             .collect::<Vec<_>>();
         let remote_to_local_names = to_download
             .clone()
@@ -1102,6 +1113,7 @@ impl ClusterImpl {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter(),
             )
+            .map(|((remote_path, _), path)| (remote_path, path))
             .collect::<HashMap<_, _>>();
         let warmup = start.elapsed()?;
         if warmup.as_millis() > 200 {
@@ -1195,70 +1207,6 @@ impl ClusterImpl {
         let _ = join_all(streams).await;
         // TODO
         Ok(())
-    }
-
-    pub async fn elect_leader(&self) -> Result<String, CubeError> {
-        let heart_beats_dir =
-            Path::new(self.remote_fs.local_path().await.as_str()).join("node-heart-beats");
-
-        fs::create_dir_all(heart_beats_dir.clone()).await?;
-
-        let heart_beat_path = heart_beats_dir.join(&self.server_name);
-
-        {
-            let mut heart_beat_file = File::create(heart_beat_path.clone()).await?;
-
-            heart_beat_file
-                .write_u64(
-                    SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)?
-                        .as_secs(),
-                )
-                .await?;
-            heart_beat_file.flush().await?;
-        }
-
-        let to_upload = heart_beat_path
-            .to_str()
-            .unwrap()
-            .to_string()
-            .replace(&self.remote_fs.local_path().await, "")
-            .trim_start_matches("/")
-            .to_string();
-
-        self.remote_fs
-            .upload_file(heart_beat_path.to_str().unwrap(), &to_upload)
-            .await?;
-
-        let heart_beats = self
-            .remote_fs
-            .list_with_metadata("node-heart-beats/")
-            .await?;
-        let leader_paths = heart_beats
-            .iter()
-            .filter(|f| {
-                f.updated().clone() + chrono::Duration::from_std(self.connect_timeout).unwrap() * 4
-                    >= Utc::now()
-            })
-            .flat_map(|f| {
-                HEART_BEAT_NODE_REGEX
-                    .captures(f.remote_path())
-                    .and_then(|v| v.name("node"))
-                    .map(|v| v.as_str().to_string())
-            })
-            .collect::<HashSet<_>>();
-
-        if let Some(leader) = self
-            .server_addresses
-            .iter()
-            .find(|a| leader_paths.contains(*a))
-        {
-            return Ok(leader.to_string());
-        }
-
-        Err(CubeError::internal(
-            "No leader has been elected".to_string(),
-        ))
     }
 
     #[instrument(level = "trace", skip(self, m))]
@@ -1463,7 +1411,11 @@ impl ClusterImpl {
                 }
                 // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
                 //       so they are not errors most of the time.
-                ack_error!(self.remote_fs.download_file(&file).await);
+                ack_error!(
+                    self.remote_fs
+                        .download_file(&file, p.get_row().file_size())
+                        .await
+                );
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
@@ -1472,7 +1424,10 @@ impl ClusterImpl {
                 }
                 ack_error!(
                     self.remote_fs
-                        .download_file(&chunk_file_name(c.get_id(), c.get_row().suffix()))
+                        .download_file(
+                            &chunk_file_name(c.get_id(), c.get_row().suffix()),
+                            c.get_row().file_size()
+                        )
                         .await
                 );
             }
