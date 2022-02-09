@@ -108,7 +108,7 @@ describe('SQLInteface', () => {
       {
         const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
         console.log(result);
-  
+
         expect(result).toEqual([
           {
             Tables_in_db: 'KibanaSampleDataEcommerce',
@@ -118,7 +118,7 @@ describe('SQLInteface', () => {
             Tables_in_db: 'Logs',
             Table_type: 'BASE TABLE',
           },
-        ]);  
+        ]);
       }
 
       expect(checkAuth.mock.calls.length).toEqual(1);
@@ -143,8 +143,8 @@ describe('SQLInteface', () => {
 
           throw new Error('Error was not passed from transport to the client');
         } catch (e) {
-          expect(e.sqlState).toEqual('HY000'); 
-          expect(e.sqlMessage).toEqual('This error should be passed back to MySQL client'); 
+          expect(e.sqlState).toEqual('HY000');
+          expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
         }
       }
 
