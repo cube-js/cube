@@ -32,6 +32,8 @@
     "birdbox:local:postgresql:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "birdbox:local:postgresql-pre-aggregations": "jest --forceExit --verbose -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "birdbox:local:postgresql-pre-aggregations:snapshot": "jest --forceExit --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
+    "birdbox:driver": "jest --verbose -i dist/test/birdbox-driver.test.js",
+    "birdbox:driver:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-driver.test.js",
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js"
   },
@@ -40,14 +42,18 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.29.25",
     "@cubejs-backend/schema-compiler": "^0.29.27",
     "@cubejs-backend/shared": "^0.29.23",
     "@cubejs-client/ws-transport": "^0.29.23",
+    "@types/dedent": "^0.7.0",
+    "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
-    "testcontainers": "^7.5.0"
+    "testcontainers": "^7.5.0",
+    "yargs": "^17.3.1"
   },
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
@@ -64,6 +70,7 @@
     "cypress-wait-until": "^1.7.1",
     "eslint-plugin-cypress": "^2.12.1",
     "jest": "^26.6.3",
+    "jest-specific-snapshot": "^5.0.0",
     "jwt-decode": "^3.1.2",
     "typescript": "~4.1.5"
   },
