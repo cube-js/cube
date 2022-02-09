@@ -18,6 +18,7 @@ lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
 serde = { version = "^1.0", features = ["derive"] }
+itertools = "0.10.2"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 bytes = "0.5.4"
@@ -31,7 +32,6 @@ log = "=0.4.11"
 # It's a problem with determing local_offset_at for local-offset feature
 # https://github.com/time-rs/time/issues/325
 simple_logger = "=1.13.0"
-itertools = "0.10.3"
 async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
