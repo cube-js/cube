@@ -12,7 +12,7 @@ import moment from 'moment';
 import transformValueDef from '../../src/helpers/transformValue';
 import { transformValue } from '../../src/helpers/transformValue';
 
-describe('transformValue', () => {
+describe('transformValue helper', () => {
   test('export looks as expected', () => {
     expect(transformValueDef).toBeDefined();
     expect(transformValue).toBeDefined();

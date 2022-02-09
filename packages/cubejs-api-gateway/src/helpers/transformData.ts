@@ -132,9 +132,27 @@ function getBlendingResponseKey(
 function getMembers(
   queryType: QueryType,
   query: NormalizedQuery,
-  data: { [sqlAlias: string]: DBResponseValue }[]
+  data: { [sqlAlias: string]: DBResponseValue }[],
+  aliasToMemberNameMap: AliasToMemberMap,
 ): string[] {
-  const members = Object.keys(data[0]);
+  const members: string[] = [];
+  if (!data.length) {
+    return members;
+  }
+  const columns = Object.keys(data[0]);
+  columns.forEach((column) => {
+    if (!aliasToMemberNameMap[column]) {
+      throw new UserError(
+        `You requested hidden member: '${
+          column
+        }'. Please make it visible using \`shown: true\`. ` +
+        'Please note primaryKey fields are `shown: false` by ' +
+        'default: https://cube.dev/docs/schema/reference/joins#' +
+        'setting-a-primary-key.'
+      );
+    }
+    members.push(aliasToMemberNameMap[column]);
+  });
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
     members.push(COMPARE_DATE_RANGE_FIELD);
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
@@ -146,6 +164,7 @@ function getMembers(
 /**
  * Convert DB response object to the compact output format.
  * @internal
+ * @todo should we use transformValue for blending query?
  */
 function getCompactRow(
   aliasToMemberNameMap: AliasToMemberMap,
@@ -165,9 +184,15 @@ function getCompactRow(
     );
   });
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
-    row.push(getDateRangeValue(timeDimensions));
+    row.push(
+      getDateRangeValue(timeDimensions)
+    );
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
-    row.push(row[getBlendingResponseKey(timeDimensions)]);
+    row.push(
+      item[
+        getBlendingResponseKey(timeDimensions)
+      ] as DBResponsePrimitive
+    );
   }
   return row;
 }
@@ -245,7 +270,7 @@ function getVanilaRow(
     return {
       ...row,
       [getBlendingQueryKey(query.timeDimensions)]:
-        row[getBlendingResponseKey(query.timeDimensions)]
+        item[getBlendingResponseKey(query.timeDimensions)]
     };
   }
   return row as { [member: string]: DBResponsePrimitive; };
@@ -268,7 +293,12 @@ function transformData(
   [member: string]: DBResponsePrimitive
 }[] {
   const d = data as { [sqlAlias: string]: DBResponseValue }[];
-  const members: string[] = getMembers(queryType, query, d);
+  const members: string[] = getMembers(
+    queryType,
+    query,
+    d,
+    aliasToMemberNameMap,
+  );
   const dataset: DBResponsePrimitive[][] | {
     [member: string]: DBResponsePrimitive
   }[] = d.map((r) => {
@@ -308,6 +338,11 @@ function transformData(
 export default transformData;
 export {
   AliasToMemberMap,
+  COMPARE_DATE_RANGE_FIELD,
+  COMPARE_DATE_RANGE_SEPARATOR,
+  BLENDING_QUERY_KEY_PREFIX,
+  BLENDING_QUERY_RES_SEPARATOR,
+  MEMBER_SEPARATOR,
   getDateRangeValue,
   getBlendingQueryKey,
   getBlendingResponseKey,

@@ -16,7 +16,7 @@ import {
   prepareAnnotation,
 } from '../../src/helpers/prepareAnnotation';
 
-describe('prepareAnnotation', () => {
+describe('prepareAnnotation helpers', () => {
   test('export looks as expected', () => {
     expect(prepareAnnotationDef).toBeDefined();
     expect(annotation).toBeDefined();
