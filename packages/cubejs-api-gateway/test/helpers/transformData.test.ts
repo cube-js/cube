@@ -21,11 +21,11 @@ import {
   DBResponseValue,
   transformValue,
 } from '../../src/helpers/transformValue';
-import transformDataDefault
-  from '../../src/helpers/transformData';
 import {
   ConfigItem,
 } from '../../src/helpers/prepareAnnotation';
+import transformDataDefault
+  from '../../src/helpers/transformData';
 import {
   AliasToMemberMap,
   COMPARE_DATE_RANGE_FIELD,
@@ -41,6 +41,549 @@ import {
   getVanilaRow,
   transformData,
 } from '../../src/helpers/transformData';
+import {
+  QueryType,
+} from '../../src/types/strings';
+
+const mockData = {
+  regular_discount_by_city: {
+    query: {
+      dimensions: [
+        'ECommerceRecordsUs2021.city'
+      ],
+      measures: [
+        'ECommerceRecordsUs2021.avg_discount'
+      ],
+      limit: 2
+    },
+    data: {
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__avg_discount: 'ECommerceRecordsUs2021.avg_discount',
+        e_commerce_records_us2021__city: 'ECommerceRecordsUs2021.city'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.avg_discount': {
+          title: 'E Commerce Records Us2021 Avg Discount',
+          shortTitle: 'Avg Discount',
+          type: 'number',
+          drillMembers: [],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: []
+          }
+        },
+        'ECommerceRecordsUs2021.city': {
+          title: 'E Commerce Records Us2021 City',
+          shortTitle: 'City',
+          type: 'string'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__city: 'Missouri City',
+          e_commerce_records_us2021__avg_discount: '0.80000000000000000000'
+        },
+        {
+          e_commerce_records_us2021__city: 'Abilene',
+          e_commerce_records_us2021__avg_discount: '0.80000000000000000000'
+        }
+      ],
+      query: {
+        dimensions: [
+          'ECommerceRecordsUs2021.city'
+        ],
+        measures: [
+          'ECommerceRecordsUs2021.avg_discount'
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        timeDimensions: []
+      },
+      queryType: 'regularQuery',
+      result_default: [
+        {
+          'ECommerceRecordsUs2021.city': 'Missouri City',
+          'ECommerceRecordsUs2021.avg_discount': '0.80000000000000000000'
+        },
+        {
+          'ECommerceRecordsUs2021.city': 'Abilene',
+          'ECommerceRecordsUs2021.avg_discount': '0.80000000000000000000'
+        }
+      ],
+      result_compact: {
+        members: ['ECommerceRecordsUs2021.city', 'ECommerceRecordsUs2021.avg_discount'],
+        dataset: [['Missouri City', '0.80000000000000000000'], ['Abilene', '0.80000000000000000000']],
+      }
+    }
+  },
+  regular_profit_by_postal_code: {
+    query: {
+      dimensions: [
+        'ECommerceRecordsUs2021.postalCode'
+      ],
+      measures: [
+        'ECommerceRecordsUs2021.avg_profit'
+      ],
+      limit: 2
+    },
+    data: {
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__avg_profit: 'ECommerceRecordsUs2021.avg_profit',
+        e_commerce_records_us2021__postal_code: 'ECommerceRecordsUs2021.postalCode'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.avg_profit': {
+          title: 'E Commerce Records Us2021 Avg Profit',
+          shortTitle: 'Avg Profit',
+          type: 'number',
+          drillMembers: [],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: []
+          }
+        },
+        'ECommerceRecordsUs2021.postalCode': {
+          title: 'E Commerce Records Us2021 Postal Code',
+          shortTitle: 'Postal Code',
+          type: 'string'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__postal_code: '95823',
+          e_commerce_records_us2021__avg_profit: '646.1258666666666667'
+        },
+        {
+          e_commerce_records_us2021__postal_code: '64055',
+          e_commerce_records_us2021__avg_profit: '487.8315000000000000'
+        }
+      ],
+      query: {
+        dimensions: [
+          'ECommerceRecordsUs2021.postalCode'
+        ],
+        measures: [
+          'ECommerceRecordsUs2021.avg_profit'
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        timeDimensions: []
+      },
+      queryType: 'regularQuery',
+      result: [
+        {
+          'ECommerceRecordsUs2021.postalCode': '95823',
+          'ECommerceRecordsUs2021.avg_profit': '646.1258666666666667'
+        },
+        {
+          'ECommerceRecordsUs2021.postalCode': '64055',
+          'ECommerceRecordsUs2021.avg_profit': '487.8315000000000000'
+        }
+      ]
+    }
+  },
+  compare_date_range_count_by_order_date: {
+    http_params: {
+      queryType: 'whatever value or nothing, \'multi\' to apply pivot transformation'
+    },
+    query: {
+      measures: ['ECommerceRecordsUs2021.count'],
+      timeDimensions: [
+        {
+          dimension: 'ECommerceRecordsUs2021.orderDate',
+          granularity: 'day',
+          compareDateRange: [
+            ['2020-01-01', '2020-01-31'],
+            ['2020-03-01', '2020-03-31']
+          ]
+        }
+      ],
+      limit: 2
+    },
+    data: [{
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__count: 'ECommerceRecordsUs2021.count',
+        e_commerce_records_us2021__order_date_day: 'ECommerceRecordsUs2021.orderDate.day'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.count': {
+          title: 'E Commerce Records Us2021 Count',
+          shortTitle: 'Count',
+          type: 'number',
+          drillMembers: [
+            'ECommerceRecordsUs2021.city',
+            'ECommerceRecordsUs2021.country',
+            'ECommerceRecordsUs2021.customerId',
+            'ECommerceRecordsUs2021.orderId',
+            'ECommerceRecordsUs2021.productId',
+            'ECommerceRecordsUs2021.productName',
+            'ECommerceRecordsUs2021.orderDate'
+          ],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: [
+              'ECommerceRecordsUs2021.city',
+              'ECommerceRecordsUs2021.country',
+              'ECommerceRecordsUs2021.customerId',
+              'ECommerceRecordsUs2021.orderId',
+              'ECommerceRecordsUs2021.productId',
+              'ECommerceRecordsUs2021.productName',
+              'ECommerceRecordsUs2021.orderDate'
+            ]
+          }
+        },
+        'ECommerceRecordsUs2021.orderDate.day': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        },
+        'ECommerceRecordsUs2021.orderDate': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__order_date_day: '2020-01-01T00:00:00.000',
+          e_commerce_records_us2021__count: '10'
+        },
+        {
+          e_commerce_records_us2021__order_date_day: '2020-01-02T00:00:00.000',
+          e_commerce_records_us2021__count: '8'
+        }
+      ],
+      query: {
+        measures: [
+          'ECommerceRecordsUs2021.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'ECommerceRecordsUs2021.orderDate',
+            granularity: 'day',
+            dateRange: [
+              '2020-01-01T00:00:00.000',
+              '2020-01-31T23:59:59.999'
+            ]
+          }
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        dimensions: []
+      },
+      queryType: 'compareDateRangeQuery',
+      result: [
+        {
+          'ECommerceRecordsUs2021.orderDate.day': '2020-01-01T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-01-01T00:00:00.000',
+          'ECommerceRecordsUs2021.count': '10',
+          compareDateRange: '2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999'
+        },
+        {
+          'ECommerceRecordsUs2021.orderDate.day': '2020-01-02T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-01-02T00:00:00.000',
+          'ECommerceRecordsUs2021.count': '8',
+          compareDateRange: '2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999'
+        }
+      ]
+    }, {
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__count: 'ECommerceRecordsUs2021.count',
+        e_commerce_records_us2021__order_date_day: 'ECommerceRecordsUs2021.orderDate.day'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.count': {
+          title: 'E Commerce Records Us2021 Count',
+          shortTitle: 'Count',
+          type: 'number',
+          drillMembers: [
+            'ECommerceRecordsUs2021.city',
+            'ECommerceRecordsUs2021.country',
+            'ECommerceRecordsUs2021.customerId',
+            'ECommerceRecordsUs2021.orderId',
+            'ECommerceRecordsUs2021.productId',
+            'ECommerceRecordsUs2021.productName',
+            'ECommerceRecordsUs2021.orderDate'
+          ],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: [
+              'ECommerceRecordsUs2021.city',
+              'ECommerceRecordsUs2021.country',
+              'ECommerceRecordsUs2021.customerId',
+              'ECommerceRecordsUs2021.orderId',
+              'ECommerceRecordsUs2021.productId',
+              'ECommerceRecordsUs2021.productName',
+              'ECommerceRecordsUs2021.orderDate'
+            ]
+          }
+        },
+        'ECommerceRecordsUs2021.orderDate.day': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        },
+        'ECommerceRecordsUs2021.orderDate': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__order_date_day: '2020-03-02T00:00:00.000',
+          e_commerce_records_us2021__count: '11'
+        },
+        {
+          e_commerce_records_us2021__order_date_day: '2020-03-03T00:00:00.000',
+          e_commerce_records_us2021__count: '7'
+        }
+      ],
+      query: {
+        measures: [
+          'ECommerceRecordsUs2021.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'ECommerceRecordsUs2021.orderDate',
+            granularity: 'day',
+            dateRange: [
+              '2020-03-01T00:00:00.000',
+              '2020-03-31T23:59:59.999'
+            ]
+          }
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        dimensions: []
+      },
+      queryType: 'compareDateRangeQuery',
+      result: [
+        {
+          'ECommerceRecordsUs2021.orderDate.day': '2020-03-02T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-03-02T00:00:00.000',
+          'ECommerceRecordsUs2021.count': '11',
+          compareDateRange: '2020-03-01T00:00:00.000 - 2020-03-31T23:59:59.999'
+        },
+        {
+          'ECommerceRecordsUs2021.orderDate.day': '2020-03-03T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-03-03T00:00:00.000',
+          'ECommerceRecordsUs2021.count': '7',
+          compareDateRange: '2020-03-01T00:00:00.000 - 2020-03-31T23:59:59.999'
+        }
+      ]
+    }]
+  },
+  blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode: {
+    http_params: {
+      queryType: 'whatever value or nothing, \'multi\' to apply pivot transformation'
+    },
+    query: [{
+      measures: ['ECommerceRecordsUs2021.avg_discount'],
+      timeDimensions: [
+        {
+          dimension: 'ECommerceRecordsUs2021.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-30']
+        }
+      ],
+      filters: [{
+        member: 'ECommerceRecordsUs2021.shipMode',
+        operator: 'equals',
+        values: ['Standard Class']
+      }],
+      limit: 2
+    }, {
+      measures: ['ECommerceRecordsUs2021.avg_discount'],
+      timeDimensions: [
+        {
+          dimension: 'ECommerceRecordsUs2021.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-30']
+        }
+      ],
+      filters: [{
+        member: 'ECommerceRecordsUs2021.shipMode',
+        operator: 'equals',
+        values: ['First Class']
+      }],
+      limit: 2
+    }],
+    data: [{
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__avg_discount: 'ECommerceRecordsUs2021.avg_discount',
+        e_commerce_records_us2021__order_date_month: 'ECommerceRecordsUs2021.orderDate.month'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.avg_discount': {
+          title: 'E Commerce Records Us2021 Avg Discount',
+          shortTitle: 'Avg Discount',
+          type: 'number',
+          drillMembers: [],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: []
+          }
+        },
+        'ECommerceRecordsUs2021.orderDate.month': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        },
+        'ECommerceRecordsUs2021.orderDate': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__order_date_month: '2020-01-01T00:00:00.000',
+          e_commerce_records_us2021__avg_discount: '0.15638297872340425532'
+        },
+        {
+          e_commerce_records_us2021__order_date_month: '2020-02-01T00:00:00.000',
+          e_commerce_records_us2021__avg_discount: '0.17573529411764705882'
+        }
+      ],
+      query: {
+        measures: [
+          'ECommerceRecordsUs2021.avg_discount'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'ECommerceRecordsUs2021.orderDate',
+            granularity: 'month',
+            dateRange: [
+              '2020-01-01T00:00:00.000',
+              '2020-12-30T23:59:59.999'
+            ]
+          }
+        ],
+        filters: [
+          {
+            operator: 'equals',
+            values: [
+              'Standard Class'
+            ],
+            member: 'ECommerceRecordsUs2021.shipMode'
+          }
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        dimensions: []
+      },
+      queryType: 'blendingQuery',
+      result: [
+        {
+          'ECommerceRecordsUs2021.orderDate.month': '2020-01-01T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-01-01T00:00:00.000',
+          'ECommerceRecordsUs2021.avg_discount': '0.15638297872340425532',
+          'time.month': '2020-01-01T00:00:00.000'
+        },
+        {
+          'ECommerceRecordsUs2021.orderDate.month': '2020-02-01T00:00:00.000',
+          'ECommerceRecordsUs2021.orderDate': '2020-02-01T00:00:00.000',
+          'ECommerceRecordsUs2021.avg_discount': '0.17573529411764705882',
+          'time.month': '2020-02-01T00:00:00.000'
+        }
+      ]
+    }, {
+      aliasToMemberNameMap: {
+        e_commerce_records_us2021__avg_discount: 'ECommerceRecordsUs2021.avg_discount',
+        e_commerce_records_us2021__order_date_month: 'ECommerceRecordsUs2021.orderDate.month'
+      },
+      annotation: {
+        'ECommerceRecordsUs2021.avg_discount': {
+          title: 'E Commerce Records Us2021 Avg Discount',
+          shortTitle: 'Avg Discount',
+          type: 'number',
+          drillMembers: [],
+          drillMembersGrouped: {
+            measures: [],
+            dimensions: []
+          }
+        },
+        'ECommerceRecordsUs2021.orderDate.month': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        },
+        'ECommerceRecordsUs2021.orderDate': {
+          title: 'E Commerce Records Us2021 Order Date',
+          shortTitle: 'Order Date',
+          type: 'time'
+        }
+      },
+      data: [
+        {
+          e_commerce_records_us2021__order_date_month: '2020-01-01T00:00:00.000',
+          e_commerce_records_us2021__avg_discount: '0.28571428571428571429'
+        },
+        {
+          e_commerce_records_us2021__order_date_month: '2020-02-01T00:00:00.000',
+          e_commerce_records_us2021__avg_discount: '0.21777777777777777778'
+        }
+      ],
+      query: {
+        measures: [
+          'ECommerceRecordsUs2021.avg_discount'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'ECommerceRecordsUs2021.orderDate',
+            granularity: 'month',
+            dateRange: [
+              '2020-01-01T00:00:00.000',
+              '2020-12-30T23:59:59.999'
+            ]
+          }
+        ],
+        filters: [
+          {
+            operator: 'equals',
+            values: [
+              'First Class'
+            ],
+            member: 'ECommerceRecordsUs2021.shipMode'
+          }
+        ],
+        limit: 2,
+        rowLimit: 2,
+        timezone: 'UTC',
+        order: [],
+        dimensions: []
+      },
+      queryType: 'blendingQuery',
+      result: [{
+        'ECommerceRecordsUs2021.orderDate.month': '2020-01-01T00:00:00.000',
+        'ECommerceRecordsUs2021.orderDate': '2020-01-01T00:00:00.000',
+        'ECommerceRecordsUs2021.avg_discount': '0.28571428571428571429',
+        'time.month': '2020-01-01T00:00:00.000'
+      },
+      {
+        'ECommerceRecordsUs2021.orderDate.month': '2020-02-01T00:00:00.000',
+        'ECommerceRecordsUs2021.orderDate': '2020-02-01T00:00:00.000',
+        'ECommerceRecordsUs2021.avg_discount': '0.21777777777777777778',
+        'time.month': '2020-02-01T00:00:00.000'
+      }]
+    }]
+  }
+};
 
 describe('transformData helpers', () => {
   test('export looks as expected', () => {
@@ -59,12 +602,23 @@ describe('transformData helpers', () => {
     expect(transformData).toBeDefined();
     expect(transformData).toEqual(transformDataDefault);
   });
+
   test('getDateRangeValue helper', () => {
-    const d = Date();
+    const timeDimensions = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data[0]
+          .query
+          .timeDimensions
+      )
+    ) as QueryTimeDimension[];
+
     expect(() => { getDateRangeValue(); }).toThrow(
       'QueryTimeDimension should be specified ' +
       'for the compare date range query.'
     );
+
     expect(() => {
       getDateRangeValue([
         { prop: 'val' } as unknown as QueryTimeDimension
@@ -74,6 +628,7 @@ describe('transformData helpers', () => {
       'for the compare date range query, dateRange required: '}${
         ({ prop: 'val' }).toString()}`
     );
+
     expect(() => {
       getDateRangeValue([
         { dateRange: 'val' } as unknown as QueryTimeDimension
@@ -82,17 +637,38 @@ describe('transformData helpers', () => {
       'Inconsistent dateRange configuration for the ' +
       'compare date range query: val'
     );
-    expect(getDateRangeValue([
-      { dateRange: [d, d] } as unknown as QueryTimeDimension
-    ])).toEqual(`${d}${COMPARE_DATE_RANGE_SEPARATOR}${d}`);
+
+    expect(getDateRangeValue(timeDimensions)).toEqual(
+      `${
+        // @ts-ignore
+        timeDimensions[0].dateRange[0]
+      }${
+        COMPARE_DATE_RANGE_SEPARATOR
+      }${
+        // @ts-ignore
+        timeDimensions[0].dateRange[1]
+      }`
+    );
   });
+
   test('getBlendingQueryKey helper', () => {
+    const timeDimensions = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data[0]
+          .query
+          .timeDimensions
+      )
+    ) as QueryTimeDimension[];
+
     expect(() => {
       getBlendingQueryKey();
     }).toThrow(
       'QueryTimeDimension should be specified ' +
       'for the blending query.'
     );
+
     expect(() => {
       getBlendingQueryKey([
         { prop: 'val' } as unknown as QueryTimeDimension
@@ -102,19 +678,33 @@ describe('transformData helpers', () => {
       `for the blending query, granularity required: ${
         ({ prop: 'val' }).toString()}`
     );
-    expect(
-      getBlendingQueryKey([
-        { granularity: 'day' } as unknown as QueryTimeDimension
-      ])
-    ).toEqual(`${BLENDING_QUERY_KEY_PREFIX}day`);
+
+    expect(getBlendingQueryKey(timeDimensions))
+      .toEqual(`${
+        BLENDING_QUERY_KEY_PREFIX
+      }${
+        timeDimensions[0].granularity
+      }`);
   });
+
   test('getBlendingResponseKey helper', () => {
+    const timeDimensions = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data[0]
+          .query
+          .timeDimensions
+      )
+    ) as QueryTimeDimension[];
+    
     expect(() => {
       getBlendingResponseKey();
     }).toThrow(
       'QueryTimeDimension should be specified ' +
       'for the blending query.'
     );
+
     expect(() => {
       getBlendingResponseKey([
         { prop: 'val' } as unknown as QueryTimeDimension
@@ -124,6 +714,7 @@ describe('transformData helpers', () => {
       `for the blending query, granularity required: ${
         ({ prop: 'val' }).toString()}`
     );
+
     expect(() => {
       getBlendingResponseKey([
         { granularity: 'day' } as unknown as QueryTimeDimension
@@ -133,663 +724,338 @@ describe('transformData helpers', () => {
       `for the blending query, dimension required: ${
         ({ granularity: 'day' }).toString()}`
     );
-    expect(
-      getBlendingResponseKey([
-        {
-          granularity: 'day',
-          dimension: 'dim',
-        } as unknown as QueryTimeDimension
-      ])
-    ).toEqual(`dim${BLENDING_QUERY_RES_SEPARATOR}day`);
+
+    expect(getBlendingResponseKey(timeDimensions))
+      .toEqual(`${
+        timeDimensions[0].dimension
+      }${
+        BLENDING_QUERY_RES_SEPARATOR
+      }${
+        timeDimensions[0].granularity
+      }`);
   });
+
   test('getMembers helper', () => {
+    let data;
+
     // throw
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_profit_by_postal_code.data)
+    );
+    data.aliasToMemberNameMap = {};
     expect(() => {
       getMembers(
-        QueryTypeEnum.REGULAR_QUERY,
-        {} as NormalizedQuery,
-        [
-          { col_1: 'col1', col_2: 'col2', col_3: 'col3' }
-        ] as { [sqlAlias: string]: DBResponseValue }[],
-        {
-          col_1: 'col1',
-          col_2: 'col2',
-        },
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
       );
     }).toThrow(
-      'You requested hidden member: \'col_3\'. Please make it ' +
-      'visible using `shown: true`. ' +
-      'Please note primaryKey fields are `shown: false` by ' +
-      'default: https://cube.dev/docs/schema/reference/joins#' +
-      'setting-a-primary-key.'
+      'You requested hidden member: \'e_commerce_records_us2021__postal_code\'. ' +
+      'Please make it visible using `shown: true`. Please note primaryKey fields are ' +
+      '`shown: false` by default: ' +
+      'https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.'
     );
 
     // regular
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_profit_by_postal_code.data)
+    );
     expect(getMembers(
-      QueryTypeEnum.REGULAR_QUERY,
-      {} as NormalizedQuery,
-      [] as { [sqlAlias: string]: DBResponseValue }[],
-      {},
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
+    )).toEqual(Object.keys(data.result[0]));
+
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_profit_by_postal_code.data)
+    );
+    data.data = [];
+    expect(getMembers(
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
     )).toEqual([]);
-    expect(getMembers(
-      QueryTypeEnum.REGULAR_QUERY,
-      {} as NormalizedQuery,
-      [
-        { col_1: 'col1', col_2: 'col2', col_3: 'col3' }
-      ] as { [sqlAlias: string]: DBResponseValue }[],
-      {
-        col_1: 'col1',
-        col_2: 'col2',
-        col_3: 'col3',
-      },
-    )).toEqual(['col1', 'col2', 'col3']);
-
-    // compare
-    expect(getMembers(
-      QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-      {} as NormalizedQuery,
-      [] as { [sqlAlias: string]: DBResponseValue }[],
-      {},
-    )).toEqual([]);
-    expect(getMembers(
-      QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-      {} as NormalizedQuery,
-      [
-        { col_1: 'col1', col_2: 'col2', col_3: 'col3' }
-      ] as { [sqlAlias: string]: DBResponseValue }[],
-      {
-        col_1: 'col1',
-        col_2: 'col2',
-        col_3: 'col3',
-      },
-    )).toEqual(['col1', 'col2', 'col3', COMPARE_DATE_RANGE_FIELD]);
-
-    // blending
-    expect(getMembers(
-      QueryTypeEnum.BLENDING_QUERY,
-      {} as NormalizedQuery,
-      [] as { [sqlAlias: string]: DBResponseValue }[],
-      {},
-    )).toEqual([]);
-    expect(getMembers(
-      QueryTypeEnum.BLENDING_QUERY,
-      {
-        timeDimensions: [{ granularity: 'day' }]
-      } as unknown as NormalizedQuery,
-      [
-        { col_1: 'col1', col_2: 'col2', col_3: 'col3' }
-      ] as { [sqlAlias: string]: DBResponseValue }[],
-      {
-        col_1: 'col1',
-        col_2: 'col2',
-        col_3: 'col3',
-      },
-    )).toEqual(['col1', 'col2', 'col3', getBlendingQueryKey([
-      { granularity: 'day' } as unknown as QueryTimeDimension
-    ])]);
-  });
-  test('getCompactRow helper', () => {
-    // regular
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.REGULAR_QUERY,
-
-        // members
-        [
-          'member_1',
-          'member_2',
-        ],
-
-        // time dimensions
-        undefined,
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
-      )
-    ).toEqual(['value 1', 'value 2']);
 
     // compare date range
-    const d = Date();
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
+    data = JSON.parse(
+      JSON.stringify(mockData.compare_date_range_count_by_order_date.data[0])
+    );
+    data.data = [];
+    expect(getMembers(
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
+    )).toEqual([]);
 
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-
-        // members
-        [],
-
-        // time dimensions
-        [
-          {
-            dateRange: [d, d]
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {},
-      )
-    ).toEqual([
-      `${d}${COMPARE_DATE_RANGE_SEPARATOR}${d}`
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-
-        // members
-        [],
-
-        // time dimensions
-        [
-          {
-            dateRange: [d, d]
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
-      )
-    ).toEqual([
-      `${d}${COMPARE_DATE_RANGE_SEPARATOR}${d}`
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-
-        // members
-        [
-          'member_1',
-        ],
-
-        // time dimensions
-        [
-          {
-            dateRange: [d, d]
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
-      )
-    ).toEqual([
-      'value 1',
-      `${d}${COMPARE_DATE_RANGE_SEPARATOR}${d}`
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.COMPARE_DATE_RANGE_QUERY,
-
-        // members
-        [
-          'member_1',
-          'member_2',
-        ],
-
-        // time dimensions
-        [
-          {
-            dateRange: [d, d]
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
-      )
-    ).toEqual([
-      'value 1',
-      'value 2',
-      `${d}${COMPARE_DATE_RANGE_SEPARATOR}${d}`
+    data = JSON.parse(
+      JSON.stringify(mockData.compare_date_range_count_by_order_date.data[0])
+    );
+    expect(getMembers(
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
+    )).toEqual([
+      'ECommerceRecordsUs2021.orderDate.day',
+      'ECommerceRecordsUs2021.count',
+      'compareDateRange'
     ]);
 
     // blending
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.BLENDING_QUERY,
-
-        // members
-        [],
-
-        // time dimensions
-        [
-          {
-            dimension: 'member_2',
-            granularity: 'day',
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
+    data = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data[0]
       )
-    ).toEqual([
-      undefined,
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.BLENDING_QUERY,
-
-        // members
-        [],
-
-        // time dimensions
-        [
-          {
-            dimension: 'member_2',
-            granularity: 'day',
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-          'member_2.day': 'granular value',
-        },
-      )
-    ).toEqual([
-      'granular value'
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.BLENDING_QUERY,
-
-        // members
-        [
-          'member_1',
-        ],
-
-        // time dimensions
-        [
-          {
-            dimension: 'member_2',
-            granularity: 'day',
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-          'member_2.day': 'granular value',
-        },
-      )
-    ).toEqual([
-      'value 1',
-      'granular value'
-    ]);
-    expect(
-      getCompactRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.BLENDING_QUERY,
-
-        // members
-        [
-          'member_1',
-          'member_2',
-        ],
-
-        // time dimensions
-        [
-          {
-            dimension: 'member_2',
-            granularity: 'day',
-          } as unknown as QueryTimeDimension
-        ],
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-          'member_2.day': 'granular value',
-        },
-      )
-    ).toEqual([
-      'value 1',
-      'value 2',
-      'granular value'
-    ]);
-  });
-  test('getVanilaRow helper', () => {
-    // hidden memeber request
-    expect(() => {
-      getVanilaRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.REGULAR_QUERY,
-
-        // query
-        {} as NormalizedQuery,
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-        },
-      );
-    }).toThrow(
-      'You requested hidden member: \'member_2\'. Please make it ' +
-      'visible using `shown: true`. ' +
-      'Please note primaryKey fields are `shown: false` by ' +
-      'default: https://cube.dev/docs/schema/reference/joins#' +
-      'setting-a-primary-key.'
     );
+    data.data = [];
+    expect(getMembers(
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
+    )).toEqual([]);
 
-    // blending query
-    expect(
-      getVanilaRow(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-          'member_2.day': 'time.day',
-        },
-
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-          'time.day': {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
-
-        // queryType
-        QueryTypeEnum.BLENDING_QUERY,
-
-        // query
-        {
-          dimensions: [
-            'member_1',
-            'member_2',
-          ],
-          timeDimensions: [
-            {
-              dimension: 'member_2',
-              granularity: 'day',
-            } as unknown as QueryTimeDimension
-          ],
-        } as NormalizedQuery,
-
-        // db row
-        {
-          member_1: 'value 1',
-          member_2: 'value 2',
-          'member_2.day': 'granular value',
-        },
+    data = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data[0]
       )
-    ).toEqual({
-      member1: 'value 1',
-      member2: 'value 2',
-      'time.day': 'granular value',
-    });
+    );
+    expect(getMembers(
+      data.queryType as QueryTypeEnum,
+      data.query as unknown as NormalizedQuery,
+      data.data as { [sqlAlias: string]: DBResponseValue }[],
+      data.aliasToMemberNameMap,
+    )).toEqual([
+      'ECommerceRecordsUs2021.orderDate.month',
+      'ECommerceRecordsUs2021.avg_discount',
+      'time.month',
+    ]);
   });
-  test('transformData helper', () => {
+
+  test('getCompactRow helper', () => {
+    let data;
+
     // regular
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_profit_by_postal_code.data)
+    );
+    expect(getCompactRow(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.queryType as QueryType,
+      getMembers(
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
+      ),
+      data.query.timeDimensions as QueryTimeDimension[],
+      data.data[0],
+    )).toEqual(['95823', '646.1258666666666667']);
+
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_discount_by_city.data)
+    );
+    expect(getCompactRow(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.queryType as QueryType,
+      getMembers(
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
+      ),
+      data.query.timeDimensions as QueryTimeDimension[],
+      data.data[0],
+    )).toEqual(['Missouri City', '0.80000000000000000000']);
+
+    // compare date range
+    data = JSON.parse(
+      JSON.stringify(mockData.compare_date_range_count_by_order_date.data[0])
+    );
+    expect(getCompactRow(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.queryType as QueryType,
+      getMembers(
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
+      ),
+      data.query.timeDimensions as QueryTimeDimension[],
+      data.data[0],
+    )).toEqual([
+      '2020-01-01T00:00:00.000',
+      '10',
+      '2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999'
+    ]);
+
+    data = JSON.parse(
+      JSON.stringify(mockData.compare_date_range_count_by_order_date.data[0])
+    );
+    expect(getCompactRow(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.queryType as QueryType,
+      getMembers(
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
+      ),
+      data.query.timeDimensions as QueryTimeDimension[],
+      data.data[1],
+    )).toEqual([
+      '2020-01-02T00:00:00.000',
+      '8',
+      '2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999'
+    ]);
+
+    // blending
+    data = JSON.parse(
+      JSON.stringify(mockData.blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode.data[0])
+    );
+    expect(getCompactRow(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.queryType as QueryType,
+      getMembers(
+        data.queryType as QueryTypeEnum,
+        data.query as unknown as NormalizedQuery,
+        data.data as { [sqlAlias: string]: DBResponseValue }[],
+        data.aliasToMemberNameMap,
+      ),
+      data.query.timeDimensions as QueryTimeDimension[],
+      data.data[0],
+    )).toEqual([
+      '0.15638297872340425532',
+    ]);
+  });
+});
+
+describe('transformData default mode', () => {
+  test('regular discount by city', () => {
+    let data;
+
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_discount_by_city.data)
+    );
+    delete data.aliasToMemberNameMap.e_commerce_records_us2021__avg_discount;
+    expect(() => transformData(
+      data.aliasToMemberNameMap,
+      data.annotation as unknown as { [member: string]: ConfigItem },
+      data.data,
+      data.query as unknown as NormalizedQuery,
+      data.queryType as QueryType,
+    )).toThrow();
+
+    data = JSON.parse(
+      JSON.stringify(mockData.regular_discount_by_city.data)
+    );
     expect(
       transformData(
-        // aliasToMemberNameMap
-        {
-          member_1: 'member1',
-          member_2: 'member2',
-        },
+        data.aliasToMemberNameMap,
+        data.annotation as unknown as { [member: string]: ConfigItem },
+        data.data,
+        data.query as unknown as NormalizedQuery,
+        data.queryType as QueryType,
+      )
+    ).toEqual(data.result_default);
+  });
 
-        // annotation
-        {
-          member1: {
-            type: 'string',
-          },
-          member2: {
-            type: 'string',
-          },
-        } as unknown as { [member: string]: ConfigItem },
+  test('regular profit by postal code', () => {
+    const data = JSON.parse(
+      JSON.stringify(mockData.regular_profit_by_postal_code.data)
+    );
+    expect(
+      transformData(
+        data.aliasToMemberNameMap,
+        data.annotation as unknown as { [member: string]: ConfigItem },
+        data.data,
+        data.query as unknown as NormalizedQuery,
+        data.queryType as QueryType,
+      )
+    ).toEqual(data.result);
+  });
 
-        // data
-        [{
-          member_1: 'value 1',
-          member_2: 'value 2',
-        }],
+  test('compare date range count by order date', () => {
+    const data = JSON.parse(
+      JSON.stringify(mockData.compare_date_range_count_by_order_date.data)
+    );
 
-        // query
-        {
-          dimensions: [
-            'member_1',
-            'member_2',
-          ],
-        } as NormalizedQuery,
+    expect(
+      transformData(
+        data[0].aliasToMemberNameMap,
+        data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data[0].data,
+        data[0].query as unknown as NormalizedQuery,
+        data[0].queryType as QueryType,
+      )
+    ).toEqual(data[0].result);
 
-        // queryType
-        QueryTypeEnum.REGULAR_QUERY,
+    expect(
+      transformData(
+        data[1].aliasToMemberNameMap,
+        data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data[1].data,
+        data[1].query as unknown as NormalizedQuery,
+        data[1].queryType as QueryType,
+      )
+    ).toEqual(data[1].result);
+  });
 
-        // resType
+  test('blending query avg discount by date range for the first and standard ship mode', () => {
+    const data = JSON.parse(
+      JSON.stringify(
+        mockData
+          .blending_query_avg_discount_by_date_range_for_the_first_and_standard_ship_mode
+          .data
+      )
+    );
+
+    expect(
+      transformData(
+        data[0].aliasToMemberNameMap,
+        data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data[0].data,
+        data[0].query as unknown as NormalizedQuery,
+        data[0].queryType as QueryType,
+      )
+    ).toEqual(data[0].result);
+
+    expect(
+      transformData(
+        data[1].aliasToMemberNameMap,
+        data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data[1].data,
+        data[1].query as unknown as NormalizedQuery,
+        data[1].queryType as QueryType,
+      )
+    ).toEqual(data[1].result);
+  });
+});
+
+describe('transformData compact mode', () => {
+  test.skip('regular discount by city', () => {
+    expect(
+      transformData(
+        mockData.regular_discount_by_city.data.aliasToMemberNameMap,
+        mockData.regular_discount_by_city.data.annotation as unknown as { [member: string]: ConfigItem },
+        mockData.regular_discount_by_city.data.data,
+        mockData.regular_discount_by_city.data.query as unknown as NormalizedQuery,
+        mockData.regular_discount_by_city.data.queryType as QueryType,
         ResultTypeEnum.COMPACT,
       )
-    ).toEqual([{
-      member1: 'value 1',
-      member2: 'value 2',
-    }]);
-    // expect(
-    //   transformData(
-    //     // aliasToMemberNameMap
-    //     {
-    //       member_1: 'member1',
-    //       member_2: 'member2',
-    //     },
-
-    //     // annotation
-    //     {
-    //       member1: {
-    //         type: 'string',
-    //       },
-    //       member2: {
-    //         type: 'string',
-    //       },
-    //     } as unknown as { [member: string]: ConfigItem },
-
-    //     // data
-    //     [{
-    //       member_1: 'value 1',
-    //       member_2: 'value 2',
-    //     }],
-
-    //     // query
-    //     {
-    //       dimensions: [
-    //         'member1',
-    //         'member2',
-    //       ],
-    //     } as NormalizedQuery,
-
-    //     // queryType
-    //     QueryTypeEnum.REGULAR_QUERY,
-
-    //     // resType
-    //     ResultTypeEnum.COMPACT,
-    //   )
-    // ).toEqual({
-    //   members: ['member1', 'member2'],
-    //   dataset: [['value 1', 'value 2']],
-    // });
+    ).toEqual(mockData.regular_discount_by_city.data.result_compact);
   });
 });

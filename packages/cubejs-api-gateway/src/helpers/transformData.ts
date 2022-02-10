@@ -172,14 +172,14 @@ function getCompactRow(
   queryType: QueryType,
   members: string[],
   timeDimensions: QueryTimeDimension[] | undefined,
-  item: { [sqlAlias: string]: DBResponseValue },
+  dbRow: { [sqlAlias: string]: DBResponseValue },
 ): DBResponsePrimitive[] {
   const row: DBResponsePrimitive[] = [];
-  members.forEach((col: string) => {
+  Object.keys(dbRow).forEach((dbCol: string) => {
     row.push(
       transformValue(
-        item[col],
-        annotation[aliasToMemberNameMap[col]].type
+        dbRow[dbCol],
+        annotation[aliasToMemberNameMap[dbCol]].type
       ),
     );
   });
@@ -189,7 +189,7 @@ function getCompactRow(
     );
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
     row.push(
-      item[
+      dbRow[
         getBlendingResponseKey(timeDimensions)
       ] as DBResponsePrimitive
     );
@@ -207,7 +207,7 @@ function getVanilaRow(
   annotation: { [member: string]: ConfigItem },
   queryType: QueryType,
   query: NormalizedQuery,
-  item: { [sqlAlias: string]: DBResponseValue },
+  dbRow: { [sqlAlias: string]: DBResponseValue },
 ): { [member: string]: DBResponsePrimitive } {
   const row = R.pipe(
     R.toPairs,
@@ -260,7 +260,7 @@ function getVanilaRow(
     R.unnest,
     R.fromPairs
   // @ts-ignore
-  )(item);
+  )(dbRow);
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
     return {
       ...row,
@@ -270,7 +270,7 @@ function getVanilaRow(
     return {
       ...row,
       [getBlendingQueryKey(query.timeDimensions)]:
-        item[getBlendingResponseKey(query.timeDimensions)]
+        row[getBlendingResponseKey(query.timeDimensions)]
     };
   }
   return row as { [member: string]: DBResponsePrimitive; };
@@ -285,7 +285,7 @@ function transformData(
   data: { [sqlAlias: string]: unknown }[],
   query: NormalizedQuery,
   queryType: QueryType,
-  resType: ResultType
+  resType?: ResultType
 ): {
   members: string[],
   dataset: DBResponsePrimitive[][]
