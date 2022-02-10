@@ -440,9 +440,16 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_init: {}", database);
+        debug!("on_init: USE {}", database);
 
-        self.state.set_database(Some(database.to_string()));
+        if self
+            .execute_query(&format!("USE {}", database))
+            .await
+            .is_err()
+        {
+            writter.error(ErrorKind::ER_BAD_DB_ERROR, b"Unknown database")?;
+            return Ok(());
+        };
 
         writter.ok()?;
 
