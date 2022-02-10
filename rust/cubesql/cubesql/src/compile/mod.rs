@@ -1570,6 +1570,7 @@ impl QueryPlanner {
                 self.explain_table_to_plan(&table_name)
             }
             ast::Statement::Explain { statement, .. } => self.explain_to_plan(&statement),
+            ast::Statement::Use { db_name } => self.use_to_plan(&db_name),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1907,6 +1908,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 )])],
             )),
         ));
+    }
+
+    fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
+        self.state.set_database(Some(db_name.value.clone()));
+
+        Ok(QueryPlan::MetaOk(StatusFlags::empty()))
     }
 
     fn set_variable_to_plan(
@@ -3940,7 +3947,9 @@ mod tests {
             QueryPlan::MetaTabular(flags, frame) => {
                 return Ok((frame.print(), flags));
             }
-            _ => panic!("Unknown execution method"),
+            QueryPlan::MetaOk(flags) => {
+                return Ok(("".to_string(), flags));
+            }
         }
     }
 
@@ -4377,6 +4386,13 @@ mod tests {
         insta::assert_snapshot!(
             execute_query("explain KibanaSampleDataEcommerce;".to_string()).await?
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_use_db() -> Result<(), CubeError> {
+        assert_eq!(execute_query("use db;".to_string()).await?, "".to_string());
 
         Ok(())
     }
