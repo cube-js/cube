@@ -2822,6 +2822,28 @@ mod tests {
                 ),
             ),
             (
+                "SELECT COUNT(count) FROM KibanaSampleDataEcommerce".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.count",
+                        DataType::Int64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
+            ),
+            (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["Logs.agentCount".to_string()]),
@@ -2900,6 +2922,28 @@ mod tests {
     #[test]
     fn test_select_error() {
         let variants = vec![
+            // Count agg fn
+            (
+                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
+            ),
+            (
+                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
+            ),
+            (
+                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
+            ),
+            (
+                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
+            ),
+            // Another aggregation functions
+            (
+                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
+            ),
             (
                 "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
                 CompilationError::User("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
@@ -2914,7 +2958,7 @@ mod tests {
             ),
             (
                 "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to find measure with name 'unknownIdentifier' for MAX(unknownIdentifier)".to_string()),
+                CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
             ),
             // Check restrictions for segments usage
             (
@@ -2929,18 +2973,6 @@ mod tests {
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
                 CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
             ),
-            (
-                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
-            ),
-            (
-                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use 'unknownIdentifier' as argument to aggregation function 'COUNT()'".to_string()),
-            ),
-            (
-                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-            ),
         ];
 
         for (input_query, expected_error) in variants.iter() {
@@ -2953,7 +2985,7 @@ mod tests {
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
-                Err(e) => assert_eq!(e, expected_error),
+                Err(e) => assert_eq!(e, expected_error, "for {}", input_query),
             }
         }
     }
