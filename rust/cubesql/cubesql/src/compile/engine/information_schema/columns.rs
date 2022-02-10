@@ -30,6 +30,7 @@ struct InformationSchemaColumnsBuilder {
     char_max_length: UInt32Builder,
     char_octet_length: UInt32Builder,
     column_type: StringBuilder,
+    numeric_scale: UInt32Builder,
     numeric_precision: UInt32Builder,
     datetime_precision: UInt32Builder,
 }
@@ -51,6 +52,7 @@ impl InformationSchemaColumnsBuilder {
             char_octet_length: UInt32Builder::new(capacity),
             column_type: StringBuilder::new(capacity),
             numeric_precision: UInt32Builder::new(capacity),
+            numeric_scale: UInt32Builder::new(capacity),
             datetime_precision: UInt32Builder::new(capacity),
         }
     }
@@ -91,6 +93,7 @@ impl InformationSchemaColumnsBuilder {
         self.char_max_length.append_null().unwrap();
         self.char_octet_length.append_null().unwrap();
         self.numeric_precision.append_null().unwrap();
+        self.numeric_scale.append_null().unwrap();
         self.datetime_precision.append_null().unwrap();
     }
 
@@ -111,6 +114,7 @@ impl InformationSchemaColumnsBuilder {
         columns.push(Arc::new(self.char_octet_length.finish()));
         columns.push(Arc::new(self.column_type.finish()));
         columns.push(Arc::new(self.numeric_precision.finish()));
+        columns.push(Arc::new(self.numeric_scale.finish()));
         columns.push(Arc::new(self.datetime_precision.finish()));
 
         // COLUMN_KEY
@@ -189,6 +193,7 @@ impl TableProvider for InfoSchemaColumnsProvider {
             Field::new("CHARACTER_OCTET_LENGTH", DataType::UInt32, true),
             Field::new("COLUMN_TYPE", DataType::Utf8, false),
             Field::new("NUMERIC_PRECISION", DataType::UInt32, true),
+            Field::new("NUMERIC_SCALE", DataType::UInt32, true),
             Field::new("DATETIME_PRECISION", DataType::UInt32, true),
             Field::new("COLUMN_KEY", DataType::Utf8, false),
             Field::new("EXTRA", DataType::Utf8, false),
