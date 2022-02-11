@@ -23,11 +23,29 @@ async function fetchRelease(version: string) {
     }
   });
 
-  const { data } = await client.request('GET /repos/{owner}/{repo}/releases/tags/{tag}', {
+  let data;
+  const url = 'GET /repos/{owner}/{repo}/releases/tags/{tag}';
+  const params = {
     owner: 'cube-js',
     repo: 'cube.js',
     tag: `v${version}`
-  });
+  };
+
+  try {
+    ({ data } = await client.request(url, params));
+  } catch (err) {
+    // https://docs.github.com/en/rest/overview/resources-in-the-rest-api#rate-limit-http-headers
+    const { status, headers } = (err as any)?.response || {};
+    if (status === 403 && headers?.['x-ratelimit-remaining'] === '0') {
+      const waitForReset = Number(headers['x-ratelimit-reset']) * 1000 - Date.now();
+      if (waitForReset > 0) {
+        await new Promise((resolve) => setTimeout(resolve, waitForReset));
+      }
+      ({ data } = await client.request(url, params));
+    } else {
+      throw err;
+    }
+  }
 
   return data;
 }
