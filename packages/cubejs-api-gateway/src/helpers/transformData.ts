@@ -132,14 +132,14 @@ function getBlendingResponseKey(
 function getMembers(
   queryType: QueryType,
   query: NormalizedQuery,
-  data: { [sqlAlias: string]: DBResponseValue }[],
+  dbData: { [sqlAlias: string]: DBResponseValue }[],
   aliasToMemberNameMap: AliasToMemberMap,
-): string[] {
-  const members: string[] = [];
-  if (!data.length) {
+): { [member: string]: string } {
+  const members: { [member: string]: string } = {};
+  if (!dbData.length) {
     return members;
   }
-  const columns = Object.keys(data[0]);
+  const columns = Object.keys(dbData[0]);
   columns.forEach((column) => {
     if (!aliasToMemberNameMap[column]) {
       throw new UserError(
@@ -151,12 +151,25 @@ function getMembers(
         'setting-a-primary-key.'
       );
     }
-    members.push(aliasToMemberNameMap[column]);
+    members[aliasToMemberNameMap[column]] = column;
+    const path = aliasToMemberNameMap[column]
+      .split(MEMBER_SEPARATOR);
+    const calcMember =
+      [path[0], path[1]].join(MEMBER_SEPARATOR);
+    if (
+      path.length === 3 &&
+      query.dimensions?.indexOf(calcMember) === -1
+    ) {
+      members[calcMember] = column;
+    }
   });
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
-    members.push(COMPARE_DATE_RANGE_FIELD);
+    members[COMPARE_DATE_RANGE_FIELD] =
+      QueryTypeEnum.COMPARE_DATE_RANGE_QUERY;
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
-    members.push(getBlendingQueryKey(query.timeDimensions));
+    members[getBlendingQueryKey(query.timeDimensions)] =
+      // @ts-ignore
+      members[query.timeDimensions[0].dimension];
   }
   return members;
 }
@@ -167,7 +180,7 @@ function getMembers(
  * @todo should we use transformValue for blending query?
  */
 function getCompactRow(
-  aliasToMemberNameMap: AliasToMemberMap,
+  membersToAliasMap: { [member: string]: string },
   annotation: { [member: string]: ConfigItem },
   queryType: QueryType,
   members: string[],
@@ -175,22 +188,30 @@ function getCompactRow(
   dbRow: { [sqlAlias: string]: DBResponseValue },
 ): DBResponsePrimitive[] {
   const row: DBResponsePrimitive[] = [];
-  Object.keys(dbRow).forEach((dbCol: string) => {
-    row.push(
-      transformValue(
-        dbRow[dbCol],
-        annotation[aliasToMemberNameMap[dbCol]].type
-      ),
-    );
+  members.forEach((m: string) => {
+    if (annotation[m]) {
+      row.push(
+        transformValue(
+          dbRow[membersToAliasMap[m]],
+          annotation[m].type
+        ),
+      );
+    }
   });
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
     row.push(
       getDateRangeValue(timeDimensions)
     );
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
+    console.log(getBlendingResponseKey(timeDimensions));
+    console.log(dbRow[
+      getBlendingResponseKey(timeDimensions)
+    ]);
     row.push(
       dbRow[
-        getBlendingResponseKey(timeDimensions)
+        membersToAliasMap[
+          getBlendingResponseKey(timeDimensions)
+        ]
       ] as DBResponsePrimitive
     );
   }
@@ -293,12 +314,13 @@ function transformData(
   [member: string]: DBResponsePrimitive
 }[] {
   const d = data as { [sqlAlias: string]: DBResponseValue }[];
-  const members: string[] = getMembers(
+  const membersToAliasMap = getMembers(
     queryType,
     query,
     d,
     aliasToMemberNameMap,
   );
+  const members: string[] = Object.keys(membersToAliasMap);
   const dataset: DBResponsePrimitive[][] | {
     [member: string]: DBResponsePrimitive
   }[] = d.map((r) => {
@@ -306,7 +328,7 @@ function transformData(
       [member: string]: DBResponsePrimitive
     } = resType === ResultTypeEnum.COMPACT
       ? getCompactRow(
-        aliasToMemberNameMap,
+        membersToAliasMap,
         annotation,
         queryType,
         members,
