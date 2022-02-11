@@ -48,3 +48,10 @@ comfy-table = "4.1.1"
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
+mysql_async = "0.29"
+portpicker = "0.1.1"
+
+[[test]]
+name = "e2e"
+path = "e2e/main.rs"
+harness = false
