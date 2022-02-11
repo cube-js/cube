@@ -428,7 +428,7 @@ mod tests {
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
             assert_eq!(
                 pool.process(Message::Panic).await,
-                Err(CubeError::internal("oops".to_string()))
+                Err(CubeError::panic("oops".to_string()))
             );
             pool.stop_workers().await.unwrap();
         });

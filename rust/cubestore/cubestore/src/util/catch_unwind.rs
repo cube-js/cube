@@ -11,10 +11,10 @@ pub async fn async_try_with_catch_unwind<F, R>(future: F) -> Result<R, CubeError
         Ok(x) => x,
         Err(e) => Err(
             match e.downcast::<String>() {
-                Ok(s) => CubeError::internal(*s),
+                Ok(s) => CubeError::panic(*s),
                 Err(e) => match e.downcast::<&str>() {
-                    Ok(m1) => CubeError::internal(m1.to_string()),
-                    Err(_) => CubeError::internal("unknown panic cause".to_string()),
+                    Ok(m1) => CubeError::panic(m1.to_string()),
+                    Err(_) => CubeError::panic("unknown cause".to_string()),
                 }
             }
         )
@@ -39,9 +39,9 @@ mod tests {
         assert_eq!(x1, Err(CubeError::internal("err".to_string())));
         let f2: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { panic!("oops") });
         let x2 = async_try_with_catch_unwind(f2).await;
-        assert_eq!(x2, Err(CubeError::internal("oops".to_string())));
+        assert_eq!(x2, Err(CubeError::panic("oops".to_string())));
         let f3: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { panic!("oops{}", "ie") });
         let x3 = async_try_with_catch_unwind(f3).await;
-        assert_eq!(x3, Err(CubeError::internal("oopsie".to_string())));
+        assert_eq!(x3, Err(CubeError::panic("oopsie".to_string())));
     }
 }

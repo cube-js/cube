@@ -74,6 +74,7 @@ impl std::error::Error for CubeError {}
 pub enum CubeErrorCauseType {
     User,
     Internal,
+    Panic,
 }
 
 impl CubeError {
@@ -105,6 +106,14 @@ impl CubeError {
             message,
             backtrace: String::new(),
             cause: CubeErrorCauseType::Internal,
+        }
+    }
+
+    pub fn panic(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::Panic,
         }
     }
 
