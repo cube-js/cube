@@ -24,6 +24,7 @@
     "watch": "tsc -w",
     "lint": "eslint src/*.ts",
     "lint:fix": "eslint --fix src/*.ts",
+    "test": "yarn integration",
     "integration": "jest",
     "integration:cubestore": "jest"
   },
