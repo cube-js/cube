@@ -19,6 +19,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
+use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -277,7 +278,8 @@ where
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let send_res = tx.send(P::process(args).await);
+                    let result = async_try_with_catch_unwind(P::process(args)).await;
+                    let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
                         return 0;
@@ -319,6 +321,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     pub enum Message {
         Delay(u64),
+        Panic,
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -335,6 +338,9 @@ mod tests {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;
                     Ok(Response::Foo(x))
+                }
+                Message::Panic => {
+                    panic!("oops")
                 }
             }
         }
@@ -405,6 +411,25 @@ mod tests {
                     assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
                 }
             }
+            pool.stop_workers().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_panic() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(1000),
+            ));
+            let pool_to_move = pool.clone();
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
+            assert_eq!(
+                pool.process(Message::Panic).await,
+                Err(CubeError::internal("oops".to_string()))
+            );
             pool.stop_workers().await.unwrap();
         });
     }

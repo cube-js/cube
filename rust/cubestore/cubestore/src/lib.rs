@@ -61,7 +61,7 @@ pub mod util;
 pub use datafusion::cube_ext::spawn;
 pub use datafusion::cube_ext::spawn_blocking;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CubeError {
     pub message: String,
     pub backtrace: String,
@@ -70,7 +70,7 @@ pub struct CubeError {
 
 impl std::error::Error for CubeError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CubeErrorCauseType {
     User,
     Internal,

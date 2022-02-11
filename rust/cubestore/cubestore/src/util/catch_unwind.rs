@@ -1,0 +1,47 @@
+use std::future::Future;
+use std::panic::AssertUnwindSafe;
+use futures::future::FutureExt;
+use crate::CubeError;
+
+pub async fn async_try_with_catch_unwind<F, R>(future: F) -> Result<R, CubeError>
+    where F: Future<Output = Result<R, CubeError>>
+{
+    let result = AssertUnwindSafe(future).catch_unwind().await;
+    return match result {
+        Ok(x) => x,
+        Err(e) => Err(
+            match e.downcast::<String>() {
+                Ok(s) => CubeError::internal(*s),
+                Err(e) => match e.downcast::<&str>() {
+                    Ok(m1) => CubeError::internal(m1.to_string()),
+                    Err(_) => CubeError::internal("unknown panic cause".to_string()),
+                }
+            }
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use std::panic;
+    use std::pin::Pin;
+    use super::*;
+
+    #[tokio::test]
+    async fn test_async_try_with_catch_unwind() {
+        let f0: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { Ok("ok".to_string()) });
+        let x0 = async_try_with_catch_unwind(f0).await;
+        assert_eq!(x0, Ok("ok".to_string()));
+        let f1: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { Err(CubeError::internal("err".to_string())) });
+        let x1 = async_try_with_catch_unwind(f1).await;
+        assert_eq!(x1, Err(CubeError::internal("err".to_string())));
+        let f2: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { panic!("oops") });
+        let x2 = async_try_with_catch_unwind(f2).await;
+        assert_eq!(x2, Err(CubeError::internal("oops".to_string())));
+        let f3: Pin<Box<dyn Future<Output = Result<String, CubeError>>>> = Box::pin(async { panic!("oops{}", "ie") });
+        let x3 = async_try_with_catch_unwind(f3).await;
+        assert_eq!(x3, Err(CubeError::internal("oopsie".to_string())));
+    }
+}
