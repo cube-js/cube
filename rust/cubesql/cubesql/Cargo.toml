@@ -9,15 +9,16 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "a3abf5bf90c8c93d22141e395571541e347a2bf6", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "55a1d4a0f35cc932f5b4ceda037a302c5e1a3311", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "a9d45cc6d2e7458effee27939edfe787ef8e1b6d" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "d6250ba4ca315d73d8b52fb67d1a54ca11351348" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
 serde = { version = "^1.0", features = ["derive"] }
+itertools = "0.10.2"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 bytes = "0.5.4"
@@ -31,7 +32,6 @@ log = "=0.4.11"
 # It's a problem with determing local_offset_at for local-offset feature
 # https://github.com/time-rs/time/issues/325
 simple_logger = "=1.13.0"
-itertools = "0.10.3"
 async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }

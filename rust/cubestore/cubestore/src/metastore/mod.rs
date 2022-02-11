@@ -504,6 +504,7 @@ impl fmt::Display for Column {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum ImportFormat {
     CSV,
+    CSVNoHeader,
 }
 
 data_frame_from! {

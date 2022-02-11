@@ -15,7 +15,6 @@ use log::trace;
 
 use msql_srv::*;
 
-use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
@@ -262,11 +261,11 @@ impl Connection {
         } else if !ignore {
             trace!("query was not detected");
 
-            let ctx = self.server.transport
-                .meta(&self.auth_context()?)
+            let meta = self.server.transport
+                .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx),self.state.clone())?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.state.clone(),self.server.transport.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));
@@ -274,7 +273,7 @@ impl Connection {
                 crate::compile::QueryPlan::MetaTabular(status, data_frame) => {
                     return Ok(QueryResponse::ResultSet(status, data_frame));
                 },
-                crate::compile::QueryPlan::DataFushionSelect(status, plan, ctx) => {
+                crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
                     let df = DataFrameImpl::new(
                         ctx.state,
                         &plan,
@@ -283,52 +282,6 @@ impl Connection {
                     let response =  batch_to_dataframe(&batches)?;
 
                     return Ok(QueryResponse::ResultSet(status, Arc::new(response)))
-                },
-                crate::compile::QueryPlan::CubeSelect(status, plan) => {
-                    debug!("Request {}", json!(plan.request).to_string());
-                    debug!("Meta {:?}", plan.meta);
-
-                    let response = self.server.transport
-                        .load(plan.request, &self.auth_context()?)
-                        .await?;
-
-                    let mut columns: Vec<dataframe::Column> = vec![];
-
-                    for column_meta in &plan.meta {
-                        columns.push(dataframe::Column::new(
-                            column_meta.column_to.clone(),
-                            column_meta.column_type,
-                            ColumnFlags::empty(),
-                        ));
-                    }
-
-                    let mut rows: Vec<dataframe::Row> = vec![];
-
-                    if let Some(result) = response.results.first() {
-                        debug!("Columns {:?}", columns);
-                        debug!("Hydration mapping {:?}", plan.meta);
-                        trace!("Response from Cube.js {:?}", result.data);
-
-                        for row in result.data.iter() {
-                            if let Some(record) = row.as_object() {
-                                rows.push(
-                                    dataframe::Row::hydrate_from_response(&plan.meta, record)
-                                );
-                            } else {
-                                error!(
-                                    "Unable to map row to DataFrame::Row: {:?}, skipping row",
-                                    row
-                                );
-                            }
-                        }
-
-                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(
-                            columns,
-                            rows
-                        ))));
-                    } else {
-                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(vec![], vec![]))));
-                    }
                 }
             }
         }
@@ -343,9 +296,9 @@ impl Connection {
         }
     }
 
-    pub(crate) fn auth_context(&self) -> Result<AuthContext, CubeError> {
+    pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
         if let Some(ctx) = self.state.auth_context() {
-            Ok(ctx)
+            Ok(Arc::new(ctx))
         } else {
             Err(CubeError::internal("must be auth".to_string()))
         }
@@ -487,9 +440,16 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_init: {}", database);
+        debug!("on_init: USE {}", database);
 
-        self.state.set_database(Some(database.to_string()));
+        if self
+            .execute_query(&format!("USE {}", database))
+            .await
+            .is_err()
+        {
+            writter.error(ErrorKind::ER_BAD_DB_ERROR, b"Unknown database")?;
+            return Ok(());
+        };
 
         writter.ok()?;
 

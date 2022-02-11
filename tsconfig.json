@@ -47,6 +47,9 @@
       "path": "packages/cubejs-redshift-driver"
     },
     {
+      "path": "packages/cubejs-athena-driver"
+    },
+    {
       "path": "packages/cubejs-bigquery-driver"
     },
     {

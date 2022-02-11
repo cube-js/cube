@@ -1,0 +1,22 @@
+version: "2.2"
+
+services:
+  cube:
+    container_name: birdbox-cube
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
+    environment:
+      CUBEJS_DB_TYPE: bigquery
+      CUBEJS_DB_BQ_PROJECT_ID: ${CUBEJS_DB_BQ_PROJECT_ID}
+      CUBEJS_DB_BQ_CREDENTIALS: ${CUBEJS_DB_BQ_CREDENTIALS}
+      CUBEJS_DB_BQ_EXPORT_BUCKET: ${CUBEJS_DB_BQ_EXPORT_BUCKET}
+
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEDULED_REFRESH_DEFAULT: "false"
+      CUBEJS_REFRESH_WORKER: "false"
+    volumes:
+      - ./postgresql/single/cube.js:/cube/conf/cube.js
+      - ./postgresql/schema:/cube/conf/schema
+    ports:
+      - "4000:4000"
+    restart: always

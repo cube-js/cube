@@ -3,6 +3,8 @@ use std::{backtrace::Backtrace, fmt};
 
 use chrono::{prelude::*, Duration};
 
+use datafusion::arrow::datatypes::DataType;
+use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -18,8 +20,7 @@ use cubeclient::models::{
 
 use crate::mysql::{dataframe, ConnectionState};
 pub use crate::transport::ctx::*;
-use crate::transport::V1CubeMetaExt;
-
+use crate::transport::{TransportService, V1CubeMetaExt};
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
@@ -30,6 +31,8 @@ use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 use self::builder::*;
 use self::context::*;
 use self::engine::context::SystemVar;
+use self::engine::df::planner::CubeQueryPlanner;
+use self::engine::df::scan::CubeScanNode;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
@@ -43,6 +46,7 @@ pub mod builder;
 pub mod context;
 pub mod engine;
 pub mod parser;
+pub mod service;
 
 #[derive(Debug, PartialEq)]
 pub enum CompilationError {
@@ -1323,12 +1327,22 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 }
 
 struct QueryPlanner {
-    context: Arc<MetaContext>,
+    state: Arc<ConnectionState>,
+    meta: Arc<MetaContext>,
+    transport: Arc<dyn TransportService>,
 }
 
 impl QueryPlanner {
-    pub fn new(context: Arc<MetaContext>) -> Self {
-        Self { context }
+    pub fn new(
+        state: Arc<ConnectionState>,
+        meta: Arc<MetaContext>,
+        transport: Arc<dyn TransportService>,
+    ) -> Self {
+        Self {
+            state,
+            transport,
+            meta,
+        }
     }
 
     /// Common case for both planners: meta & olap
@@ -1338,7 +1352,6 @@ impl QueryPlanner {
         &self,
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
-        connection_state: Arc<ConnectionState>,
     ) -> CompilationResult<QueryPlan> {
         let select = match &q.body {
             sqlparser::ast::SetExpr::Select(select) => select,
@@ -1352,7 +1365,7 @@ impl QueryPlanner {
         let from_table = if select.from.len() == 1 {
             &select.from[0]
         } else {
-            return self.create_df_logical_plan(stmt.clone(), connection_state);
+            return self.create_df_logical_plan(stmt.clone());
         };
 
         let (schema_name, table_name) = match &from_table.relation {
@@ -1382,7 +1395,7 @@ impl QueryPlanner {
         if schema_name.to_lowercase() == "information_schema"
             || schema_name.to_lowercase() == "performance_schema"
         {
-            return self.create_df_logical_plan(stmt.clone(), connection_state);
+            return self.create_df_logical_plan(stmt.clone());
         }
 
         if !select.from[0].joins.is_empty() {
@@ -1443,7 +1456,7 @@ impl QueryPlanner {
             ));
         };
 
-        if let Some(cube) = self.context.find_cube_with_name(table_name.clone()) {
+        if let Some(cube) = self.meta.find_cube_with_name(table_name.clone()) {
             let mut ctx = QueryContext::new(&cube);
             let mut builder = compile_select(select, &mut ctx)?;
 
@@ -1476,7 +1489,33 @@ impl QueryPlanner {
                 compile_where(selection, &ctx, &mut builder)?;
             }
 
-            Ok(QueryPlan::CubeSelect(StatusFlags::empty(), builder.build()))
+            let query = builder.build();
+            let schema = query.meta_as_df_schema();
+
+            let projection_expr = query.meta_as_df_projection_expr();
+            let projection_schema = query.meta_as_df_projection_schema();
+
+            let scan_node = LogicalPlan::Extension {
+                node: Arc::new(CubeScanNode::new(
+                    schema,
+                    query.request,
+                    // @todo Remove after split!
+                    Arc::new(self.state.auth_context().unwrap()),
+                )),
+            };
+            let logical_plan = LogicalPlan::Projection {
+                expr: projection_expr,
+                input: Arc::new(scan_node),
+                schema: projection_schema,
+                alias: None,
+            };
+
+            let ctx = self.create_execution_ctx();
+            Ok(QueryPlan::DataFusionSelect(
+                StatusFlags::empty(),
+                logical_plan,
+                ctx,
+            ))
         } else {
             Err(CompilationError::Unknown(format!(
                 "Unknown cube '{}'. Please ensure your schema files are valid.",
@@ -1485,13 +1524,9 @@ impl QueryPlanner {
         }
     }
 
-    pub fn plan(
-        &self,
-        stmt: &ast::Statement,
-        connection_state: Arc<ConnectionState>,
-    ) -> CompilationResult<QueryPlan> {
+    pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
         match stmt {
-            ast::Statement::Query(q) => self.select_to_plan(stmt, q, connection_state),
+            ast::Statement::Query(q) => self.select_to_plan(stmt, q),
             ast::Statement::SetTransaction { .. } => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Arc::new(dataframe::DataFrame::new(vec![], vec![])),
@@ -1513,12 +1548,8 @@ impl QueryPlanner {
             }
             ast::Statement::Kill { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
             ast::Statement::SetVariable { key_values } => self.set_variable_to_plan(&key_values),
-            ast::Statement::ShowVariable { variable } => {
-                self.show_variable_to_plan(variable, connection_state)
-            }
-            ast::Statement::ShowVariables { filter } => {
-                self.show_variables_to_plan(&filter, connection_state)
-            }
+            ast::Statement::ShowVariable { variable } => self.show_variable_to_plan(variable),
+            ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter),
             ast::Statement::ShowCreate { obj_name, obj_type } => {
                 self.show_create_to_plan(&obj_name, &obj_type)
             }
@@ -1527,24 +1558,19 @@ impl QueryPlanner {
                 full,
                 filter,
                 table_name,
-            } => {
-                self.show_columns_to_plan(*extended, *full, &filter, &table_name, connection_state)
-            }
+            } => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
             ast::Statement::ShowTables {
                 extended,
                 full,
                 filter,
                 db_name,
-            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name, connection_state),
-            ast::Statement::ShowCollation { filter } => {
-                self.show_collation_to_plan(&filter, connection_state)
-            }
+            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
+            ast::Statement::ShowCollation { filter } => self.show_collation_to_plan(&filter),
             ast::Statement::ExplainTable { table_name, .. } => {
-                self.explain_table_to_plan(&table_name, connection_state)
+                self.explain_table_to_plan(&table_name)
             }
-            ast::Statement::Explain { statement, .. } => {
-                self.explain_to_plan(&statement, connection_state)
-            }
+            ast::Statement::Explain { statement, .. } => self.explain_to_plan(&statement),
+            ast::Statement::Use { db_name } => self.use_to_plan(&db_name),
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1552,11 +1578,7 @@ impl QueryPlanner {
         }
     }
 
-    fn show_variable_to_plan(
-        &self,
-        variable: &Vec<Ident>,
-        connection_state: Arc<ConnectionState>,
-    ) -> CompilationResult<QueryPlan> {
+    fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
         let name = ObjectName(variable.to_vec()).to_string();
         if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
@@ -1607,19 +1629,15 @@ impl QueryPlanner {
                 )),
             ))
         } else {
-            self.create_df_logical_plan(
-                ast::Statement::ShowVariable {
-                    variable: variable.clone(),
-                },
-                connection_state,
-            )
+            self.create_df_logical_plan(ast::Statement::ShowVariable {
+                variable: variable.clone(),
+            })
         }
     }
 
     fn show_variables_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
         let filter = match filter {
             Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
@@ -1644,7 +1662,7 @@ impl QueryPlanner {
             &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter)
         )?;
 
-        self.create_df_logical_plan(stmt, connection_state)
+        self.create_df_logical_plan(stmt)
     }
 
     fn show_create_to_plan(
@@ -1668,7 +1686,7 @@ impl QueryPlanner {
             &obj_name.0[0].value
         };
 
-        self.context.cubes.iter().find(|c| c.name.eq(table_name_filter)).map(|cube| {
+        self.meta.cubes.iter().find(|c| c.name.eq(table_name_filter)).map(|cube| {
             let mut fields: Vec<String> = vec![];
 
             for column in &cube.get_columns() {
@@ -1714,7 +1732,6 @@ impl QueryPlanner {
         full: bool,
         filter: &Option<ast::ShowStatementFilter>,
         table_name: &ast::ObjectName,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
         let extended = match extended {
             false => "".to_string(),
@@ -1747,10 +1764,7 @@ impl QueryPlanner {
         };
         let db_name = match object_name.pop() {
             Some(db_name) => escape_single_quote_string(&db_name.value).to_string(),
-            None => connection_state
-                .database()
-                .unwrap_or("db".to_string())
-                .clone(),
+            None => self.state.database().unwrap_or("db".to_string()).clone(),
         };
 
         let filter = match filter {
@@ -1775,7 +1789,7 @@ impl QueryPlanner {
             columns, information_schema_sql, filter
         ))?;
 
-        self.create_df_logical_plan(stmt, connection_state)
+        self.create_df_logical_plan(stmt)
     }
 
     fn show_tables_to_plan(
@@ -1785,11 +1799,10 @@ impl QueryPlanner {
         full: bool,
         filter: &Option<ast::ShowStatementFilter>,
         db_name: &Option<ast::Ident>,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
         let db_name = match db_name {
             Some(db_name) => db_name.clone(),
-            None => Ident::new(connection_state.database().unwrap_or("db".to_string())),
+            None => Ident::new(self.state.database().unwrap_or("db".to_string())),
         };
 
         let column_name = format!("Tables_in_{}", db_name.value);
@@ -1830,13 +1843,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
             columns, information_schema_sql, filter
         ))?;
 
-        self.create_df_logical_plan(stmt, connection_state)
+        self.create_df_logical_plan(stmt)
     }
 
     fn show_collation_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
         let filter = match filter {
             Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
@@ -1860,25 +1872,27 @@ WHERE `TABLE_SCHEMA` = '{}'",
             information_schema_sql, filter
         ))?;
 
-        self.create_df_logical_plan(stmt, connection_state)
+        self.create_df_logical_plan(stmt)
     }
 
     fn explain_table_to_plan(
         &self,
         table_name: &ast::ObjectName,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
         // EXPLAIN <table> matches the SHOW COLUMNS output exactly, reuse the plan
-        self.show_columns_to_plan(false, false, &None, table_name, connection_state)
+        self.show_columns_to_plan(false, false, &None, table_name)
     }
 
     fn explain_to_plan(
         &self,
         statement: &Box<ast::Statement>,
-        connection_state: Arc<ConnectionState>,
     ) -> Result<QueryPlan, CompilationError> {
-        let plan =
-            convert_statement_to_cube_query(&statement, self.context.clone(), connection_state)?;
+        let plan = convert_statement_to_cube_query(
+            &statement,
+            self.meta.clone(),
+            self.state.clone(),
+            self.transport.clone(),
+        )?;
 
         return Ok(QueryPlan::MetaTabular(
             StatusFlags::empty(),
@@ -1894,6 +1908,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 )])],
             )),
         ));
+    }
+
+    fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
+        self.state.set_database(Some(db_name.value.clone()));
+
+        Ok(QueryPlan::MetaOk(StatusFlags::empty()))
     }
 
     fn set_variable_to_plan(
@@ -1915,29 +1935,22 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ))
     }
 
-    fn create_df_logical_plan(
-        &self,
-        stmt: ast::Statement,
-        connection_state: Arc<ConnectionState>,
-    ) -> CompilationResult<QueryPlan> {
-        let mut ctx =
-            ExecutionContext::with_config(ExecutionConfig::new().with_information_schema(false));
+    fn create_execution_ctx(&self) -> ExecutionContext {
+        let mut ctx = ExecutionContext::with_config(
+            ExecutionConfig::new()
+                .with_query_planner(Arc::new(CubeQueryPlanner::new(self.transport.clone())))
+                .with_information_schema(false),
+        );
 
         let variable_provider = SystemVar::new();
         ctx.register_variable(VarType::System, Arc::new(variable_provider));
 
         ctx.register_udf(create_version_udf());
-        ctx.register_udf(create_db_udf(
-            "database".to_string(),
-            connection_state.clone(),
-        ));
-        ctx.register_udf(create_db_udf(
-            "schema".to_string(),
-            connection_state.clone(),
-        ));
-        ctx.register_udf(create_connection_id_udf(connection_state.clone()));
-        ctx.register_udf(create_user_udf(connection_state.clone()));
-        ctx.register_udf(create_current_user_udf(connection_state.clone()));
+        ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
+        ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
+        ctx.register_udf(create_connection_id_udf(self.state.clone()));
+        ctx.register_udf(create_user_udf(self.state.clone()));
+        ctx.register_udf(create_current_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_ucase_udf());
         ctx.register_udf(create_isnull_udf());
@@ -1948,8 +1961,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
 
+        ctx
+    }
+
+    fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+        let ctx = self.create_execution_ctx();
+
         let state = ctx.state.lock().unwrap().clone();
-        let cube_ctx = CubeContext::new(&state, &self.context.cubes);
+        let cube_ctx = CubeContext::new(&state, &self.meta.cubes);
         let df_query_planner = SqlToRel::new(&cube_ctx);
 
         let plan = df_query_planner
@@ -1962,7 +1981,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             CompilationError::Internal(format!("Planning optimization error: {}", err))
         })?;
 
-        Ok(QueryPlan::DataFushionSelect(
+        Ok(QueryPlan::DataFusionSelect(
             StatusFlags::empty(),
             optimized_plan,
             ctx,
@@ -1973,10 +1992,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
-    connection_state: Arc<ConnectionState>,
+    state: Arc<ConnectionState>,
+    transport: Arc<dyn TransportService>,
 ) -> CompilationResult<QueryPlan> {
-    let planner = QueryPlanner::new(meta);
-    planner.plan(stmt, connection_state)
+    let planner = QueryPlanner::new(state, meta, transport);
+    planner.plan(stmt)
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -1985,32 +2005,101 @@ pub struct CompiledQuery {
     pub meta: Vec<CompiledQueryFieldMeta>,
 }
 
+impl CompiledQuery {
+    pub fn meta_as_df_projection_expr(&self) -> Vec<Expr> {
+        let mut projection = Vec::new();
+
+        for meta_field in self.meta.iter() {
+            projection.push(Expr::Alias(
+                Box::new(Expr::Column(Column {
+                    relation: None,
+                    name: meta_field.column_from.clone(),
+                })),
+                meta_field.column_to.clone(),
+            ));
+        }
+
+        projection
+    }
+
+    pub fn meta_as_df_projection_schema(&self) -> Arc<DFSchema> {
+        let mut fields: Vec<DFField> = Vec::new();
+
+        for meta_field in self.meta.iter() {
+            fields.push(DFField::new(
+                None,
+                meta_field.column_to.as_str(),
+                match meta_field.column_type {
+                    ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
+                        DataType::Int64
+                    }
+                    ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
+                    ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
+                    ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                    _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
+                },
+                false,
+            ));
+        }
+
+        DFSchemaRef::new(DFSchema::new(fields).unwrap())
+    }
+
+    pub fn meta_as_df_schema(&self) -> Arc<DFSchema> {
+        let mut fields: Vec<DFField> = Vec::new();
+
+        for meta_field in self.meta.iter() {
+            let exists = fields
+                .iter()
+                .any(|field| field.name() == &meta_field.column_from);
+            if !exists {
+                fields.push(DFField::new(
+                    None,
+                    meta_field.column_from.as_str(),
+                    match meta_field.column_type {
+                        ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
+                            DataType::Int64
+                        }
+                        ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
+                        ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
+                        ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                        _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
+                    },
+                    false,
+                ));
+            }
+        }
+
+        DFSchemaRef::new(DFSchema::new(fields).unwrap())
+    }
+}
+
 pub enum QueryPlan {
     // Meta will not be executed in DF,
     // we already knows how respond to it
     MetaOk(StatusFlags),
     MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
-    DataFushionSelect(StatusFlags, LogicalPlan, ExecutionContext),
-    // Query will be executed by direct request in Cube.js
-    CubeSelect(StatusFlags, CompiledQuery),
+    DataFusionSelect(StatusFlags, LogicalPlan, ExecutionContext),
 }
 
 impl QueryPlan {
+    pub fn as_logical_plan(self) -> LogicalPlan {
+        match self {
+            QueryPlan::DataFusionSelect(_, plan, _) => plan,
+            QueryPlan::MetaOk(_) | QueryPlan::MetaTabular(_, _) => {
+                panic!("This query doesnt have a plan, because it already has values for response")
+            }
+        }
+    }
+
     pub fn print(&self, pretty: bool) -> Result<String, CubeError> {
         match self {
-            QueryPlan::DataFushionSelect(_, plan, _) => {
+            QueryPlan::DataFusionSelect(_, plan, _) => {
                 if pretty {
                     Ok(plan.display_indent().to_string())
                 } else {
                     Ok(plan.display().to_string())
-                }
-            }
-            QueryPlan::CubeSelect(_, compiled_query) => {
-                if pretty {
-                    Ok(serde_json::to_string_pretty(&compiled_query)?)
-                } else {
-                    Ok(serde_json::to_string(&compiled_query)?)
                 }
             }
             QueryPlan::MetaOk(_) | QueryPlan::MetaTabular(_, _) => Ok(
@@ -2024,7 +2113,8 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
-    connection_state: Arc<ConnectionState>,
+    state: Arc<ConnectionState>,
+    transport: Arc<dyn TransportService>,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
     // metabase
@@ -2039,13 +2129,14 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
     let stmt = parse_sql_to_statement(&query)?;
-    convert_statement_to_cube_query(&stmt, meta, connection_state)
+    convert_statement_to_cube_query(&stmt, meta, state, transport)
 }
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use cubeclient::models::{
-        V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment,
+        V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
 
     use crate::mysql::{dataframe::batch_to_dataframe, AuthContext, ConnectionProperties};
@@ -2152,150 +2243,219 @@ mod tests {
         ))
     }
 
-    fn convert_simple_select(query: String) -> CompiledQuery {
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_connection_state());
-        match query.unwrap() {
-            QueryPlan::CubeSelect(_, query) => query,
-            _ => panic!("Must return CubeSelect instead of DF plan"),
+    fn get_test_transport() -> Arc<dyn TransportService> {
+        #[derive(Debug)]
+        struct TestConnectionTransport {}
+
+        #[async_trait]
+        impl TransportService for TestConnectionTransport {
+            // Load meta information about cubes
+            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<MetaContext, CubeError> {
+                panic!("It's a fake transport");
+            }
+
+            // Execute load query
+            async fn load(
+                &self,
+                _query: V1LoadRequestQuery,
+                _ctx: Arc<AuthContext>,
+            ) -> Result<V1LoadResponse, CubeError> {
+                panic!("It's a fake transport");
+            }
+        }
+
+        Arc::new(TestConnectionTransport {})
+    }
+
+    fn convert_select_to_query_plan(query: String) -> QueryPlan {
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_connection_state(),
+            get_test_transport(),
+        );
+
+        query.unwrap()
+    }
+
+    fn find_cube_scan_deep_search(parent: Arc<LogicalPlan>) -> CubeScanNode {
+        match &*parent {
+            LogicalPlan::Projection { input, .. } => find_cube_scan_deep_search(input.clone()),
+            LogicalPlan::Extension { node } => {
+                if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    scan_node.clone()
+                } else {
+                    panic!("Unable to unpack extension node");
+                }
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    trait LogicalPlanTestUtils {
+        fn find_projection_schema(&self) -> DFSchemaRef;
+
+        fn find_cube_scan(&self) -> CubeScanNode;
+    }
+
+    impl LogicalPlanTestUtils for LogicalPlan {
+        fn find_projection_schema(&self) -> DFSchemaRef {
+            match self {
+                LogicalPlan::Projection { schema, .. } => schema.clone(),
+                _ => panic!("Root plan node is not projection!"),
+            }
+        }
+
+        fn find_cube_scan(&self) -> CubeScanNode {
+            find_cube_scan_deep_search(Arc::new(self.clone()))
         }
     }
 
     #[test]
     fn test_select_measure_via_function() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(maxPrice), MEASURE(minPrice), MEASURE(avgPrice) FROM KibanaSampleDataEcommerce".to_string(),
         );
 
+        let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
-            query,
-            CompiledQuery {
-                request: V1LoadRequestQuery {
-                    measures: Some(vec![
-                        "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                    ]),
-                    segments: Some(vec![]),
-                    dimensions: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None
-                },
-                meta: vec![
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        column_to: "maxPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        column_to: "minPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                        column_to: "avgPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                ]
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
             }
+        );
+
+        assert_eq!(
+            logical_plan.find_projection_schema(),
+            Arc::new(
+                DFSchema::new(vec![
+                    DFField::new(None, "maxPrice", DataType::Float64, false),
+                    DFField::new(None, "minPrice", DataType::Float64, false),
+                    DFField::new(None, "avgPrice", DataType::Float64, false),
+                ])
+                .unwrap()
+            ),
+        );
+
+        assert_eq!(
+            logical_plan.find_cube_scan().schema,
+            Arc::new(
+                DFSchema::new(vec![
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.maxPrice",
+                        DataType::Float64,
+                        false
+                    ),
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.minPrice",
+                        DataType::Float64,
+                        false
+                    ),
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.avgPrice",
+                        DataType::Float64,
+                        false
+                    ),
+                ])
+                .unwrap()
+            ),
         )
     }
 
     #[test]
     fn test_select_compound_identifiers() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(),
         );
 
+        let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
-            query,
-            CompiledQuery {
-                request: V1LoadRequestQuery {
-                    measures: Some(vec![
-                        "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        "KibanaSampleDataEcommerce.minPrice".to_string(),
-                    ]),
-                    segments: Some(vec![]),
-                    dimensions: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None
-                },
-                meta: vec![
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        column_to: "maxPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        column_to: "minPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    }
-                ]
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
             }
+        );
+
+        assert_eq!(
+            logical_plan.find_cube_scan().schema,
+            Arc::new(
+                DFSchema::new(vec![
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.maxPrice",
+                        DataType::Float64,
+                        false
+                    ),
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.minPrice",
+                        DataType::Float64,
+                        false
+                    ),
+                ])
+                .unwrap()
+            ),
         )
     }
 
     #[test]
     fn test_select_measure_aggregate_functions() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
         );
 
         assert_eq!(
-            query,
-            CompiledQuery {
-                request: V1LoadRequestQuery {
-                    measures: Some(vec![
-                        "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                    ]),
-                    segments: Some(vec![]),
-                    dimensions: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None
-                },
-                meta: vec![
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        column_to: "maxPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        column_to: "minPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                        column_to: "avgPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    },
-                ]
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
             }
         )
     }
 
     #[test]
     fn test_order_alias_for_measure_default() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce ORDER BY cnt".to_string(),
         );
 
         assert_eq!(
-            query.request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
@@ -2451,21 +2611,24 @@ mod tests {
         ];
 
         for (sql, expected_request) in supported_orders.iter() {
-            let query = convert_simple_select(sql.to_string());
+            let query_plan = convert_select_to_query_plan(sql.to_string());
 
-            assert_eq!(&query.request, expected_request)
+            assert_eq!(
+                &query_plan.as_logical_plan().find_cube_scan().request,
+                expected_request
+            )
         }
     }
 
     #[test]
     fn test_order_function_date() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
                 .to_string(),
         );
 
         assert_eq!(
-            query.request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
@@ -2488,11 +2651,12 @@ mod tests {
 
     #[test]
     fn test_select_all_fields_by_asterisk_limit_100() {
-        let query =
-            convert_simple_select("SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string());
+        let query_plan = convert_select_to_query_plan(
+            "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
+        );
 
         assert_eq!(
-            query.request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
@@ -2512,12 +2676,12 @@ mod tests {
 
     #[test]
     fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100 OFFSET 50".to_string(),
         );
 
         assert_eq!(
-            query.request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
@@ -2537,12 +2701,12 @@ mod tests {
 
     #[test]
     fn test_select_two_fields() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
         );
 
         assert_eq!(
-            query.request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
@@ -2561,40 +2725,59 @@ mod tests {
 
     #[test]
     fn test_select_fields_alias() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
                 .to_string(),
         );
 
+        let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
-            query,
-            CompiledQuery {
-                request: V1LoadRequestQuery {
-                    measures: Some(vec![]),
-                    segments: Some(vec![]),
-                    dimensions: Some(vec![
-                        "KibanaSampleDataEcommerce.order_date".to_string(),
-                        "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    ]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                },
-                meta: vec![
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        column_to: "order_date".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_STRING,
-                    },
-                    CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                        column_to: "customer_gender".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_STRING,
-                    }
-                ]
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
             }
+        );
+
+        assert_eq!(
+            logical_plan.find_projection_schema(),
+            Arc::new(
+                DFSchema::new(vec![
+                    DFField::new(None, "order_date", DataType::Utf8, false),
+                    DFField::new(None, "customer_gender", DataType::Utf8, false),
+                ])
+                .unwrap()
+            ),
+        );
+
+        assert_eq!(
+            logical_plan.find_cube_scan().schema,
+            Arc::new(
+                DFSchema::new(vec![
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.order_date",
+                        DataType::Utf8,
+                        false
+                    ),
+                    DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.customer_gender",
+                        DataType::Utf8,
+                        false
+                    ),
+                ])
+                .unwrap()
+            ),
         )
     }
 
@@ -2603,116 +2786,171 @@ mod tests {
         let variants = vec![
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce".to_string(),
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: None,
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None,
-                    },
-                    meta: vec![CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.count".to_string(),
-                        column_to: "count".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_LONGLONG,
-                    }],
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
                 },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.count",
+                        DataType::Int64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
             ),
             (
                 "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: None,
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None,
-                    },
-                    meta: vec![CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.count".to_string(),
-                        column_to: "count".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_LONGLONG,
-                    }],
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
                 },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.count",
+                        DataType::Int64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
+            ),
+            (
+                "SELECT COUNT(count) FROM KibanaSampleDataEcommerce".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.count",
+                        DataType::Int64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["Logs.agentCount".to_string()]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: None,
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None,
-                    },
-                    meta: vec![CompiledQueryFieldMeta {
-                        column_from: "Logs.agentCount".to_string(),
-                        column_to: "agentCount".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    }],
+                V1LoadRequestQuery {
+                    measures: Some(vec!["Logs.agentCount".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
                 },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "Logs.agentCount",
+                        DataType::Float64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCountApprox) FROM Logs".to_string(),
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["Logs.agentCountApprox".to_string()]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: None,
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None,
-                    },
-                    meta: vec![CompiledQueryFieldMeta {
-                        column_from: "Logs.agentCountApprox".to_string(),
-                        column_to: "agentCountApprox".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    }],
+                V1LoadRequestQuery {
+                    measures: Some(vec!["Logs.agentCountApprox".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
                 },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "Logs.agentCountApprox",
+                        DataType::Float64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
             ),
             (
                 "SELECT MAX(`maxPrice`) FROM KibanaSampleDataEcommerce".to_string(),
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: None,
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None,
-                    },
-                    meta: vec![CompiledQueryFieldMeta {
-                        column_from: "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        column_to: "maxPrice".to_string(),
-                        column_type: ColumnType::MYSQL_TYPE_DOUBLE,
-                    }],
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
                 },
+                Arc::new(
+                    DFSchema::new(vec![DFField::new(
+                        None,
+                        "KibanaSampleDataEcommerce.maxPrice",
+                        DataType::Float64,
+                        false,
+                    )])
+                    .unwrap(),
+                ),
             ),
         ];
 
-        for (input_query, expected_query) in variants.iter() {
-            let query = convert_simple_select(input_query.clone());
+        for (input_query, expected_request, expected_scan_schema) in variants.iter() {
+            let logical_plan = convert_select_to_query_plan(input_query.clone()).as_logical_plan();
 
-            assert_eq!(&query, expected_query)
+            assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
+            assert_eq!(&logical_plan.find_cube_scan().schema, expected_scan_schema);
         }
     }
 
     #[test]
     fn test_select_error() {
         let variants = vec![
+            // Count agg fn
+            (
+                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
+            ),
+            (
+                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
+            ),
+            (
+                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
+            ),
+            (
+                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
+            ),
+            // Another aggregation functions
+            (
+                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
+            ),
             (
                 "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
                 CompilationError::User("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
@@ -2727,7 +2965,7 @@ mod tests {
             ),
             (
                 "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to find measure with name 'unknownIdentifier' for MAX(unknownIdentifier)".to_string()),
+                CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
             ),
             // Check restrictions for segments usage
             (
@@ -2742,18 +2980,6 @@ mod tests {
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
                 CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
             ),
-            (
-                "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
-            ),
-            (
-                "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use 'unknownIdentifier' as argument to aggregation function 'COUNT()'".to_string()),
-            ),
-            (
-                "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-            ),
         ];
 
         for (input_query, expected_error) in variants.iter() {
@@ -2761,11 +2987,12 @@ mod tests {
                 &input_query,
                 get_test_tenant_ctx(),
                 get_test_connection_state(),
+                get_test_transport(),
             );
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
-                Err(e) => assert_eq!(e, expected_error),
+                Err(e) => assert_eq!(e, expected_error, "for {}", input_query),
             }
         }
     }
@@ -2810,39 +3037,25 @@ mod tests {
         ];
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
-            let query = convert_simple_select(
+            let logical_plan = convert_select_to_query_plan(
                 format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery)
-            );
+            ).as_logical_plan();
 
             assert_eq!(
-                query,
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: Some(expected_granularity.to_string()),
-                            date_range: None,
-                        }]),
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None
-                    },
-                    meta: vec![
-                        CompiledQueryFieldMeta {
-                            column_from: "KibanaSampleDataEcommerce.count".to_string(),
-                            column_to: "count".to_string(),
-                            column_type: ColumnType::MYSQL_TYPE_LONGLONG,
-                        },
-                        CompiledQueryFieldMeta {
-                            column_from: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            column_to: "__timestamp".to_string(),
-                            column_type: ColumnType::MYSQL_TYPE_STRING,
-                        }
-                    ]
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
                 }
             )
         }
@@ -2875,39 +3088,25 @@ mod tests {
         ];
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
-            let query = convert_simple_select(
+            let logical_plan = convert_select_to_query_plan(
                 format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery)
-            );
+            ).as_logical_plan();
 
             assert_eq!(
-                query,
-                CompiledQuery {
-                    request: V1LoadRequestQuery {
-                        measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                        dimensions: Some(vec![]),
-                        segments: Some(vec![]),
-                        time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: Some(expected_granularity.to_string()),
-                            date_range: None,
-                        }]),
-                        order: None,
-                        limit: None,
-                        offset: None,
-                        filters: None
-                    },
-                    meta: vec![
-                        CompiledQueryFieldMeta {
-                            column_from: "KibanaSampleDataEcommerce.count".to_string(),
-                            column_to: "count".to_string(),
-                            column_type: ColumnType::MYSQL_TYPE_LONGLONG,
-                        },
-                        CompiledQueryFieldMeta {
-                            column_from: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            column_to: "__timestamp".to_string(),
-                            column_type: ColumnType::MYSQL_TYPE_STRING,
-                        }
-                    ]
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
                 }
             )
         }
@@ -2985,22 +3184,26 @@ mod tests {
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
-            let query = convert_simple_select(format!(
+            let logical_plan = convert_select_to_query_plan(format!(
                 "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
                 sql_projection, sql_filter
-            ));
+            ))
+            .as_logical_plan();
 
-            assert_eq!(query.request.time_dimensions, *expected_tdm)
+            assert_eq!(
+                logical_plan.find_cube_scan().request.time_dimensions,
+                *expected_tdm
+            )
         }
     }
 
     #[test]
     fn test_where_filter_or() {
-        let query = convert_simple_select(
+        let query_plan = convert_select_to_query_plan(
             "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
@@ -3010,7 +3213,11 @@ mod tests {
         );
 
         assert_eq!(
-            query.request.filters,
+            query_plan
+                .as_logical_plan()
+                .find_cube_scan()
+                .request
+                .filters,
             Some(vec![V1LoadRequestQueryFilterItem {
                 member: None,
                 operator: None,
@@ -3305,22 +3512,25 @@ mod tests {
         ];
 
         for (sql, expected_fitler, expected_time_dimensions) in to_check.iter() {
-            let query = convert_simple_select(format!(
+            let logical_plan = convert_select_to_query_plan(format!(
                 "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
                 sql
-            ));
+            ))
+            .as_logical_plan();
 
             assert_eq!(
-                query.request.filters, *expected_fitler,
+                logical_plan.find_cube_scan().request.filters,
+                *expected_fitler,
                 "Filters for {}",
                 sql
             );
             assert_eq!(
-                query.request.time_dimensions, *expected_time_dimensions,
+                logical_plan.find_cube_scan().request.time_dimensions,
+                *expected_time_dimensions,
                 "Time dimensions for {}",
                 sql
             );
@@ -3378,6 +3588,7 @@ mod tests {
                 ),
                 get_test_tenant_ctx(),
                 get_test_connection_state(),
+                get_test_transport(),
             );
 
             match &query {
@@ -3582,16 +3793,20 @@ mod tests {
         ];
 
         for (sql, expected_fitler) in to_check.iter() {
-            let query = convert_simple_select(format!(
+            let logical_plan = convert_select_to_query_plan(format!(
                 "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
                 sql
-            ));
+            ))
+            .as_logical_plan();
 
-            assert_eq!(query.request.filters, Some(expected_fitler.clone()))
+            assert_eq!(
+                logical_plan.find_cube_scan().request.filters,
+                Some(expected_fitler.clone())
+            )
         }
     }
 
@@ -3747,10 +3962,14 @@ mod tests {
     }
 
     async fn execute_query_with_flags(query: String) -> Result<(String, StatusFlags), CubeError> {
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_connection_state());
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_connection_state(),
+            get_test_transport(),
+        );
         match query.unwrap() {
-            QueryPlan::DataFushionSelect(flags, plan, ctx) => {
+            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let frame = batch_to_dataframe(&batches)?;
@@ -3760,7 +3979,9 @@ mod tests {
             QueryPlan::MetaTabular(flags, frame) => {
                 return Ok((frame.print(), flags));
             }
-            _ => panic!("Unknown execution method"),
+            QueryPlan::MetaOk(flags) => {
+                return Ok(("".to_string(), flags));
+            }
         }
     }
 
@@ -4197,6 +4418,13 @@ mod tests {
         insta::assert_snapshot!(
             execute_query("explain KibanaSampleDataEcommerce;".to_string()).await?
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_use_db() -> Result<(), CubeError> {
+        assert_eq!(execute_query("use db;".to_string()).await?, "".to_string());
 
         Ok(())
     }
