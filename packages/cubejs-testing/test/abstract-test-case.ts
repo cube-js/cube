@@ -55,6 +55,16 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ]
     }
   ],
+  [
+    {
+      name: 'Dbt orders count'
+    },
+    {
+      measures: [
+        'OrdersFiltered.ordersCount'
+      ]
+    }
+  ],
 ];
 
 // eslint-disable-next-line import/prefer-default-export
@@ -118,6 +128,15 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
             expect(response.rawData()).toMatchSnapshot(options.name);
           });
         }
+      }
+    });
+
+    it('Failing query rewrite', async () => {
+      try {
+        await httpClient.load({ measures: ['Orders.toRemove'] });
+        throw new Error('Should not successfully run Orders.toRemove query');
+      } catch (e) {
+        expect(e.toString()).toContain('Query should contain either');
       }
     });
   });

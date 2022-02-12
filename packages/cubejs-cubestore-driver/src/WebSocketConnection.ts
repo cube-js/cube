@@ -146,10 +146,19 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string): Promise<any[]> {
+  public async query(query: string, queryTracingObj?: any): Promise<any[]> {
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
-    const httpQueryOffset = HttpQuery.createHttpQuery(builder, queryOffset);
+    let traceObjOffset: number | null = null;
+    if (queryTracingObj) {
+      traceObjOffset = builder.createString(JSON.stringify(queryTracingObj));
+    }
+    HttpQuery.startHttpQuery(builder);
+    HttpQuery.addQuery(builder, queryOffset);
+    if (traceObjOffset) {
+      HttpQuery.addTraceObj(builder, traceObjOffset);
+    }
+    const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;
     const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQuery, httpQueryOffset);
     builder.finish(message);

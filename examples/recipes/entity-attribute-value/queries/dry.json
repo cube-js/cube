@@ -1,0 +1,27 @@
+{
+  "dimensions": [
+    "UsersStatuses_DRY.name",
+    "UsersStatuses_DRY.completedCreatedAt",
+    "UsersStatuses_DRY.processingCreatedAt",
+    "UsersStatuses_DRY.shippedCreatedAt"
+  ],
+  "filters": [
+    {
+      "or": [
+        {
+          "member": "UsersStatuses_DRY.completedCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_DRY.processingCreatedAt",
+          "operator": "notSet"
+        },
+        {
+          "member": "UsersStatuses_DRY.shippedCreatedAt",
+          "operator": "notSet"
+        }
+      ]
+    }
+  ],
+  "limit": 3
+}

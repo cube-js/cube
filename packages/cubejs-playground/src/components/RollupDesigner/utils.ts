@@ -7,10 +7,12 @@ import {
 import { camelCase } from 'camel-case';
 
 import { QueryMemberKey } from '../../types';
+import { RollupSettings } from './components/Settings';
 
 export type PreAggregationReferences = {
   measures: string[];
   dimensions: string[];
+  segments: string[];
   timeDimensions: TimeDimensionBase[];
   timeDimension?: string;
   granularity?: TimeDimensionGranularity;
@@ -23,31 +25,41 @@ export type PreAggregationDefinition = {
 };
 
 export function getPreAggregationReferences(
-  transformedQuery: TransformedQuery | null
+  transformedQuery: TransformedQuery | null,
+  segments: Set<string>
 ): PreAggregationReferences {
   const references: PreAggregationReferences = {
     measures: [],
     dimensions: [],
+    segments: [],
     timeDimensions: [],
   };
 
-  if (transformedQuery?.leafMeasures.length) {
+  if (!transformedQuery) {
+    return references;
+  }
+
+  if (transformedQuery.leafMeasures.length) {
     references.measures = [...transformedQuery.leafMeasures];
   }
 
-  if (transformedQuery?.sortedDimensions.length) {
-    references.dimensions = [...transformedQuery.sortedDimensions];
+  if (transformedQuery.sortedDimensions.length) {
+    references.dimensions = [
+      ...transformedQuery.sortedDimensions.filter(
+        (name) => !segments.has(name)
+      ),
+    ];
+    references.segments = [
+      ...transformedQuery.sortedDimensions.filter((name) => segments.has(name)),
+    ];
   }
 
-  if (
-    transformedQuery?.sortedTimeDimensions.length &&
-    transformedQuery.sortedTimeDimensions[0]?.[1] != null
-  ) {
+  if (transformedQuery.sortedTimeDimensions?.[0]?.[0]) {
     const [dimension, granularity] = transformedQuery.sortedTimeDimensions[0];
     references.timeDimensions = [
       {
         dimension,
-        granularity: <TimeDimensionGranularity>granularity,
+        granularity: <TimeDimensionGranularity>granularity || 'day',
       },
     ];
   }
@@ -55,38 +67,51 @@ export function getPreAggregationReferences(
   return references;
 }
 
+export function areReferencesEmpty(
+  references: PreAggregationReferences
+): boolean {
+  for (const [, value] of Object.entries(references)) {
+    if (Array.isArray(value) && value.length > 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 type PreAggregationDefinitionResult = {
   code: string;
   value: Object;
 };
 
-export function getPreAggregationDefinitionFromReferences(
+export function getRollupDefinitionFromReferences(
   references: PreAggregationReferences,
-  name: string = 'main'
+  name: string = 'main',
+  settings: RollupSettings
 ): PreAggregationDefinitionResult {
-  const lines: string[] = [];
+  const { timeDimensions, ...otherReferences } = references;
+  const code: Record<string, any> = {
+    ...Object.entries(otherReferences).reduce(
+      (memo, [key, value]) => ({
+        ...memo,
+        ...(Array.isArray(value) && value.length ? { [key]: value } : null),
+      }),
+      {}
+    ),
+    ...settings,
+  };
 
-  if (references.measures.length) {
-    lines.push(`  measures: [${references.measures.map((m) => m).join(', ')}]`);
-  }
-
-  if (references.dimensions.length) {
-    lines.push(
-      `  dimensions: [${references.dimensions.map((m) => m).join(', ')}]`
-    );
-  }
-
-  if (references.timeDimensions.length) {
+  if (timeDimensions.length) {
     const { dimension, granularity } = references.timeDimensions[0];
 
-    lines.push(`  timeDimension: ${dimension}`);
+    code.timeDimension = dimension;
 
     if (granularity) {
-      lines.push(`  granularity: \`${granularity}\``);
+      code.granularity = `\`${granularity}\``;
     }
   }
 
-  const value = `{\n${lines.join(',\n')}\n}`;
+  const value = JSON.stringify(code, null, 2).replaceAll('"', '');
 
   return {
     code: `${camelCase(name)}: ${value}`,
@@ -107,7 +132,7 @@ export function updateQuery(
     } else {
       updatedQuery.timeDimensions = [
         {
-          // defafult granularity
+          // default granularity
           granularity: 'day',
           ...updatedQuery.timeDimensions?.[0],
           dimension: key,
@@ -125,4 +150,124 @@ export function updateQuery(
   }
 
   return updatedQuery;
+}
+
+function isBuffer(obj) {
+  return (
+    typeof obj?.constructor?.isBuffer === 'function' &&
+    obj.constructor.isBuffer(obj)
+  );
+}
+
+function keyIdentity(key) {
+  return key;
+}
+
+type FlattenOptions = {
+  safe?: boolean;
+  maxDepth?: number;
+  delimiter?: string;
+  transformKey?: (key: string) => string;
+};
+
+export function flatten(target: Object, opts: FlattenOptions = {}) {
+  const delimiter = opts.delimiter || '.';
+  const maxDepth = opts.maxDepth || 100;
+  const transformKey = opts.transformKey || keyIdentity;
+  const output = {};
+
+  function step(object, prev = null, keyDepth = 1) {
+    Object.keys(object).forEach(function (key) {
+      const value = object[key];
+      const isArray = opts.safe && Array.isArray(value);
+      const type = Object.prototype.toString.call(value);
+      const isbuffer = isBuffer(value);
+      const isobject = type === '[object Object]' || type === '[object Array]';
+
+      const newKey = prev
+        ? prev + delimiter + transformKey(key)
+        : transformKey(key);
+
+      if (
+        !isArray &&
+        !isbuffer &&
+        isobject &&
+        Object.keys(value).length &&
+        (!opts.maxDepth || keyDepth < maxDepth)
+      ) {
+        return step(value, newKey, keyDepth + 1);
+      }
+
+      output[newKey] = value;
+    });
+  }
+
+  step(target);
+
+  return output;
+}
+
+export function buildSettings(
+  values: Record<string, string | boolean | number>
+) {
+  const nextSettings: RollupSettings = {};
+
+  if (values['refreshKey.checked.every']) {
+    if (
+      values['refreshKey.isCron'] &&
+      (values['refreshKey.cron'] || values['refreshKey.timeZone'])
+    ) {
+      nextSettings.refreshKey = {};
+
+      if (values['refreshKey.cron']) {
+        nextSettings.refreshKey.every = `\`${values['refreshKey.cron']}\``;
+      }
+
+      if (values['refreshKey.timeZone']) {
+        nextSettings.refreshKey.timezone = `\`${values['refreshKey.timeZone']}\``;
+      }
+    } else {
+      nextSettings.refreshKey = {
+        every: `\`${values['refreshKey.value']} ${values['refreshKey.granularity']}\``,
+      };
+    }
+  }
+
+  if (values['refreshKey.checked.sql'] && values['refreshKey.sql']) {
+    nextSettings.refreshKey = {
+      ...nextSettings.refreshKey,
+      sql: `\`${values['refreshKey.sql']}\``,
+    };
+  }
+
+  if (values.partitionGranularity) {
+    nextSettings.partitionGranularity = `\`${values.partitionGranularity}\``;
+
+    if (values['updateWindow.value']) {
+      const value = [
+        values['updateWindow.value'],
+        values['updateWindow.granularity'],
+      ].join(' ');
+
+      nextSettings.refreshKey = {
+        ...nextSettings.refreshKey,
+        updateWindow: `\`${value}\``,
+      };
+    }
+
+    nextSettings.refreshKey = {
+      ...nextSettings.refreshKey,
+      incremental: Boolean(values['incrementalRefresh']),
+    };
+  }
+
+  if (Array.isArray(values.indexes) && values.indexes.length > 0) {
+    nextSettings.indexes = {
+      indexName: {
+        columns: values.indexes,
+      },
+    };
+  }
+
+  return nextSettings;
 }

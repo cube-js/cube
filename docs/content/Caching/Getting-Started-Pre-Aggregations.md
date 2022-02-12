@@ -5,15 +5,6 @@ category: Caching
 menuOrder: 2
 ---
 
-<!-- prettier-ignore-start -->
-[[info |]]
-| The Cube.js pre-aggregations workshop is on August 18th at 9-11 am PST! If you
-| want to learn why/when you want to use pre-aggregations, how to get started,
-| tips & tricks, you will want to attend this event 😀 <br/> You can register
-| for the workshop at [the event
-| page](https://cube.dev/events/pre-aggregations/).
-<!-- prettier-ignore-end -->
-
 Often at the beginning of an analytical application's lifecycle - when there is
 a smaller dataset that queries execute over - the application works well and
 delivers responses within acceptable thresholds. However, as the size of the
@@ -107,7 +98,6 @@ cube(`Orders`, {
   // Same content as before, but including the following:
   preAggregations: {
     orderStatuses: {
-      type: `rollup`,
       dimensions: [status],
     },
   },
@@ -135,7 +125,6 @@ cube(`Orders`, {
   // Same content as before, but including the following:
   preAggregations: {
     ordersByCompletedAt: {
-      type: `rollup`,
       measures: [count],
       timeDimension: completedAt,
       granularity: `month`,
@@ -163,10 +152,8 @@ data in this pre-aggregated dataset might look like:
 Pre-aggregations can become out-of-date or out-of-sync if the original dataset
 changes. [Cube.js uses a refresh key to check the freshness of the
 data][ref-caching-preaggs-refresh]; if a change in the refresh key is detected,
-the pre-aggregations are rebuilt.
-
-These refreshes can be done on-demand, or [in the background as a scheduled
-process][ref-caching-preaggs-bk-refresh].
+the pre-aggregations are rebuilt. These refreshes are performed in the
+background as a scheduled process, unless configured otherwise.
 
 ## Ensuring pre-aggregations are targeted by queries
 
@@ -192,7 +179,7 @@ it receives via the API. The process for selection is summarized below:
 
 You can find a complete flowchart [here][self-select-pre-agg].
 
-### Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Additivity
 
 So far, we've described pre-aggregations as aggregated versions of your existing
 data. However, there are some rules that apply when Cube.js uses the
@@ -288,7 +275,7 @@ additive** query. Additive leaf measures can only be of the following
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
-### Non-Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Non-Additivity
 
 Using the same sample data for `line_items`, there's a `profit_margin` field
 which is different for each row. However, despite the value being numerical, it
@@ -432,7 +419,7 @@ cube(`LineItems`, {
 });
 ```
 
-### Selecting the pre-aggregation
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Selecting the pre-aggregation
 
 To recap what we've learnt so far:
 
@@ -449,9 +436,9 @@ To recap what we've learnt so far:
 - A query is **leaf measure additive** if all of its leaf measures are one of:
   `count`, `sum`, `min`, `max` or `countDistinctApprox`
 
-Cube.js attempts to find the best available pre-aggregation for the queries it
-receives via the API. The process for selection is outlined in the diagram
-below:
+Cube looks for matching pre-aggregations in the order they are defined in a
+cube's schema file. Each defined pre-aggregation is then tested for a match
+based on the criteria in the flowchart below:
 
 <div
   style="text-align: center"
@@ -494,8 +481,6 @@ Some extra considerations for pre-aggregation selection:
   instruct Cube.js to use the original SQL pre-aggregations by using
   [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
 
-[ref-caching-preaggs-bk-refresh]:
-  /caching/using-pre-aggregations#background-refresh
 [ref-caching-preaggs-cubestore]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-caching-preaggs-refresh]: /caching/using-pre-aggregations#refresh-strategy
@@ -503,10 +488,9 @@ Some extra considerations for pre-aggregation selection:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-schema-dims]: /schema/reference/dimensions
 [ref-schema-joins]: /schema/reference/joins
-[ref-schema-joins-hasmany]: /schema/reference/joins#parameters-relationship
+[ref-schema-joins-hasmany]: /schema/reference/joins#relationship
 [ref-schema-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
-[self-select-pre-agg]:
-  #ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
+  /schema/reference/pre-aggregations#type-originalsql
+[self-select-pre-agg]: #selecting-the-pre-aggregation
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor

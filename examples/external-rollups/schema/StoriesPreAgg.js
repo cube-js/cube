@@ -2,54 +2,43 @@ const Stories = require("./Stories");
 
 cube(`StoriesPreAgg`, {
   extends: Stories,
+
   preAggregations: {
     avgScByDay: {
-      type: `rollup`,
-      measureReferences: [averageScore],
-      dimensionReferences: [category],
+      measures: [ averageScore ],
+      dimensions: [ category ],
       granularity: `day`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     },
     avgScByWeek: {
-      type: `rollup`,
-      measureReferences: [averageScore],
-      dimensionReferences: [category],
+      measures: [ averageScore ],
+      dimensions: [ category ],
       granularity: `week`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     },
     main: {
-      type: `rollup`,
-      measureReferences: [count],
-      dimensionReferences: [category, dead],
+      measures: [ count ],
+      dimensions: [ category, dead ],
       granularity: `day`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     },
     authors: {
-      type: `rollup`,
-      measureReferences: [authorsCount],
-      dimensionReferences: [category],
+      measures: [ authorsCount ],
+      dimensions: [ category ],
       granularity: `day`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     },
     prcOfHihRkd: {
-      type: `rollup`,
-      measureReferences: [count, highRankedCount],
-      dimensionReferences: [category],
+      measures: [ count, highRankedCount ],
+      dimensions: [ category ],
       granularity: `month`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     },
     countByTiers: {
-      type: `rollup`,
-      measureReferences: [count],
-      dimensionReferences: [category, scoreTier],
+      measures: [ count ],
+      dimensions: [ category, scoreTier ],
       granularity: `day`,
-      timeDimensionReference: time,
-      external: true
+      timeDimension: time
     }
   }
 });

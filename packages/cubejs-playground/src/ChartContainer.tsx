@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { Component, useEffect, FunctionComponent, lazy, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -7,23 +7,27 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { QueryRenderer } from '@cubejs-client/react';
-import { ChartType, Query, ResultSet } from '@cubejs-client/core';
+import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
 import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
-import { Button, Card, FatalError } from './atoms';
+import { Button, Card, CubeLoader, FatalError } from './atoms';
 import PrismCode from './PrismCode';
 import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
+import { GraphQLIcon } from './shared/icons/GraphQLIcon';
+
+const GraphiQLSandbox = lazy(
+  () => import('./components/GraphQL/GraphiQLSandbox')
+);
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -32,6 +36,8 @@ const frameworkToTemplate = {
 };
 
 const StyledCard: any = styled(Card)`
+  min-height: 420px;
+  
   .ant-card-head {
     position: sticky;
     top: 0;
@@ -46,53 +52,105 @@ const StyledCard: any = styled(Card)`
   }
 `;
 
+type UnsupportedPlaceholder = FunctionComponent<{ framework: string }>;
 type FrameworkDescriptor = {
   id: string;
   title: string;
   docsLink?: string;
-  supported?: boolean;
+  placeholder?: UnsupportedPlaceholder;
   scaffoldingSupported?: boolean;
 };
+
+const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
+  framework,
+}) => (
+  <h2 style={{ padding: 24, textAlign: 'center' }}>
+    We do not support&nbsp; Vanilla JavaScript &nbsp;code generation here yet.
+    <br />
+    Please refer to&nbsp;
+    <a
+      href="https://cube.dev/docs/@cubejs-client-core"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() =>
+        playgroundAction('Unsupported Framework Docs', { framework })
+      }
+    >
+      Vanilla JavaScript &nbsp;docs
+    </a>
+    &nbsp;to see on how to use it with Cube.js.
+  </h2>
+);
+
+const BIPlaceholder: UnsupportedPlaceholder = () => (
+  <h2 style={{ padding: 24, textAlign: 'center' }}>
+    You can connect Cube to any Business Intelligence tool through the Cube SQL
+    API.
+    <br />
+    Please refer to&nbsp;
+    <a
+      href="https://cube.dev/docs/backend/sql"
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => playgroundAction('BI Docs')}
+    >
+      Cube SQL &nbsp;docs
+    </a>
+    &nbsp;to learn more.
+  </h2>
+);
 
 export const frameworks: FrameworkDescriptor[] = [
   {
     id: 'react',
     title: 'React',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'angular',
     title: 'Angular',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'vue',
     title: 'Vue',
-    supported: true,
     scaffoldingSupported: true,
   },
   {
     id: 'vanilla',
     title: 'Vanilla JavaScript',
-    docsLink: 'https://cube.dev/docs/@cubejs-client-core',
+    placeholder: UnsupportedFrameworkPlaceholder,
+  },
+  {
+    id: 'bi',
+    title: 'BI',
+    placeholder: BIPlaceholder,
   },
 ];
 
 type ChartContainerProps = {
   query: Query;
+  meta: Meta;
   hideActions: boolean;
   chartType: ChartType;
+  isGraphQLSupported: boolean;
   dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;
   [k: string]: any;
 };
 
+type ChartContainerState = {
+  sql: {
+    loading: boolean;
+    value?: string;
+  };
+  [k: string]: any;
+};
+
 class ChartContainer extends Component<
   ChartContainerProps & RouteComponentProps,
-  any
+  ChartContainerState
 > {
   static defaultProps = {
     query: {},
@@ -105,7 +163,8 @@ class ChartContainer extends Component<
       props.iframeRef.current != null &&
       props.chartingLibrary
     ) {
-      const { __cubejsPlayground } = props.iframeRef.current.contentWindow;
+      const { __cubejsPlayground } =
+        props.iframeRef.current.contentWindow || {};
 
       if (!__cubejsPlayground) {
         return {
@@ -153,7 +212,10 @@ class ChartContainer extends Component<
     this.state = {
       showCode: false,
       chartRendererError: null,
-    } as any;
+      sql: {
+        loading: false,
+      },
+    };
   }
 
   render() {
@@ -165,6 +227,7 @@ class ChartContainer extends Component<
       showCode,
       addingToDashboard,
       chartRendererError,
+      sql,
     } = this.state;
     const {
       isChartRendererReady,
@@ -180,6 +243,7 @@ class ChartContainer extends Component<
       history,
       framework,
       setFramework,
+      meta,
       isFetchingMeta,
       onChartRendererReadyChange,
     } = this.props;
@@ -263,7 +327,7 @@ class ChartContainer extends Component<
             {chartLibrariesMenu ? (
               <Dropdown
                 overlay={chartLibrariesMenu}
-                disabled={!frameworkItem?.supported || isFetchingMeta}
+                disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               >
                 <Button data-testid="charting-library-btn" size="small">
                   {currentLibraryItem?.title}
@@ -278,7 +342,7 @@ class ChartContainer extends Component<
               data-testid="chart-btn"
               size="small"
               type={!showCode ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
                 this.setState({
@@ -291,10 +355,9 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="json-query-btn"
-              icon={<ThunderboltOutlined />}
               size="small"
               type={showCode === 'query' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
@@ -306,11 +369,25 @@ class ChartContainer extends Component<
             </Button>
 
             <Button
+              data-testid="graphiql-btn"
+              icon={<GraphQLIcon />}
+              size="small"
+              type={showCode === 'graphiql' ? 'primary' : 'default'}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show GraphiQL');
+                this.setState({ showCode: 'graphiql' });
+              }}
+            >
+              GraphiQL
+            </Button>
+
+            <Button
               data-testid="code-btn"
               icon={<CodeOutlined />}
               size="small"
               type={showCode === 'code' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Code');
                 this.setState({ showCode: 'code' });
@@ -324,7 +401,7 @@ class ChartContainer extends Component<
               icon={<QuestionCircleOutlined />}
               size="small"
               type={showCode === 'sql' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show SQL');
                 this.setState({ showCode: 'sql' });
@@ -338,7 +415,7 @@ class ChartContainer extends Component<
               icon={<SyncOutlined />}
               size="small"
               type={showCode === 'cache' ? 'primary' : 'default'}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
@@ -355,7 +432,7 @@ class ChartContainer extends Component<
             icon={<CodeSandboxOutlined />}
             size="small"
             htmlType="submit"
-            disabled={!frameworkItem?.supported || isFetchingMeta}
+            disabled={!!frameworkItem?.placeholder || isFetchingMeta}
             onClick={() => playgroundAction('Open Code Sandbox')}
           >
             Edit
@@ -398,7 +475,7 @@ class ChartContainer extends Component<
               icon={<PlusOutlined />}
               size="small"
               loading={addingToDashboard}
-              disabled={!frameworkItem?.supported || isFetchingMeta}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               type="primary"
             >
               {addingToDashboard
@@ -413,28 +490,9 @@ class ChartContainer extends Component<
     const queryText = JSON.stringify(query, null, 2);
 
     const renderChart = () => {
-      if (!frameworkItem?.supported) {
-        return (
-          <h2 style={{ padding: 24, textAlign: 'center' }}>
-            We do not support&nbsp;
-            {frameworkItem?.title}
-            &nbsp;code generation here yet.
-            <br />
-            Please refer to&nbsp;
-            <a
-              href={frameworkItem?.docsLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                playgroundAction('Unsupported Framework Docs', { framework })
-              }
-            >
-              {frameworkItem?.title}
-              &nbsp;docs
-            </a>
-            &nbsp;to see on how to use it with Cube.js.
-          </h2>
-        );
+      if (frameworkItem?.placeholder) {
+        const Placeholder = frameworkItem.placeholder;
+        return <Placeholder framework={framework} />;
       } else if (showCode === 'code') {
         if (error) {
           return <FatalError error={error} />;
@@ -448,20 +506,53 @@ class ChartContainer extends Component<
           <QueryRenderer
             loadSql="only"
             query={query}
-            render={({ sqlQuery, error }) => {
+            render={({ sqlQuery, loadingState, error }) => {
               if (error) {
                 return <FatalError error={error} />;
               }
 
-              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
               // in the case of a compareDateRange query the SQL will be the same
-              return <PrismCode code={query && format(query.sql())} />;
+              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
+              const value = query && format(query.sql());
+
+              return (
+                <>
+                  <PrismCode code={value} />
+                  <SqlEmitter
+                    loading={loadingState.isLoading}
+                    sql={value}
+                    onChange={({ sql, loading }) => {
+                      this.setState({
+                        sql: {
+                          loading,
+                          value: sql,
+                        },
+                      });
+                    }}
+                  />
+                </>
+              );
             }}
           />
         );
       } else if (showCode === 'cache') {
         return <CachePane query={query} />;
+      } else if (showCode === 'graphiql' && meta) {
+        if (!this.props.isGraphQLSupported) {
+          return <div>GraphQL API is supported since version 0.29.0</div>
+        }
+        
+        return (
+          <Suspense fallback={<div style={{ height: 363 }}><CubeLoader /></div>}>
+            <GraphiQLSandbox
+              apiUrl={this.props.apiUrl}
+              query={query}
+              meta={meta}
+            />
+          </Suspense>
+        );
       }
+
       return render({ framework, error });
     };
 
@@ -471,6 +562,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow style={{ alignItems: 'center' }}>
           <div>Code</div>
+
           <Button
             data-testid="copy-code-btn"
             icon={<CopyOutlined />}
@@ -490,6 +582,7 @@ class ChartContainer extends Component<
       title = (
         <SectionRow>
           <div>Query</div>
+
           <Button
             data-testid="copy-cube-query-btn"
             icon={<CopyOutlined />}
@@ -505,9 +598,30 @@ class ChartContainer extends Component<
         </SectionRow>
       );
     } else if (showCode === 'sql') {
-      title = 'SQL';
+      title = (
+        <SectionRow>
+          <div>SQL</div>
+
+          {!sql.loading && sql.value ? (
+            <Button
+              data-testid="copy-sql-btn"
+              icon={<CopyOutlined />}
+              size="small"
+              onClick={async () => {
+                await copyToClipboard(sql.value, 'The SQL has been copied');
+                playgroundAction('Copy SQL to Clipboard');
+              }}
+              type="primary"
+            >
+              Copy to Clipboard
+            </Button>
+          ) : null}
+        </SectionRow>
+      );
     } else if (showCode === 'cache') {
       title = 'Cache';
+    } else if (showCode === 'graphiql') {
+      title = 'GraphQL API';
     } else {
       title = 'Chart';
     }
@@ -515,11 +629,30 @@ class ChartContainer extends Component<
     return hideActions ? (
       render({ resultSet, error })
     ) : (
-      <StyledCard title={title} style={{ minHeight: 420 }} extra={extra}>
+      <StyledCard title={title} extra={extra}>
         {renderChart()}
       </StyledCard>
     );
   }
+}
+
+type SqlEmitterOnChangeProps = {
+  sql?: string;
+  loading: boolean;
+};
+
+type SqlEmitterProps = {
+  loading: boolean;
+  sql?: string;
+  onChange: (props: SqlEmitterOnChangeProps) => void;
+};
+
+function SqlEmitter({ sql, loading, onChange }: SqlEmitterProps) {
+  useEffect(() => {
+    onChange({ sql, loading });
+  }, [sql, loading]);
+
+  return null;
 }
 
 export default withRouter(ChartContainer);

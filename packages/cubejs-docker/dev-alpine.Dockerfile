@@ -1,4 +1,4 @@
-FROM node:12.22.1-alpine3.12
+FROM node:14.18.2-alpine3.14
 
 ARG IMAGE_VERSION=dev
 
@@ -6,7 +6,14 @@ ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=dev
 ENV CI=0
 
-RUN apk add rxvt-unicode
+RUN apk add rxvt-unicode curl cmake
+
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- --profile minimal --default-toolchain nightly-2021-07-04 -y
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
@@ -22,9 +29,11 @@ COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
 # Backend
-COPY rust/package.json rust/package.json
-COPY rust/bin rust/bin
+COPY rust/cubesql/package.json rust/cubesql/package.json
+COPY rust/cubestore/package.json rust/cubestore/package.json
+COPY rust/cubestore/bin rust/cubestore/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
 COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
@@ -50,6 +59,8 @@ COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
 COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
 COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
+COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 # Frontend
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
@@ -68,8 +79,10 @@ RUN yarn policies set-version v1.22.5
 RUN yarn install
 
 # Backend
-COPY rust/ rust/
+COPY rust/cubestore/ rust/cubestore/
+COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing/ packages/cubejs-testing/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
@@ -95,6 +108,8 @@ COPY packages/cubejs-server/ packages/cubejs-server/
 COPY packages/cubejs-server-core/ packages/cubejs-server-core/
 COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
+COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
+COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 # Frontend
 COPY packages/cubejs-templates/ packages/cubejs-templates/
 COPY packages/cubejs-client-core/ packages/cubejs-client-core/
@@ -113,7 +128,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
-RUN ln -s  /cubejs/rust/bin/cubestore-dev /usr/local/bin/cubestore-dev
+RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
 WORKDIR /cube/conf
 

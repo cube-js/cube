@@ -16,8 +16,28 @@ import { getEnv } from '@cubejs-backend/shared';
 
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
+// eslint-disable-next-line import/order
+const util = require('snowflake-sdk/lib/util');
+
+// TODO Remove when https://github.com/snowflakedb/snowflake-connector-nodejs/pull/158 is resolved
+util.construct_hostname = (region: any, account: any) => {
+  let host;
+  if (region === 'us-west-2') {
+    region = null;
+  }
+  if (account.indexOf('.') > 0) {
+    account = account.substring(0, account.indexOf('.'));
+  }
+  if (region) {
+    host = `${account}.${region}.snowflakecomputing.com`;
+  } else {
+    host = `${account}.snowflakecomputing.com`;
+  }
+  return host;
+};
+
 type HydrationConfiguration = {
-  types: string[], toValue: (column: Column) => ((value: any) => any)|null
+  types: string[], toValue: (column: Column) => ((value: any) => any) | null
 };
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
@@ -110,7 +130,10 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  privateKey?: string,
+  resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
+  executionTimeout?: number,
 }
 
 /**
@@ -119,13 +142,17 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
-  protected connection: Promise<Connection>|null = null;
+  protected connection: Promise<Connection> | null = null;
 
   protected readonly config: SnowflakeDriverOptions;
 
   public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
     super();
 
+    let privateKey = process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY;
+    if (privateKey && !privateKey.endsWith('\n')) {
+      privateKey += '\n';
+    }
     this.config = {
       account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
@@ -138,7 +165,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      privateKey,
       exportBucket: this.getExportBucket(),
+      resultPrefetch: 1,
+      executionTimeout: getEnv('dbQueryTimeout'),
       ...config
     };
   }
@@ -171,7 +201,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * @todo Move to BaseDriver in the future?
    */
-  protected getExportBucket(): SnowflakeDriverExportBucket|undefined {
+  protected getExportBucket(): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       supported: ['s3', 'gcs']
     });
@@ -211,7 +241,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.query('SELECT 1 as number');
+    const connection = snowflake.createConnection(this.config);
+    await new Promise(
+      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...rest } = this.config;
+    if (!connection.isUp()) {
+      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+    }
+    await new Promise(
+      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
   }
 
   protected async initConnection() {
@@ -222,7 +263,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-      await this.execute(connection, 'ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 600', [], false);
+      await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
 
       return connection;
     } catch (e) {
@@ -405,7 +446,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: [
         // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube.js
         'Number',
@@ -469,7 +510,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): Promise<R> {
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
-      binds: <string[]|undefined>values,
+      binds: <string[] | undefined>values,
       fetchAsString: ['Number'],
       complete: (err, stmt, rows) => {
         if (err) {

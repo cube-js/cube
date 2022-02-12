@@ -15,6 +15,12 @@ describe('dateParser', () => {
     );
   });
 
+  test('next 1 day', () => {
+    expect(dateParser('next 1 day', 'UTC')).toStrictEqual(
+      [dateParser('tomorrow', 'UTC')[0], dateParser('tomorrow', 'UTC')[1]]
+    );
+  });
+
   test('today', () => {
     const start = new Date();
     const end = new Date();
@@ -43,6 +49,15 @@ describe('dateParser', () => {
     );
   });
 
+  test('from now to 23 hours from now', () => {
+    expect(dateParser('from now to 23 hours from now', 'UTC')).toStrictEqual(
+      [
+        new Date((Math.floor(new Date().getTime() / (1000 * 60 * 60))) * (1000 * 60 * 60)).toISOString().replace('Z', ''),
+        new Date((Math.ceil(new Date().getTime() / (1000 * 60 * 60)) + 23) * (1000 * 60 * 60) - 1).toISOString().replace('Z', '')
+      ]
+    );
+  });
+
   test('from 1 hour ago to now LA', () => {
     // 'Z' stands for Zulu time, which is also GMT and UTC.
     const now = '2020-09-22T13:03:20.518Z';
@@ -61,6 +76,12 @@ describe('dateParser', () => {
     expect(dateParser('from 7 days ago to now', 'UTC')).toStrictEqual(
       [dateParser('last 7 days', 'UTC')[0], dateParser('today', 'UTC')[1]]
     );
+  });
+
+  test('from 7 days ago to 7 days from now', () => {
+    expect(dateParser('from 7 days ago to 7 days from now', 'UTC')).toStrictEqual([
+      dateParser('last 7 days', 'UTC')[0], dateParser('next 7 days', 'UTC')[1]
+    ]);
   });
 
   test('unexpected date', () => {
@@ -87,6 +108,40 @@ describe('dateParser', () => {
       '2020-09-01T00:00:00.000',
       '2021-02-28T23:59:59.999',
     ]);
+
+    Date.now.mockRestore();
+  });
+
+  test('next 6 months', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 1, 20, 13, 0, 0, 0));
+    expect(dateParser('next 6 months', 'UTC', new Date(2021, 1, 20, 13, 0, 0, 0))).toStrictEqual([
+      '2021-03-01T00:00:00.000',
+      '2021-08-31T23:59:59.999',
+    ]);
+
+    Date.now.mockRestore();
+  });
+
+  test('next month', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 5, 13, 0, 0, 0));
+    expect(dateParser('next month', 'UTC', new Date(2021, 2, 5, 13, 0, 0, 0))).toStrictEqual(
+      [
+        '2021-04-01T00:00:00.000',
+        '2021-04-30T23:59:59.999'
+      ]
+    );
+
+    Date.now.mockRestore();
+  });
+
+  test('next 5 days', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 5, 13, 0, 0, 0));
+    expect(dateParser('next 5 days', 'UTC', new Date(2021, 2, 5, 13, 0, 0, 0))).toStrictEqual(
+      [
+        '2021-03-06T00:00:00.000',
+        '2021-03-10T23:59:59.999'
+      ]
+    );
 
     Date.now.mockRestore();
   });

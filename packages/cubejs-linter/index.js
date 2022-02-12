@@ -4,16 +4,13 @@ module.exports = {
   env: {
     node: true,
   },
-  plugins: [
-    'import',
-    '@typescript-eslint/eslint-plugin',
-  ],
+  plugins: ['import', '@typescript-eslint/eslint-plugin'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     sourceType: 'module',
     ecmaVersion: 2020,
     ecmaFeatures: {
-      legacyDecorators: true
+      legacyDecorators: true,
     },
   },
   rules: {
@@ -47,13 +44,36 @@ module.exports = {
     '@typescript-eslint/no-empty-function': 'error',
     'no-extra-semi': 'off',
     '@typescript-eslint/no-extra-semi': 'error',
+    'no-underscore-dangle': 'off',
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'warn',
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_.*',
+        varsIgnorePattern: '^_.*',
+      },
+    ],
     // '@typescript-eslint/no-var-requires': 'error',
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
     '@typescript-eslint/type-annotation-spacing': 'error',
+    '@typescript-eslint/space-infix-ops': 'error',
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: 'ForInStatement',
+        message: 'for..in loops iterate over the entire prototype chain, which is virtually never what you want. Use Object.{keys,values,entries}, and iterate over the resulting array.',
+      },
+      {
+        selector: 'LabeledStatement',
+        message: 'Labels are a form of GOTO; using them makes code confusing and hard to maintain and understand.',
+      },
+      {
+        selector: 'WithStatement',
+        message: '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
+      },
+    ],
   },
   overrides: [
     {

@@ -73,7 +73,12 @@ export class RedisCacheDriver implements CacheDriverInterface {
     const client = await this.getClient();
 
     try {
-      return await client.setAsync(key, JSON.stringify(value), 'EX', expiration);
+      const strValue = JSON.stringify(value);
+      await client.setAsync(key, strValue, 'EX', expiration);
+      return {
+        key,
+        bytes: Buffer.byteLength(strValue),
+      };
     } finally {
       this.redisPool.release(client);
     }

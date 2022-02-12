@@ -99,7 +99,7 @@ export class LocalQueueDriverConnection {
       });
     }
 
-    return [added, null, null, Object.keys(this.toProcess).length]; // TODO nulls
+    return [added, null, null, Object.keys(this.toProcess).length, queryQueueObj.addedToQueueTime]; // TODO nulls
   }
 
   getToProcessQueries() {

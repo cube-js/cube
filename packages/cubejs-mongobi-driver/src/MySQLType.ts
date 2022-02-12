@@ -50,6 +50,8 @@ const MySqlNativeToMySqlType: Record<number, string> = {
   [MySQLType.BLOB]: 'text',
   [MySQLType.VAR_STRING]: 'varchar',
   [MySQLType.STRING]: 'binary',
+  [MySQLType.FLOAT]: 'float',
+  [MySQLType.DOUBLE]: 'double',
 };
 
 export function getNativeTypeName(typeId: MySQLType) {

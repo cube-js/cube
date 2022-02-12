@@ -1,0 +1,46 @@
+[package]
+name = "cubestore-sql-tests"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2018"
+license = "Apache-2.0"
+description = "Tests for CubeStore that can run in multiple configurations."
+documentation = "https://cube.dev/docs"
+homepage = "https://cube.dev"
+repository = "https://github.com/cube-js/cube.js"
+
+[lib]
+test = false
+
+[[test]]
+name = "in-process"
+path = "tests/in_process.rs"
+harness = false
+
+[[test]]
+name = "multi-process"
+path = "tests/multi_process.rs"
+harness = false
+
+[[test]]
+name = "cluster"
+path = "tests/cluster.rs"
+harness = false
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+ipc-channel = { version = "0.14.1" }
+
+[dependencies]
+async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
+async-trait = "0.1.36"
+cubestore = { path = "../cubestore" }
+futures = "0.3.5"
+itertools = "0.9.0"
+lazy_static = "1.4.0"
+log = "0.4.11"
+pretty_assertions = "0.7.1"
+scopeguard = "1.1.0"
+serde = "1.0.115"
+serde_derive = "1.0.115"
+tokio = { version = "1.0", features = ["full", "rt"] }
+futures-timer = "3.0.2"

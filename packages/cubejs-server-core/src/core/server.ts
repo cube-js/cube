@@ -8,11 +8,8 @@ import isDocker from 'is-docker';
 import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval, displayCLIWarning, formatDuration,
-  getAnonymousId,
-  getEnv,
-  internalExceptions, isDockerImage, requireFromPackage,
-  track,
+  createCancelableInterval, displayCLIWarning, formatDuration, getAnonymousId,
+  getEnv, getRealType, internalExceptions, isDockerImage, requireFromPackage, track,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -96,21 +93,21 @@ export class CubejsServerCore {
 
   protected readonly standalone: boolean = true;
 
-  protected maxCompilerCacheKeep: NodeJS.Timeout|null = null;
+  protected maxCompilerCacheKeep: NodeJS.Timeout | null = null;
 
-  protected scheduledRefreshTimerInterval: CancelableInterval|null = null;
+  protected scheduledRefreshTimerInterval: CancelableInterval | null = null;
 
-  protected driver: BaseDriver|null = null;
+  protected driver: BaseDriver | null = null;
 
-  protected apiGatewayInstance: ApiGateway|null = null;
+  protected apiGatewayInstance: ApiGateway | null = null;
 
   public readonly event: (name: string, props?: object) => Promise<void>;
 
-  public projectFingerprint: string|null = null;
+  public projectFingerprint: string | null = null;
 
-  public anonymousId: string|null = null;
+  public anonymousId: string | null = null;
 
-  public coreServerVersion: string|null = null;
+  public coreServerVersion: string | null = null;
 
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
@@ -147,7 +144,7 @@ export class CubejsServerCore {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
 
-    this.contextToOrchestratorId = this.options.contextToOrchestratorId || this.contextToAppId;
+    this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -293,13 +290,9 @@ export class CubejsServerCore {
     return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
   }
 
-  private requireCubeStoreDriver = () => requireFromPackage<{
-    isCubeStoreSupported: typeof isCubeStoreSupported,
-    CubeStoreHandler: typeof CubeStoreHandler,
-    CubeStoreDevDriver: typeof CubeStoreDevDriver,
-  }>('@cubejs-backend/cubestore-driver', {
-    relative: isDockerImage(),
-  });
+  // requireFromPackage was used here. Removed as it wasn't necessary check and conflicts with local E2E test running.
+  // eslint-disable-next-line import/no-extraneous-dependencies
+  private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [
@@ -343,6 +336,12 @@ export class CubejsServerCore {
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation to configure Cube Store https://cube.dev/docs/caching/running-in-production'
+      );
+    }
+
+    if (devServer && externalDbType !== 'cubestore') {
+      displayCLIWarning(
+        `Using ${externalDbType} as an external database is deprecated. Please use Cube Store instead: https://cube.dev/docs/caching/running-in-production`
       );
     }
 
@@ -393,12 +392,13 @@ export class CubejsServerCore {
       devServer,
       driverFactory: (ctx) => {
         const dbType = this.contextToDbType(ctx);
-
-        if (dbType) {
+        if (typeof dbType === 'string') {
           return CubejsServerCore.createDriver(dbType);
         }
 
-        return null;
+        throw new Error(
+          `Unexpected return type, dbType must return string (dataSource: "${ctx.dataSource}"), actual: ${getRealType(dbType)}`
+        );
       },
       dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
@@ -506,7 +506,8 @@ export class CubejsServerCore {
   }
 
   protected initAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
       this.logger = (msg, params) => {
@@ -516,7 +517,7 @@ export class CubejsServerCore {
             msg,
             ...params
           },
-          process.env.CUBEJS_AGENT_ENDPOINT_URL,
+          agentEndpointUrl,
           oldLogger
         );
       };
@@ -524,10 +525,11 @@ export class CubejsServerCore {
   }
 
   protected async flushAgent() {
-    if (process.env.CUBEJS_AGENT_ENDPOINT_URL) {
+    const agentEndpointUrl = getEnv('agentEndpointUrl');
+    if (agentEndpointUrl) {
       await agentCollect(
         { msg: 'Flush Agent' },
-        process.env.CUBEJS_AGENT_ENDPOINT_URL,
+        agentEndpointUrl,
         this.preAgentLogger
       );
     }
@@ -554,6 +556,11 @@ export class CubejsServerCore {
   public initSubscriptionServer(sendMessage) {
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
+  }
+
+  public initSQLServer() {
+    const apiGateway = this.apiGateway();
+    return apiGateway.initSQLServer();
   }
 
   protected apiGateway(): ApiGateway {
@@ -630,7 +637,7 @@ export class CubejsServerCore {
     }
 
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
-    let externalPreAggregationsDriverPromise: Promise<BaseDriver>|null = null;
+    let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const externalDbType = this.contextToExternalDbType(context);
     // orchestrator options can be empty, if user didnt define it
@@ -656,13 +663,19 @@ export class CubejsServerCore {
 
           try {
             driver = await this.options.driverFactory({ ...context, dataSource });
-            if (driver.setLogger) {
-              driver.setLogger(this.logger);
+            if (typeof driver === 'object' && driver != null) {
+              if (driver.setLogger) {
+                driver.setLogger(this.logger);
+              }
+
+              await driver.testConnection();
+
+              return driver;
             }
 
-            await driver.testConnection();
-
-            return driver;
+            throw new Error(
+              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
+            );
           } catch (e) {
             driverPromise[dataSource] = null;
 
@@ -682,17 +695,23 @@ export class CubejsServerCore {
 
           // eslint-disable-next-line no-return-assign
           return externalPreAggregationsDriverPromise = (async () => {
-            let driver: BaseDriver|null = null;
+            let driver: BaseDriver | null = null;
 
             try {
               driver = await this.options.externalDriverFactory(context);
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
+              if (typeof driver === 'object' && driver != null) {
+                if (driver.setLogger) {
+                  driver.setLogger(this.logger);
+                }
+
+                await driver.testConnection();
+
+                return driver;
               }
 
-              await driver.testConnection();
-
-              return driver;
+              throw new Error(
+                `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
+              );
             } catch (e) {
               externalPreAggregationsDriverPromise = null;
 
@@ -738,6 +757,7 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
+      standalone: this.standalone
     });
   }
 
@@ -781,7 +801,7 @@ export class CubejsServerCore {
   /**
    * @internal Please dont use this method directly, use refreshTimer
    */
-  public async runScheduledRefresh(context: UserBackgroundContext|null, queryingOptions?: ScheduledRefreshOptions) {
+  public async runScheduledRefresh(context: UserBackgroundContext | null, queryingOptions?: ScheduledRefreshOptions) {
     return this.getRefreshScheduler().runScheduledRefresh(
       this.migrateBackgroundContext(context),
       queryingOptions
@@ -790,7 +810,7 @@ export class CubejsServerCore {
 
   protected warningBackgroundContextShow: boolean = false;
 
-  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext|null {
+  protected migrateBackgroundContext(ctx: UserBackgroundContext | null): RequestContext | null {
     let result: any = null;
 
     // We renamed authInfo to securityContext, but users can continue to use both ways
@@ -882,7 +902,7 @@ export class CubejsServerCore {
     }
   }
 
-  protected causeErrorPromise: Promise<any>|null = null;
+  protected causeErrorPromise: Promise<any> | null = null;
 
   protected onUncaughtException = async (e: Error) => {
     console.error(e.stack || e);

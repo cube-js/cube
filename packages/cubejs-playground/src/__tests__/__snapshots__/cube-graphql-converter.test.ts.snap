@@ -1,0 +1,177 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country","Orders.createdAt"],"order":[["Orders.count","desc"],["Orders.status","asc"],["Users.country","desc"]]} 1`] = `
+"query CubeQuery {
+  cube {
+    orders(orderBy: {count: desc, status: asc}) {
+      count
+      status
+      createdAt {
+        value
+      }
+    }
+    users(orderBy: {country: desc}) {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country","Orders.createdAt"],"order":{"Orders.count":"desc","Orders.status":"asc","Users.country":"desc"}} 1`] = `
+"query CubeQuery {
+  cube {
+    orders(orderBy: {count: desc, status: asc}) {
+      count
+      status
+      createdAt {
+        value
+      }
+    }
+    users(orderBy: {country: desc}) {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country","Orders.createdAt"]} 1`] = `
+"query CubeQuery {
+  cube {
+    orders {
+      count
+      status
+      createdAt {
+        value
+      }
+    }
+    users {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Orders.amount","operator":"equals","values":["5","10"]},{"or":[{"member":"Users.country","operator":"equals","values":["US"]},{"and":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"member":"Users.country","operator":"equals","values":["US"]}]}]}]} 1`] = `
+"query CubeQuery {
+  cube(
+    where: {orders: {amount: {in: [5, 10]}}, OR: [{users: {country: {equals: \\"US\\"}}}, {AND: [{orders: {status: {in: [\\"canceled\\", \\"active\\"]}}}, {users: {country: {equals: \\"US\\"}}}]}]}
+  ) {
+    orders {
+      count
+      status
+    }
+    users {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Orders.status","operator":"equals","values":["canceled","active"]}]} 1`] = `
+"query CubeQuery {
+  cube(
+    where: {users: {country: {equals: \\"US\\"}}, orders: {status: {in: [\\"canceled\\", \\"active\\"]}}}
+  ) {
+    orders {
+      count
+      status
+    }
+    users {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Users.country","operator":"equals","values":["Canada"]}]} 1`] = `
+"query CubeQuery {
+  cube(
+    where: {users: {AND: [{country: {equals: \\"US\\"}}, {country: {equals: \\"Canada\\"}}]}}
+  ) {
+    orders {
+      count
+      status
+    }
+    users {
+      country
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"filters":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"or":[{"member":"Users.country","operator":"notSet"},{"member":"Users.country","operator":"equals","values":["US"]}]}]} 1`] = `
+"query CubeQuery {
+  cube(
+    where: {orders: {status: {in: [\\"canceled\\", \\"active\\"]}}, OR: [users: {OR: [{country: {set: false}}, {country: {equals: \\"US\\"}}]}]}
+  ) {
+    orders {
+      count
+      status
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"day","dateRange":["2020-01-01","2021-01-01"]}]} 1`] = `
+"query CubeQuery {
+  cube(where: {orders: {createdAt: {inDateRange: [\\"2020-01-01\\", \\"2021-01-01\\"]}}}) {
+    orders {
+      count
+      status
+      createdAt {
+        day
+      }
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 1`] = `
+"query CubeQuery {
+  cube(timezone: \\"America/Los_Angeles\\", limit: 100) {
+    orders {
+      count
+      status
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 2`] = `
+"query CubeQuery {
+  cube(timezone: \\"America/Los_Angeles\\", limit: 100) {
+    orders {
+      count
+      status
+    }
+  }
+}
+"
+`;
+
+exports[`Cube GraphQL converter: {"measures":["Orders.count"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"quarter"}],"order":[["Orders.count","asc"],["Users.country","asc"]],"dimensions":["Users.country","Orders.createdAt"]} 1`] = `
+"query CubeQuery {
+  cube {
+    orders(orderBy: {count: asc}) {
+      count
+      createdAt {
+        value
+        quarter
+      }
+    }
+    users(orderBy: {country: asc}) {
+      country
+    }
+  }
+}
+"
+`;

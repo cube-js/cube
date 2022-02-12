@@ -1,0 +1,15 @@
+{
+    "measures": [],
+    "order": [
+      [
+        "Users.createdAt",
+        "asc"
+      ]
+    ],
+    "dimensions": [
+      "Users.firstName",
+      "Users.lastName",
+      "Users.createdAt"
+    ],
+    "limit": 5
+  }

@@ -45,10 +45,10 @@ export function getMajorityVersion(pkg: SemVer, strict: boolean = false): string
 }
 
 export type ProjectLock = {
-  resolveVersion: (pkg: string) => string|null
+  resolveVersion: (pkg: string) => string | null
 };
 
-export function parseNpmLock(): ProjectLock|null {
+export function parseNpmLock(): ProjectLock | null {
   const file = fs.readFileSync(
     path.join(process.cwd(), 'package-lock.json'),
     'utf8'
@@ -81,7 +81,7 @@ export function parseNpmLock(): ProjectLock|null {
   }
 }
 
-export function parseYarnLock(): ProjectLock|null {
+export function parseYarnLock(): ProjectLock | null {
   const file = fs.readFileSync(
     path.join(process.cwd(), 'yarn.lock'),
     'utf8'

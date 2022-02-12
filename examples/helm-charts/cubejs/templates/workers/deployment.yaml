@@ -1,0 +1,91 @@
+{{- if gt (.Values.workers.workersCount | int) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-workers" (include "cubejs.fullname" .) }}
+  labels:
+    {{- include "cubejs.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- toYaml .Values.commonLabels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml .Values.commonAnnotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.workers.workersCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: workers
+      {{- include "cubejs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: workers
+        {{- include "cubejs.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: cube
+          {{- if .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.apiPort }}
+              protocol: TCP
+          env:
+            {{- include "cubejs.common-env" . | nindent 12 }}
+            - name: CUBEJS_REFRESH_WORKER
+              value: "true"
+          {{- if .Values.workers.livenessProbe.enabled }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.workers.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.workers.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.workers.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.workers.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.workers.livenessProbe.failureThreshold }}
+            httpGet:
+              path: /livez
+              port: http
+          {{- else if .Values.workers.customLivenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.workers.customLivenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.workers.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.workers.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.workers.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.workers.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.workers.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.workers.readinessProbe.failureThreshold }}
+            httpGet:
+              path: /readyz
+              port: http
+          {{- else if .Values.workers.customReadinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.workers.customReadinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.workers.resources }}
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.config.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.config.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if .Values.workers.affinity }}
+      affinity:
+        {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.spreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .Values.config.volumes }}
+      volumes:
+        {{- toYaml .Values.config.volumes | nindent 8 }}
+      {{- end }}
+
+{{- end }}

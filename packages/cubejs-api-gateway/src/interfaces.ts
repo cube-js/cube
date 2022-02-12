@@ -24,12 +24,23 @@ export interface QueryFilter {
   values?: string[];
 }
 
+export type LogicalAndFilter = {
+  and: (QueryFilter | {
+    or: (QueryFilter | LogicalAndFilter)[]
+  })[]
+};
+
+export type LogicalOrFilter = {
+  or: (QueryFilter | LogicalAndFilter)[]
+};
+
 export type QueryTimeDimensionGranularity =
   | 'hour'
   | 'day'
   | 'week'
   | 'month'
-  | 'year';
+  | 'year'
+  | 'quarter';
 
 export interface QueryTimeDimension {
   dimension: string;
@@ -40,7 +51,7 @@ export interface QueryTimeDimension {
 export interface Query {
   measures: string[];
   dimensions?: string[];
-  filters?: QueryFilter[];
+  filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
   segments?: string[];
   limit?: number;
@@ -104,6 +115,12 @@ export type SecurityContextExtractorFn = (ctx: Readonly<RequestContext>) => any;
 export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void;
 
 // @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
-export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void>|void;
+export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void> | void;
 
-export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension>|RequestExtension;
+export type CheckSQLAuthSuccessResponse = {
+  password: string | null,
+  securityContext?: any
+};
+export type CheckSQLAuthFn = (ctx: any, user: string | null) => Promise<CheckSQLAuthSuccessResponse> | CheckSQLAuthSuccessResponse;
+
+export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension> | RequestExtension;

@@ -1,10 +1,3 @@
-import { RefObject, useEffect, useRef, useState } from 'react';
-import { Col, Row } from 'antd';
-import {
-  QueryBuilder,
-  SchemaChangeProps,
-  VizState,
-} from '@cubejs-client/react';
 import {
   areQueriesEqual,
   ChartType,
@@ -13,31 +6,39 @@ import {
   Query,
   TransformedQuery,
 } from '@cubejs-client/core';
+import {
+  QueryBuilder,
+  SchemaChangeProps,
+  VizState,
+} from '@cubejs-client/react';
+import { Col, Row, Space } from 'antd';
+import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { playgroundAction } from '../../../events';
-import MemberGroup from '../../../QueryBuilder/MemberGroup';
-import FilterGroup from '../../../QueryBuilder/FilterGroup';
-import TimeGroup from '../../../QueryBuilder/TimeGroup';
-import SelectChartType from '../../../QueryBuilder/SelectChartType';
-import Settings from '../../../components/Settings/Settings';
-import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
-import { SectionHeader, SectionRow } from '../../../components';
+import { Card, FatalError } from '../../../atoms';
 import ChartContainer from '../../../ChartContainer';
-import { dispatchPlaygroundEvent } from '../../../utils';
+import { SectionHeader, SectionRow } from '../../../components';
+import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
+import Settings from '../../../components/Settings/Settings';
+import DashboardSource from '../../../DashboardSource';
+import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
   useIsMounted,
   useSecurityContext,
+  useServerCoreVersionGte,
 } from '../../../hooks';
-import { Card, FatalError } from '../../../atoms';
+import FilterGroup from '../../../QueryBuilder/FilterGroup';
+import MemberGroup from '../../../QueryBuilder/MemberGroup';
+import SelectChartType from '../../../QueryBuilder/SelectChartType';
+import TimeGroup from '../../../QueryBuilder/TimeGroup';
 import { UIFramework } from '../../../types';
+import { dispatchPlaygroundEvent } from '../../../utils';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
 } from '../../QueryTabs/ChartRendererStateProvider';
 import { PreAggregationStatus } from './PreAggregationStatus';
-import DashboardSource from '../../../DashboardSource';
 
 const Section = styled.div`
   display: flex;
@@ -147,11 +148,11 @@ function QueryChangeEmitter({
   query2,
   onChange,
 }: QueryChangeEmitterProps) {
-  useEffect(() => {
+  useDeepEffect(() => {
     if (!areQueriesEqual(query1, query2)) {
       onChange();
     }
-  }, [areQueriesEqual(query1, query2)]);
+  }, [query1, query2]);
 
   return null;
 }
@@ -170,6 +171,7 @@ export type PlaygroundQueryBuilderProps = {
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
+  extra?: React.FC<any>;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
@@ -191,12 +193,15 @@ export function PlaygroundQueryBuilder({
   dashboardSource,
   schemaVersion = 0,
   initialVizState,
+  extra: Extra,
   onSchemaChange,
   onVizStateChanged,
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const { isChartRendererReady, queryStatus, queryError } =
+  const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
+  
+  const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
     setQueryStatus,
@@ -207,7 +212,7 @@ export function PlaygroundQueryBuilder({
 
   const { refreshToken } = useSecurityContext();
 
-  const ref = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const queryRef = useRef<Query | null>(null);
 
   const [tokenRefreshed, setTokenRefreshed] = useState<boolean>(false);
@@ -225,30 +230,34 @@ export function PlaygroundQueryBuilder({
   }, [isMounted]);
 
   useEffect(() => {
-    if (isChartRendererReady && ref.current) {
-      dispatchPlaygroundEvent(ref.current.contentDocument, 'credentials', {
-        token: cubejsToken,
-        apiUrl,
-      });
+    if (isChartRendererReady && iframeRef.current) {
+      dispatchPlaygroundEvent(
+        iframeRef.current.contentDocument,
+        'credentials',
+        {
+          token: cubejsToken,
+          apiUrl,
+        }
+      );
     }
-  }, [ref, cubejsToken, apiUrl, isChartRendererReady]);
+  }, [iframeRef, cubejsToken, apiUrl, isChartRendererReady]);
 
   function handleRunButtonClick({
     query,
     pivotConfig,
     chartType,
   }: HandleRunButtonClickProps) {
-    if (ref.current) {
+    if (iframeRef.current) {
       if (areQueriesEqual(query, queryRef.current)) {
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
           pivotConfig,
           query,
           chartType,
           chartingLibrary,
         });
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'refetch');
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'refetch');
       } else {
-        dispatchPlaygroundEvent(ref.current.contentDocument, 'chart', {
+        dispatchPlaygroundEvent(iframeRef.current.contentDocument, 'chart', {
           pivotConfig,
           query,
           chartType,
@@ -277,6 +286,7 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        meta,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -413,9 +423,9 @@ export function PlaygroundQueryBuilder({
                       playgroundAction('Change Chart Type');
                       updateChartType(type);
 
-                      if (ref.current) {
+                      if (iframeRef.current) {
                         dispatchPlaygroundEvent(
-                          ref.current.contentDocument,
+                          iframeRef.current.contentDocument,
                           'chart',
                           {
                             chartType: type,
@@ -438,14 +448,22 @@ export function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  {queryStatus ? (
-                    <PreAggregationStatus
-                      apiUrl={apiUrl}
-                      availableMembers={availableMembers}
-                      query={query}
-                      {...(queryStatus as QueryStatus)}
-                    />
-                  ) : null}
+                  <Space style={{ marginLeft: 'auto' }}>
+                    {Extra ? (
+                      <Extra
+                        queryRequestId={queryRequestId}
+                        queryStatus={queryStatus as QueryStatus}
+                      />
+                    ) : null}
+                    {queryStatus ? (
+                      <PreAggregationStatus
+                        apiUrl={apiUrl}
+                        availableMembers={availableMembers}
+                        query={query}
+                        {...(queryStatus as QueryStatus)}
+                      />
+                    ) : null}
+                  </Space>
                 </SectionRow>
               </Col>
             </Row>
@@ -473,7 +491,9 @@ export function PlaygroundQueryBuilder({
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
-                    iframeRef={ref}
+                    meta={meta}
+                    isGraphQLSupported={isGraphQLSupported}
+                    iframeRef={iframeRef}
                     isChartRendererReady={isChartRendererReady}
                     query={query}
                     error={error}
@@ -489,9 +509,9 @@ export function PlaygroundQueryBuilder({
                       }
                     }}
                     setChartLibrary={(value) => {
-                      if (ref.current) {
+                      if (iframeRef.current) {
                         dispatchPlaygroundEvent(
-                          ref.current.contentDocument,
+                          iframeRef.current.contentDocument,
                           'chart',
                           {
                             chartingLibrary: value,
@@ -520,12 +540,12 @@ export function PlaygroundQueryBuilder({
                           chartType={chartType || 'line'}
                           query={query}
                           pivotConfig={pivotConfig}
-                          iframeRef={ref}
+                          iframeRef={iframeRef}
                           queryHasMissingMembers={missingMembers.length > 0}
                           onRunButtonClick={async () => {
                             if (
                               isChartRendererReady &&
-                              ref.current &&
+                              iframeRef.current &&
                               missingMembers.length === 0
                             ) {
                               await refreshToken();
@@ -549,7 +569,7 @@ export function PlaygroundQueryBuilder({
             </Row>
 
             <PivotChangeEmitter
-              iframeRef={ref}
+              iframeRef={iframeRef}
               chartType={chartType || 'line'}
               pivotConfig={pivotConfig}
             />

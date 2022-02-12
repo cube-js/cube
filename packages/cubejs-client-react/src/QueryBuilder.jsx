@@ -13,7 +13,7 @@ import {
 
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { generateAnsiHTML } from './utils';
+import { generateAnsiHTML, removeEmpty } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -23,6 +23,7 @@ const granularities = [
   { name: 'day', title: 'Day' },
   { name: 'week', title: 'Week' },
   { name: 'month', title: 'Month' },
+  { name: 'quarter', title: 'Quarter' },
   { name: 'year', title: 'Year' },
 ];
 
@@ -200,11 +201,12 @@ export default class QueryBuilder extends React.Component {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
         : { dateRange: member.dateRange };
-      return {
+        
+      return removeEmpty({
         dimension: member.dimension.name,
         granularity: member.granularity,
         ...rangeSelection,
-      };
+      });
     };
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,

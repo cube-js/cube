@@ -257,6 +257,37 @@ const GlobalStyles = createGlobalStyle`
   .ant-notification {
     z-index: 9999;
   }
+  
+  .ant-modal-header {
+    padding: 16px 24px;
+  }
+  
+  .ant-modal-body {
+    padding: 24px;
+  }
+
+  // Fix close tab button styles
+  .ant-tabs-dropdown {
+    & .ant-tabs-dropdown-menu-item {
+      display: flex;
+      place-content: center space-between;
+    }
+    
+    & button.ant-tabs-dropdown-menu-item-remove {
+      -webkit-appearance: none;
+      padding: 0;
+      border: none;
+      border-radius: var(--border-radius-base);
+      background: transparent;
+      color: var(--dark-color);
+      cursor: pointer;
+      transition: color .125s linear;
+    }
+    
+    & button.ant-tabs-dropdown-menu-item-remove:hover {
+      color: var(--purple-color);
+    }
+  }
 `;
 
 export default GlobalStyles;

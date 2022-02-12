@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useHistory } from 'react-router';
-import { fetch } from 'whatwg-fetch';
 
 import { useIsMounted, usePlaygroundContext } from '../../hooks';
 

@@ -49,7 +49,7 @@ export async function event(opts: BaseEvent) {
   }
 }
 
-export const displayError = async (text: string|string[], options = {}) => {
+export const displayError = async (text: string | string[], options = {}) => {
   console.error('');
   console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
   console.error('');

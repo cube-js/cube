@@ -30,7 +30,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     };
   }
 
-  protected getExportBucket(): RedshiftDriverExportAWS|undefined {
+  protected getExportBucket(): RedshiftDriverExportAWS | undefined {
     const exportBucket: Partial<RedshiftDriverExportAWS> = {
       bucketType: getEnv('dbExportBucketType', {
         supported: ['s3']
@@ -62,6 +62,10 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     }
 
     return undefined;
+  }
+
+  public async loadUserDefinedTypes(): Promise<void> {
+    // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
   }
 
   public async isUnloadSupported() {
@@ -96,10 +100,10 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         .join(' ');
 
       await this.prepareConnection(conn, {
-        executionTimeout: 600000,
+        executionTimeout: this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000,
       });
 
-      let unloadTotalRows: number|null = null;
+      let unloadTotalRows: number | null = null;
 
       /**
        * @link https://github.com/brianc/node-postgres/blob/pg%408.6.0/packages/pg-protocol/src/messages.ts#L211

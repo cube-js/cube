@@ -24,7 +24,6 @@ export function RunOnCubeCloud() {
     <StyledMenuButton
       data-testid="live-preview-btn"
       onClick={() => {
-        console.log({ active });
         if (!active) {
           livePreviewContext.startLivePreview();
         }
@@ -100,7 +99,7 @@ function LivePreviewOverlay({
               target="_blank"
               href={`${url}/deployments/${deploymentId}/history`}
             >
-              Inspect querires
+              Inspect queries
             </Button>
 
             <Button

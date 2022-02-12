@@ -1,13 +1,13 @@
 import { Component, CSSProperties } from 'react';
 import Prism from 'prismjs';
 
-type TPrismCodeProps = {
+type PrismCodeProps = {
   code: string;
   language?: string;
   style?: CSSProperties;
 };
 
-export default class PrismCode extends Component<TPrismCodeProps> {
+export default class PrismCode extends Component<PrismCodeProps> {
   componentDidMount() {
     Prism.highlightAll();
   }
@@ -18,8 +18,11 @@ export default class PrismCode extends Component<TPrismCodeProps> {
 
   render() {
     return (
-      <pre data-testid="prism-code" style={this.props.style}>
-        <code className={`language-${this.props.language || 'javascript'}`}>
+      <pre style={this.props.style}>
+        <code
+          data-testid="prism-code"
+          className={`language-${this.props.language || 'javascript'}`}
+        >
           {this.props.code}
         </code>
       </pre>

@@ -4,6 +4,11 @@ interface CreateCubeSchemaOptions {
   preAggregations?: string,
 }
 
+/**
+ * Returns test cube schema based on incoming parameters.
+ * @param {CreateCubeSchemaOptions} param
+ * @returns {string}
+ */
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }: CreateCubeSchemaOptions) {
   return ` 
     cube('${name}', {

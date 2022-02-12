@@ -12,18 +12,16 @@ export interface WebSocketServerOptions {
 }
 
 export class WebSocketServer {
-  protected subscriptionsTimer: CancelableInterval|null = null;
+  protected subscriptionsTimer: CancelableInterval | null = null;
 
-  protected wsServer: WebSocket.Server|null = null;
+  protected wsServer: WebSocket.Server | null = null;
 
   protected subscriptionServer: any = null;
 
   public constructor(
     protected readonly serverCore: CubejsServerCore,
     protected readonly options: WebSocketServerOptions = {},
-  ) {
-    this.serverCore = serverCore;
-  }
+  ) { }
 
   public initServer(server: http.Server | https.Server) {
     this.wsServer = new WebSocket.Server({

@@ -8,6 +8,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   minute: 'minute',
   second: 'second',
   month: 'month',
+  quarter: 'quarter',
   year: 'year'
 };
 

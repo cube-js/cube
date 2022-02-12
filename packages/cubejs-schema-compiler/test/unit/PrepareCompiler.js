@@ -6,3 +6,13 @@ export const prepareCompiler = (content, options) => originalPrepareCompiler({
     { fileName: 'main.js', content }
   ])
 }, { adapter: 'postgres', ...options });
+
+export const prepareCube = (cubeName, cube, options) => {
+  const fileName = `${cubeName}.js`;
+  const content = `cube(${JSON.stringify(cubeName)}, ${JSON.stringify(cube).replace(/"([^"]+)":/g, '$1:')});`;
+
+  return originalPrepareCompiler({
+    localPath: () => __dirname,
+    dataSchemaFiles: () => Promise.resolve([{ fileName, content }])
+  }, { adapter: 'postgres', ...options });
+};

@@ -1,4 +1,4 @@
-import { shallowMount } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import flushPromises from 'flush-promises';
 import { h } from 'vue';
 
@@ -12,7 +12,7 @@ describe('QueryRenderer.vue', () => {
       const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
-      const wrapper = shallowMount(QueryRenderer, {
+      const wrapper = mount(QueryRenderer, {
         props: {
           query: {},
           cubejsApi: cube,
@@ -30,8 +30,8 @@ describe('QueryRenderer.vue', () => {
       const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock({ error: 'error message' }, 400));
 
-      const wrapper = shallowMount(QueryRenderer, {
-        propsData: {
+      const wrapper = mount(QueryRenderer, {
+        props: {
           query: {
             measures: ['Stories.count'],
           },
@@ -51,7 +51,7 @@ describe('QueryRenderer.vue', () => {
       const cube = createCubejsApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
-      const wrapper = shallowMount(QueryRenderer, {
+      const wrapper = mount(QueryRenderer, {
         props: {
           query: {
             measures: ['Stories.count'],

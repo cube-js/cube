@@ -1,0 +1,30 @@
+version: '2.2'
+
+services:
+  cubestore:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+      
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 3000:3000
+    env_file: .env
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+
+  query:
+    image: cfmanteiga/alpine-bash-curl-jq
+    depends_on:
+      - cube
+    volumes:
+      - .:/query
+    entrypoint: ["sh", "query/queries/run.sh"]

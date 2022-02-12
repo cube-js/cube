@@ -2,9 +2,9 @@
 title: Segments
 permalink: /schema/reference/segments
 scope: cubejs
-category: Reference
+category: Data Schema
 subCategory: Reference
-menuOrder: 6
+menuOrder: 12
 proofread: 06/18/2019
 redirect_from:
   - /segments
@@ -12,7 +12,7 @@ redirect_from:
 
 Segments are predefined filters. You can use segments to define complex
 filtering logic in SQL. For example, users for one particular city can be
-treated as a segment.
+treated as a segment:
 
 ```javascript
 cube(`Users`, {

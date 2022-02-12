@@ -21,7 +21,9 @@ export const TIME_SERIES: { [key: string]: (range: DateRange) => QueryDateRange[
   second: (range: DateRange) => Array.from(range.snapTo('second').by('second'))
     .map(d => [d.format('YYYY-MM-DDTHH:mm:ss.000'), d.format('YYYY-MM-DDTHH:mm:ss.999')]),
   week: (range: DateRange) => Array.from(range.snapTo(<unitOfTime.Diff>'isoWeek').by('week'))
-    .map(d => [d.startOf('isoWeek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoWeek').format('YYYY-MM-DDT23:59:59.999')])
+    .map(d => [d.startOf('isoWeek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoWeek').format('YYYY-MM-DDT23:59:59.999')]),
+  quarter: (range: DateRange) => Array.from(range.snapTo('quarter').by('quarter'))
+    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.endOf('quarter').format('YYYY-MM-DDT23:59:99.999')]),
 };
 
 export const timeSeries = (granularity: string, dateRange: QueryDateRange): QueryDateRange[] => {
@@ -39,6 +41,10 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange): Quer
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
+
+export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
+
+export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
   if (timestamp.length === 23) {
@@ -58,9 +64,32 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+  if (timestamp.length === 23) {
+    const zone = moment.tz.zone(timezone);
+    if (!zone) {
+      throw new Error(`Unknown timezone: ${timezone}`);
+    }
+    const parsedTime = Date.parse(`${timestamp}Z`);
+    // TODO parsedTime might be incorrect offset for conversion
+    const offset = zone.utcOffset(parsedTime);
+    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
+      return inDbTimeZoneDate.toJSON();
+    } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
+      return inDbTimeZoneDate.toJSON().replace('Z', '');
+    }
+  }
+  return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
+};
+
 export const extractDate = (data: any): string => {
   data = JSON.parse(JSON.stringify(data));
-  return moment.tz(data[0] && data[0][Object.keys(data[0])[0]], 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  if (!value) {
+    return value;
+  }
+  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {

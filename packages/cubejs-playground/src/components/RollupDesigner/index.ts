@@ -1,1 +1,2 @@
-export * from './RollupDesigner'
+export * from './RollupDesigner';
+export * from './Context';

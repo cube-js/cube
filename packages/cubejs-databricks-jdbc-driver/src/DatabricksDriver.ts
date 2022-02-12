@@ -26,7 +26,7 @@ const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
 
-const jdbcDriverResolver: Promise<string>|null = null;
+const jdbcDriverResolver: Promise<string> | null = null;
 
 async function resolveJDBCDriver(): Promise<string> {
   if (jdbcDriverResolver) {

@@ -10,6 +10,11 @@ on:
     workflows: [ "Release" ]
     types:
       - completed
+  push:
+    paths:
+      - '.github/workflows/birdbox.yml'
+    branches:
+      - 'master'
 
 jobs:
   cli:
@@ -23,7 +28,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -34,7 +45,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -72,12 +83,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ['postgresql', 'postgresql-cubestore']
+        target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
         arch: ['', '-alpine']
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -88,7 +105,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -104,6 +121,7 @@ jobs:
       - name: Birdbox
         run: |
           cd packages/cubejs-testing/
+          export DEBUG=testcontainers
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
           yarn run dataset:minimal
           yarn run birdbox:${{ matrix.target }}
@@ -131,7 +149,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -142,7 +166,7 @@ jobs:
           path: |
             ~/.npm
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -158,6 +182,7 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
+          export DEBUG=testcontainers
           export BIRDBOX_CYPRESS_BROWSER=${{ matrix.browser }}
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
           yarn run cypress:install

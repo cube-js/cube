@@ -176,12 +176,25 @@ export class OrchestratorApi {
     );
   }
 
-  public getPreAggregationPreview(context: RequestContext, preAggregation, versionEntry) {
-    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation, versionEntry);
+  public getPreAggregationPreview(context: RequestContext, preAggregation) {
+    return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
   }
 
-  public expandPartitionsInPreAggregations(queryBody) {
-    return this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+  public async expandPartitionsInPreAggregations(queryBody) {
+    try {
+      return await this.orchestrator.expandPartitionsInPreAggregations(queryBody);
+    } catch (err) {
+      if (err instanceof ContinueWaitError) {
+        throw {
+          error: 'Continue wait'
+        };
+      }
+      throw err;
+    }
+  }
+
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 
   public async getPreAggregationQueueStates() {

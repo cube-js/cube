@@ -1,4 +1,6 @@
 import dayjs from 'dayjs';
+import quarterOfYear from 'dayjs/plugin/quarterOfYear';
+
 import en from 'dayjs/locale/en';
 import {
   groupBy, pipe, fromPairs, uniq, filter, map, dropLast, equals, reduce, minBy, maxBy, clone, mergeDeepLeft,
@@ -7,10 +9,11 @@ import {
 
 import { aliasSeries } from './utils';
 
-dayjs.locale({
-  ...en,
-  weekStart: 1,
-});
+dayjs.extend(quarterOfYear);
+
+// When granularity is week, weekStart Value must be 1. However, since the client can change it globally (https://day.js.org/docs/en/i18n/changing-locale)
+// So the function below has been added.
+const internalDayjs = (...args) => dayjs(...args).locale({ ...en, weekStart: 1 });
 
 export const TIME_SERIES = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
@@ -19,7 +22,8 @@ export const TIME_SERIES = {
   hour: (range) => range.by('h').map(d => d.format('YYYY-MM-DDTHH:00:00.000')),
   minute: (range) => range.by('m').map(d => d.format('YYYY-MM-DDTHH:mm:00.000')),
   second: (range) => range.by('s').map(d => d.format('YYYY-MM-DDTHH:mm:ss.000')),
-  week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000'))
+  week: (range) => range.snapTo('week').by('w').map(d => d.startOf('week').format('YYYY-MM-DDT00:00:00.000')),
+  quarter: (range) => range.snapTo('quarter').by('quarter').map(d => d.startOf('quarter').format('YYYY-MM-DDT00:00:00.000')),
 };
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
@@ -56,8 +60,8 @@ export const dayRange = (from, to) => ({
   by: (value) => {
     const results = [];
 
-    let start = dayjs(from);
-    const end = dayjs(to);
+    let start = internalDayjs(from);
+    const end = internalDayjs(to);
 
     while (start.isBefore(end) || start.isSame(end)) {
       results.push(start);
@@ -66,9 +70,9 @@ export const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(dayjs(from).startOf(value), dayjs(to).endOf(value)),
-  start: dayjs(from),
-  end: dayjs(to),
+  snapTo: (value) => dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value)),
+  start: internalDayjs(from),
+  end: internalDayjs(to),
 });
 
 export const QUERY_TYPE = {
@@ -314,7 +318,7 @@ class ResultSet {
     if (!dateRange) {
       const member = ResultSet.timeDimensionMember(timeDimension);
       const dates = pipe(
-        map(row => row[member] && dayjs(row[member])),
+        map(row => row[member] && internalDayjs(row[member])),
         filter(Boolean)
       )(this.timeDimensionBackwardCompatibleData(resultIndex));
 
@@ -351,7 +355,7 @@ class ResultSet {
     const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
 
-      let measureValue = (row, measure) => row[measure];
+      const measureValue = (row, measure) => row[measure] || 0;
 
       if (
         pivotConfig.fillMissingDates &&
@@ -375,8 +379,6 @@ class ResultSet {
             );
             return series[resultIndex].map(d => [d, byXValues[d] || [{ xValues: [d], row: {} }]]);
           };
-
-          measureValue = (row, measure) => row[measure] || 0;
         }
       }
 
@@ -533,15 +535,15 @@ class ResultSet {
         let currentItem = schema;
 
         yValues.forEach((value, index) => {
-          currentItem[value] = {
+          currentItem[`_${value}`] = {
             key: value,
             memberId: normalizedPivotConfig.y[index] === 'measures'
               ? value
               : normalizedPivotConfig.y[index],
-            children: (currentItem[value] && currentItem[value].children) || {}
+            children: (currentItem[`_${value}`] && currentItem[`_${value}`].children) || {}
           };
 
-          currentItem = currentItem[value].children;
+          currentItem = currentItem[`_${value}`].children;
         });
       }
     });

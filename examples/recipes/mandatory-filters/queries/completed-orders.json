@@ -1,0 +1,12 @@
+{
+  "order": [["Orders.createdAt", "asc"]],
+  "dimensions": ["Orders.number", "Orders.createdAt"],
+  "filters": [
+    {
+      "member": "Orders.status",
+      "operator": "equals",
+      "values": ["completed"]
+    }
+  ],
+  "limit": 5
+}

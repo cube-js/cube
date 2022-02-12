@@ -4,7 +4,7 @@ import { PreAggregationDefinition } from '../../components/RollupDesigner/utils'
 
 type AddPreAggregationToSchemaResult = {
   error?: string;
-}
+};
 
 type CloudProviderContext = {
   isCloud: boolean;
@@ -30,7 +30,6 @@ export function CloudProvider({ children }: CloudProviderProps) {
       value={{
         ...context,
         setContext(partialContext) {
-          console.log('will set', partialContext);
           set({
             ...context,
             ...partialContext,

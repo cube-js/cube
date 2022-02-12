@@ -19,6 +19,7 @@ class PrestoDriver extends BaseDriver {
         user: process.env.CUBEJS_DB_USER,
         password: process.env.CUBEJS_DB_PASS
       } : undefined,
+      ssl: this.getSslOptions(),
       ...config
     };
 

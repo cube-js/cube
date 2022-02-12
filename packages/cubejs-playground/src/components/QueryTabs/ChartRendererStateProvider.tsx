@@ -2,25 +2,30 @@ import { createContext, ReactNode, useContext, useState } from 'react';
 
 import { QueryLoadResult } from '../ChartRenderer/ChartRenderer';
 
+type BooleanMap = Record<string, boolean>;
+
 type QueryStatusContextProps = {
-  chartRendererState: Record<string, boolean>;
+  chartRendererState: BooleanMap;
   setChartRendererReady: (queryId: string, isReady: boolean) => void;
   queryStatus: Record<string, QueryLoadResult | null>;
   setQueryStatus: (queryId: string, status: QueryLoadResult | null) => void;
-  resultSetExists: Record<string, boolean>;
+  resultSetExists: BooleanMap;
   setResultSetExists: (queryId: string, exists: boolean) => void;
-  isQueryLoading: Record<string, boolean>;
+  isQueryLoading: BooleanMap;
   setQueryLoading: (queryId: string, loading: boolean) => void;
   queryError: Record<string, Error | null>;
   setQueryError: (queryId: string, error: Error | null) => void;
-  isBuildInProgress: Record<string, boolean>;
+  isBuildInProgress: BooleanMap;
   setBuildInProgress: (queryId: string, inProgress: boolean) => void;
 
-  slowQuery: Record<string, boolean>;
+  slowQuery: BooleanMap;
   setSlowQuery: (queryId: string, isSlow: boolean) => void;
 
-  slowQueryFromCache: Record<string, boolean>;
+  slowQueryFromCache: BooleanMap;
   setSlowQueryFromCache: (queryId: string, isSlow: boolean) => void;
+
+  queryRequestId: Record<string, string>;
+  setQueryRequestId: (queryId: string, requestId: string) => void;
 };
 
 const ChartRendererStateContext = createContext({} as QueryStatusContextProps);
@@ -32,28 +37,23 @@ type ChartRendererStateProviderProps = {
 export function ChartRendererStateProvider({
   children,
 }: ChartRendererStateProviderProps) {
-  const [chartRendererState, setChartRendererStateMap] = useState<
-    Record<string, boolean>
-  >({});
+  const [chartRendererState, setChartRendererStateMap] = useState<BooleanMap>(
+    {}
+  );
   const [queryStatus, setQueryStatus] = useState<
     Record<string, QueryLoadResult | null>
   >({});
-  const [resultSetExists, setResultSetExists] = useState<
-    Record<string, boolean>
-  >({});
-  const [isQueryLoading, setQueryLoading] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [resultSetExists, setResultSetExists] = useState<BooleanMap>({});
+  const [isQueryLoading, setQueryLoading] = useState<BooleanMap>({});
   const [queryError, setQueryError] = useState<Record<string, Error | null>>(
     {}
   );
-  const [isBuildInProgress, setBuildInProgress] = useState<
-    Record<string, boolean>
-  >({});
-  const [slowQuery, setSlowQuery] = useState<Record<string, boolean>>({});
-  const [slowQueryFromCache, setSlowQueryFromCache] = useState<
-    Record<string, boolean>
-  >({});
+  const [isBuildInProgress, setBuildInProgress] = useState<BooleanMap>({});
+  const [slowQuery, setSlowQuery] = useState<BooleanMap>({});
+  const [slowQueryFromCache, setSlowQueryFromCache] = useState<BooleanMap>({});
+  const [queryRequestId, setQueryRequestId] = useState<Record<string, string>>(
+    {}
+  );
 
   return (
     <ChartRendererStateContext.Provider
@@ -116,6 +116,14 @@ export function ChartRendererStateProvider({
             [queryId]: isSlow,
           }));
         },
+
+        queryRequestId,
+        setQueryRequestId(queryId, requestId) {
+          setQueryRequestId((prev) => ({
+            ...prev,
+            [queryId]: requestId,
+          }));
+        },
       }}
     >
       {children}
@@ -133,6 +141,7 @@ export function useChartRendererState(queryId: string) {
     isBuildInProgress,
     slowQuery,
     slowQueryFromCache,
+    queryRequestId,
   } = useContext(ChartRendererStateContext);
 
   return {
@@ -144,6 +153,7 @@ export function useChartRendererState(queryId: string) {
     isBuildInProgress: Boolean(isBuildInProgress[queryId]),
     slowQuery: Boolean(slowQuery[queryId]),
     slowQueryFromCache: Boolean(slowQueryFromCache[queryId]),
+    queryRequestId: queryRequestId[queryId],
   };
 }
 
@@ -157,6 +167,7 @@ export function useChartRendererStateMethods() {
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   } = useContext(ChartRendererStateContext);
 
   return {
@@ -168,5 +179,6 @@ export function useChartRendererStateMethods() {
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   };
 }
