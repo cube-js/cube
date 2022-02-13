@@ -1,0 +1,19 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4090
+expression: "execute_query(\"show columns from KibanaSampleDataEcommerce;\".to_string()).await?"
+
+---
++--------------------+--------------+------+-----+---------+-------+
+| Field              | Type         | Null | Key | Default | Extra |
++--------------------+--------------+------+-----+---------+-------+
+| count              | int          | NO   |     | NULL    |       |
+| maxPrice           | int          | NO   |     | NULL    |       |
+| minPrice           | int          | NO   |     | NULL    |       |
+| avgPrice           | int          | NO   |     | NULL    |       |
+| order_date         | datetime     | YES  |     | NULL    |       |
+| customer_gender    | varchar(255) | YES  |     | NULL    |       |
+| taxful_total_price | varchar(255) | YES  |     | NULL    |       |
+| is_male            | boolean      | NO   |     | NULL    |       |
+| is_female          | boolean      | NO   |     | NULL    |       |
++--------------------+--------------+------+-----+---------+-------+

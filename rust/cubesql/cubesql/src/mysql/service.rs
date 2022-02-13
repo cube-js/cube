@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock as RwLockSync};
 use std::time::SystemTime;
 
 use async_trait::async_trait;
@@ -15,26 +15,21 @@ use log::trace;
 
 use msql_srv::*;
 
-use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
-use crate::compile::convert_statement_to_cube_query;
-use crate::compile::parser::parse_sql_to_statement;
-use crate::compile::QueryPlannerExecutionProps;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
 use crate::transport::TransportService;
-use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
-use sqlparser::ast;
 
 use super::dataframe;
 use super::server_manager::ServerManager;
 use super::AuthContext;
 use super::SqlAuthService;
 
+#[derive(Debug)]
 struct PreparedStatements {
     id: u32,
     statements: HashMap<u32, String>,
@@ -49,12 +44,96 @@ impl PreparedStatements {
     }
 }
 
+#[derive(Debug)]
+pub struct ConnectionProperties {
+    user: Option<String>,
+    database: Option<String>,
+}
+
+impl ConnectionProperties {
+    pub fn new(user: Option<String>, database: Option<String>) -> Self {
+        Self { user, database }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConnectionState {
+    // connection id, it's immutable
+    pub connection_id: u32,
+    // Connection properties
+    properties: RwLockSync<ConnectionProperties>,
+    // @todo Remove RWLock after split of Connection & SQLWorker
+    // Context for Transport
+    auth_context: RwLockSync<Option<AuthContext>>,
+}
+
+impl ConnectionState {
+    pub fn new(
+        connection_id: u32,
+        properties: ConnectionProperties,
+        auth_context: Option<AuthContext>,
+    ) -> Self {
+        Self {
+            connection_id,
+            properties: RwLockSync::new(properties),
+            auth_context: RwLockSync::new(auth_context),
+        }
+    }
+
+    pub fn user(&self) -> Option<String> {
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading user");
+        guard.user.clone()
+    }
+
+    pub fn set_user(&self, user: Option<String>) {
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting user");
+        guard.user = user;
+    }
+
+    pub fn database(&self) -> Option<String> {
+        let guard = self
+            .properties
+            .read()
+            .expect("failed to unlock properties for reading database");
+        guard.database.clone()
+    }
+
+    pub fn set_database(&self, database: Option<String>) {
+        let mut guard = self
+            .properties
+            .write()
+            .expect("failed to unlock properties for writting database");
+        guard.database = database;
+    }
+
+    pub fn auth_context(&self) -> Option<AuthContext> {
+        let guard = self
+            .auth_context
+            .read()
+            .expect("failed to unlock auth_context for reading");
+        guard.clone()
+    }
+
+    pub fn set_auth_context(&self, auth_context: Option<AuthContext>) {
+        let mut guard = self
+            .auth_context
+            .write()
+            .expect("failed to auth_context properties for writting");
+        *guard = auth_context;
+    }
+}
+
+#[derive(Debug)]
 struct Connection {
     server: Arc<ServerManager>,
     // Props for execution queries
-    props: QueryPlannerExecutionProps,
-    // Context for Transport
-    context: Option<AuthContext>,
+    state: Arc<ConnectionState>,
     // Prepared statements
     statements: Arc<RwLock<PreparedStatements>>,
 }
@@ -131,21 +210,10 @@ impl Connection {
         let ignore = match query_lower.as_str() {
             "rollback" => true,
             "commit" => true,
-            // DataGrip workaround
-            "set character_set_results = utf8" => true,
-            "set character_set_results = latin1" => true,
-            "set autocommit=1" => true,
-            "set sql_mode='strict_trans_tables'" => true,
-            "set sql_select_limit=501" => true,
             _ => false,
         };
 
-        if query_lower.eq("set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables')")
-        {
-            return Ok(QueryResponse::Ok(
-                StatusFlags::SERVER_STATUS_AUTOCOMMIT | StatusFlags::SERVER_SESSION_STATE_CHANGED,
-            ));
-        } else if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
+        if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
                 QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
                     dataframe::DataFrame::new(
@@ -190,106 +258,14 @@ impl Connection {
                     )
                 ),)
             )
-        } else if query_lower.starts_with("describe") || query_lower.starts_with("explain") {
-            let stmt = parse_sql_to_statement(&query)?;
-            match stmt {
-                ast::Statement::ExplainTable { table_name, .. } => {
-                    let table_name_filter = if table_name.0.len() == 2 {
-                        &table_name.0[1].value
-                    } else {
-                        &table_name.0[0].value
-                    };
-
-                    let ctx = self.server.transport
-                        .meta(self.auth_context()?)
-                        .await?;
-
-                    if let Some(cube) = ctx.cubes.iter().find(|c| c.name.eq(table_name_filter)) {
-                        let rows = cube.get_columns().iter().map(|column| dataframe::Row::new(
-                            vec![
-                                dataframe::TableValue::String(column.get_name().clone()),
-                                dataframe::TableValue::String(column.get_column_type().clone()),
-                                dataframe::TableValue::String(if column.mysql_can_be_null() { "Yes".to_string() } else { "No".to_string() }),
-                                dataframe::TableValue::String("".to_string()),
-                                dataframe::TableValue::Null,
-                                dataframe::TableValue::String("".to_string()),
-                            ]
-                        )).collect();
-
-
-                        return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                            vec![
-                                dataframe::Column::new(
-                                    "Field".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Type".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Null".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Key".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Default".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                ),
-                                dataframe::Column::new(
-                                    "Extra".to_string(),
-                                    ColumnType::MYSQL_TYPE_STRING,
-                                    ColumnFlags::empty(),
-                                )
-                            ],
-                            rows
-                        ))))
-                    } else {
-                        return Err(CubeError::internal("Unknown table".to_string()))
-                    }
-                },
-                ast::Statement::Explain { statement, .. } => {
-                    let ctx = self.server.transport
-                        .meta(self.auth_context()?)
-                    .await?;
-
-                    let plan = convert_statement_to_cube_query(&statement, Arc::new(ctx), &self.props)?;
-
-                    return Ok(QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
-                        vec![
-                            dataframe::Column::new(
-                                "Execution Plan".to_string(),
-                                ColumnType::MYSQL_TYPE_STRING,
-                                ColumnFlags::empty(),
-                            ),
-                        ],
-                        vec![dataframe::Row::new(vec![
-                            dataframe::TableValue::String(
-                                plan.print(true)?
-                            )
-                        ])]
-                    ))))
-                },
-                _ => {
-                    return Err(CubeError::internal("Unexpected type in ExplainTable".to_string()))
-                }
-            }
         } else if !ignore {
             trace!("query was not detected");
 
-            let ctx = self.server.transport
+            let meta = self.server.transport
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(ctx), &self.props)?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.state.clone(),self.server.transport.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));
@@ -297,7 +273,7 @@ impl Connection {
                 crate::compile::QueryPlan::MetaTabular(status, data_frame) => {
                     return Ok(QueryResponse::ResultSet(status, data_frame));
                 },
-                crate::compile::QueryPlan::DataFushionSelect(status, plan, ctx) => {
+                crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
                     let df = DataFrameImpl::new(
                         ctx.state,
                         &plan,
@@ -306,52 +282,6 @@ impl Connection {
                     let response =  batch_to_dataframe(&batches)?;
 
                     return Ok(QueryResponse::ResultSet(status, Arc::new(response)))
-                },
-                crate::compile::QueryPlan::CubeSelect(status, plan) => {
-                    debug!("Request {}", json!(plan.request).to_string());
-                    debug!("Meta {:?}", plan.meta);
-
-                    let response = self.server.transport
-                        .load(plan.request, self.auth_context()?)
-                        .await?;
-
-                    let mut columns: Vec<dataframe::Column> = vec![];
-
-                    for column_meta in &plan.meta {
-                        columns.push(dataframe::Column::new(
-                            column_meta.column_to.clone(),
-                            column_meta.column_type,
-                            ColumnFlags::empty(),
-                        ));
-                    }
-
-                    let mut rows: Vec<dataframe::Row> = vec![];
-
-                    if let Some(result) = response.results.first() {
-                        debug!("Columns {:?}", columns);
-                        debug!("Hydration mapping {:?}", plan.meta);
-                        trace!("Response from Cube.js {:?}", result.data);
-
-                        for row in result.data.iter() {
-                            if let Some(record) = row.as_object() {
-                                rows.push(
-                                    dataframe::Row::hydrate_from_response(&plan.meta, record)
-                                );
-                            } else {
-                                error!(
-                                    "Unable to map row to DataFrame::Row: {:?}, skipping row",
-                                    row
-                                );
-                            }
-                        }
-
-                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(
-                            columns,
-                            rows
-                        ))));
-                    } else {
-                        return Ok(QueryResponse::ResultSet(status, Arc::new(dataframe::DataFrame::new(vec![], vec![]))));
-                    }
                 }
             }
         }
@@ -366,9 +296,9 @@ impl Connection {
         }
     }
 
-    pub(crate) fn auth_context(&self) -> Result<&AuthContext, CubeError> {
-        if self.context.is_some() {
-            Ok(self.context.as_ref().unwrap())
+    pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
+        if let Some(ctx) = self.state.auth_context() {
+            Ok(Arc::new(ctx))
         } else {
             Err(CubeError::internal("must be auth".to_string()))
         }
@@ -384,7 +314,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
     }
 
     fn connection_id(&self) -> u32 {
-        self.props.connection_id()
+        self.state.connection_id
     }
 
     async fn on_prepare<'a>(
@@ -486,8 +416,8 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
 
         let passwd = auth_response.password.map(|p| p.as_bytes().to_vec());
 
-        self.props.set_user(user.clone());
-        self.context = Some(auth_response.context);
+        self.state.set_user(user.clone());
+        self.state.set_auth_context(Some(auth_response.context));
 
         Ok(passwd)
     }
@@ -510,9 +440,16 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Connection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_init: {}", database);
+        debug!("on_init: USE {}", database);
 
-        self.props.set_database(Some(database.to_string()));
+        if self
+            .execute_query(&format!("USE {}", database))
+            .await
+            .is_err()
+        {
+            writter.error(ErrorKind::ER_BAD_DB_ERROR, b"Unknown database")?;
+            return Ok(());
+        };
 
         writter.ok()?;
 
@@ -575,8 +512,11 @@ impl ProcessingLoop for MySqlServer {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     Connection {
                         server,
-                        props: QueryPlannerExecutionProps::new(connection_id, None, None),
-                        context: None,
+                        state: Arc::new(ConnectionState::new(
+                            connection_id,
+                            ConnectionProperties::new(None, None),
+                            None,
+                        )),
                         statements: Arc::new(RwLock::new(PreparedStatements::new())),
                     },
                     socket,

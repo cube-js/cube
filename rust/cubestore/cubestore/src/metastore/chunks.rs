@@ -1,7 +1,7 @@
 use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use rand::distributions::Alphanumeric;
@@ -25,6 +25,7 @@ impl Chunk {
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
         }
     }
 
@@ -51,6 +52,21 @@ impl Chunk {
         to_update.uploaded = uploaded;
         to_update.active = uploaded;
         to_update
+    }
+
+    pub fn file_size(&self) -> Option<u64> {
+        self.file_size
+    }
+
+    pub fn set_file_size(&self, file_size: u64) -> Result<Self, CubeError> {
+        let mut c = self.clone();
+        if file_size == 0 {
+            return Err(CubeError::internal(format!(
+                "Received zero file size for chunk"
+            )));
+        }
+        c.file_size = Some(file_size);
+        Ok(c)
     }
 
     pub fn deactivate(&self) -> Chunk {

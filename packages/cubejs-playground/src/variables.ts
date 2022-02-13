@@ -74,7 +74,10 @@ const VARIABLES = {
 };
 
 Object.keys(colors).forEach(
-  (name) => (VARIABLES[`${name}-color`] = color(name))
+  (name) => {
+    VARIABLES[`${name}-color`] = color(name);
+    VARIABLES[`${name}-color-rgb`] = colors[name];
+  }
 );
 
 const LESS_VARIABLES = {};

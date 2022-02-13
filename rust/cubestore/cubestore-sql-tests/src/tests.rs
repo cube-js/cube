@@ -82,6 +82,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_invalid_digit",
             create_table_with_location_invalid_digit,
         ),
+        t("create_table_with_csv", create_table_with_csv),
+        t(
+            "create_table_with_csv_no_header",
+            create_table_with_csv_no_header,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -147,6 +152,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
+        ),
+        t(
+            "unique_key_and_multi_measures_for_stream_table",
+            unique_key_and_multi_measures_for_stream_table,
         ),
     ];
 
@@ -1739,6 +1748,50 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
         res.is_err(),
         "Expected invalid digit error but got {:?}",
         res
+    );
+}
+
+async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION './data/csv.csv'")
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION './data/csv_no_header.csv'")
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
     );
 }
 
@@ -4393,6 +4446,30 @@ async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
+}
+
+async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int, measure2 text) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, measure2, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, '{}', {})", i, j, "text_value", i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT bar_id, measure1, measure2 FROM test.events_by_type as `events` LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

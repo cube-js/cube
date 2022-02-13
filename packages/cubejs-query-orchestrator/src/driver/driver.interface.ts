@@ -1,5 +1,4 @@
 /* eslint-disable max-len */
-
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
@@ -30,6 +29,11 @@ export interface DownloadTableCSVData extends DownloadTableBase {
    * Some drivers know types of response
    */
   types?: TableStructure;
+
+  /**
+   * Some drivers export csv files with no header row.
+   */
+  csvNoHeader?: boolean;
 }
 
 export interface StreamTableData extends DownloadTableBase {
@@ -113,4 +117,6 @@ export interface DriverInterface {
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
+  // Shutdown the driver
+  release(): Promise<void>
 }
