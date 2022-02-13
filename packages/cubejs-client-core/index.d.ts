@@ -88,6 +88,7 @@ declare module '@cubejs-client/core' {
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
+    resType?: 'default' | 'compact';
   };
 
   export type LoadMethodOptions = {

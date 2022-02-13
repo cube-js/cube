@@ -1,7 +1,8 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
-
 import { BirdBox } from '../src';
 
 type QueryTestOptions = {
@@ -73,9 +74,12 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
-    let httpClient: CubejsApi;
-    let wsClient: CubejsApi;
     let wsTransport: WebSocketTransport;
+    let wsCompactTransport: WebSocketTransport;
+    let httpClient: CubejsApi;
+    let httpCompactClient: CubejsApi;
+    let wsClient: CubejsApi;
+    let wsCompactClient: CubejsApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -86,13 +90,26 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         httpClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
         });
+        httpCompactClient = cubejs(async () => 'test', {
+          apiUrl: birdbox.configuration.apiUrl,
+          resType: 'compact',
+        });
 
         wsTransport = new WebSocketTransport({
           apiUrl: birdbox.configuration.apiUrl,
         });
+        wsCompactTransport = new WebSocketTransport({
+          apiUrl: birdbox.configuration.apiUrl,
+        });
+
         wsClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
           transport: wsTransport,
+        });
+        wsCompactClient = cubejs(async () => 'test', {
+          apiUrl: birdbox.configuration.apiUrl,
+          resType: 'compact',
+          transport: wsCompactTransport,
         });
       } catch (e) {
         console.log(e);
@@ -103,6 +120,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
       await wsTransport.close();
+      await wsCompactTransport.close();
 
       await birdbox.stop();
     });
@@ -113,6 +131,17 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         // eslint-disable-next-line no-loop-func
         it(`${options.name}`, async () => {
           const response = await httpClient.load(query);
+          expect(response.rawData()).toMatchSnapshot(options.name);
+        });
+      }
+    });
+
+    describe('HTTP Compact Transport', () => {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [options, query] of asserts) {
+        // eslint-disable-next-line no-loop-func
+        it(`${options.name}`, async () => {
+          const response = await httpCompactClient.load(query);
           expect(response.rawData()).toMatchSnapshot(options.name);
         });
       }
@@ -131,12 +160,25 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       }
     });
 
+    describe('WS Compact Transport', () => {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [options, query] of asserts) {
+        if (options.ws) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await wsCompactClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      }
+    });
+
     it('Failing query rewrite', async () => {
       try {
         await httpClient.load({ measures: ['Orders.toRemove'] });
         throw new Error('Should not successfully run Orders.toRemove query');
       } catch (e) {
-        expect(e.toString()).toContain('Query should contain either');
+        expect((e as Error).toString()).toContain('Query should contain either');
       }
     });
   });
