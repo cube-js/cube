@@ -244,15 +244,17 @@ class CubejsApi {
    */
   loadResponseInternal(response) {
     if (this.resType === ResultType.COMPACT) {
-      const data = [];
-      response.results[0].data.dataset.forEach((r) => {
-        const row = {};
-        response.results[0].data.members.forEach((m, i) => {
-          row[m] = r[i];
+      response.results.forEach((result, j) => {
+        const data = [];
+        result.data.dataset.forEach((r) => {
+          const row = {};
+          result.data.members.forEach((m, i) => {
+            row[m] = r[i];
+          });
+          data.push(row);
         });
-        data.push(row);
+        response.results[j].data = data;
       });
-      response.results[0].data = data;
     }
     return new ResultSet(response, {
       parseDateMeasures: this.parseDateMeasures

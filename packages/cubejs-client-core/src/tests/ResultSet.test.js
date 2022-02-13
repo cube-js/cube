@@ -1,3 +1,11 @@
+/**
+ * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview ResultSet class unit tests.
+ */
+
+/* globals describe,test,expect */
+
 import 'jest';
 import ResultSet from '../ResultSet';
 
