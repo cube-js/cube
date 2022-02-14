@@ -15,7 +15,7 @@ import {
   QueryType
 } from './types/strings';
 import {
-  QueryType as QueryTypeEnum
+  QueryType as QueryTypeEnum, ResultType
 } from './types/enums';
 import {
   RequestContext,
@@ -166,35 +166,29 @@ class ApiGateway {
     app.use(this.logNetworkUsage);
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
-      // resType parameter
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        resType: req.query.resType,
         queryType: req.query.queryType,
       });
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
     app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, (async (req, res) => {
-      // resType parameter
       await this.load({
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
-        resType: req.query.resType,
         queryType: req.body.queryType
       });
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
-      // resType parameter
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        resType: req.query.resType,
         queryType: req.query.queryType
       });
     }));
@@ -725,13 +719,15 @@ class ApiGateway {
       context,
       res,
       apiType = 'rest',
-      resType = 'default',
       ...props
     } = request;
     const requestStarted = new Date();
 
     try {
       query = this.parseQueryParam(request.query);
+      const resType = query.$_resType || ResultType.DEFAULT;
+      delete query.$_resType;
+
       this.log({
         type: 'Load Request',
         query

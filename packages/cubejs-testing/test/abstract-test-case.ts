@@ -87,6 +87,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       try {
         birdbox = await entrypoint();
 
+        // http clients
         httpClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
         });
@@ -95,6 +96,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           resType: 'compact',
         });
 
+        // ws transports
         wsTransport = new WebSocketTransport({
           apiUrl: birdbox.configuration.apiUrl,
         });
@@ -102,6 +104,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           apiUrl: birdbox.configuration.apiUrl,
         });
 
+        // ws clients
         wsClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
           transport: wsTransport,

@@ -236,6 +236,22 @@ class CubejsApi {
   }
 
   /**
+   * Add system properties to a query object.
+   * @param {Query} query
+   * @returns {Query}
+   * @private
+   */
+  patchQueryInternal(query) {
+    if (
+      this.resType === ResultType.COMPACT &&
+      query.$_resType !== ResultType.COMPACT
+    ) {
+      query.$_resType = ResultType.COMPACT;
+    }
+    return query;
+  }
+
+  /**
    * Process result fetched from the gateway#load method according
    * to the network protocol.
    * @param {*} response
@@ -270,11 +286,17 @@ class CubejsApi {
    * @returns {undefined | Promise<ResultSet>}
    */
   load(query, options, callback) {
+    if (Array.isArray(query)) {
+      query.forEach((q) => {
+        this.patchQueryInternal(q);
+      });
+    } else {
+      this.patchQueryInternal(query);
+    }
     return this.loadMethod(
       () => this.request('load', {
         query,
         queryType: 'multi',
-        resType: this.resType,
       }),
       this.loadResponseInternal.bind(this),
       options,
@@ -292,11 +314,17 @@ class CubejsApi {
    * @returns {void}
    */
   subscribe(query, options, callback) {
+    if (Array.isArray(query)) {
+      query.forEach((q) => {
+        this.patchQueryInternal(q);
+      });
+    } else {
+      this.patchQueryInternal(query);
+    }
     return this.loadMethod(
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
-        resType: this.resType,
       }),
       this.loadResponseInternal.bind(this),
       { ...options, subscribe: true },
