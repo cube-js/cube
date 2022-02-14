@@ -95,7 +95,8 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().min(1).max(50000),
   offset: Joi.number().integer().min(0),
   renewQuery: Joi.boolean(),
-  ungrouped: Joi.boolean()
+  ungrouped: Joi.boolean(),
+  $_resType: Joi.strict(),
 });
 
 const normalizeQueryOrder = order => {
