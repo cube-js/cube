@@ -75,11 +75,8 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
 
     let birdbox: BirdBox;
     let wsTransport: WebSocketTransport;
-    let wsCompactTransport: WebSocketTransport;
     let httpClient: CubejsApi;
-    let httpCompactClient: CubejsApi;
     let wsClient: CubejsApi;
-    let wsCompactClient: CubejsApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -91,16 +88,9 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         httpClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
         });
-        httpCompactClient = cubejs(async () => 'test', {
-          apiUrl: birdbox.configuration.apiUrl,
-          resType: 'compact',
-        });
 
         // ws transports
         wsTransport = new WebSocketTransport({
-          apiUrl: birdbox.configuration.apiUrl,
-        });
-        wsCompactTransport = new WebSocketTransport({
           apiUrl: birdbox.configuration.apiUrl,
         });
 
@@ -108,11 +98,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         wsClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
           transport: wsTransport,
-        });
-        wsCompactClient = cubejs(async () => 'test', {
-          apiUrl: birdbox.configuration.apiUrl,
-          resType: 'compact',
-          transport: wsCompactTransport,
         });
       } catch (e) {
         console.log(e);
@@ -123,7 +108,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
       await wsTransport.close();
-      await wsCompactTransport.close();
 
       await birdbox.stop();
     });
@@ -139,17 +123,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       }
     });
 
-    describe('HTTP Compact Transport', () => {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const [options, query] of asserts) {
-        // eslint-disable-next-line no-loop-func
-        it(`${options.name}`, async () => {
-          const response = await httpCompactClient.load(query);
-          expect(response.rawData()).toMatchSnapshot(options.name);
-        });
-      }
-    });
-
     describe('WS Transport', () => {
       // eslint-disable-next-line no-restricted-syntax
       for (const [options, query] of asserts) {
@@ -157,19 +130,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           // eslint-disable-next-line no-loop-func
           it(`${options.name}`, async () => {
             const response = await wsClient.load(query);
-            expect(response.rawData()).toMatchSnapshot(options.name);
-          });
-        }
-      }
-    });
-
-    describe('WS Compact Transport', () => {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const [options, query] of asserts) {
-        if (options.ws) {
-          // eslint-disable-next-line no-loop-func
-          it(`${options.name}`, async () => {
-            const response = await wsCompactClient.load(query);
             expect(response.rawData()).toMatchSnapshot(options.name);
           });
         }
