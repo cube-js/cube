@@ -32,6 +32,7 @@ $ yarn birdbox:driver --env-file=${HOME}/.env --mode=local --type=bigquery
 
 ### Run Cypress tests
 
+```shell
 $ docker build . -f packages/cubejs-docker/dev.Dockerfile -t localhost:5000/cubejs/cube:testx
 $ cd packages/cubejs-testing
 $ export BIRDBOX_CUBEJS_VERSION=testx
@@ -42,6 +43,7 @@ $ export DEBUG=testcontainers
 $ yarn database:minimal
 $ yarn cypress:install
 $ yarn cypress:birdbox
+```
 
 ### Convert Postgres dump into csv and upload it to BigQuery
 
