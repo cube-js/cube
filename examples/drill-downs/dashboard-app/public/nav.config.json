@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Drill Downs",
+        "url": "https://drill-downs-demo.cube.dev/#/"
+    },
+    {
+        "name": "Compare Date Range",
+        "url": "https://compare-date-range-demo.cube.dev/"
+    },
+    {
+        "name": "Data Blending",
+        "url": "https://data-blending-demo.cube.dev"
+    }
+]

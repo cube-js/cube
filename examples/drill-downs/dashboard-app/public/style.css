@@ -1,5 +1,6 @@
 :root {
     --primary-color: rgba(102, 93, 232, 1);
+    --dark-color: 20, 20, 70;
     --success-color: rgba(65, 181, 111, 0.12);
     --danger-color: rgba(255, 100, 109, 0.1);
 
@@ -13,8 +14,62 @@
     box-sizing: border-box;
 }
 
-.d-none{
+.d-none {
     display: none !important;
+}
+
+.dropdown {
+    position: relative;
+}
+
+.dropdown-button{
+    display: inline-block;
+    background-color: transparent;
+    border: 1px solid rgba(var(--dark-color), 0.12);
+    padding: 6px 16px;
+    outline: none;
+    border-radius: 8px;
+}
+
+.dropdown-content {
+    display: none;
+
+    left: 0;
+    padding-top: 4px;
+    position: absolute;
+    top: 100%;
+
+    background-color: #fff;
+    box-shadow: 0px 30px 50px rgba(20, 20, 70, 0.05);
+    border-radius: 8px;
+    z-index: 9999;
+
+    min-width: 240px;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+.dropdown-list-item > *{
+    text-decoration: none;
+    color: rgba(var(--dark-color, 1));
+    font-size: 14px;
+    font-weight: 500;
+
+    display: block;
+    width: 100%;
+
+    padding: 12px 16px;
+    transition: 0.1s;
+}
+
+.dropdown-list-item:not(:last-child) > *{
+    box-shadow: inset 0px -1px 0px #E5E5F6;
+}
+
+.dropdown-list-item > *:hover {
+    background-color: rgba(20, 20, 70, 0.07);
 }
 
 
@@ -139,7 +194,7 @@ header a:hover::after {
     padding: 8px;
     background-color: #fff;
     box-shadow: 0px 8px 16px rgba(20, 20, 70, 0.07);
-    border-radius: 8px; 
+    border-radius: 8px;
 
     display: flex;
     align-items: center;
@@ -185,4 +240,8 @@ header a:hover::after {
 
 .feedback-button:not(:first-child) {
     margin-left: 8px;
+}
+
+.menu-list {
+    list-style: none;
 }
