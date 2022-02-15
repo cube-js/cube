@@ -7,6 +7,7 @@ use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::get_worker_plan;
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -100,7 +101,10 @@ impl QueryExecutor for QueryExecutorImpl {
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
-        trace!("Router Query Physical Plan: {:#?}", &split_plan);
+        trace!(
+            "Router Query Physical Plan: {}",
+            pp_phys_plan(split_plan.as_ref())
+        );
 
         let execution_time = SystemTime::now();
 
@@ -109,17 +113,27 @@ impl QueryExecutor for QueryExecutorImpl {
         debug!("Query data processing time: {:?}", execution_time,);
         app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         if execution_time.as_millis() > 200 {
-            warn!("Slow Query ({:?}):\n{:#?}", execution_time, logical_plan);
+            warn!(
+                "Slow Query ({:?}):\n{}",
+                execution_time,
+                pp_plan(&logical_plan)
+            );
             debug!(
-                "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time, &split_plan
+                "Slow Query Physical Plan ({:?}): {}",
+                execution_time,
+                pp_phys_plan(split_plan.as_ref())
             );
         }
         if results.is_err() {
-            error!("Error Query ({:?}):\n{:#?}", execution_time, logical_plan);
             error!(
-                "Error Query Physical Plan ({:?}): {:#?}",
-                execution_time, &split_plan
+                "Error Query ({:?}):\n{}",
+                execution_time,
+                pp_plan(&logical_plan)
+            );
+            error!(
+                "Error Query Physical Plan ({:?}): {}",
+                execution_time,
+                pp_phys_plan(split_plan.as_ref())
             );
         }
         Ok((split_plan.schema(), results?))
@@ -148,7 +162,10 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
+        trace!(
+            "Partition Query Physical Plan: {}",
+            pp_phys_plan(worker_plan.as_ref())
+        );
 
         let execution_time = SystemTime::now();
         let results = collect(worker_plan.clone())
@@ -163,26 +180,26 @@ impl QueryExecutor for QueryExecutorImpl {
         );
         if execution_time.elapsed()?.as_millis() > 200 || results.is_err() {
             warn!(
-                "Slow Partition Query ({:?}):\n{:#?}",
+                "Slow Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                logical_plan
+                pp_plan(&logical_plan)
             );
             debug!(
-                "Slow Partition Query Physical Plan ({:?}): {:#?}",
+                "Slow Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                &worker_plan
+                pp_phys_plan(worker_plan.as_ref())
             );
         }
         if results.is_err() {
             error!(
-                "Error Partition Query ({:?}):\n{:#?}",
+                "Error Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                logical_plan
+                pp_plan(&logical_plan)
             );
             error!(
-                "Error Partition Query Physical Plan ({:?}): {:#?}",
+                "Error Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                &worker_plan
+                pp_phys_plan(worker_plan.as_ref())
             );
         }
         // TODO: stream results as they become available.

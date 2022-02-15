@@ -9,11 +9,14 @@ use datafusion::physical_plan::hash_aggregate::{
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::merge_join::MergeJoinExec;
-use datafusion::physical_plan::merge_sort::{MergeReSortExec, MergeSortExec};
+use datafusion::physical_plan::merge_sort::{
+    LastRowByUniqueKeyExec, MergeReSortExec, MergeSortExec,
+};
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
+use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
@@ -22,10 +25,14 @@ use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
+use datafusion::cube_ext::rolling::RollingWindowAggExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
+use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::skip::SkipExec;
 use datafusion::physical_plan::union::UnionExec;
 
 #[derive(Default, Clone, Copy)]
@@ -385,8 +392,28 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         } else if let Some(_) = a.downcast_ref::<UnionExec>() {
             *out += "Union";
+        } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
+            *out += "FilterByKeyRange";
+        } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
+            *out += &format!(
+                "ParquetScan, files: {}",
+                p.partitions()
+                    .iter()
+                    .map(|p| p.filenames.iter())
+                    .flatten()
+                    .join(",")
+            );
+        } else if let Some(_) = a.downcast_ref::<SkipExec>() {
+            *out += "SkipRows";
+        } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
+            *out += "RollingWindowAgg";
+        } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
+            *out += "LastRowByUniqueKey";
+        } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
+            *out += "MemoryScan";
         } else {
-            panic!("unhandled ExecutionPlan: {:?}", p);
+            let to_string = format!("{:?}", p);
+            *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
 
         if o.show_output_hints {

@@ -1445,6 +1445,7 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
 
@@ -1834,6 +1835,71 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn decimal_partition_pruning() {
+        Config::test("decimal_partition_pruning")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num decimal)")
+                    .await
+                    .unwrap();
+
+                for i in 0..100 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
+
+                let result = service
+                    .exec_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows()[0],
+                    Row::new(vec![TableValue::Decimal(Decimal::new(5000000))])
+                );
+
+                let partitions = service
+                    .exec_query("SELECT id, min_value, max_value FROM system.partitions")
+                    .await
+                    .unwrap();
+
+                println!("All partitions: {:#?}", partitions);
+
+                let plans = service
+                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+
+                let worker_plan = pp_phys_plan(plans.worker.as_ref());
+                println!("Worker Plan: {}", worker_plan);
+                let indices = worker_plan.match_indices("ParquetScan").collect::<Vec<_>>();
+                assert!(
+                    // TODO 2 because partition pruning doesn't respect half open intervals yet
+                    indices.len() < 3 && indices.len() > 0,
+                    "{}\nshould have 2 and less ParquetScan nodes",
+                    worker_plan
+                );
             })
             .await;
     }
