@@ -136,6 +136,8 @@ impl QueryExecutor for QueryExecutorImpl {
             .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
             .await?;
 
+        panic!("OMG {:?}", physical_plan);
+
         let worker_plan;
         let max_batch_rows;
         if let Some((p, s)) = get_worker_plan(&physical_plan) {

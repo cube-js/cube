@@ -607,7 +607,8 @@ impl SqlService for SqlServiceImpl {
                             multi_part_subtree: HashMap::new(),
                         }
                     ).await?;
-                    cluster.run_select(worker, plan).await?;
+                    cluster.route_select(worker, plan).await?;
+                    // cluster.run_select(worker, plan).await?;
                     panic!("worker did not panic")
                 }
             },

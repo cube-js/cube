@@ -18,6 +18,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
+use cubestore::CubeError;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -157,6 +158,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
+        t("panic_worker", panic_worker),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4469,6 +4471,24 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
     assert_eq!(
         to_rows(&r),
         rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
+}
+
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    // service.exec_query("CREATE SCHEMA s").await.unwrap();
+    // service
+    //     .exec_query("CREATE TABLE s.t(i int)")
+    //     .await
+    //     .unwrap();
+    // service
+    //     .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+    //     .await
+    //     .unwrap();
+    // let r = service.exec_query("SELECT i / 0 FROM s.t").await;
+    assert_eq!(
+        r,
+        Err(CubeError::panic("ohlala".to_string()))
     );
 }
 

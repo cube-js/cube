@@ -50,8 +50,7 @@ impl UserDefinedLogicalNode for PanicNode {
         assert!(exprs.is_empty());
         assert!(inputs.is_empty());
 
-        Arc::new(PanicNode {
-        })
+        Arc::new(PanicNode {})
     }
 }
 

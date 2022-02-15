@@ -27,7 +27,7 @@ use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
-use crate::queryplanner::panic::PanicNode;
+use crate::queryplanner::panic::{PanicExec, PanicNode};
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {
@@ -363,6 +363,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     pp_sort_columns(topk.key_len, &topk.order_by)
                 );
             }
+        } else if let Some(_) = a.downcast_ref::<PanicExec>() {
+            *out += "Panic";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += "Worker";
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {
