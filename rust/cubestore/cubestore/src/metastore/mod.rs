@@ -2033,6 +2033,34 @@ impl RocksMetaStore {
         Self::with_listener(path, vec![], remote_fs, config)
     }
 
+    pub async fn load_from_dump(
+        path: impl AsRef<Path>,
+        dump_path: impl AsRef<Path>,
+        remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Result<Arc<RocksMetaStore>, CubeError> {
+        if !fs::metadata(path.as_ref()).await.is_ok() {
+            let mut backup =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), dump_path)?;
+            backup.restore_from_latest_backup(
+                &path,
+                &path,
+                &rocksdb::backup::RestoreOptions::default(),
+            )?;
+        } else {
+            info!(
+                "Using existing metastore in {}",
+                path.as_ref().as_os_str().to_string_lossy()
+            );
+        }
+
+        let meta_store = Self::new(path, remote_fs, config);
+
+        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        Ok(meta_store)
+    }
+
     pub async fn load_from_remote(
         path: impl AsRef<Path>,
         remote_fs: Arc<dyn RemoteFs>,
