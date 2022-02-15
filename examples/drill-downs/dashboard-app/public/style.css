@@ -1,5 +1,6 @@
 :root {
-    --primary-color: rgba(102, 93, 232, 1);
+    --primary-color: rgba(255, 100, 146, 1);
+    --secondary-color: rgba(102, 93, 232, 1);
     --dark-color: 20, 20, 70;
     --success-color: rgba(65, 181, 111, 0.12);
     --danger-color: rgba(255, 100, 109, 0.1);
@@ -125,7 +126,7 @@ header p {
 }
 
 header a, header a.link {
-    color: var(--primary-color);
+    color: var(--secondary-color);
     font-size: 16px;
     line-height: 1.625;
     text-decoration: none;
@@ -157,7 +158,7 @@ header a:hover::after {
 }
 
 .link {
-    color: var(--primary-color);
+    color: rgba(var(--dark-color), 1);
     font-size: 14px;
     text-decoration: none;
     font-weight: 500;
