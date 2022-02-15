@@ -1,0 +1,53 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`cli-result-type HTTP Compact Transport: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`cli-result-type HTTP Transport: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`cli-result-type WS Compact Transport: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`cli-result-type WS Transport: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
