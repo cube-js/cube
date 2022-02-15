@@ -412,7 +412,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
             *out += "MemoryScan";
         } else {
-            panic!("unhandled ExecutionPlan: {:?}", p);
+            let to_string = format!("{:?}", p);
+            *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
 
         if o.show_output_hints {
