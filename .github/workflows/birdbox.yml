@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
+        target: ['result-type', 'postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
         arch: ['', '-alpine']
     steps:
       - name: Checkout
