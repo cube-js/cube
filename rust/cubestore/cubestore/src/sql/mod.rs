@@ -48,8 +48,8 @@ use crate::metastore::{
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
-use crate::queryplanner::serialized_plan::RowFilter;
-use crate::queryplanner::{QueryPlan, QueryPlanner};
+use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
+use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
@@ -66,6 +66,7 @@ use crate::{
 };
 use data::create_array_builder;
 use std::mem::take;
+use crate::queryplanner::panic::PanicNode;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -595,6 +596,19 @@ impl SqlService for SqlServiceImpl {
                     let partition = self.db.get_partition(partition_id).await?;
                     self.cluster.schedule_repartition(&partition).await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+                SystemCommand::PanicWorker => {
+                    let cluster = self.cluster.clone();
+                    let worker = &self.config_obj.select_workers()[0];
+                    let plan = SerializedPlan::try_new(
+                        PanicNode {}.into_plan(),
+                        PlanningMeta {
+                            indices: Vec::new(),
+                            multi_part_subtree: HashMap::new(),
+                        }
+                    ).await?;
+                    cluster.run_select(worker, plan).await?;
+                    panic!("worker did not panic")
                 }
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {

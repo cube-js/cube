@@ -27,6 +27,7 @@ use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
+use crate::queryplanner::panic::PanicNode;
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {
@@ -177,6 +178,8 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 pp_sort_columns(topk.group_expr.len(), &topk.order_by)
                             );
                         }
+                    } else if let Some(_) = node.as_any().downcast_ref::<PanicNode>() {
+                        self.output += &format!("Panic")
                     } else {
                         panic!("unknown extension node");
                     }

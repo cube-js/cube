@@ -49,6 +49,7 @@ use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Seri
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::iter::FromIterator;
+use crate::queryplanner::panic::{PanicNode, plan_panic};
 
 #[cfg(test)]
 pub async fn choose_index(
@@ -759,6 +760,9 @@ impl ExtensionPlanner for CubeExtensionPlanner {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
             Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
+        } else if let Some(_) = node.as_any().downcast_ref::<PanicNode>() {
+            assert_eq!(inputs.len(), 0);
+            Ok(Some(plan_panic()?))
         } else {
             Ok(None)
         }

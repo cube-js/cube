@@ -335,6 +335,8 @@ pub trait ConfigObj: DIService {
     fn malloc_trim_every_secs(&self) -> u64;
 
     fn max_cached_queries(&self) -> usize;
+
+    fn fault_injection(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -370,6 +372,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
+    pub fault_injection: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -489,6 +492,8 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
+
+    fn fault_injection(&self) -> bool { self.fault_injection }
 }
 
 lazy_static! {
@@ -625,6 +630,7 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                fault_injection: env_bool("CUBESTORE_FAULT_INJECTION", false),
             }),
         }
     }
@@ -672,6 +678,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                fault_injection: false,
             }),
         }
     }

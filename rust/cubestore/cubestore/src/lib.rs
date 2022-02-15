@@ -18,6 +18,7 @@
 // trace_macros!(true);
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
