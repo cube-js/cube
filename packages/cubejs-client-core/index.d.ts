@@ -1003,7 +1003,7 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>, responseFormat = 'default'):  Promise<ResultSet>;
+    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>, responseFormat: string):  Promise<ResultSet>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
