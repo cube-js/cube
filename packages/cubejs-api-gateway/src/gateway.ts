@@ -725,8 +725,7 @@ class ApiGateway {
 
     try {
       query = this.parseQueryParam(request.query);
-      const resType = query.$_resType || ResultType.DEFAULT;
-      delete query.$_resType;
+      const resType = query.responseFormat || ResultType.DEFAULT;
 
       this.log({
         type: 'Load Request',

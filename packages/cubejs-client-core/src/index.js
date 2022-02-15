@@ -47,12 +47,6 @@ class CubejsApi {
     this.method = options.method;
     this.headers = options.headers || {};
     this.credentials = options.credentials;
-
-    /**
-     * Query result dataset format.
-     * @type {string} 'default' or 'compact'
-     */
-    this.resType = options.resType || ResultType.DEFAULT;
     this.transport = options.transport || new HttpTransport({
       authorization: typeof apiToken === 'function' ? undefined : apiToken,
       apiUrl: this.apiUrl,
@@ -238,17 +232,17 @@ class CubejsApi {
   /**
    * Add system properties to a query object.
    * @param {Query} query
-   * @returns {Query}
+   * @param {string} responseFormat
+   * @returns {void}
    * @private
    */
-  patchQueryInternal(query) {
+  patchQueryInternal(query, responseFormat) {
     if (
-      this.resType === ResultType.COMPACT &&
-      query.$_resType !== ResultType.COMPACT
+      responseFormat === ResultType.COMPACT &&
+      query.responseFormat !== ResultType.COMPACT
     ) {
-      query.$_resType = ResultType.COMPACT;
+      query.responseFormat = ResultType.COMPACT;
     }
-    return query;
   }
 
   /**
@@ -259,7 +253,11 @@ class CubejsApi {
    * @private
    */
   loadResponseInternal(response) {
-    if (this.resType === ResultType.COMPACT) {
+    if (
+      response.results.length &&
+      response.results[0].query.responseFormat &&
+      response.results[0].query.responseFormat === ResultType.COMPACT
+    ) {
       response.results.forEach((result, j) => {
         const data = [];
         result.data.dataset.forEach((r) => {
@@ -283,15 +281,18 @@ class CubejsApi {
    * @param {Query | Query[]} query
    * @param {LoadMethodOptions | undefined} options
    * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @param {string} responseFormat
    * @returns {undefined | Promise<ResultSet>}
    */
-  load(query, options, callback) {
-    if (Array.isArray(query)) {
-      query.forEach((q) => {
-        this.patchQueryInternal(q);
-      });
-    } else {
-      this.patchQueryInternal(query);
+  load(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    if (responseFormat === ResultType.COMPACT) {
+      if (Array.isArray(query)) {
+        query.forEach((q) => {
+          this.patchQueryInternal(q, ResultType.COMPACT);
+        });
+      } else {
+        this.patchQueryInternal(query, ResultType.COMPACT);
+      }
     }
     return this.loadMethod(
       () => this.request('load', {
@@ -311,15 +312,18 @@ class CubejsApi {
    * @param {Query | Query[]} query
    * @param {LoadMethodOptions | null} options
    * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @param {string} responseFormat
    * @returns {void}
    */
-  subscribe(query, options, callback) {
-    if (Array.isArray(query)) {
-      query.forEach((q) => {
-        this.patchQueryInternal(q);
-      });
-    } else {
-      this.patchQueryInternal(query);
+  subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    if (responseFormat === ResultType.COMPACT) {
+      if (Array.isArray(query)) {
+        query.forEach((q) => {
+          this.patchQueryInternal(q, ResultType.COMPACT);
+        });
+      } else {
+        this.patchQueryInternal(query, ResultType.COMPACT);
+      }
     }
     return this.loadMethod(
       () => this.request('subscribe', {

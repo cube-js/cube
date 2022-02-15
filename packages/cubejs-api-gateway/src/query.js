@@ -96,7 +96,7 @@ const querySchema = Joi.object().keys({
   offset: Joi.number().integer().min(0),
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
-  $_resType: Joi.strict(),
+  responseFormat: Joi.valid('default', 'compact'),
 });
 
 const normalizeQueryOrder = order => {

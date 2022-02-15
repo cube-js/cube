@@ -204,33 +204,13 @@ const mockData = {
 };
 
 describe('CubejsApi', () => {
-  test('should support options.resType property', () => {
-    let api;
-
-    expect(() => {
-      api = new CubejsApi(undefined, {
-        apiUrl: 'http://localhost:4000/cubejs-api/v1',
-      });
-    }).not.toThrow();
-    expect(api.resType).toEqual('default');
-    expect(ResultSet).not.toHaveBeenCalled();
-
-    expect(() => {
-      api = new CubejsApi(undefined, {
-        apiUrl: 'http://localhost:4000/cubejs-api/v1',
-        resType: 'compact',
-      });
-    }).not.toThrow();
-    expect(api.resType).toEqual('compact');
-    expect(ResultSet).not.toHaveBeenCalled();
-  });
-
   test('CubejsApi#loadResponseInternal should work with the "default" resType for regular query', () => {
     const api = new CubejsApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.regular_1.result_default
@@ -240,6 +220,7 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.regular_1.result_default
@@ -261,12 +242,14 @@ describe('CubejsApi', () => {
     });
     const income = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[0].result_default
           )
         )
       }, {
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[1].result_default
@@ -276,12 +259,14 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[0].result_default
           )
         )
       }, {
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[1].result_default
@@ -303,12 +288,14 @@ describe('CubejsApi', () => {
     });
     const income = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[0].result_default
           )
         )
       }, {
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[1].result_default
@@ -318,12 +305,14 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[0].result_default
           )
         )
       }, {
+        query: {},
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[1].result_default
@@ -342,10 +331,10 @@ describe('CubejsApi', () => {
   test('CubejsApi#loadResponseInternal should work with the "compact" resType for regular query', () => {
     const api = new CubejsApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
-      resType: 'compact',
     });
     const income = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.regular_1.result_compact
@@ -355,6 +344,7 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.regular_1.result_default
@@ -373,16 +363,17 @@ describe('CubejsApi', () => {
   test('CubejsApi#loadResponseInternal should work with the "compact" resType for compare date range query', () => {
     const api = new CubejsApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
-      resType: 'compact',
     });
     const income = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[0].result_compact
           )
         )
       }, {
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[1].result_compact
@@ -392,12 +383,14 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[0].result_default
           )
         )
       }, {
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.compare[1].result_default
@@ -416,16 +409,17 @@ describe('CubejsApi', () => {
   test('CubejsApi#loadResponseInternal should work with the "compact" resType for blending query', () => {
     const api = new CubejsApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
-      resType: 'compact',
     });
     const income = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[0].result_compact
           )
         )
       }, {
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[1].result_compact
@@ -435,12 +429,14 @@ describe('CubejsApi', () => {
     };
     const outcome = {
       results: [{
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[0].result_default
           )
         )
       }, {
+        query: { responseFormat: 'compact' },
         data: JSON.parse(
           JSON.stringify(
             mockData.blending[1].result_default

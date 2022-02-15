@@ -4,7 +4,7 @@
  * @fileoverview transformValue function unit tests.
  */
 
-/* globals describe,test,expect,jest */
+/* globals describe,test,expect */
 /* eslint-disable import/no-duplicates */
 /* eslint-disable @typescript-eslint/no-duplicate-imports */
 
