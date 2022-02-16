@@ -17,6 +17,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
@@ -34,7 +35,6 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::skip::SkipExec;
 use datafusion::physical_plan::union::UnionExec;
-use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {

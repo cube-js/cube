@@ -7,6 +7,7 @@ use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
+use cubestore::CubeError;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -18,7 +19,6 @@ use std::path::Path;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
-use cubestore::CubeError;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -4485,7 +4485,11 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
         .await
         .unwrap();
-    let r = service.exec_query("SELECT i / z FROM s.t").await.err().unwrap();
+    let r = service
+        .exec_query("SELECT i / z FROM s.t")
+        .await
+        .err()
+        .unwrap();
     assert_eq!(
         r.elide_backtrace(),
         CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
@@ -4494,10 +4498,7 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
 
 async fn panic_worker(service: Box<dyn SqlClient>) {
     let r = service.exec_query("SYS PANIC WORKER").await;
-    assert_eq!(
-        r,
-        Err(CubeError::panic("worker panic".to_string()))
-    );
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

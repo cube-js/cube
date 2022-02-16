@@ -140,8 +140,7 @@ impl<'a> CubeStoreParser<'a> {
                     x
                 ))),
             }
-        } else if self.parse_custom_token("panic")
-            && self.parse_custom_token("worker") {
+        } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
             Ok(Statement::System(SystemCommand::PanicWorker))
         } else {
             Err(ParserError::ParserError(

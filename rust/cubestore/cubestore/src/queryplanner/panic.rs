@@ -1,16 +1,17 @@
+use crate::queryplanner::planning::WorkerExec;
+use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
+use datafusion::error::DataFusionError;
+use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::physical_plan::{
+    ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+};
 use std::any::Any;
 use std::fmt::Formatter;
 use std::sync::Arc;
-use arrow::datatypes::{Schema, SchemaRef};
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
-use datafusion::physical_plan::{ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream};
-use crate::queryplanner::planning::WorkerExec;
 
 #[derive(Debug, Clone)]
-pub struct PanicWorkerNode {
-}
+pub struct PanicWorkerNode {}
 
 impl PanicWorkerNode {
     pub fn into_plan(self) -> LogicalPlan {
@@ -33,7 +34,9 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         vec![]
     }
 
-    fn schema(&self) -> &DFSchemaRef { &EMPTY_SCHEMA }
+    fn schema(&self) -> &DFSchemaRef {
+        &EMPTY_SCHEMA
+    }
 
     fn expressions(&self) -> Vec<Expr> {
         vec![]
@@ -56,8 +59,7 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
 }
 
 #[derive(Debug)]
-pub struct PanicWorkerExec {
-}
+pub struct PanicWorkerExec {}
 
 impl PanicWorkerExec {
     pub fn new() -> PanicWorkerExec {

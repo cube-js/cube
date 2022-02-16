@@ -1,5 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
+use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
@@ -28,7 +29,6 @@ use sqlparser::ast::RollingOffset;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use crate::queryplanner::panic::PanicWorkerNode;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
@@ -452,7 +452,7 @@ impl SerializedLogicalPlan {
                 }),
             },
             SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
-                node: Arc::new(PanicWorkerNode {})
+                node: Arc::new(PanicWorkerNode {}),
             },
         })
     }

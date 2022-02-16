@@ -39,6 +39,7 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition, Schema};
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
@@ -49,7 +50,6 @@ use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Seri
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::iter::FromIterator;
-use crate::queryplanner::panic::{PanicWorkerNode, plan_panic_worker};
 
 #[cfg(test)]
 pub async fn choose_index(
