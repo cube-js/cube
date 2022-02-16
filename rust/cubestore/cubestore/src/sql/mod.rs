@@ -2181,6 +2181,8 @@ mod tests {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
+                c.meta_store_log_upload_interval = 1;
+                c.gc_loop_interval = 1;
                 c
             })
             .start_test(async move |services| {
@@ -2230,6 +2232,9 @@ mod tests {
                     .await
                     .unwrap();
                 let last_active_partition = active_partitions.iter().next().unwrap();
+
+                // Wait for GC tasks to drop files
+                Delay::new(Duration::from_millis(3000)).await;
 
                 let files = services
                     .remote_fs

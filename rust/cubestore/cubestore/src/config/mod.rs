@@ -304,6 +304,12 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    fn meta_store_snapshot_interval(&self) -> u64;
+
+    fn meta_store_log_upload_interval(&self) -> u64;
+
+    fn gc_loop_interval(&self) -> u64;
+
     fn stale_stream_timeout(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
@@ -358,6 +364,9 @@ pub struct ConfigObjImpl {
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub meta_store_log_upload_interval: u64,
+    pub meta_store_snapshot_interval: u64,
+    pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -429,6 +438,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn meta_store_snapshot_interval(&self) -> u64 {
+        self.meta_store_snapshot_interval
+    }
+
+    fn meta_store_log_upload_interval(&self) -> u64 {
+        self.meta_store_log_upload_interval
+    }
+
+    fn gc_loop_interval(&self) -> u64 {
+        self.gc_loop_interval
     }
 
     fn stale_stream_timeout(&self) -> u64 {
@@ -609,6 +630,9 @@ impl Config {
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
                 stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
@@ -683,6 +707,9 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
             }),
         }
     }
