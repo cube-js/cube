@@ -9,7 +9,8 @@ extern crate bincode;
 use bincode::{deserialize_from, serialize_into};
 
 use crate::metastore::{
-    table::Table, Chunk, Column, ColumnType, IdRow, Index, MetaStore, Partition, WAL,
+    deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
+    MetaStore, Partition, WAL,
 };
 use crate::remotefs::RemoteFs;
 use crate::table::{Row, TableValue};
@@ -462,9 +463,10 @@ impl ChunkStore {
             .await?;
         let file_size = chunk.get_row().file_size();
         let remote_path = ChunkStore::chunk_file_name(chunk);
-        self.remote_fs
-            .download_file(&remote_path, file_size)
-            .await?;
+        let result = self.remote_fs.download_file(&remote_path, file_size).await;
+
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition).await;
+
         Ok((
             self.remote_fs.local_file(&remote_path).await?,
             index.into_row(),

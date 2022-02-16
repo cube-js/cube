@@ -4719,6 +4719,45 @@ impl MetaStore for RocksMetaStore {
     }
 }
 
+pub async fn deactivate_table_on_corrupt_data<'a, T: 'static>(
+    meta_store: Arc<dyn MetaStore>,
+    e: &'a Result<T, CubeError>,
+    partition: &'a IdRow<Partition>,
+) {
+    if let Err(e) = deactivate_table_on_corrupt_data_res::<T>(meta_store, e, partition).await {
+        log::error!("Error during deactivation of table on corrupt data: {}", e);
+    }
+}
+
+pub async fn deactivate_table_on_corrupt_data_res<'a, T: 'static>(
+    meta_store: Arc<dyn MetaStore>,
+    result: &'a Result<T, CubeError>,
+    partition: &'a IdRow<Partition>,
+) -> Result<(), CubeError> {
+    if let Err(e) = &result {
+        if e.is_corrupt_data() {
+            let table_id = meta_store
+                .get_index(partition.get_row().get_index_id())
+                .await?
+                .get_row()
+                .table_id();
+            let table = meta_store.get_table_by_id(table_id).await?;
+            let schema = meta_store
+                .get_schema_by_id(table.get_row().get_schema_id())
+                .await?;
+            log::info!(
+                "Deactivating table {}.{} (#{}) due to corrupt data error: {}",
+                schema.get_row().get_name(),
+                table.get_row().get_table_name(),
+                table_id,
+                e
+            );
+            meta_store.table_ready(table_id, false).await?;
+        }
+    }
+    Ok(())
+}
+
 fn get_table_impl(
     db_ref: DbTableRef,
     schema_name: String,

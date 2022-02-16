@@ -482,7 +482,7 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for (f, size) in p.all_required_files() {
+                for (_, f, size) in p.all_required_files() {
                     let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
@@ -917,7 +917,7 @@ impl SqlService for SqlServiceImpl {
                                 .collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for (f, _) in worker_plan.files_to_download() {
+                        for (_, f, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -1795,6 +1795,19 @@ mod tests {
                 let result = service.exec_query("SELECT count(*) from foo.ints").await;
                 println!("Result: {:?}", result);
                 assert!(result.is_err(), "Expected error but {:?} found", result);
+
+                let result = service.exec_query("SELECT count(*) from foo.ints").await;
+                println!("Result: {:?}", result);
+                assert!(
+                    result
+                        .clone()
+                        .err()
+                        .unwrap()
+                        .to_string()
+                        .contains("not found"),
+                    "Expected table not found error but got {:?}",
+                    result
+                );
             })
             .await;
     }
