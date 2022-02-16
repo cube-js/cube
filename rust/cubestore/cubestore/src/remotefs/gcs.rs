@@ -238,6 +238,7 @@ impl RemoteFs for GCSRemoteFs {
                     .map(|obj| RemoteFile {
                         remote_path: leading_slash.replace(&obj.name, NoExpand("")).to_string(),
                         updated: obj.updated.clone(),
+                        file_size: obj.size,
                     })
                     .collect())
             })

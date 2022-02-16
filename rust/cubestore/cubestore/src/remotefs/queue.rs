@@ -154,10 +154,37 @@ impl QueueRemoteFs {
                     .await?
                     .contains(remote_path.as_str())
                 {
-                    let res = self
+                    let mut res = self
                         .remote_fs
                         .upload_file(&temp_upload_path, &remote_path)
                         .await;
+                    if let Ok(size) = res {
+                        match self.remote_fs.list_with_metadata(&remote_path).await {
+                            Ok(list) => {
+                                let list_res = list.iter().next().ok_or(CubeError::internal(
+                                    format!("File {} can't be listed after upload", remote_path),
+                                ));
+                                match list_res {
+                                    Ok(file) => {
+                                        if file.file_size != size {
+                                            res = Err(CubeError::internal(format!(
+                                                "File sizes for {} doesn't match after upload. Expected to be {} but {} uploaded",
+                                                remote_path,
+                                                size,
+                                                file.file_size
+                                            )));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        res = Err(e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                res = Err(e);
+                            }
+                        }
+                    }
                     self.result_sender
                         .send(RemoteFsOpResult::Upload(remote_path, res))?;
                 }
