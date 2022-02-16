@@ -610,13 +610,11 @@ impl SqlService for SqlServiceImpl {
                     )
                     .await?;
                     if workers.len() == 0 {
-                        println!("EXEC SELECT");
                         let executor = self.query_executor.clone();
                         async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
                             .await?;
                     } else {
                         let worker = &workers[0];
-                        println!("WORKER SELECT");
                         cluster.run_select(worker, plan).await?;
                     }
                     panic!("worker did not panic")

@@ -58,7 +58,6 @@ COPY --from=builder /build/cubestore/target/release/cubestored .
 
 EXPOSE 3306
 
-# ENV RUST_BACKTRACE=true
-ENV RUST_BACKTRACE=full
+ENV RUST_BACKTRACE=true
 
 CMD ["./cubestored"]
