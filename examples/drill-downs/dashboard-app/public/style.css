@@ -231,11 +231,11 @@ header a:hover::after {
     cursor: pointer;
 }
 
-.feedback-button[data-type="like"] {
+#feedback-like {
     background-color: var(--success-color);
 }
 
-.feedback-button[data-type="dislike"] {
+#feedback-dislike {
     background-color: var(--danger-color);
 }
 

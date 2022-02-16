@@ -12,6 +12,7 @@
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.4",
+    "cubedev-tracking": "^1.0.7",
     "fontsource-roboto": "^2.1.4",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
