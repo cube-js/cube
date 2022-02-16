@@ -418,7 +418,7 @@ impl QueueRemoteFs {
             let actual_size = metadata.len();
             if actual_size != expected_file_size {
                 tokio::fs::remove_file(local_path).await?;
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::corrupt_data(format!(
                     "Expected file size for '{}' is {} but {} received",
                     remote_path, expected_file_size, actual_size
                 )));
