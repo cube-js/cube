@@ -67,7 +67,6 @@ jobs:
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
           yarn run dataset:minimal
           yarn run birdbox:cli:postgresql
-          yarn run birdbox:cli:result-type
       - name: Slack Failure
         if: failure()
         uses: voxmedia/github-action-slack-notify-build@v1
@@ -84,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ['result-type', 'postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
+        target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
         arch: ['', '-alpine']
     steps:
       - name: Checkout
