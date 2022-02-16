@@ -1448,6 +1448,7 @@ mod tests {
     use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use regex::Regex;
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1906,11 +1907,12 @@ mod tests {
 
                 let worker_plan = pp_phys_plan(plans.worker.as_ref());
                 println!("Worker Plan: {}", worker_plan);
-                let indices = worker_plan.match_indices("ParquetScan").collect::<Vec<_>>();
+                let parquet_regex = Regex::new(r"\d+-[a-z0-9]+.parquet").unwrap();
+                let matches = parquet_regex.captures_iter(&worker_plan).count();
                 assert!(
                     // TODO 2 because partition pruning doesn't respect half open intervals yet
-                    indices.len() < 3 && indices.len() > 0,
-                    "{}\nshould have 2 and less ParquetScan nodes",
+                    matches < 3 && matches > 0,
+                    "{}\nshould have 2 and less partition scan nodes",
                     worker_plan
                 );
             })
