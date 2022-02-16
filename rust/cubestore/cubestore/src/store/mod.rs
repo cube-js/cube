@@ -203,7 +203,6 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     ) -> Result<Vec<ChunkUploadJob>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
-    async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
 }
@@ -435,12 +434,6 @@ impl ChunkDataStore for ChunkStore {
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.remove(&chunk_id);
-        Ok(())
-    }
-
-    async fn delete_remote_chunk(&self, chunk: IdRow<Chunk>) -> Result<(), CubeError> {
-        let remote_path = ChunkStore::chunk_file_name(chunk);
-        self.remote_fs.delete_file(&remote_path).await?;
         Ok(())
     }
 }
