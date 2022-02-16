@@ -1,7 +1,7 @@
 import { DriverTests } from '@cubejs-backend/testing/dist/src/testing';
+import { CubeStoreDBRunner } from '@cubejs-backend/testing';
 
 import { CubeStoreDriver } from '../src';
-import { CubeStoreDBRunner } from '@cubejs-backend/testing';
 
 DriverTests.config();
 
@@ -29,5 +29,11 @@ describe('CubeStoreDriver', () => {
 
   test('query', async () => {
     await tests.testQuery();
+  });
+
+  test('panic', async () => {
+    await expect(tests.driver.query('SYS PANIC WORKER', []))
+      .rejects
+      .toThrow("Panic: worker panic");
   });
 });

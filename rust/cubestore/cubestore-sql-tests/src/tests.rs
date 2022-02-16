@@ -19,7 +19,6 @@ use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use cubestore::CubeError;
-use cubestore::util::catch_unwind::async_try_with_catch_unwind;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -159,8 +158,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
-        t("panic_worker", panic_worker),
         t("divide_by_zero", divide_by_zero),
+        t("panic_worker", panic_worker),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4494,7 +4493,7 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
 }
 
 async fn panic_worker(service: Box<dyn SqlClient>) {
-    let r = async_try_with_catch_unwind(service.exec_query("SYS PANIC WORKER")).await;
+    let r = service.exec_query("SYS PANIC WORKER").await;
     assert_eq!(
         r,
         Err(CubeError::panic("worker panic".to_string()))

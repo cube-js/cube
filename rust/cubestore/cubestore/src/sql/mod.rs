@@ -67,6 +67,7 @@ use crate::{
 use data::create_array_builder;
 use std::mem::take;
 use crate::queryplanner::panic::PanicWorkerNode;
+use crate::util::catch_unwind::async_try_with_catch_unwind;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -608,10 +609,12 @@ impl SqlService for SqlServiceImpl {
                         }
                     ).await?;
                     if workers.len() == 0 {
+                        println!("EXEC SELECT");
                         let executor = self.query_executor.clone();
-                        executor.execute_router_plan(plan, cluster).await?;
+                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster)).await?;
                     } else {
                         let worker = &workers[0];
+                        println!("WORKER SELECT");
                         cluster.run_select(worker, plan).await?;
                     }
                     panic!("worker did not panic")
