@@ -186,7 +186,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             );
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
-                        self.output += &format!("Panic")
+                        self.output += &format!("PanicWorker")
                     } else {
                         panic!("unknown extension node");
                     }
@@ -371,7 +371,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 );
             }
         } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
-            *out += "Panic";
+            *out += "PanicWorker;
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += "Worker";
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {
