@@ -47,7 +47,12 @@ impl SchedulerImpl {
         config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
         let cancel_token = CancellationToken::new();
-        let gc_loop = DataGCLoop::new(meta_store.clone(), remote_fs.clone(), cancel_token.clone());
+        let gc_loop = DataGCLoop::new(
+            meta_store.clone(),
+            remote_fs.clone(),
+            config.clone(),
+            cancel_token.clone(),
+        );
         SchedulerImpl {
             meta_store,
             cluster,
@@ -435,19 +440,30 @@ impl SchedulerImpl {
                     .free_memory_chunk(&node_name, chunk.get_id())
                     .await?;
             } else if chunk.get_row().uploaded() {
-                self.remote_fs
-                    .delete_file(
-                        ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix())
-                            .as_str(),
-                    )
-                    .await?
+                let file_name =
+                    ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
+                let deadline = Instant::now()
+                    + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                self.gc_loop
+                    .send(GCTimedTask {
+                        deadline,
+                        task: GCTask::RemoveRemoteFile(file_name),
+                    })
+                    .await?;
             }
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
             // remove file only if partition is active otherwise it should be removed when it's deactivated
             if partition.get_row().is_active() {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                    self.remote_fs.delete_file(file_name.as_str()).await?;
+                    let deadline = Instant::now()
+                        + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                    self.gc_loop
+                        .send(GCTimedTask {
+                            deadline,
+                            task: GCTask::RemoveRemoteFile(file_name),
+                        })
+                        .await?;
                 }
             }
         }
@@ -733,6 +749,7 @@ enum GCTask {
 struct DataGCLoop {
     metastore: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
+    config: Arc<dyn ConfigObj>,
     stop: CancellationToken,
     task_notify: Notify,
     pending: RwLock<(BinaryHeap<GCTimedTask>, HashSet<GCTask>)>,
@@ -742,11 +759,13 @@ impl DataGCLoop {
     fn new(
         metastore: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
         stop: CancellationToken,
     ) -> Arc<Self> {
         Arc::new(DataGCLoop {
             metastore,
             remote_fs,
+            config,
             stop,
             task_notify: Notify::new(),
             pending: RwLock::new((BinaryHeap::new(), HashSet::new())),
@@ -758,7 +777,14 @@ impl DataGCLoop {
             let mut pending_lock = self.pending.write().await;
             // Double-checked locking
             if pending_lock.1.get(&task.task).is_none() {
-                log::trace!("Posting GCTask: {:?}", task);
+                log::trace!(
+                    "Posting GCTask {}: {:?}",
+                    task.deadline
+                        .checked_duration_since(Instant::now())
+                        .map(|d| format!("in {:?}", d))
+                        .unwrap_or("now".to_string()),
+                    task
+                );
                 pending_lock.1.insert(task.task.clone());
                 pending_lock.0.push(task);
                 self.task_notify.notify_waiters();
@@ -774,7 +800,7 @@ impl DataGCLoop {
                 _ = self.stop.cancelled() => {
                     return;
                 }
-                _ = Delay::new(Duration::from_secs(60)) => {}
+                _ = Delay::new(Duration::from_secs(self.config.gc_loop_interval())) => {}
                 _ = self.task_notify.notified() => {}
             };
 

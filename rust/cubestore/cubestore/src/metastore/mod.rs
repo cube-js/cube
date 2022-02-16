@@ -2256,11 +2256,12 @@ impl RocksMetaStore {
             log::info!("Not running metastore upload loop");
             return;
         }
+        let upload_interval = meta_store.config.meta_store_log_upload_interval();
         meta_store
             .upload_loop
             .process(
                 meta_store.clone(),
-                async move |_| Ok(Delay::new(Duration::from_secs(60)).await),
+                async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
                 async move |m, _| m.run_upload().await,
             )
             .await;
@@ -2314,7 +2315,10 @@ impl RocksMetaStore {
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
-        if last_checkpoint_time + time::Duration::from_secs(300) < SystemTime::now() {
+        if last_checkpoint_time
+            + time::Duration::from_secs(self.config.meta_store_snapshot_interval())
+            < SystemTime::now()
+        {
             info!("Uploading meta store check point");
             self.upload_check_point().await?;
         }
