@@ -108,7 +108,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
       await wsTransport.close();
-
       await birdbox.stop();
     });
 
@@ -143,6 +142,156 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       } catch (e) {
         expect((e as Error).toString()).toContain('Query should contain either');
       }
+    });
+
+    describe('responseFormat', () => {
+      const responses: unknown[] = [];
+      let transport: WebSocketTransport;
+      let http: CubejsApi;
+      let ws: CubejsApi;
+  
+      beforeAll(async () => {
+        try {
+          transport = new WebSocketTransport({
+            apiUrl: birdbox.configuration.apiUrl,
+          });
+          http = cubejs(async () => 'test', {
+            apiUrl: birdbox.configuration.apiUrl,
+          });
+          ws = cubejs(async () => 'test', {
+            apiUrl: birdbox.configuration.apiUrl,
+            transport,
+          });
+        } catch (e) {
+          console.log(e);
+          process.exit(1);
+        }
+      });
+  
+      afterAll(async () => {
+        await transport.close();
+      });
+  
+      test('http+responseFormat=default', async () => {
+        const response = await http.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#1', async () => {
+        const response = await http.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'compact',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#2', async () => {
+        const response = await http.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#1+2', async () => {
+        const response = await http.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'compact',
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=default', async () => {
+        const response = await ws.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#1', async () => {
+        const response = await ws.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'compact',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#2', async () => {
+        const response = await ws.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#1+2', async () => {
+        const response = await ws.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'compact',
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('responses', () => {
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[1].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[2].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[3].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[4].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[5].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[6].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[7].rawData());
+      });
     });
   });
 }
