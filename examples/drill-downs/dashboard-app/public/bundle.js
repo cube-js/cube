@@ -1804,20 +1804,30 @@ const cubeTracking = require("cubedev-tracking")
 const { event: cubeTrackingEvent } = cubeTracking
 
 // fetch examples nav items
-const navConfigPath = "nav.config.json";
+const NAV_CONFIG_PATH = "examples-nav.config.json";
 const populateExamplesNav = (data) => {
+    const menu = document.getElementsByClassName("menu-list")[0]
+    const menuButton = document.getElementById("menu-button")
+
+    // find current nav item index
+    const currentNavItemIndex = data.map(item=>item.url).indexOf(window.location.href)
+    // remove current nav item from data
+    const currentNavItem = data.splice(currentNavItemIndex, 1)[0]
+
     // generate nav options from data items
-    const navOptions = data
+    const navItems = data
         .map(item =>
             `<li class="dropdown-list-item"><a href="${item.url}">${item.name}</a></li>`)
         .join("");
 
     // set options to menu select
-    const menu = document.getElementsByClassName("menu-list")[0]
-    menu.innerHTML = navOptions
+    menu.innerHTML = navItems
+    // set current item name as menu button text
+    menuButton.innerHTML = currentNavItem.name
 }
 
-fetch(navConfigPath).then(res => res.json())
+// fetch nav items from config file
+fetch(NAV_CONFIG_PATH).then(res => res.json())
     .then(data => populateExamplesNav(data))
     .catch();
 

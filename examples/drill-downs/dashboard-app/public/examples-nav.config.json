@@ -10,5 +10,9 @@
     {
         "name": "Data Blending",
         "url": "https://data-blending-demo.cube.dev"
+    },
+    {
+        "name": "World of Open Source",
+        "url": "http://localhost:3000/#/"
     }
 ]
