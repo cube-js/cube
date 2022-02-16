@@ -371,7 +371,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 );
             }
         } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
-            *out += "PanicWorker;
+            *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += "Worker";
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {
