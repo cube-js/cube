@@ -28,7 +28,7 @@ use sqlparser::ast::RollingOffset;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use crate::queryplanner::panic::PanicNode;
+use crate::queryplanner::panic::PanicWorkerNode;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
@@ -452,7 +452,7 @@ impl SerializedLogicalPlan {
                 }),
             },
             SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
-                node: Arc::new(PanicNode {})
+                node: Arc::new(PanicWorkerNode {})
             },
         })
     }
@@ -928,7 +928,7 @@ impl SerializedPlan {
                             .map(|d| Self::serialized_expr(d)),
                         aggs: Self::serialized_exprs(&r.aggs),
                     }
-                } else if let Some(_) = node.as_any().downcast_ref::<PanicNode>() {
+                } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                     SerializedLogicalPlan::Panic {}
                 } else {
                     panic!("unknown extension");

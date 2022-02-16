@@ -19,6 +19,7 @@ use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use cubestore::CubeError;
+use cubestore::util::catch_unwind::async_try_with_catch_unwind;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -159,6 +160,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             unique_key_and_multi_measures_for_stream_table,
         ),
         t("panic_worker", panic_worker),
+        t("divide_by_zero", divide_by_zero),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4474,21 +4476,28 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
     );
 }
 
+async fn divide_by_zero(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i int, z int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
+        .await
+        .unwrap();
+    let r = service.exec_query("SELECT i / z FROM s.t").await.err().unwrap();
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+    );
+}
+
 async fn panic_worker(service: Box<dyn SqlClient>) {
-    let r = service.exec_query("SYS PANIC WORKER").await;
-    // service.exec_query("CREATE SCHEMA s").await.unwrap();
-    // service
-    //     .exec_query("CREATE TABLE s.t(i int)")
-    //     .await
-    //     .unwrap();
-    // service
-    //     .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
-    //     .await
-    //     .unwrap();
-    // let r = service.exec_query("SELECT i / 0 FROM s.t").await;
+    let r = async_try_with_catch_unwind(service.exec_query("SYS PANIC WORKER")).await;
     assert_eq!(
         r,
-        Err(CubeError::panic("ohlala".to_string()))
+        Err(CubeError::panic("worker panic".to_string()))
     );
 }
 

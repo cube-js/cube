@@ -66,7 +66,7 @@ use crate::{
 };
 use data::create_array_builder;
 use std::mem::take;
-use crate::queryplanner::panic::PanicNode;
+use crate::queryplanner::panic::PanicWorkerNode;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -599,16 +599,21 @@ impl SqlService for SqlServiceImpl {
                 }
                 SystemCommand::PanicWorker => {
                     let cluster = self.cluster.clone();
-                    let worker = &self.config_obj.select_workers()[0];
+                    let workers = self.config_obj.select_workers();
                     let plan = SerializedPlan::try_new(
-                        PanicNode {}.into_plan(),
+                        PanicWorkerNode {}.into_plan(),
                         PlanningMeta {
                             indices: Vec::new(),
                             multi_part_subtree: HashMap::new(),
                         }
                     ).await?;
-                    cluster.route_select(worker, plan).await?;
-                    // cluster.run_select(worker, plan).await?;
+                    if workers.len() == 0 {
+                        let executor = self.query_executor.clone();
+                        executor.execute_router_plan(plan, cluster).await?;
+                    } else {
+                        let worker = &workers[0];
+                        cluster.run_select(worker, plan).await?;
+                    }
                     panic!("worker did not panic")
                 }
             },

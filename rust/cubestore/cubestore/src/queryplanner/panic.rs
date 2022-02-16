@@ -6,12 +6,13 @@ use arrow::datatypes::{Schema, SchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use datafusion::physical_plan::{ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream};
+use crate::queryplanner::planning::WorkerExec;
 
 #[derive(Debug, Clone)]
-pub struct PanicNode {
+pub struct PanicWorkerNode {
 }
 
-impl PanicNode {
+impl PanicWorkerNode {
     pub fn into_plan(self) -> LogicalPlan {
         LogicalPlan::Extension {
             node: Arc::new(self),
@@ -23,7 +24,7 @@ lazy_static! {
     static ref EMPTY_SCHEMA: DFSchemaRef = Arc::new(DFSchema::empty());
 }
 
-impl UserDefinedLogicalNode for PanicNode {
+impl UserDefinedLogicalNode for PanicWorkerNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -50,22 +51,22 @@ impl UserDefinedLogicalNode for PanicNode {
         assert!(exprs.is_empty());
         assert!(inputs.is_empty());
 
-        Arc::new(PanicNode {})
+        Arc::new(PanicWorkerNode {})
     }
 }
 
 #[derive(Debug)]
-pub struct PanicExec {
+pub struct PanicWorkerExec {
 }
 
-impl PanicExec {
-    pub fn new() -> PanicExec {
-        PanicExec {}
+impl PanicWorkerExec {
+    pub fn new() -> PanicWorkerExec {
+        PanicWorkerExec {}
     }
 }
 
 #[async_trait]
-impl ExecutionPlan for PanicExec {
+impl ExecutionPlan for PanicWorkerExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -87,7 +88,7 @@ impl ExecutionPlan for PanicExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 0);
-        Ok(Arc::new(PanicExec::new()))
+        Ok(Arc::new(PanicWorkerExec::new()))
     }
 
     fn output_hints(&self) -> OptimizerHints {
@@ -103,6 +104,10 @@ impl ExecutionPlan for PanicExec {
     }
 }
 
-pub fn plan_panic() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    Ok(Arc::new(PanicExec::new()))
+pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    Ok(Arc::new(WorkerExec {
+        input: Arc::new(PanicWorkerExec::new()),
+        schema: Arc::new(Schema::empty()),
+        max_batch_rows: 1,
+    }))
 }

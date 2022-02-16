@@ -94,6 +94,14 @@ impl CubeError {
         WithBt(self)
     }
 
+    pub fn elide_backtrace(&self) -> CubeError {
+        CubeError {
+            message: self.message.clone(),
+            backtrace: String::new(),
+            cause: self.cause.clone(),
+        }
+    }
+
     pub fn user(message: String) -> CubeError {
         CubeError {
             message,
