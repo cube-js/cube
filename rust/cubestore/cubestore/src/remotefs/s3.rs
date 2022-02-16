@@ -259,6 +259,7 @@ impl RemoteFs for S3RemoteFs {
                             remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
                             updated: DateTime::parse_from_rfc3339(&o.last_modified)?
                                 .with_timezone(&Utc),
+                            file_size: o.size,
                         })
                     })
             })

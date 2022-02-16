@@ -3,7 +3,9 @@ use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
-use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
+use crate::metastore::{
+    deactivate_table_on_corrupt_data, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
+};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
 use crate::util::time_span::warn_long_fut;
@@ -687,9 +689,14 @@ impl SchedulerImpl {
         path: String,
     ) -> Result<(), CubeError> {
         let node_name = self.cluster.node_name_by_partition(p);
-        self.cluster
+        let result = self
+            .cluster
             .warmup_download(&node_name, path, p.get_row().file_size())
-            .await
+            .await;
+
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, p).await;
+
+        result
     }
 }
 

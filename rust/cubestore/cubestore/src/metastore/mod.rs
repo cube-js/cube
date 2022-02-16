@@ -2033,6 +2033,34 @@ impl RocksMetaStore {
         Self::with_listener(path, vec![], remote_fs, config)
     }
 
+    pub async fn load_from_dump(
+        path: impl AsRef<Path>,
+        dump_path: impl AsRef<Path>,
+        remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Result<Arc<RocksMetaStore>, CubeError> {
+        if !fs::metadata(path.as_ref()).await.is_ok() {
+            let mut backup =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), dump_path)?;
+            backup.restore_from_latest_backup(
+                &path,
+                &path,
+                &rocksdb::backup::RestoreOptions::default(),
+            )?;
+        } else {
+            info!(
+                "Using existing metastore in {}",
+                path.as_ref().as_os_str().to_string_lossy()
+            );
+        }
+
+        let meta_store = Self::new(path, remote_fs, config);
+
+        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        Ok(meta_store)
+    }
+
     pub async fn load_from_remote(
         path: impl AsRef<Path>,
         remote_fs: Arc<dyn RemoteFs>,
@@ -4689,6 +4717,45 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+}
+
+pub async fn deactivate_table_on_corrupt_data<'a, T: 'static>(
+    meta_store: Arc<dyn MetaStore>,
+    e: &'a Result<T, CubeError>,
+    partition: &'a IdRow<Partition>,
+) {
+    if let Err(e) = deactivate_table_on_corrupt_data_res::<T>(meta_store, e, partition).await {
+        log::error!("Error during deactivation of table on corrupt data: {}", e);
+    }
+}
+
+pub async fn deactivate_table_on_corrupt_data_res<'a, T: 'static>(
+    meta_store: Arc<dyn MetaStore>,
+    result: &'a Result<T, CubeError>,
+    partition: &'a IdRow<Partition>,
+) -> Result<(), CubeError> {
+    if let Err(e) = &result {
+        if e.is_corrupt_data() {
+            let table_id = meta_store
+                .get_index(partition.get_row().get_index_id())
+                .await?
+                .get_row()
+                .table_id();
+            let table = meta_store.get_table_by_id(table_id).await?;
+            let schema = meta_store
+                .get_schema_by_id(table.get_row().get_schema_id())
+                .await?;
+            log::info!(
+                "Deactivating table {}.{} (#{}) due to corrupt data error: {}",
+                schema.get_row().get_name(),
+                table.get_row().get_table_name(),
+                table_id,
+                e
+            );
+            meta_store.table_ready(table_id, false).await?;
+        }
+    }
+    Ok(())
 }
 
 fn get_table_impl(

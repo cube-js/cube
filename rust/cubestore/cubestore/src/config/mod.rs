@@ -336,7 +336,7 @@ pub trait ConfigObj: DIService {
 
     fn max_cached_queries(&self) -> usize;
 
-    fn fault_injection(&self) -> bool;
+    fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
 #[derive(Debug, Clone)]
@@ -347,6 +347,7 @@ pub struct ConfigObjImpl {
     pub compaction_chunks_count_threshold: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
+    pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
@@ -372,7 +373,6 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
-    pub fault_injection: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -493,7 +493,9 @@ impl ConfigObj for ConfigObjImpl {
         self.max_cached_queries
     }
 
-    fn fault_injection(&self) -> bool { self.fault_injection }
+    fn dump_dir(&self) -> &Option<PathBuf> {
+        &self.dump_dir
+    }
 }
 
 lazy_static! {
@@ -549,6 +551,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
+                dump_dir: env::var("CUBESTORE_DUMP_DIR")
+                    .ok()
+                    .map(|v| PathBuf::from(v)),
                 partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
@@ -630,7 +635,6 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
-                fault_injection: env_bool("CUBESTORE_FAULT_INJECTION", false),
             }),
         }
     }
@@ -643,6 +647,7 @@ impl Config {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
+                dump_dir: None,
                 partition_split_threshold: 20,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
@@ -678,7 +683,6 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
-                fault_injection: false,
             }),
         }
     }
@@ -903,14 +907,23 @@ impl Config {
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
-                        let meta_store = RocksMetaStore::load_from_remote(
-                            &path,
-                            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            i.get_service("original_remote_fs").await,
-                            i.get_service_typed::<dyn ConfigObj>().await,
-                        )
-                        .await
-                        .unwrap();
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            RocksMetaStore::load_from_dump(
+                                &path,
+                                dump_dir,
+                                original_remote_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            RocksMetaStore::load_from_remote(&path, original_remote_fs, config)
+                                .await
+                                .unwrap()
+                        };
                         meta_store.add_listener(event_sender).await;
                         meta_store
                     },

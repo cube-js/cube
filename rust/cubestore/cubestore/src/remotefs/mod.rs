@@ -24,6 +24,7 @@ use tokio::sync::{Mutex, RwLock};
 pub struct RemoteFile {
     remote_path: String,
     updated: DateTime<Utc>,
+    file_size: u64,
 }
 
 impl RemoteFile {
@@ -329,6 +330,7 @@ impl LocalDirRemoteFs {
                         result.push(RemoteFile {
                             remote_path: relative_name.to_string(),
                             updated: DateTime::from(metadata.modified()?),
+                            file_size: metadata.len(),
                         });
                     }
                 }

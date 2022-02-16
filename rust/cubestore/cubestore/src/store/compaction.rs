@@ -2,7 +2,9 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
-use crate::metastore::{Chunk, IdRow, MetaStore, Partition, PartitionData};
+use crate::metastore::{
+    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, Partition, PartitionData,
+};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
@@ -185,11 +187,12 @@ impl CompactionService for CompactionServiceImpl {
             None => partition.get_row().get_full_name(partition.get_id()),
         };
         let old_partition_local = if let Some(f) = old_partition_remote {
-            Some(
-                self.remote_fs
-                    .download_file(&f, partition.get_row().file_size())
-                    .await?,
-            )
+            let result = self
+                .remote_fs
+                .download_file(&f, partition.get_row().file_size())
+                .await;
+            deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition).await;
+            Some(result?)
         } else {
             None
         };
@@ -383,6 +386,7 @@ impl CompactionService for CompactionServiceImpl {
         let key_len = multi_index.get_row().key_columns().len();
 
         // Find key ranges for new partitions.
+        // TODO deactivate corrupt tables
         let files = download_files(&partitions, self.remote_fs.clone()).await?;
         let keys = find_partition_keys(
             keys_with_counts(&files, key_len).await?,

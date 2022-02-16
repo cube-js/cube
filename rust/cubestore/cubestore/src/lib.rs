@@ -75,6 +75,7 @@ impl std::error::Error for CubeError {}
 pub enum CubeErrorCauseType {
     User,
     Internal,
+    CorruptData,
     Panic,
 }
 
@@ -118,11 +119,26 @@ impl CubeError {
         }
     }
 
+    pub fn corrupt_data(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::CorruptData,
+        }
+    }
+
     pub fn panic(message: String) -> CubeError {
         CubeError {
             message,
             backtrace: String::new(),
             cause: CubeErrorCauseType::Panic,
+        }
+    }
+
+    pub fn is_corrupt_data(&self) -> bool {
+        match self.cause {
+            CubeErrorCauseType::CorruptData => true,
+            _ => false,
         }
     }
 
