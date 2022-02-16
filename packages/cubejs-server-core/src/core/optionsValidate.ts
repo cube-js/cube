@@ -101,6 +101,19 @@ const schemaOptions = Joi.object().keys({
         softIdleTimeoutSeconds: Joi.number().min(0),
         createClient: Joi.func(),
         destroyClient: Joi.func(),
+        poolOptions: Joi.object().keys({
+          maxWaitingClients: Joi.number(),
+          testOnBorrow: Joi.bool(),
+          testOnReturn: Joi.bool(),
+          acquireTimeoutMillis: Joi.number(),
+          fifo: Joi.bool(),
+          priorityRange: Joi.number(),
+          autostart: Joi.bool(),
+          evictionRunIntervalMillis: Joi.number().min(0),
+          numTestsPerEvictionRun: Joi.number().min(1),
+          softIdleTimeoutMillis: Joi.number().min(0),
+          idleTimeoutMillis: Joi.number().min(0),
+        })
       }),
       continueWaitTimeout: Joi.number().min(0).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
@@ -122,6 +135,11 @@ const schemaOptions = Joi.object().keys({
   dashboardAppPort: Joi.number(),
   sqlCache: Joi.boolean(),
   livePreview: Joi.boolean(),
+  // SQL API
+  sqlPort: Joi.number(),
+  checkSqlAuth: Joi.func(),
+  sqlUser: Joi.string(),
+  sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
 });

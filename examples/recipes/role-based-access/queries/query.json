@@ -1,0 +1,11 @@
+{
+    "dimensions": [
+        "Orders.status"
+    ],
+    "order": {
+        "Orders.count": "desc"
+    },
+    "measures": [
+        "Orders.count"
+    ]
+}

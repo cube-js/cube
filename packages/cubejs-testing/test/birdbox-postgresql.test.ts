@@ -3,4 +3,5 @@ import { startBirdBoxFromContainer } from '../src';
 
 createBirdBoxTestCase('postgresql', () => startBirdBoxFromContainer({
   name: 'postgresql',
+  loadScript: 'load.sh',
 }));

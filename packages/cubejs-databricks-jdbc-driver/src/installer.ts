@@ -37,7 +37,7 @@ async function cliAcceptVerify() {
   return false;
 }
 
-export async function downloadJDBCDriver(isCli: boolean = false): Promise<string|null> {
+export async function downloadJDBCDriver(isCli: boolean = false): Promise<string | null> {
   let driverAccepted = acceptedByEnv();
 
   if (driverAccepted === undefined && isCli) {

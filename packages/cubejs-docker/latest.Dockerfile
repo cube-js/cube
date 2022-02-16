@@ -1,4 +1,4 @@
-FROM node:12.22.1
+FROM node:14.18.2-buster-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -18,10 +18,16 @@ COPY . .
 
 RUN yarn policies set-version v1.22.5
 
+# Required for node-oracledb to buld on ARM64
+RUN apt-get update \
+    && apt-get install -y python2 gcc g++ make \
+    && npm config set python /usr/bin/python2.7 \
+    && rm -rf /var/lib/apt/lists/*
+
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
-RUN yarn install
+RUN yarn install && yarn cache clean
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules

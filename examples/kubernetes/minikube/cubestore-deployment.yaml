@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: cubestore
+  name: cubestore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: cubestore
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        service: cubestore
+    spec:
+      containers:
+        - env:
+            - name: CUBESTORE_REMOTE_DIR
+              value: /cube/data
+            - name: CUBESTORE_PORT
+              value: "3306"
+            - name: CUBESTORE_HTTP_PORT
+              value: "3030"
+            - name: CUBESTORE_META_PORT
+              value: "9999"
+          image: cubejs/cubestore:latest
+          name: cubestore
+          resources: {}
+          volumeMounts:
+            - mountPath: /cube/data
+              name: cubestore-hostpath0
+      restartPolicy: Always
+      volumes:
+        - hostPath: # ONLY WORKS FOR MINIKUBE OR SINGLE INSTANCE K8S CLUSTER
+            path: /home/docker/conf/.cubestore
+          name: cubestore-hostpath0
+status: {}

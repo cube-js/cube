@@ -5,6 +5,7 @@ import {
   JWTOptions,
   UserBackgroundContext,
   QueryRewriteFn,
+  CheckSQLAuthFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -84,12 +85,12 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver>|BaseDriver;
+export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver>|BaseDriver;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
@@ -112,12 +113,13 @@ export interface CreateOptions {
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
+  checkSqlAuth?: CheckSQLAuthFn;
   jwt?: JWTOptions;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  schemaVersion?: (context: RequestContext) => string;
+  schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[];

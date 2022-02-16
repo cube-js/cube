@@ -18,23 +18,24 @@ const config = {
     'gatsby-plugin-sharp',
     'gatsby-plugin-root-import',
     `gatsby-plugin-sitemap`,
+    `gatsby-env-variables`,
     {
       resolve: 'gatsby-plugin-manifest',
       options: {
         icon: `src/favicon.png`,
-      }
+      },
     },
     {
       resolve: `gatsby-plugin-layout`,
       options: {
-        component: require.resolve(`./src/components/Layout/index.tsx`)
-      }
+        component: require.resolve(`./src/components/Layout/index.tsx`),
+      },
     },
     {
       resolve: `gatsby-plugin-google-analytics`,
       options: {
-        trackingId: "UA-70480064-3"
-      }
+        trackingId: 'UA-70480064-3',
+      },
     },
     {
       resolve: 'gatsby-source-filesystem',
@@ -52,24 +53,24 @@ const config = {
       },
     },
     {
-      resolve: 'gatsby-transformer-remark',
+      resolve: 'gatsby-plugin-mdx',
       options: {
-        plugins: [
+        extensions: [`.md`, `.mdx`],
+        gatsbyRemarkPlugins: [
           {
             resolve: 'gatsby-remark-copy-linked-files',
             options: {
               destinationDir: 'content/',
-            }
+            },
           },
           {
             resolve: 'gatsby-remark-images',
             options: {
               linkImagesToOriginal: false,
               maxWidth: 1150,
-              wrapperStyle: 'margin-bottom: 24px'
-            }
+              wrapperStyle: 'margin-bottom: 24px',
+            },
           },
-          `gatsby-remark-mathjax-ssr`,
           {
             resolve: 'gatsby-remark-find-replace',
             options: {
@@ -79,35 +80,26 @@ const config = {
               prefix: '%',
             },
           },
-          {
-            resolve: 'gatsby-remark-custom-blocks',
-            options: {
-              blocks: {
-                danger: {
-                  classes: 'danger',
-                  title: 'optional',
-                },
-                info: {
-                  classes: 'info',
-                  title: 'optional',
-                },
-                warning: {
-                  classes: 'warning',
-                  title: 'optional',
-                },
-                success: {
-                  classes: 'success',
-                  title: 'optional',
-                },
-              },
-            },
-          },
-        ]
-      }
+        ],
+        remarkPlugins: [require('remark-math'), require('remark-html-katex')],
+      },
     },
-    'gatsby-redirect-from',
+    {
+      resolve: 'gatsby-redirect-from',
+      options: {
+        query: 'allMdx',
+      },
+    },
+    {
+      resolve: 'gatsby-plugin-react-svg',
+      options: {
+        rule: {
+          include: /\.inline\.svg$/,
+        },
+      },
+    },
     'gatsby-plugin-meta-redirect',
-    'gatsby-plugin-percy',
+    // 'gatsby-plugin-percy',
   ],
 };
 

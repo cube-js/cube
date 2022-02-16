@@ -17,7 +17,7 @@ export type Event = BaseEvent & {
   sentFrom: 'backend';
 };
 
-let flushPromise: Promise<any>|null = null;
+let flushPromise: Promise<any> | null = null;
 let trackEvents: Array<Event> = [];
 
 async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any> {

@@ -5,6 +5,9 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
+      "path": "packages/cubejs-backend-native"
+    },
+    {
       "path": "packages/cubejs-templates"
     },
     {
@@ -44,10 +47,16 @@
       "path": "packages/cubejs-redshift-driver"
     },
     {
+      "path": "packages/cubejs-athena-driver"
+    },
+    {
       "path": "packages/cubejs-bigquery-driver"
     },
     {
       "path": "packages/cubejs-snowflake-driver"
+    },
+    {
+      "path": "packages/cubejs-ksql-driver"
     },
     {
       "path": "packages/cubejs-jdbc-driver"
@@ -56,7 +65,7 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
-      "path": "rust/"
+      "path": "rust/cubestore"
     },
     {
       "path": "packages/cubejs-cubestore-driver"
@@ -71,7 +80,7 @@
       "path": "packages/cubejs-cli"
     },
     {
-      "path": "rust"
-    },
+      "path": "packages/cubejs-dbt-schema-extension"
+    }
   ]
 }

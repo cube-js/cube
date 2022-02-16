@@ -620,7 +620,7 @@ describe('QueryBuilder.vue', () => {
     //   };
     //
     //   const wrapper = mount(QueryBuilder, {
-    //     propsData: {
+    //     props: {
     //       cubejsApi: cube,
     //       query: {
     //         filters: [filter],

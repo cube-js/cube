@@ -29,6 +29,10 @@ export class LocalCacheDriver implements CacheDriverInterface {
       value,
       exp: new Date().getTime() + expiration * 1000
     };
+    return {
+      key,
+      bytes: Buffer.byteLength(JSON.stringify(value)),
+    };
   }
 
   public async remove(key: string) {

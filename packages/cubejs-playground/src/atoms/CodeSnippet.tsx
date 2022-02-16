@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { ThemeProvider } from 'styled-components';
 import { CSSProperties } from 'react';
 import { Button } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
@@ -6,16 +6,10 @@ import { CopyOutlined } from '@ant-design/icons';
 import PrismCode from '../PrismCode';
 import { copyToClipboard } from '../utils';
 
-type CodeSnippetProps = {
-  code: string;
-  language?: string;
-  style?: CSSProperties;
-};
-
 const StyledCodeSnippet = styled.div`
   display: flex;
   border-radius: 4px;
-  background: var(--layout-body-background);
+  background: ${(props) => props.theme.background};
   width: 100%;
   max-width: 100%;
 `;
@@ -47,25 +41,43 @@ const ButtonWrapper = styled.div`
     bottom: 0;
     background: linear-gradient(
       to right,
-      rgba(246, 246, 248, 0),
-      rgba(246, 246, 248, 1)
+      ${(props) => `${props.theme.background}00`},
+      ${(props) => props.theme.background}
     );
   }
 `;
 
-export function CodeSnippet({ code, language, style }: CodeSnippetProps) {
-  return (
-    <StyledCodeSnippet style={style}>
-      <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
+type CodeSnippetProps = {
+  code: string;
+  language?: string;
+  style?: CSSProperties;
+  copyMessage?: string;
+  theme?: 'dark' | 'light';
+};
 
-      <ButtonWrapper>
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() =>
-            copyToClipboard(code, 'Pre-aggregation code is copied')
-          }
-        />
-      </ButtonWrapper>
-    </StyledCodeSnippet>
+export function CodeSnippet({
+  code,
+  language,
+  style,
+  copyMessage,
+  theme = 'dark',
+}: CodeSnippetProps) {
+  return (
+    <ThemeProvider
+      theme={{
+        background: theme === 'dark' ? '#F6F6F8' : '#FFFFFF',
+      }}
+    >
+      <StyledCodeSnippet style={style}>
+        <PrismCode code={code} language={language} style={{ flexGrow: 1 }} />
+
+        <ButtonWrapper>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => copyToClipboard(code, copyMessage || 'Copied')}
+          />
+        </ButtonWrapper>
+      </StyledCodeSnippet>
+    </ThemeProvider>
   );
 }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "serve": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
-    "start ": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
     "build": "SKIP_PREFLIGHT_CHECK=true vue-cli-service build",
     "lint": "vue-cli-service lint",
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"

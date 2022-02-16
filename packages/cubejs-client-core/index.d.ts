@@ -1,13 +1,14 @@
 /**
  * @title @cubejs-client/core
  * @permalink /@cubejs-client-core
- * @menuCategory Cube.js Frontend
+ * @menuCategory Frontend Integrations
  * @subcategory Reference
  * @menuOrder 2
  * @description Vanilla JavaScript Cube.js client.
  */
 
 declare module '@cubejs-client/core' {
+
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -95,6 +96,10 @@ declare module '@cubejs-client/core' {
      */
     subscribe?: boolean;
     /**
+     * A Cube.js API instance. If not provided will be taken from `CubeProvider`
+     */
+    cubejsApi?: CubejsApi;
+    /**
      * Function that receives `ProgressResult` on each `Continue wait` message.
      */
     progressCallback?(result: ProgressResult): void;
@@ -144,7 +149,7 @@ declare module '@cubejs-client/core' {
   type UsedPreAggregation = {
     targetTableName: string;
     type: PreAggregationType;
-  }
+  };
 
   type LoadResponseResult<T> = {
     annotation: QueryAnnotations;
@@ -154,6 +159,7 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
+    requestId?: string,
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
@@ -709,28 +715,34 @@ declare module '@cubejs-client/core' {
   }
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
-  type LogicalAndFilter = {
-    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[]
+  export type LogicalAndFilter = {
+    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
   };
 
-  type LogicalOrFilter = {
-    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[]
+  export type LogicalOrFilter = {
+    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
   };
 
-  type BinaryFilter = {
+  export interface BinaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
-  type UnaryFilter = {
+  }
+  export interface UnaryFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: UnaryOperator;
     values?: never;
-  };
-  type UnaryOperator = 'set' | 'notSet';
-  type BinaryOperator =
+  }
+  export type UnaryOperator = 'set' | 'notSet';
+  export type BinaryOperator =
     | 'equals'
     | 'notEquals'
     | 'contains'
@@ -744,14 +756,14 @@ declare module '@cubejs-client/core' {
     | 'beforeDate'
     | 'afterDate';
 
-  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 
   export type DateRange = string | [string, string];
 
-  export type TimeDimensionBase = {
+  export interface TimeDimensionBase {
     dimension: string;
     granularity?: TimeDimensionGranularity;
-  };
+  }
 
   type TimeDimensionComparisonFields = {
     compareDateRange: Array<DateRange>;
@@ -766,7 +778,7 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
-  export type Query = {
+  export interface Query {
     measures?: string[];
     dimensions?: string[];
     filters?: Filter[];
@@ -778,7 +790,7 @@ declare module '@cubejs-client/core' {
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
-  };
+  }
 
   export class ProgressResult {
     stage(): string;
@@ -812,14 +824,27 @@ declare module '@cubejs-client/core' {
 
   type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
+  // @see BaseCubeMember
+  // @deprecated
   export type TCubeMember = {
     type: TCubeMemberType;
     name: string;
     title: string;
     shortTitle: string;
+    isVisible?: boolean;
+    meta?: any;
   };
 
-  export type TCubeMeasure = TCubeMember & {
+  export type BaseCubeMember = {
+    type: TCubeMemberType;
+    name: string;
+    title: string;
+    shortTitle: string;
+    isVisible?: boolean;
+    meta?: any;
+  };
+
+  export type TCubeMeasure = BaseCubeMember & {
     aggType: 'count' | 'number';
     cumulative: boolean;
     cumulativeTotal: boolean;
@@ -830,11 +855,11 @@ declare module '@cubejs-client/core' {
     };
   };
 
-  export type TCubeDimension = TCubeMember & {
+  export type TCubeDimension = BaseCubeMember & {
     suggestFilterValues: boolean;
   };
 
-  export type TCubeSegment = Pick<TCubeMember, 'name' | 'shortTitle' | 'title'>;
+  export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
 
   type TCubeMemberByType<T> = T extends 'measures'
     ? TCubeMeasure
@@ -844,6 +869,8 @@ declare module '@cubejs-client/core' {
     ? TCubeSegment
     : never;
 
+  export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
+
   /**
    * @deprecated use DryRunResponse
    */
@@ -852,7 +879,7 @@ declare module '@cubejs-client/core' {
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
-    transformedQueries: TransformedQuery[]
+    transformedQueries: TransformedQuery[];
   };
 
   export type DryRunResponse = {
@@ -860,6 +887,7 @@ declare module '@cubejs-client/core' {
     normalizedQueries: Query[];
     pivotQuery: PivotQuery;
     queryOrder: Array<{ [k: string]: QueryOrder }>;
+    transformedQueries: TransformedQuery[];
   };
 
   export type Cube = {
@@ -928,6 +956,9 @@ declare module '@cubejs-client/core' {
     ): { title: string; error: string } | TCubeMemberByType<T>;
     defaultTimeDimensionNameFor(memberName: string): string;
     filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[];
+
+    // todo: types
+    membersGroupedByCube(): any;
   }
 
   /**
@@ -1030,7 +1061,7 @@ declare module '@cubejs-client/core' {
    * );
    * ```
    *
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on on startup. In case of async function `authorization` is updated for `options.transport` on each request.
+   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
@@ -1068,7 +1099,7 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function isQueryPresent(query: Query | Query[]): boolean;
+  export function isQueryPresent(query: Query | Query[] | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
@@ -1083,12 +1114,15 @@ declare module '@cubejs-client/core' {
 
   export function defaultOrder(query: Query): { [key: string]: QueryOrder };
 
-  type TFlatFilter = {
+  export interface TFlatFilter {
+    /**
+     * @deprecated Use `member` instead.
+     */
     dimension?: string;
     member?: string;
     operator: BinaryOperator;
     values: string[];
-  };
+  }
 
   /**
    * @hidden

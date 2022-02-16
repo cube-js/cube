@@ -3,13 +3,15 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import moment from 'moment';
 import bodyParser from 'body-parser';
+import { graphqlHTTP } from 'express-graphql';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
 
 import type {
-  Response, NextFunction,
   Application as ExpressApplication,
+  ErrorRequestHandler,
+  NextFunction,
   RequestHandler,
-  ErrorRequestHandler
+  Response,
 } from 'express';
 
 import { getRequestIdFromRequest, requestParser } from './requestParser';
@@ -21,25 +23,28 @@ import {
   getPivotQuery,
   getQueryGranularity,
   normalizeQuery,
-  normalizeQueryPreAggregations,
-  normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
-  QUERY_TYPE
+  normalizeQueryPreAggregationPreview,
+  normalizeQueryPreAggregations,
+  QUERY_TYPE, validatePostRewrite,
 } from './query';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
-  QueryRewriteFn,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  Request,
   ExtendedRequestContext,
   JWTOptions,
+  QueryRewriteFn,
+  Request,
+  RequestContext,
+  RequestLoggerMiddlewareFn,
   SecurityContextExtractorFn,
 } from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
+import { SQLServer } from './sql-server';
+
+import { makeSchema } from './graphql';
 
 type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
 
@@ -120,7 +125,7 @@ const transformData = (aliasToMemberNameMap, annotation, data, query, queryType)
       const annotationForMember = annotation[memberName];
 
       if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/joins#setting-a-primary-key.`);
+        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
       }
 
       const transformResult = [
@@ -181,7 +186,8 @@ type BaseRequest = {
 
 type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi'
+  queryType?: 'multi';
+  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
 };
 
 export interface ApiGatewayOptions {
@@ -278,6 +284,29 @@ export class ApiGateway {
     // @todo Should we pass requestLoggerMiddleware?
     const guestMiddlewares = [];
 
+    app.use(`${this.basePath}/graphql`, userMiddlewares, async (req, res) => {
+      const compilerApi = this.getCompilerApi(req.context);
+      let schema = compilerApi.getGraphQLSchema();
+      if (!schema) {
+        const metaConfig = await compilerApi.metaConfig({
+          requestId: req.context.requestId,
+        });
+        schema = makeSchema(metaConfig);
+        compilerApi.setGraphQLSchema(schema);
+      }
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: this
+        },
+        graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
+      })(req, res);
+    });
+
+    app.use(this.logNetworkUsage);
+
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
@@ -356,6 +385,7 @@ export class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
         await this.getPreAggregations({
+          cacheOnly: req.query.cacheOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -431,6 +461,10 @@ export class ApiGateway {
     app.use(this.handleErrorMiddleware);
   }
 
+  public initSQLServer() {
+    return new SQLServer(this);
+  }
+
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
     return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
   }
@@ -460,23 +494,54 @@ export class ApiGateway {
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
+
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
     try {
-      const metaConfig = await this.getCompilerApi(context).metaConfig({ requestId: context.requestId });
-      const cubes = metaConfig.map(c => c.config);
+      const metaConfig = await this.getCompilerApi(context).metaConfig({
+        requestId: context.requestId,
+      });
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...cube,
+          measures: cube.measures.filter(visibilityFilter),
+          dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
       res({ cubes });
     } catch (e) {
       this.handleError({
-        e, context, res, requestStarted
+        e,
+        context,
+        res,
+        requestStarted,
       });
     }
   }
 
-  public async getPreAggregations({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const preAggregations = await this.getCompilerApi(context).preAggregations();
+      const compilerApi = this.getCompilerApi(context);
+      const preAggregations = await compilerApi.preAggregations();
 
-      res({ preAggregations });
+      const preAggregationPartitions = await this.refreshScheduler()
+        .preAggregationPartitions(
+          context,
+          normalizeQueryPreAggregations(
+            {
+              timezones: this.scheduledRefreshTimeZones,
+              preAggregations: preAggregations.map(p => ({
+                id: p.id,
+                cacheOnly,
+              }))
+            },
+          )
+        );
+
+      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
@@ -499,14 +564,15 @@ export class ApiGateway {
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           query
         );
-        
+
+      const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
+
       const versionEntriesResult = preAggregationPartitions &&
         await orchestratorApi.getPreAggregationVersionEntries(
           context,
-          preAggregationPartitions,
+          preAggregationPartitionsWithoutError,
           compilerApi.preAggregationsSchema
         );
 
@@ -514,8 +580,8 @@ export class ApiGateway {
         ...props,
         preAggregation,
         partitions: partitions.map(partition => {
-          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition.sql?.tableName] || [];
-          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition.sql?.tableName];
+          partition.versionEntries = versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [];
+          partition.structureVersion = versionEntriesResult?.structureVersionsByTableName[partition?.tableName];
           return partition;
         }),
       });
@@ -539,25 +605,22 @@ export class ApiGateway {
       const { preAggregationId, versionEntry, timezone } = query;
 
       const orchestratorApi = this.getAdapterApi(context);
-      const compilerApi = this.getCompilerApi(context);
 
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
-          compilerApi,
           {
             timezones: [timezone],
             preAggregations: [{ id: preAggregationId }]
           }
         );
       const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p.sql?.tableName === versionEntry.table_name);
+      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
-          preAggregationPartition,
-          query.versionEntry
+          preAggregationPartition
         )
       });
     } catch (e) {
@@ -576,7 +639,6 @@ export class ApiGateway {
       const result = await this.refreshScheduler()
         .buildPreAggregations(
           context,
-          this.getCompilerApi(context),
           query
         );
 
@@ -636,7 +698,7 @@ export class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
     const normalizedQueries = await Promise.all(
-      queries.map((currentQuery) => this.queryRewrite(normalizeQuery(currentQuery), context))
+      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
@@ -774,7 +836,7 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, ...props }: QueryRequest) {
+  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -848,6 +910,7 @@ export class ApiGateway {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
             transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
           } : null),
           annotation,
           dataSource: response.dataSource,
@@ -858,13 +921,19 @@ export class ApiGateway {
         };
       }));
 
-      this.log({
-        type: 'Load Request Success',
-        query,
-        duration: this.duration(requestStarted),
-        queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length).length,
-        queriesWithData: results.filter((r: any) => r.data?.length).length
-      }, context);
+      this.log(
+        {
+          type: 'Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          apiType,
+          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
+          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
+            .length,
+          queriesWithData: results.filter((r: any) => r.data?.length).length,
+        },
+        context
+      );
 
       if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
         throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
@@ -903,7 +972,7 @@ export class ApiGateway {
   }
 
   public async subscribe({
-    query, context, res, subscribe, subscriptionState, queryType
+    query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
     const requestStarted = new Date();
     try {
@@ -916,7 +985,7 @@ export class ApiGateway {
       let error: any = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res, queryType });
+        await this.load({ query, context, res, queryType, apiType });
         return;
       }
 
@@ -931,7 +1000,8 @@ export class ApiGateway {
             result = { message, opts };
           }
         },
-        queryType
+        queryType,
+        apiType,
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
@@ -1127,7 +1197,7 @@ export class ApiGateway {
   }
 
   protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
-    type VerifyTokenFn = (auth: string, secret: string) => Promise<object|string>|object|string;
+    type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
       algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
@@ -1157,7 +1227,7 @@ export class ApiGateway {
       }
 
       checkAuthFn = async (auth) => {
-        const decoded = <Record<string, any>|null>jwt.decode(auth, { complete: true });
+        const decoded = <Record<string, any> | null>jwt.decode(auth, { complete: true });
         if (!decoded) {
           throw new CubejsHandlerError(
             403,
@@ -1308,6 +1378,24 @@ export class ApiGateway {
     }
   };
 
+  protected logNetworkUsage: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    this.log({
+      type: 'Incoming network usage',
+      service: 'api-http',
+      bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+    }, req.context);
+    res.on('finish', () => {
+      this.log({
+        type: 'Outgoing network usage',
+        service: 'api-http',
+        bytes: Number(res.get('content-length')) || 0,
+      }, req.context);
+    });
+    if (next) {
+      next();
+    }
+  };
+
   protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
     let compareDateRangeTDIndex;
@@ -1344,7 +1432,7 @@ export class ApiGateway {
     }));
   }
 
-  protected log(event: { type: string, [key: string]: any }, context?: RequestContext) {
+  public log(event: { type: string, [key: string]: any }, context?: Partial<RequestContext>) {
     const { type, ...restParams } = event;
 
     this.logger(type, {

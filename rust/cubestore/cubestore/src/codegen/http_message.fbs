@@ -1,0 +1,35 @@
+union HttpCommand {
+    HttpQuery,
+    HttpResultSet,
+    HttpError
+}
+
+table HttpMessage {
+    message_id: uint;
+    command: HttpCommand;
+}
+
+table HttpQuery {
+    query: string;
+    trace_obj: string;
+}
+
+table HttpError {
+    error: string;
+}
+
+table HttpResultSet {
+    columns: [string];
+    rows: [HttpRow];
+}
+
+table HttpRow {
+    values: [HttpColumnValue];
+}
+
+table HttpColumnValue {
+    string_value: string;
+}
+
+
+root_type HttpMessage;

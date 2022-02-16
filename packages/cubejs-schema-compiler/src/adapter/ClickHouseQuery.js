@@ -92,6 +92,16 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
+  dimensionsJoinCondition(leftAlias, rightAlias) {
+    const dimensionAliases = this.dimensionAliasNames();
+    if (!dimensionAliases.length) {
+      return '1 = 1';
+    }
+    return dimensionAliases
+      .map(alias => `(assumeNotNull(${leftAlias}.${alias}) = assumeNotNull(${rightAlias}.${alias}))`)
+      .join(' AND ');
+  }
+
   getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
@@ -100,7 +110,7 @@ export class ClickHouseQuery extends BaseQuery {
     let field;
 
     field = this.dimensionsForSelect().find(
-      d => equalIgnoreCase(d.dimension, id)
+      d => equalIgnoreCase(d.dimension, id),
     );
 
     if (field) {
@@ -108,7 +118,7 @@ export class ClickHouseQuery extends BaseQuery {
     }
 
     field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
     );
 
     if (field) {

@@ -9,6 +9,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
+import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {
   external?: boolean;
@@ -19,9 +20,13 @@ type QueryOptions = {
 };
 export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
 export type QueryWithParams = QueryTuple;
-type Query = {
+export type Query = {
   requestId?: string;
   dataSource: string;
+  preAggregations?: PreAggregationDescription[];
+  groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  preAggregationsLoadCacheByDataSource?: any;
+  renewQuery?: boolean;
 };
 
 type CacheEntry = {
@@ -35,7 +40,7 @@ export class QueryCache {
 
   protected queue: { [dataSource: string]: QueryQueue } = {};
 
-  protected externalQueue: QueryQueue|null = null;
+  protected externalQueue: QueryQueue | null = null;
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
@@ -374,7 +379,7 @@ export class QueryCache {
       dataSource: string
     }
   ) {
-    return cacheKeyQueries.map((q, i) => {
+    return cacheKeyQueries.map((q) => {
       const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
 
       return this.cacheQueryResult(
@@ -430,8 +435,14 @@ export class QueryCache {
           renewalKey
         };
         return this.cacheDriver.set(redisKey, result, expiration)
-          .then(() => {
+          .then(({ bytes }) => {
             this.logger('Renewed', { cacheKey, requestId: options.requestId });
+            this.logger('Outgoing network usage', {
+              service: 'cache',
+              requestId: options.requestId,
+              bytes,
+              cacheKey,
+            });
             return res;
           });
       }).catch(e => {

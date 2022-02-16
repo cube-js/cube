@@ -2,6 +2,7 @@ node_modules
 .yarn
 .yarnrc
 /.idea
+/.vscode
 newrelic_agent.log
 .ruby-version
 /.DS_Store

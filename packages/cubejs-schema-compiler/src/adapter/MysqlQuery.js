@@ -6,11 +6,12 @@ import { UserError } from '../compiler/UserError';
 
 const GRANULARITY_TO_INTERVAL = {
   day: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
-  week: (date) => `DATE_FORMAT(date_add('1900-01-01', interval TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
+  week: (date) => `DATE_FORMAT(DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
   hour: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
   minute: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:00.000')`,
   second: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:%S.000')`,
   month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
+  quarter: (date) => `DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(QUARTER, '1900-01-01', ${date}) QUARTER)`,
   year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
 };
 

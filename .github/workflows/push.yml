@@ -6,9 +6,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
+      - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -22,9 +23,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
+      - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -41,8 +43,7 @@ jobs:
 
     strategy:
       matrix:
-        # We should use our minimal version, but there are problems with packages...
-        node-version: [12.x, 14.x, 15.x]
+        node-version: [12.x, 14.x, 16.x]
       fail-fast: false
 
     steps:
@@ -55,7 +56,13 @@ jobs:
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -68,7 +75,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -84,9 +91,10 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
-        if: (matrix.node-version == '15.x')
+        if: (matrix.node-version == '16.x')
         with:
           files: ./packages/*/coverage/clover.xml
+          flags: cube-backend
           verbose: true # optional (default = false)
 
   lint:
@@ -98,7 +106,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -111,7 +125,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -134,7 +148,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
         uses: actions/setup-node@v1
         with:
           node-version: 14.x
@@ -147,7 +167,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -182,13 +202,19 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -201,7 +227,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -249,14 +275,20 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
         db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless', 'cubestore']
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
@@ -322,85 +354,8 @@ jobs:
         env:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
-  docker-image-latest:
-    needs: docker-image-latest-set-tag
-    name: Build & Test :latest for ${{ matrix.name }} without pushing
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    if: (!contains(needs['docker-image-latest-set-tag'].outputs.tag, 'v'))
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-    strategy:
-      matrix:
-        dockerfile:
-          - latest.Dockerfile
-          - latest-alpine.Dockerfile
-        include:
-          - dockerfile: latest.Dockerfile
-            name: Debian
-            tag: tmp-latest
-          - dockerfile: latest-alpine.Dockerfile
-            tag: tmp-alpine
-      fail-fast: false
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          driver-opts: network=host
-      - name: Build only
-        uses: docker/build-push-action@v2
-        timeout-minutes: 30
-        with:
-          context: ./packages/cubejs-docker
-          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          push: true
-          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 15.x
-        uses: actions/setup-node@v1
-        with:
-          node-version: 15.x
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
-        uses: actions/cache@v2
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-15.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Build client
-        run: yarn build
-      - name: Lerna tsc
-        run: yarn tsc
-      - name: Testing Docker image via BirdBox
-        run: |
-          cd packages/cubejs-testing/
-          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
-          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
-          export DEBUG=testcontainers
-          yarn run dataset:minimal
-          yarn run birdbox:postgresql
-
   docker-dev:
-    needs: [build, unit, lint, latest-tag-sha]
+    needs: [latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
@@ -427,6 +382,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
         with:
+          version: v0.6.3
           driver-opts: network=host
       - name: Build image
         uses: docker/build-push-action@v2
@@ -437,10 +393,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 15.x
+      - name: Use Node.js 16.x
         uses: actions/setup-node@v1
         with:
-          node-version: 15.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -450,11 +406,11 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-15.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-15.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
@@ -471,6 +427,7 @@ jobs:
           export DEBUG=testcontainers
           yarn run dataset:minimal
           yarn run birdbox:postgresql
+          yarn run birdbox:postgresql-pre-aggregations
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}

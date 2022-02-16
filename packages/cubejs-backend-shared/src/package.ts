@@ -44,7 +44,7 @@ export function requireFromPackage<T = unknown>(
   opts?: RequireBaseOptions
 ): T;
 
-export function requireFromPackage<T = unknown|null>(pkg: string, options?: RequireOptions): T|null {
+export function requireFromPackage<T = unknown | null>(pkg: string, options?: RequireOptions): T | null {
   const { basePath = process.cwd(), relative = false, silent = undefined } = options || {};
 
   const exists = packageExists(pkg, relative, basePath);
@@ -93,7 +93,7 @@ export function isFilePath(fp: string): boolean {
 export function requirePackageManifest<T = PackageManifest>(
   pkg: string,
   opts: RequireBaseOptions & { silent: true }
-): Promise<T|null>;
+): Promise<T | null>;
 export function requirePackageManifest<T = PackageManifest>(
   pkg: string,
   opts?: RequireBaseOptions

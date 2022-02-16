@@ -15,13 +15,26 @@ export class CompilerApi {
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
+    this.standalone = options.standalone;
+  }
+
+  setGraphQLSchema(schema) {
+    this.graphqlSchema = schema;
+  }
+
+  getGraphQLSchema() {
+    return this.graphqlSchema;
   }
 
   async getCompilers({ requestId } = {}) {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
-    ).toString();
+    );
+
+    if (typeof compilerVersion === 'object') {
+      compilerVersion = JSON.stringify(compilerVersion);
+    }
 
     if (this.options.devServer) {
       const files = await this.repository.dataSchemaFiles();
@@ -37,7 +50,8 @@ export class CompilerApi {
       this.compilers = compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
-        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+        standalone: this.standalone
       });
       this.compilerVersion = compilerVersion;
     }

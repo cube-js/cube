@@ -1035,6 +1035,8 @@ describe('PreAggregations', () => {
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
+    expect(queries.filter(([q]) => !!q.match(/3600/)).length).toBeGreaterThanOrEqual(1);
+
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
@@ -1265,6 +1267,8 @@ describe('PreAggregations', () => {
     console.log(preAggregationsDescription);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    expect(queries.filter(([q]) => !!q.match(/3600/)).length).toBeGreaterThanOrEqual(1);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
 

@@ -1,0 +1,11 @@
+{
+  "dimensions": [
+    "Statuses.orderId",
+    "Statuses.status",
+    "Statuses.changedAt"
+  ],
+  "order": {
+    "Statuses.orderId": "asc"
+  },
+  "limit": 6
+}

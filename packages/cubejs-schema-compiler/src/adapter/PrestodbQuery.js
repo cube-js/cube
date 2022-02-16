@@ -8,6 +8,7 @@ const GRANULARITY_TO_INTERVAL = {
   minute: 'minute',
   second: 'second',
   month: 'month',
+  quarter: 'quarter',
   year: 'year'
 };
 

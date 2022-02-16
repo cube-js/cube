@@ -11,7 +11,7 @@ export class InvalidConfiguration extends Error {
 export function convertTimeStrToMs(
   input: string,
   envName: string,
-  description: string = 'Must be number (in seconds) or string in time format (1s, 1m, 1h).',
+  description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
 ) {
   if (/^\d+$/.test(input)) {
     return parseInt(input, 10);
@@ -44,7 +44,7 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
-function asPortOrSocket(input: string, envName: string): number|string {
+function asPortOrSocket(input: string, envName: string): number | string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
   }
@@ -53,7 +53,15 @@ function asPortOrSocket(input: string, envName: string): number|string {
   return input;
 }
 
-function asBoolOrTime(input: string, envName: string): number|boolean {
+function asFalseOrPort(input: string, envName: string): number | false {
+  if (input.toLowerCase() === 'false' || input === '0' || input === undefined) {
+    return false;
+  }
+
+  return asPortNumber(parseInt(input, 10), envName);
+}
+
+function asBoolOrTime(input: string, envName: string): number | boolean {
   if (input.toLowerCase() === 'true') {
     return true;
   }
@@ -118,8 +126,16 @@ const variables: Record<string, (...args: any) => any> = {
   preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
     .asString(),
   dbPollTimeout: () => {
-    const value = process.env.CUBEJS_DB_POLL_TIMEOUT || '15m';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+    const value = process.env.CUBEJS_DB_POLL_TIMEOUT;
+    if (value) {
+      return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+    } else {
+      return null;
+    }
+  },
+  dbQueryTimeout: () => {
+    const value = process.env.CUBEJS_DB_QUERY_TIMEOUT || '10m';
+    return convertTimeStrToMs(value, 'CUBEJS_DB_QUERY_TIMEOUT');
   },
   dbPollMaxInterval: () => {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
@@ -274,9 +290,38 @@ const variables: Record<string, (...args: any) => any> = {
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),
+  agentEndpointUrl: () => get('CUBEJS_AGENT_ENDPOINT_URL')
+    .asString(),
+  agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
+    .default(1000)
+    .asInt(),
+  instanceId: () => get('CUBEJS_INSTANCE_ID')
+    .asString(),
   telemetry: () => get('CUBEJS_TELEMETRY')
     .default('true')
     .asBool(),
+  // SQL Interface
+  sqlPort: () => {
+    const port = asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
+  sqlNonce: () => {
+    if (process.env.CUBEJS_SQL_NONCE) {
+      if (process.env.CUBEJS_SQL_NONCE.length < 14) {
+        throw new InvalidConfiguration('CUBEJS_SQL_NONCE', process.env.CUBEJS_SQL_NONCE, 'Is too short. It should be 14 chars at least.');
+      }
+
+      return process.env.CUBEJS_SQL_NONCE;
+    }
+
+    return undefined;
+  },
+  sqlUser: () => get('CUBEJS_SQL_USER').asString(),
+  sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
@@ -293,6 +338,9 @@ const variables: Record<string, (...args: any) => any> = {
   previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
+  batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
+    .default(256 * 1024)
+    .asInt(),
 };
 
 type Vars = typeof variables;

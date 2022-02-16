@@ -5,7 +5,7 @@
   "private": true,
   "workspaces": {
     "packages": [
-      "rust",
+      "rust/*",
       "packages/*"
     ],
     "nohoist": [
@@ -16,7 +16,6 @@
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
-    "example": "http-server",
     "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w",
     "lint:npm": "yarn npmPkgJsonLint packages/*/package.json rust/package.json",
     "lint": "yarn lint:npm && yarn lerna run lint",
@@ -24,7 +23,7 @@
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "CUBESTORE_SKIP_POST_INSTALL=true lerna link && patch-package"
+    "postinstall": "lerna link && patch-package"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
@@ -58,7 +57,6 @@
     "@types/jest": "^26.0.3",
     "babel-runtime": "^6.26.0",
     "flush-promises": "^1.0.2",
-    "http-server": "^0.12.1",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
     "lerna": "^3.13.1",
@@ -81,9 +79,10 @@
     "url": "https://github.com/cube-js/cube.js.git"
   },
   "resolutions": {
+    "@types/node": "^12",
     "@types/ramda": "0.27.40",
     "rc-tree": "4.1.5",
-    "@azure/core-auth": "1.2.0"
+    "testcontainers": "7.12.1"
   },
   "license": "MIT"
 }

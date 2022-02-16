@@ -3,6 +3,481 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.28](https://github.com/cube-js/cube.js/compare/v0.29.27...v0.29.28) (2022-02-10)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.27](https://github.com/cube-js/cube.js/compare/v0.29.26...v0.29.27) (2022-02-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.26](https://github.com/cube-js/cube.js/compare/v0.29.25...v0.29.26) (2022-02-07)
+
+
+### Bug Fixes
+
+* Use prototype name matching instead of classes to allow exact version mismatches for AbstractExtension ([75545e8](https://github.com/cube-js/cube.js/commit/75545e8ffbf88fd693e4c8c4afd78d86830925b2))
+
+
+
+
+
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+
+### Features
+
+* Load metrics from DBT project ([#4000](https://github.com/cube-js/cube.js/issues/4000)) ([2975d84](https://github.com/cube-js/cube.js/commit/2975d84cd2a2d3bba3c31a7744ab5a5fb3789b6e))
+
+
+
+
+
+## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+
+### Bug Fixes
+
+* Error: column does not exist during in case of subQuery for rolling window measure ([6084407](https://github.com/cube-js/cube.js/commit/6084407cb7cad3f0d239959b072f4fa011aa29a4))
+
+
+
+
+
+## [0.29.22](https://github.com/cube-js/cube.js/compare/v0.29.21...v0.29.22) (2022-01-21)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
+
+
+### Features
+
+* **@cubejs-backend/schema-compiler:** extend the schema generation API ([#3936](https://github.com/cube-js/cube.js/issues/3936)) ([48b2335](https://github.com/cube-js/cube.js/commit/48b2335c7d9810dc433fd8c76f4b3ec8a7b83442))
+
+
+
+
+
+## [0.29.20](https://github.com/cube-js/cube.js/compare/v0.29.19...v0.29.20) (2022-01-10)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.18](https://github.com/cube-js/cube.js/compare/v0.29.17...v0.29.18) (2022-01-09)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Handle null Values in Security Context ([#3868](https://github.com/cube-js/cube.js/issues/3868)) Thanks [@joealden](https://github.com/joealden) ! ([739367b](https://github.com/cube-js/cube.js/commit/739367bd50c1863ee8bae17741c0591065ea47a1))
+
+
+
+
+
+## [0.29.17](https://github.com/cube-js/cube.js/compare/v0.29.16...v0.29.17) (2022-01-05)
+
+
+### Bug Fixes
+
+* Do not instantiate SqlParser if rewriteQueries is false to save cache memory ([00a239f](https://github.com/cube-js/cube.js/commit/00a239fae57ae9448337bd816b2ae5ca17f15230))
+
+
+
+
+
+## [0.29.16](https://github.com/cube-js/cube.js/compare/v0.29.15...v0.29.16) (2022-01-05)
+
+
+### Bug Fixes
+
+* `refreshKey` is evaluated ten times more frequently if `sql` and `every` are simultaneously defined ([#3873](https://github.com/cube-js/cube.js/issues/3873)) ([c93ae12](https://github.com/cube-js/cube.js/commit/c93ae127b4d0ce2c214d3665f8d86f6ade5cce6f))
+
+
+
+
+
+## [0.29.15](https://github.com/cube-js/cube.js/compare/v0.29.14...v0.29.15) (2021-12-30)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.12](https://github.com/cube-js/cube.js/compare/v0.29.11...v0.29.12) (2021-12-29)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.7](https://github.com/cube-js/cube.js/compare/v0.29.6...v0.29.7) (2021-12-20)
+
+
+### Bug Fixes
+
+* Table cache incorrectly invalidated after merge multi-tenant queues by default change ([#3828](https://github.com/cube-js/cube.js/issues/3828)) ([540446a](https://github.com/cube-js/cube.js/commit/540446a76e19be3aec38b96ad81c149f567e9e40))
+
+
+
+
+
+## [0.29.6](https://github.com/cube-js/cube.js/compare/v0.29.5...v0.29.6) (2021-12-19)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.29.4](https://github.com/cube-js/cube.js/compare/v0.29.3...v0.29.4) (2021-12-16)
+
+
+### Bug Fixes
+
+* Validate `contextToAppId` is in place when COMPILE_CONTEXT is used ([54a8b84](https://github.com/cube-js/cube.js/commit/54a8b843eca965c6a098118da04ec480ea06fa76))
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+
+### Reverts
+
+* Revert "BREAKING CHANGE: 0.29 (#3809)" (#3811) ([db005ed](https://github.com/cube-js/cube.js/commit/db005edc04d48e8251250ab9d0e19f496cf3b52b)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809) [#3811](https://github.com/cube-js/cube.js/issues/3811)
+
+
+* BREAKING CHANGE: 0.29 (#3809) ([6f1418b](https://github.com/cube-js/cube.js/commit/6f1418b9963774844f341682e594601a56bb0084)), closes [#3809](https://github.com/cube-js/cube.js/issues/3809)
+
+
+### BREAKING CHANGES
+
+* Drop support for Node.js 10 (12.x is a minimal version)
+* Upgrade Node.js to 14 for Docker images
+* Drop support for Node.js 15
+
+
+
+
+
+## [0.28.64](https://github.com/cube-js/cube.js/compare/v0.28.63...v0.28.64) (2021-12-05)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.63](https://github.com/cube-js/cube.js/compare/v0.28.62...v0.28.63) (2021-12-03)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.61](https://github.com/cube-js/cube.js/compare/v0.28.60...v0.28.61) (2021-11-30)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.60](https://github.com/cube-js/cube.js/compare/v0.28.59...v0.28.60) (2021-11-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.59](https://github.com/cube-js/cube.js/compare/v0.28.58...v0.28.59) (2021-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.58](https://github.com/cube-js/cube.js/compare/v0.28.57...v0.28.58) (2021-11-18)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/clickhouse-driver:** clickhouse joins full key query aggregate fails ([#3600](https://github.com/cube-js/cube.js/issues/3600)) Thanks [@antnmxmv](https://github.com/antnmxmv)! ([c6451cd](https://github.com/cube-js/cube.js/commit/c6451cdef8498d4d645167ed3da7cf2f599a2e5b)), closes [#3534](https://github.com/cube-js/cube.js/issues/3534)
+
+
+
+
+
+## [0.28.56](https://github.com/cube-js/cube.js/compare/v0.28.55...v0.28.56) (2021-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.55](https://github.com/cube-js/cube.js/compare/v0.28.54...v0.28.55) (2021-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.50](https://github.com/cube-js/cube.js/compare/v0.28.49...v0.28.50) (2021-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.48](https://github.com/cube-js/cube.js/compare/v0.28.47...v0.28.48) (2021-10-22)
+
+
+### Bug Fixes
+
+* Use BaseQuery#evaluateSql() for evaluate refresh range references, pre-aggregations debug API ([#3352](https://github.com/cube-js/cube.js/issues/3352)) ([ea81650](https://github.com/cube-js/cube.js/commit/ea816509ee9c07707bb46fc8fac83e55c52aaf00))
+* **@cubejs-backend/ksql-driver:** Scaffolding for empty schema generates empty prefix ([091e45c](https://github.com/cube-js/cube.js/commit/091e45c66b712491699856d0a203e442bdfbd888))
+
+
+
+
+
+## [0.28.47](https://github.com/cube-js/cube.js/compare/v0.28.46...v0.28.47) (2021-10-22)
+
+
+### Features
+
+* ksql support ([#3507](https://github.com/cube-js/cube.js/issues/3507)) ([b7128d4](https://github.com/cube-js/cube.js/commit/b7128d43d2aaffdd7273555779176b3efe4e2aa6))
+
+
+
+
+
+## [0.28.46](https://github.com/cube-js/cube.js/compare/v0.28.45...v0.28.46) (2021-10-20)
+
+
+### Bug Fixes
+
+* update error message for join across data sources ([#3435](https://github.com/cube-js/cube.js/issues/3435)) ([5ad72cc](https://github.com/cube-js/cube.js/commit/5ad72ccf0f6bbba3c362b04427b172210f0b8ada))
+* **@cubejs-backend/snowflake-driver:** escape date_from and date_to in generated series SQL ([#3542](https://github.com/cube-js/cube.js/issues/3542)) Thanks to [@zpencerq](https://github.com/zpencerq) ! ([858b7fa](https://github.com/cube-js/cube.js/commit/858b7fa2dbc5ed08350a6f875189f6f608c6d55c)), closes [#3215](https://github.com/cube-js/cube.js/issues/3215)
+* **schema-compiler:** assign isVisible to segments ([#3484](https://github.com/cube-js/cube.js/issues/3484)) Thanks to [@piktur](https://github.com/piktur)! ([53fdf27](https://github.com/cube-js/cube.js/commit/53fdf27bb522608f36343c4a14ef32bf64c43200))
+
+
+
+
+
+## [0.28.42](https://github.com/cube-js/cube.js/compare/v0.28.41...v0.28.42) (2021-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.41](https://github.com/cube-js/cube.js/compare/v0.28.40...v0.28.41) (2021-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.40](https://github.com/cube-js/cube.js/compare/v0.28.39...v0.28.40) (2021-09-30)
+
+
+### Bug Fixes
+
+* Count distinct by week matches daily rollup in case of data range is daily ([#3490](https://github.com/cube-js/cube.js/issues/3490)) ([2401418](https://github.com/cube-js/cube.js/commit/24014188d63baa6f178242e738f72790369234a9))
+* **@cubejs-backend/schema-compiler:** check segments when matching pre-aggregations ([#3494](https://github.com/cube-js/cube.js/issues/3494)) ([9357484](https://github.com/cube-js/cube.js/commit/9357484cdc924046b7371c7b701d307b1df84089))
+* **@cubejs-backend/schema-compiler:** CubePropContextTranspiler expli… ([#3461](https://github.com/cube-js/cube.js/issues/3461)) ([2ae7f1d](https://github.com/cube-js/cube.js/commit/2ae7f1d51b0caca0fe9755a98463a6898960a11f))
+* **@cubejs-backend/schema-compiler:** match query with no dimensions … ([#3472](https://github.com/cube-js/cube.js/issues/3472)) ([2a5dd4c](https://github.com/cube-js/cube.js/commit/2a5dd4cbe4805d9dea8f5f8e630bf613198195a3))
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** CubeValidator human readable error messages ([#3425](https://github.com/cube-js/cube.js/issues/3425)) ([22db0a6](https://github.com/cube-js/cube.js/commit/22db0a6b607b7ef1d2cbe399415ac64c639325f5))
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+
+### Bug Fixes
+
+* **gateway:** hidden members filtering ([#3384](https://github.com/cube-js/cube.js/issues/3384)) ([43ac8c3](https://github.com/cube-js/cube.js/commit/43ac8c30247944543f917cd893787ee8485fc985))
+
+
+
+
+
+## [0.28.34](https://github.com/cube-js/cube.js/compare/v0.28.33...v0.28.34) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+
+### Bug Fixes
+
+* `updateWindow` validation isn't consistent with `refreshKey` interval parsing -- allow `s` at the end of time interval ([#3403](https://github.com/cube-js/cube.js/issues/3403)) ([57559e7](https://github.com/cube-js/cube.js/commit/57559e7841657e1900a30522ce5a178d091b6474))
+
+
+
+
+
+## [0.28.32](https://github.com/cube-js/cube.js/compare/v0.28.31...v0.28.32) (2021-09-06)
+
+
+### Bug Fixes
+
+* HLL Rolling window query fails ([#3380](https://github.com/cube-js/cube.js/issues/3380)) ([581a52a](https://github.com/cube-js/cube.js/commit/581a52a856aeee067bac9a680e22694bf507af04))
+
+
+
+
+
+## [0.28.29](https://github.com/cube-js/cube.js/compare/v0.28.28...v0.28.29) (2021-08-31)
+
+
+### Features
+
+* Mixed rolling window and regular measure queries from rollup support ([#3326](https://github.com/cube-js/cube.js/issues/3326)) ([3147e33](https://github.com/cube-js/cube.js/commit/3147e339f14ede73e5b0d14d05b9dd1f8b79e7b8))
+* Support multi-value filtering on same column through FILTER_PARAMS ([#2854](https://github.com/cube-js/cube.js/issues/2854)) Thanks to [@omab](https://github.com/omab)! ([efc5745](https://github.com/cube-js/cube.js/commit/efc57452af44ee31092b8dfbb33a7ba23e86bba5))
+
+
+
+
+
+## [0.28.28](https://github.com/cube-js/cube.js/compare/v0.28.27...v0.28.28) (2021-08-26)
+
+
+### Bug Fixes
+
+* **playground:** reset state on query change ([#3321](https://github.com/cube-js/cube.js/issues/3321)) ([9c0d4fe](https://github.com/cube-js/cube.js/commit/9c0d4fe647f3f90a4d1a65782f5625469079b579))
+
+
+
+
+
+## [0.28.27](https://github.com/cube-js/cube.js/compare/v0.28.26...v0.28.27) (2021-08-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+
+### Features
+
+* **@cubejs-backend/dremio-driver:** support quarter granularity ([b193b04](https://github.com/cube-js/cube.js/commit/b193b048db4f104683ca5dc518b09647a8435a4e))
+* **@cubejs-backend/mysql-driver:** Support quarter granularity ([#3289](https://github.com/cube-js/cube.js/issues/3289)) ([6922e5d](https://github.com/cube-js/cube.js/commit/6922e5da50d2056c00a2ca248665e133a6de28be))
+
+
+
+
+
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Features
+
+* Added Quarter to the timeDimensions of ([3f62b2c](https://github.com/cube-js/cube.js/commit/3f62b2c125b2b7b752e370b65be4c89a0c65a623))
+* Support quarter granularity ([4ad1356](https://github.com/cube-js/cube.js/commit/4ad1356ac2d2c4d479c25e60519b0f7b4c1605bb))
+
+
+
+
+
+## [0.28.22](https://github.com/cube-js/cube.js/compare/v0.28.21...v0.28.22) (2021-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.28.21](https://github.com/cube-js/cube.js/compare/v0.28.20...v0.28.21) (2021-08-16)
+
+
+### Bug Fixes
+
+* Pre-aggregations should have default refreshKey of every 1 hour if it doesn't set for Cube ([#3259](https://github.com/cube-js/cube.js/issues/3259)) ([bc472aa](https://github.com/cube-js/cube.js/commit/bc472aac1a666c84ed9e7e00b2d4e9018a6b5719))
+
+
+
+
+
+## [0.28.19](https://github.com/cube-js/cube.js/compare/v0.28.18...v0.28.19) (2021-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

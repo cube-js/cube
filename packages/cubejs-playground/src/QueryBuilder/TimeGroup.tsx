@@ -94,7 +94,7 @@ const TimeGroup = ({
             <MemberDropdown
               data-testid="TimeDimension"
               disabled={disabled}
-              availableMembers={availableMembers}
+              availableCubes={availableMembers}
               onClick={(updateWith) =>
                 updateMethods.update(m, { ...m, dimension: updateWith })
               }
@@ -165,7 +165,7 @@ const TimeGroup = ({
         <MemberDropdown
           data-testid="TimeDimension"
           disabled={disabled}
-          availableMembers={availableMembers}
+          availableCubes={availableMembers}
           type="dashed"
           icon={<PlusOutlined />}
           onClick={(member) =>

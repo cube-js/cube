@@ -3,6 +3,130 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.29.8](https://github.com/cube-js/cube.js/compare/v0.29.7...v0.29.8) (2021-12-21)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.29.5](https://github.com/cube-js/cube.js/compare/v0.29.4...v0.29.5) (2021-12-17)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+# [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.52](https://github.com/cube-js/cube.js/compare/v0.28.51...v0.28.52) (2021-11-03)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.45](https://github.com/cube-js/cube.js/compare/v0.28.44...v0.28.45) (2021-10-19)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.38](https://github.com/cube-js/cube.js/compare/v0.28.37...v0.28.38) (2021-09-20)
+
+
+### Features
+
+* **playground:** time zone for cron expressions ([#3441](https://github.com/cube-js/cube.js/issues/3441)) ([b27f509](https://github.com/cube-js/cube.js/commit/b27f509c690c7970ea5443650a141a1bbfcc947b))
+
+
+
+
+
+## [0.28.37](https://github.com/cube-js/cube.js/compare/v0.28.36...v0.28.37) (2021-09-17)
+
+
+### Features
+
+* **playground:** add rollup button ([#3424](https://github.com/cube-js/cube.js/issues/3424)) ([a5db7f1](https://github.com/cube-js/cube.js/commit/a5db7f1905d1eb50bb6e78b4c6c54e03ba7499c9))
+
+
+
+
+
+## [0.28.36](https://github.com/cube-js/cube.js/compare/v0.28.35...v0.28.36) (2021-09-14)
+
+
+### Features
+
+* **@cubejs-client/react:** useCubeMeta hook ([#3050](https://github.com/cube-js/cube.js/issues/3050)) ([e86b3fa](https://github.com/cube-js/cube.js/commit/e86b3fab76f1fa947262c1a54b18f5c7143f0306))
+
+
+
+
+
+## [0.28.35](https://github.com/cube-js/cube.js/compare/v0.28.34...v0.28.35) (2021-09-13)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.33](https://github.com/cube-js/cube.js/compare/v0.28.32...v0.28.33) (2021-09-11)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.25](https://github.com/cube-js/cube.js/compare/v0.28.24...v0.28.25) (2021-08-20)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.28.24](https://github.com/cube-js/cube.js/compare/v0.28.23...v0.28.24) (2021-08-19)
+
+
+### Features
+
+* Added Quarter to the timeDimensions of ([3f62b2c](https://github.com/cube-js/cube.js/commit/3f62b2c125b2b7b752e370b65be4c89a0c65a623))
+
+
+
+
+
 ## [0.28.17](https://github.com/cube-js/cube.js/compare/v0.28.16...v0.28.17) (2021-08-11)
 
 **Note:** Version bump only for package @cubejs-client/react

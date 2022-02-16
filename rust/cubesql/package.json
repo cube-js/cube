@@ -1,0 +1,17 @@
+{
+  "name": "@cubejs-backend/cubesql",
+  "version": "0.29.28",
+  "description": "SQL API for Cube as proxy over MySQL protocol.",
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "scripts": {},
+  "files": [
+    "index.js"
+  ],
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

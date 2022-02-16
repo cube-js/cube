@@ -1,47 +1,44 @@
-import { TCubeMember } from '@cubejs-client/core';
-import { Typography } from 'antd';
+import { BaseCubeMember } from '@cubejs-client/core';
+import { Space, Typography } from 'antd';
 import styled from 'styled-components';
 
-import MemberDropdown from '../../../QueryBuilder/MemberDropdown';
-import RemoveButtonGroup from '../../../QueryBuilder/RemoveButtonGroup';
+import { MemberTag } from './MemberTag';
 
-const Flex = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+export const MemberType = styled(Typography.Paragraph)`
+  font-size: 10px;
+  text-transform: uppercase;
+  color: rgba(20, 20, 70, 0.5);
 `;
 
 type MembersProps = {
   title: string;
-  members: TCubeMember[];
+  members: Array<BaseCubeMember | undefined>;
   onRemove: (key: string) => void;
 };
 
 export function Members({ title, members, onRemove }: MembersProps) {
   return (
     <>
-      <Typography.Paragraph>
-        <Typography.Text>{title}</Typography.Text>
-      </Typography.Paragraph>
+      <MemberType>{title}</MemberType>
 
-      <Flex>
-        {members.map((member) => (
-          <div key={member.name}>
-            <RemoveButtonGroup
-              key={member.name}
-              onRemoveClick={() => onRemove(member.name)}
-            >
-              <MemberDropdown
-                showNoMembersPlaceholder={false}
-                availableMembers={[]}
-                onClick={() => undefined}
-              >
-                {member.title}
-              </MemberDropdown>
-            </RemoveButtonGroup>
-          </div>
-        ))}
-      </Flex>
+      <Space wrap>
+        {members.map((member) => {
+          if (!member) {
+            console.warn(
+              `Rollup Designer received 'undefined' member as ${title}`
+            );
+            return null;
+          }
+
+          return (
+            <MemberTag
+              name={member.shortTitle}
+              cubeName={member.title.replace(member.shortTitle, '').trim()}
+              onClose={() => onRemove(member.name)}
+            />
+          );
+        })}
+      </Space>
     </>
   );
 }
