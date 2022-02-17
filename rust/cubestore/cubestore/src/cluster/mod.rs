@@ -203,7 +203,8 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
             WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
-                debug!("Running select in worker started: {:?}", plan_node);
+                let time = SystemTime::now();
+                debug!("Running select in worker started");
                 let plan_node_to_send = plan_node.clone();
                 let result = chunk_id_to_record_batches
                     .into_iter()
@@ -221,7 +222,10 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                     .query_executor
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
-                debug!("Running select in worker completed: {:?}", plan_node);
+                debug!(
+                    "Running select in worker completed ({:?})",
+                    time.elapsed().unwrap()
+                );
                 let (schema, records) = res?;
                 let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
                 Ok((schema, records))
