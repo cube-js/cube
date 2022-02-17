@@ -1,5 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
+use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
@@ -229,6 +230,7 @@ pub enum SerializedLogicalPlan {
         group_by_dimension: Option<SerializedExpr>,
         aggs: Vec<SerializedExpr>,
     },
+    Panic {},
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -448,6 +450,9 @@ impl SerializedLogicalPlan {
                     group_by_dimension: group_by_dimension.as_ref().map(|d| d.expr()),
                     aggs: exprs(&aggs),
                 }),
+            },
+            SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
+                node: Arc::new(PanicWorkerNode {}),
             },
         })
     }
@@ -932,6 +937,8 @@ impl SerializedPlan {
                             .map(|d| Self::serialized_expr(d)),
                         aggs: Self::serialized_exprs(&r.aggs),
                     }
+                } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                    SerializedLogicalPlan::Panic {}
                 } else {
                     panic!("unknown extension");
                 }

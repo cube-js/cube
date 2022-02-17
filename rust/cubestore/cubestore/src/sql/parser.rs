@@ -61,6 +61,7 @@ pub enum Statement {
 pub enum SystemCommand {
     KillAllJobs,
     Repartition { partition_id: u64 },
+    PanicWorker,
 }
 
 pub struct CubeStoreParser<'a> {
@@ -139,6 +140,8 @@ impl<'a> CubeStoreParser<'a> {
                     x
                 ))),
             }
+        } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
+            Ok(Statement::System(SystemCommand::PanicWorker))
         } else {
             Err(ParserError::ParserError(
                 "Unknown system command".to_string(),

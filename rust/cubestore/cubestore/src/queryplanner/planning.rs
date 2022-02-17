@@ -39,6 +39,7 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition, Schema};
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
@@ -759,6 +760,9 @@ impl ExtensionPlanner for CubeExtensionPlanner {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
             Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
+        } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+            assert_eq!(inputs.len(), 0);
+            Ok(Some(plan_panic_worker()?))
         } else {
             Ok(None)
         }
