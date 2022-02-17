@@ -1,5 +1,5 @@
 import yargs from 'yargs/yargs';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, {CubejsApi, HttpTransport} from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
 
@@ -107,5 +107,16 @@ describe(name, () => {
     // ../.. to move out of dist/test directory
     // @ts-ignore
     expect(response.rawData()).toMatchSpecificSnapshot(`../../test/__snapshots__/${name}.query.snapshot`);
+  });
+
+  it('run-scheduled-refresh', async () => {
+    // @ts-ignore
+    const response = await httpClient.loadMethod(
+      // @ts-ignore
+      () => httpClient.request('run-scheduled-refresh'),
+      (x: any) => x,
+      {},
+    );
+    expect(response).toEqual(123);
   });
 });
