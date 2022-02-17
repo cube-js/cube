@@ -144,7 +144,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       }
     });
 
-    describe('query.responseFormat', () => {
+    describe('responseFormat', () => {
       const responses: unknown[] = [];
       let transport: WebSocketTransport;
       let http: CubejsApi;
