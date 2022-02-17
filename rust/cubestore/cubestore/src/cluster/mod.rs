@@ -18,7 +18,10 @@ use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::table::Table;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
+use crate::metastore::{
+    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
+    TableId,
+};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -412,10 +415,14 @@ impl Cluster for ClusterImpl {
             let name = chunk.get_row().get_full_name(chunk.get_id());
             futures.push(self.warmup_download(&node_name, name, chunk.get_row().file_size()));
         }
-        join_all(futures)
+        let res = join_all(futures)
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>();
+
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, &partition).await;
+
+        res?;
         Ok(())
     }
 
@@ -1100,7 +1107,17 @@ impl ClusterImpl {
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
-            .map(|(remote, file_size)| self.remote_fs.download_file(remote, file_size.clone()))
+            .map(|(partition, remote, file_size)| {
+                let meta_store = self.meta_store.clone();
+                async move {
+                    let res = self
+                        .remote_fs
+                        .download_file(remote, file_size.clone())
+                        .await;
+                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
+                    res
+                }
+            })
             .collect::<Vec<_>>();
         let remote_to_local_names = to_download
             .clone()
@@ -1113,7 +1130,7 @@ impl ClusterImpl {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter(),
             )
-            .map(|((remote_path, _), path)| (remote_path, path))
+            .map(|((_, remote_path, _), path)| (remote_path, path))
             .collect::<HashMap<_, _>>();
         let warmup = start.elapsed()?;
         if warmup.as_millis() > 200 {
@@ -1422,14 +1439,15 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                ack_error!(
-                    self.remote_fs
-                        .download_file(
-                            &chunk_file_name(c.get_id(), c.get_row().suffix()),
-                            c.get_row().file_size()
-                        )
-                        .await
-                );
+                let result = self
+                    .remote_fs
+                    .download_file(
+                        &chunk_file_name(c.get_id(), c.get_row().suffix()),
+                        c.get_row().file_size(),
+                    )
+                    .await;
+                deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &p).await;
+                ack_error!(result);
             }
         }
         log::debug!("Startup warmup finished");

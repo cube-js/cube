@@ -304,6 +304,12 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    fn meta_store_snapshot_interval(&self) -> u64;
+
+    fn meta_store_log_upload_interval(&self) -> u64;
+
+    fn gc_loop_interval(&self) -> u64;
+
     fn stale_stream_timeout(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
@@ -335,6 +341,8 @@ pub trait ConfigObj: DIService {
     fn malloc_trim_every_secs(&self) -> u64;
 
     fn max_cached_queries(&self) -> usize;
+
+    fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
 #[derive(Debug, Clone)]
@@ -345,6 +353,7 @@ pub struct ConfigObjImpl {
     pub compaction_chunks_count_threshold: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
+    pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
@@ -355,6 +364,9 @@ pub struct ConfigObjImpl {
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub meta_store_log_upload_interval: u64,
+    pub meta_store_snapshot_interval: u64,
+    pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -428,6 +440,18 @@ impl ConfigObj for ConfigObjImpl {
         self.import_job_timeout
     }
 
+    fn meta_store_snapshot_interval(&self) -> u64 {
+        self.meta_store_snapshot_interval
+    }
+
+    fn meta_store_log_upload_interval(&self) -> u64 {
+        self.meta_store_log_upload_interval
+    }
+
+    fn gc_loop_interval(&self) -> u64 {
+        self.gc_loop_interval
+    }
+
     fn stale_stream_timeout(&self) -> u64 {
         self.stale_stream_timeout
     }
@@ -489,6 +513,10 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
+
+    fn dump_dir(&self) -> &Option<PathBuf> {
+        &self.dump_dir
+    }
 }
 
 lazy_static! {
@@ -544,6 +572,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
+                dump_dir: env::var("CUBESTORE_DUMP_DIR")
+                    .ok()
+                    .map(|v| PathBuf::from(v)),
                 partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
@@ -599,6 +630,9 @@ impl Config {
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
                 stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
@@ -637,6 +671,7 @@ impl Config {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
+                dump_dir: None,
                 partition_split_threshold: 20,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
@@ -672,6 +707,9 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
             }),
         }
     }
@@ -896,14 +934,23 @@ impl Config {
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
-                        let meta_store = RocksMetaStore::load_from_remote(
-                            &path,
-                            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            i.get_service("original_remote_fs").await,
-                            i.get_service_typed::<dyn ConfigObj>().await,
-                        )
-                        .await
-                        .unwrap();
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            RocksMetaStore::load_from_dump(
+                                &path,
+                                dump_dir,
+                                original_remote_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            RocksMetaStore::load_from_remote(&path, original_remote_fs, config)
+                                .await
+                                .unwrap()
+                        };
                         meta_store.add_listener(event_sender).await;
                         meta_store
                     },

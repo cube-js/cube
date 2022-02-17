@@ -233,7 +233,7 @@ CUBEJS_REDIS_PASSWORD.
   value: {{ .Values.database.aws.region | quote }}
 {{- end }}
 {{- if .Values.database.aws.outputLocation }}
-- name: CUBEJS_AWS_OUTPUT_LOCATION
+- name: CUBEJS_AWS_S3_OUTPUT_LOCATION
   value: {{ .Values.database.aws.outputLocation | quote }}
 {{- end }}
 {{- if .Values.database.aws.secret }}

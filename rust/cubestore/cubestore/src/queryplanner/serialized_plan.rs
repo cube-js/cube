@@ -1,5 +1,6 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
+use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
 use crate::queryplanner::query_executor::CubeTable;
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
@@ -229,6 +230,7 @@ pub enum SerializedLogicalPlan {
         group_by_dimension: Option<SerializedExpr>,
         aggs: Vec<SerializedExpr>,
     },
+    Panic {},
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -448,6 +450,9 @@ impl SerializedLogicalPlan {
                     group_by_dimension: group_by_dimension.as_ref().map(|d| d.expr()),
                     aggs: exprs(&aggs),
                 }),
+            },
+            SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
+                node: Arc::new(PanicWorkerNode {}),
             },
         })
     }
@@ -683,7 +688,7 @@ impl SerializedPlan {
         &self.schema_snapshot.index_snapshots
     }
 
-    pub fn files_to_download(&self) -> Vec<(String, Option<u64>)> {
+    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
         self.list_files_to_download(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -692,14 +697,18 @@ impl SerializedPlan {
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<(String, Option<u64>)> {
+    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
         self.list_files_to_download(|_| true)
     }
 
     fn list_files_to_download(
         &self,
         include_partition: impl Fn(u64) -> bool,
-    ) -> Vec<(String, Option<u64>)> {
+    ) -> Vec<(
+        IdRow<Partition>,
+        /* file_name */ String,
+        /* size */ Option<u64>,
+    )> {
         let indexes = self.index_snapshots();
 
         let mut files = Vec::new();
@@ -714,12 +723,17 @@ impl SerializedPlan {
                     .get_row()
                     .get_full_name(partition.partition.get_id())
                 {
-                    files.push((file, partition.partition.get_row().file_size()));
+                    files.push((
+                        partition.partition.clone(),
+                        file,
+                        partition.partition.get_row().file_size(),
+                    ));
                 }
 
                 for chunk in partition.chunks() {
                     if !chunk.get_row().in_memory() {
                         files.push((
+                            partition.partition.clone(),
                             chunk.get_row().get_full_name(chunk.get_id()),
                             chunk.get_row().file_size(),
                         ))
@@ -923,6 +937,8 @@ impl SerializedPlan {
                             .map(|d| Self::serialized_expr(d)),
                         aggs: Self::serialized_exprs(&r.aggs),
                     }
+                } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                    SerializedLogicalPlan::Panic {}
                 } else {
                     panic!("unknown extension");
                 }
