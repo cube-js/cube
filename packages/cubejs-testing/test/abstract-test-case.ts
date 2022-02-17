@@ -1,7 +1,8 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
-
 import { BirdBox } from '../src';
 
 type QueryTestOptions = {
@@ -73,9 +74,9 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
+    let wsTransport: WebSocketTransport;
     let httpClient: CubejsApi;
     let wsClient: CubejsApi;
-    let wsTransport: WebSocketTransport;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -83,13 +84,17 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       try {
         birdbox = await entrypoint();
 
+        // http clients
         httpClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
         });
 
+        // ws transports
         wsTransport = new WebSocketTransport({
           apiUrl: birdbox.configuration.apiUrl,
         });
+
+        // ws clients
         wsClient = cubejs(async () => 'test', {
           apiUrl: birdbox.configuration.apiUrl,
           transport: wsTransport,
@@ -103,7 +108,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
       await wsTransport.close();
-
       await birdbox.stop();
     });
 
@@ -136,8 +140,158 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         await httpClient.load({ measures: ['Orders.toRemove'] });
         throw new Error('Should not successfully run Orders.toRemove query');
       } catch (e) {
-        expect(e.toString()).toContain('Query should contain either');
+        expect((e as Error).toString()).toContain('Query should contain either');
       }
+    });
+
+    describe('responseFormat', () => {
+      const responses: unknown[] = [];
+      let transport: WebSocketTransport;
+      let http: CubejsApi;
+      let ws: CubejsApi;
+  
+      beforeAll(async () => {
+        try {
+          transport = new WebSocketTransport({
+            apiUrl: birdbox.configuration.apiUrl,
+          });
+          http = cubejs(async () => 'test', {
+            apiUrl: birdbox.configuration.apiUrl,
+          });
+          ws = cubejs(async () => 'test', {
+            apiUrl: birdbox.configuration.apiUrl,
+            transport,
+          });
+        } catch (e) {
+          console.log(e);
+          process.exit(1);
+        }
+      });
+  
+      afterAll(async () => {
+        await transport.close();
+      });
+  
+      test('http+responseFormat=default', async () => {
+        const response = await http.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#1', async () => {
+        const response = await http.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'compact',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#2', async () => {
+        const response = await http.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('http+responseFormat=compact option#1+2', async () => {
+        const response = await http.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'compact',
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=default', async () => {
+        const response = await ws.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#1', async () => {
+        const response = await ws.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'compact',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#2', async () => {
+        const response = await ws.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('ws+responseFormat=compact option#1+2', async () => {
+        const response = await ws.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'compact',
+          },
+          undefined,
+          undefined,
+          'compact',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+  
+      test('responses', () => {
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[1].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[2].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[3].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[4].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[5].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[6].rawData());
+        // @ts-ignore
+        expect(responses[0].rawData()).toEqual(responses[7].rawData());
+      });
     });
   });
 }

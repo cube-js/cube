@@ -161,3 +161,107 @@ Array [
   },
 ]
 `;
+
+exports[`postgresql responseFormat http+responseFormat=compact option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat http+responseFormat=compact option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat http+responseFormat=compact option#2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat http+responseFormat=default: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=compact option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=compact option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=compact option#2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql responseFormat ws+responseFormat=default: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
