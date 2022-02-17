@@ -50,7 +50,12 @@ fn main() {
     #[cfg(not(target_os = "windows"))]
     cubestore::util::respawn::init();
 
-    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    let mut tokio_builder = Builder::new_multi_thread();
+    tokio_builder.enable_all();
+    if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
+        tokio_builder.worker_threads(var.parse().unwrap());
+    }
+    let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
         init_agent_sender().await;
 
