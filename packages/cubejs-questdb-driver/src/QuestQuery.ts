@@ -66,7 +66,6 @@ export class QuestQuery extends BaseQuery {
 
   public unixTimestampSql(): string {
     // QuestDB's now() function returns epoch timestamp with microsecond granularity.
-
     return 'now() / 1000000';
   }
 
@@ -90,6 +89,11 @@ export class QuestQuery extends BaseQuery {
 
   public orderHashToString(hash: any): string | null {
     // QuestDB has partial support for order by index column, so map these to the alias names.
+    // So, instead of:
+    // SELECT col_a as "a", col_b as "b" FROM tab ORDER BY 2 ASC
+    //
+    // the query should be:
+    // SELECT col_a as "a", col_b as "b" FROM tab ORDER BY "b" ASC
 
     if (!hash || !hash.id) {
       return null;
@@ -133,6 +137,11 @@ export class QuestQuery extends BaseQuery {
 
   public groupByClause(): string {
     // QuestDB doesn't support group by index column, so map these to the alias names.
+    // So, instead of:
+    // SELECT col_a as "a", count() as "c" FROM tab GROUP BY 1
+    //
+    // the query should be:
+    // SELECT col_a as "a", count() as "c" FROM tab GROUP BY "a"
 
     if (this.ungrouped) {
       return '';

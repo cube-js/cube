@@ -32,6 +32,7 @@
     "@cubejs-backend/shared": "^0.29.23",
     "@types/pg": "^8.6.0",
     "moment": "^2.24.0",
+    "ramda": "^0.27.1",
     "pg": "^8.7.0"
   },
   "license": "Apache-2.0",

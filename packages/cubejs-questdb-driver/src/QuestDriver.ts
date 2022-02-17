@@ -2,6 +2,7 @@ import { types, Pool, PoolConfig, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
+import R from 'ramda';
 import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadTableMemoryData, DriverInterface,
@@ -9,19 +10,12 @@ import {
 } from '@cubejs-backend/query-orchestrator';
 import { QuestQuery } from './QuestQuery';
 
-const NativeTypeToQuestType: Record<string, string> = {};
-
-Object.entries(types.builtins).forEach(([key, value]) => {
-  NativeTypeToQuestType[value] = key;
-});
+const NativeTypeToQuestType: Record<string, string> = R.invertObj(types.builtins);
 
 const timestampDataTypes = [
-  // @link TypeId.DATE
-  1082,
-  // @link TypeId.TIMESTAMP
-  1114,
-  // @link TypeId.TIMESTAMPTZ
-  1184
+  types.builtins.DATE,
+  types.builtins.TIMESTAMP,
+  types.builtins.TIMESTAMPTZ,
 ];
 const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 
@@ -31,9 +25,9 @@ export type QuestDriverConfiguration = Partial<PoolConfig> & {
 
 export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverConfiguration>
   extends BaseDriver implements DriverInterface {
-  protected readonly pool: Pool;
+  private readonly pool: Pool;
 
-  protected readonly config: Partial<Config>;
+  private readonly config: Partial<Config>;
 
   public static dialectClass() {
     return QuestQuery;
@@ -64,37 +58,22 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     };
   }
 
-  protected getInitialConfiguration(): Partial<QuestDriverConfiguration> {
+  private getInitialConfiguration(): Partial<QuestDriverConfiguration> {
     return {
       readOnly: true,
     };
-  }
-
-  protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
-    const isTimestamp = timestampDataTypes.includes(dataTypeID);
-    if (isTimestamp) {
-      return timestampTypeParser;
-    }
-
-    const parser = types.getTypeParser(dataTypeID, format);
-    return (val: any) => parser(val);
-  };
-
-  protected getQuestTypeForField(dataTypeID: number): string | null {
-    if (dataTypeID in NativeTypeToQuestType) {
-      return NativeTypeToQuestType[dataTypeID].toLowerCase();
-    }
-
-    return null;
   }
 
   public async testConnection(): Promise<void> {
     await this.pool.query('SELECT $1 AS number', ['1']);
   }
 
-  protected mapFields(fields: FieldDef[]) {
+  private mapFields(fields: FieldDef[]) {
     return fields.map((f) => {
-      const questType = this.getQuestTypeForField(f.dataTypeID);
+      let questType;
+      if (f.dataTypeID in NativeTypeToQuestType) {
+        questType = NativeTypeToQuestType[f.dataTypeID].toLowerCase();
+      }
       if (!questType) {
         throw new Error(
           `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
@@ -108,7 +87,12 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     });
   }
 
-  protected async queryResponse(query: string, values: unknown[]) {
+  public async query<R = unknown>(query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
+    const result = await this.queryResponse(query, values);
+    return result.rows;
+  }
+
+  private async queryResponse(query: string, values: unknown[]) {
     const conn = await this.pool.connect();
 
     try {
@@ -125,14 +109,17 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
-    const result = await this.queryResponse(query, values);
-    return result.rows;
+  private getTypeParser(dataTypeID: TypeId, format: TypeFormat | undefined) {
+    const isTimestamp = timestampDataTypes.includes(dataTypeID);
+    if (isTimestamp) {
+      return timestampTypeParser;
+    }
+
+    const parser = types.getTypeParser(dataTypeID, format);
+    return (val: any) => parser(val);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions) {
     const res = await this.queryResponse(query, values);
     return {
       rows: res.rows,
@@ -140,8 +127,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async createSchemaIfNotExists(schemaName: string): Promise<any> {
+  public async createSchemaIfNotExists(_schemaName: string): Promise<any> {
     // no-op as there are no schemas in QuestDB
   }
 
@@ -162,8 +148,8 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     return metadata;
   }
 
-  // eslint-disable-next-line camelcase, @typescript-eslint/no-unused-vars
-  public async getTablesQuery(schemaName: string): Promise<({ table_name?: string, TABLE_NAME?: string })[]> {
+  // eslint-disable-next-line camelcase
+  public async getTablesQuery(_schemaName: string): Promise<({ table_name?: string, TABLE_NAME?: string })[]> {
     const response = await this.query('SHOW TABLES', []);
 
     return response.map((row: any) => ({
