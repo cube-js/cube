@@ -52,6 +52,7 @@ fn main() {
 
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
+    tokio_builder.thread_name("cubestore-main");
     if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
         tokio_builder.worker_threads(var.parse().unwrap());
     }
