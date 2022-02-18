@@ -42,7 +42,7 @@ const FilterGroup = ({
       );
 
       return (
-        <Fragment key={m.index}>
+        <Fragment key={m.member}>
           {isMissing ? (
             <MissingMemberTooltip>{buttonGroup}</MissingMemberTooltip>
           ) : (
