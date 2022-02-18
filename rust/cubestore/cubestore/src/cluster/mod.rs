@@ -124,6 +124,11 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String;
 
+    async fn node_name_for_chunk_repartition(
+        &self,
+        chunk: &IdRow<Chunk>,
+    ) -> Result<String, CubeError>;
+
     async fn node_name_for_import(
         &self,
         table_id: u64,
@@ -390,6 +395,22 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn node_name_for_chunk_repartition(
+        &self,
+        chunk: &IdRow<Chunk>,
+    ) -> Result<String, CubeError> {
+        if chunk.get_row().in_memory() {
+            Ok(self.node_name_by_partition(
+                &self
+                    .meta_store
+                    .get_partition(chunk.get_row().get_partition_id())
+                    .await?,
+            ))
+        } else {
+            Ok(pick_worker_by_ids(self.config_obj.as_ref(), [chunk.get_id()]).to_string())
+        }
+    }
+
     async fn node_name_for_import(
         &self,
         table_id: u64,
@@ -519,17 +540,25 @@ impl Cluster for ClusterImpl {
     }
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
-        let node = self.node_name_by_partition(p);
-        let job = self
+        let chunks = self
             .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, p.get_id()),
-                JobType::Repartition,
-                node.to_string(),
-            ))
+            .get_chunks_by_partition(p.get_id(), false)
             .await?;
-        if job.is_some() {
-            self.notify_job_runner(node).await?;
+
+        for chunk in chunks {
+            let node = self.node_name_for_chunk_repartition(&chunk).await?;
+
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Chunks, chunk.get_id()),
+                    JobType::RepartitionChunk,
+                    node.to_string(),
+                ))
+                .await?;
+            if job.is_some() {
+                self.notify_job_runner(node).await?;
+            }
         }
         Ok(())
     }
@@ -821,6 +850,17 @@ impl JobRunner {
                             .clone()
                             .import_table_part(table_id, &location)
                             .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::RepartitionChunk => {
+                if let RowKey::Table(TableId::Chunks, chunk_id) = job.row_reference() {
+                    let chunk_store = self.chunk_store.clone();
+                    let chunk_id = *chunk_id;
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.repartition_chunk(chunk_id).await
                     }))
                 } else {
                     Self::fail_job_row_key(job)
