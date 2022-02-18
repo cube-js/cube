@@ -428,7 +428,7 @@ mod tests {
         runtime.block_on(async move {
             let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
                 4,
-                Duration::from_millis(1000),
+                Duration::from_millis(2000),
             ));
             let pool_to_move = pool.clone();
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
