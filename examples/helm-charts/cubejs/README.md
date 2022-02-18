@@ -253,7 +253,7 @@ cubestore:
 | `database.aws.keyFromSecret.name`              | The AWS Access Key ID to use for database connections (using secret)             |         |
 | `database.aws.keyFromSecret.key`               | The AWS Access Key ID to use for database connections (using secret)             |         |
 | `database.aws.region`                          | The AWS region of the Cube.js deployment                                         |         |
-| `database.aws.outputLocation`                  | The S3 path to store query results made by the Cube.js deployment                |         |
+| `database.aws.s3OutputLocation`                  | The S3 path to store query results made by the Cube.js deployment                |         |
 | `database.aws.secret`                          | The AWS Secret Access Key to use for database connections                        |         |
 | `database.aws.secretFromSecret.name`           | The AWS Secret Access Key to use for database connections (using secret)         |         |
 | `database.aws.secretFromSecret.key`            | The AWS Secret Access Key to use for database connections (using secret)         |         |
