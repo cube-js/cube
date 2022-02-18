@@ -892,7 +892,10 @@ impl ClusterImpl {
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
         let mut futures = Vec::new();
         #[cfg(not(target_os = "windows"))]
-        if self.config_obj.select_worker_pool_size() > 0 {
+        if (self.config_obj.select_workers().is_empty()
+            || self.config_obj.worker_bind_address().is_some())
+            && self.config_obj.select_worker_pool_size() > 0
+        {
             let mut pool = self.select_process_pool.write().await;
             let arc = Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
