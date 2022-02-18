@@ -134,6 +134,10 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
   public async tablesSchema() {
     const tables = await this.getTablesQuery('');
 
+    // QuestDB doesn't have a notion of schema/logical database while the driver
+    // has to return a `{ 'schema_name': { 'table1': {...} } }` object. So, we use
+    // empty schema name ('') as a workaround to avoid the schema prefix
+    // ('schema_name.') being used for table names in the generated queries.
     const metadata: Record<string, Record<string, object>> = { '': {} };
 
     // eslint-disable-next-line camelcase
