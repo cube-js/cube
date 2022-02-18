@@ -23,6 +23,8 @@ multi-stage process:
    raw data.
 
 Pre-aggregations can be defined in the `preAggregations` available on each cube.
+A more in-depth diagram detailing how pre-aggregations are selected can be
+[found here][ref-caching-preaggs-selecting-preaggs].
 
 ## Naming
 
@@ -799,6 +801,8 @@ cube(`Orders`, {
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-preaggs-selecting-preaggs]:
+  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-driverfactory]: /config/#driver-factory
