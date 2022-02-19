@@ -487,9 +487,13 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::Repartition => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Partitions, p) => {
-                        let p = self.meta_store.get_partition(*p).await?;
+                JobType::RepartitionChunk => match job.get_row().row_reference() {
+                    RowKey::Table(TableId::Chunks, c) => {
+                        let c = self.meta_store.get_chunk(*c).await?;
+                        let p = self
+                            .meta_store
+                            .get_partition(c.get_row().get_partition_id())
+                            .await?;
                         self.schedule_repartition_if_needed(&p).await?
                     }
                     _ => panic!(
