@@ -1,4 +1,4 @@
-use crate::files::{write_tmp_file};
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -9,6 +9,7 @@ use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
 use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -20,7 +21,6 @@ use std::path::Path;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
-use indoc::indoc;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -1761,7 +1761,8 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
         fruit,number
         apple,2
         banana,3
-    "}).unwrap();
+    "})
+    .unwrap();
     let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
@@ -1788,7 +1789,8 @@ async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
     let file = write_tmp_file(indoc! {"
         apple,2
         banana,3
-    "}).unwrap();
+    "})
+    .unwrap();
     let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
