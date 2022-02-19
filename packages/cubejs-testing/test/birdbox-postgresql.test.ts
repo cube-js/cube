@@ -1,7 +1,9 @@
 import { createBirdBoxTestCase } from './abstract-test-case';
 import { startBirdBoxFromContainer } from '../src';
 
-createBirdBoxTestCase('postgresql', () => startBirdBoxFromContainer({
+const entrypoint = () => startBirdBoxFromContainer({
   name: 'postgresql',
-  loadScript: 'load.sh',
-}));
+  loadScript: 'postgres-load-events.sh',
+});
+
+createBirdBoxTestCase('postgresql', entrypoint);

@@ -154,6 +154,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     });
 
     console.log('[Birdbox] Executing load script');
+    throw new Error('123')
 
     const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
