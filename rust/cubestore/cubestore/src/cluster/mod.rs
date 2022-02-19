@@ -661,6 +661,8 @@ impl JobRunner {
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
+            // In case of job queue is in place jump to the next job immediately
+            self.notify.notify_one();
         }
         Ok(())
     }
@@ -1150,7 +1152,7 @@ impl ClusterImpl {
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         let start = SystemTime::now();
-        debug!("Running select: {:?}", plan_node);
+        debug!("Running select");
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
