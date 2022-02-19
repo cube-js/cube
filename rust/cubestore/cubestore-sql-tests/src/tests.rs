@@ -1,3 +1,4 @@
+use crate::files::{write_tmp_file};
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -19,6 +20,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
+use indoc::indoc;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -1755,12 +1757,18 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "}).unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION './data/csv.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
@@ -1777,12 +1785,17 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "}).unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION './data/csv_no_header.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
