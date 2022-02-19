@@ -376,8 +376,10 @@ impl SqlServiceImpl {
                 indexes.iter().map(|i| i.get_id()).collect(),
             )
             .await?;
-        for (partition, chunks) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, chunks));
+        // Omit warming up chunks as those shouldn't affect select times much however will affect
+        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
+        for (partition, _) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
         }
         join_all(futures)
             .await
