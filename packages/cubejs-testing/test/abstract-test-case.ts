@@ -68,242 +68,6 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
   ],
 ];
 
-const containsAsserts: [options: QueryTestOptions, query: Query][] = [
-  [
-    {
-      name: '#1 Orders.status.contains: ["e"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'contains',
-          values: ['e'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#2 Orders.status.contains: ["es"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'contains',
-          values: ['es'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#3 Orders.status.contains: ["es", "w"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'contains',
-          values: ['es', 'w'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#3 Orders.status.contains: ["a"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'contains',
-          values: ['a'],
-        },
-      ],
-    },
-  ],
-];
-
-const startsWithAsserts: [options: QueryTestOptions, query: Query][] = [
-  [
-    {
-      name: '#1 Orders.status.startsWith: ["a"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'startsWith',
-          values: ['a'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#2 Orders.status.startsWith: ["n"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'startsWith',
-          values: ['n'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#3 Orders.status.startsWith: ["p"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'startsWith',
-          values: ['p'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#4 Orders.status.startsWith: ["sh"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'startsWith',
-          values: ['sh'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#5 Orders.status.startsWith: ["n", "p", "s"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'startsWith',
-          values: ['n', 'p', 's'],
-        },
-      ],
-    },
-  ],
-];
-
-const endsWithAsserts: [options: QueryTestOptions, query: Query][] = [
-  [
-    {
-      name: '#1 Orders.status.endsWith: ["a"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'endsWith',
-          values: ['a'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#2 Orders.status.endsWith: ["w"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'endsWith',
-          values: ['w'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#3 Orders.status.endsWith: ["sed"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'endsWith',
-          values: ['sed'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#4 Orders.status.endsWith: ["ped"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'endsWith',
-          values: ['ped'],
-        },
-      ],
-    },
-  ], [
-    {
-      name: '#4 Orders.status.endsWith: ["w", "sed", "ped"]',
-    },
-    {
-      measures: [
-        'Orders.count'
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'endsWith',
-          values: ['w', 'sed', 'ped'],
-        },
-      ],
-    },
-  ],
-];
-
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
   describe(name, () => {
@@ -531,6 +295,240 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     });
 
     describe('filters', () => {
+      const containsAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.contains: ["e"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['e'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.contains: ["es"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['es'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.contains: ["es", "w"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['es', 'w'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.contains: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['a'],
+              },
+            ],
+          },
+        ],
+      ];
+      const startsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.startsWith: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['a'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.startsWith: ["n"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['n'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.startsWith: ["p"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['p'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.startsWith: ["sh"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['sh'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#5 Orders.status.startsWith: ["n", "p", "s"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['n', 'p', 's'],
+              },
+            ],
+          },
+        ],
+      ];
+      const endsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.endsWith: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['a'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.endsWith: ["w"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['w'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.endsWith: ["sed"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['sed'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.endsWith: ["ped"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['ped'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.endsWith: ["w", "sed", "ped"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['w', 'sed', 'ped'],
+              },
+            ],
+          },
+        ],
+      ];
+
       describe('contains', () => {
         // eslint-disable-next-line no-restricted-syntax
         for (const [options, query] of containsAsserts) {
