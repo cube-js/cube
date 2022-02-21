@@ -220,6 +220,90 @@ const startsWithAsserts: [options: QueryTestOptions, query: Query][] = [
   ],
 ];
 
+const endsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+  [
+    {
+      name: '#1 Orders.status.endsWith: ["a"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'endsWith',
+          values: ['a'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#2 Orders.status.endsWith: ["w"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'endsWith',
+          values: ['w'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#3 Orders.status.endsWith: ["sed"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'endsWith',
+          values: ['sed'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#4 Orders.status.endsWith: ["ped"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'endsWith',
+          values: ['ped'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#4 Orders.status.endsWith: ["w", "sed", "ped"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'endsWith',
+          values: ['w', 'sed', 'ped'],
+        },
+      ],
+    },
+  ],
+];
+
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
   describe(name, () => {
@@ -461,6 +545,17 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       describe('startsWith', () => {
         // eslint-disable-next-line no-restricted-syntax
         for (const [options, query] of startsWithAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      });
+
+      describe('endsWith', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of endsWithAsserts) {
           // eslint-disable-next-line no-loop-func
           it(`${options.name}`, async () => {
             const response = await httpClient.load(query);
