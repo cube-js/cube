@@ -1803,52 +1803,6 @@ module.exports = v4;
 const cubeTracking = require("cubedev-tracking")
 const { event: cubeTrackingEvent } = cubeTracking
 
-// fetch examples nav items
-const NAV_CONFIG_PATH = "examples-nav.config.json";
-const populateExamplesNav = (data) => {
-    const menu = document.getElementsByClassName("menu-list")[0]
-    const menuButton = document.getElementById("menu-button")
-
-    // find current nav item index
-    const currentNavItemIndex = data.map(item=>item.url).indexOf(window.location.href)
-    // remove current nav item from data
-    const currentNavItem = data.splice(currentNavItemIndex, 1)[0]
-
-    // generate nav options from data items
-    const navItems = data
-        .map(item =>
-            `<li class="dropdown-list-item"><a class="dropdown-link" href="${item.url}">${item.name}</a></li>`)
-        .join("");
-
-    // set options to menu select
-    menu.innerHTML = navItems
-    // set current item name as menu button text
-    menuButton.innerHTML = currentNavItem.name
-}
-
-// fetch nav items from config file
-fetch(NAV_CONFIG_PATH).then(res => res.json())
-    .then(data => populateExamplesNav(data))
-    .catch();
-
-// dropdown menu functionality
-const dropdownMenuBtn = document.getElementById("dropdownMenuButton")
-const dropdownLinks = document.querySelectorAll(".dropdown-link")
-dropdownMenuBtn.addEventListener("hover", function(){
-    this.setAttribute("aria-expanded", true)
-})
-dropdownMenuBtn.addEventListener("focus", function(){
-    this.setAttribute("aria-expanded", true)
-})
-dropdownMenuBtn.addEventListener("blur", function(){
-    this.setAttribute("aria-expanded", false)
-});
-
-// dropdownLinks.forEach(link => link.addEventListener("focus", function(){
-//     console.log(this)
-//     dropdownMenuBtn.setAttribute("aria-expanded", true)
-// }))
-console.log(dropdownLinks)
 
 // feedback handler
 const feedbackLikeBtn = document.getElementById("feedback-like")

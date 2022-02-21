@@ -15,16 +15,16 @@
 
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
-  <nav>
+  <nav aria-label="Cube examples navigation">
     <img src="logo.svg" alt="Cube Examples" class="logo">
     <div class="menu dropdown">
-      <button class="dropdown-button">
-        <span id="menu-button"></span> 
+      <button class="dropdown-button" aria-expanded="false">
+        <span id="menu-button"></span>
         <svg width="10" height="7" viewBox="0 0 10 7" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1 1L5 5L9 1" stroke="#141446" stroke-width="1.6"/>
-          </svg>
+          <path d="M1 1L5 5L9 1" stroke="#141446" stroke-width="1.6" />
+        </svg>
       </button>
-      <ul class="menu-list dropdown-content"></ul>
+      <ul class="menu-list dropdown-content" aria-label="Cube examples list"></ul>
     </div>
     <a href="#" class="link">Discuss on Slack</a>
     <a href="https://cubecloud.dev/auth/signup" class="button">Get started with Cube</a>
@@ -64,7 +64,8 @@
   </div>
 
 
-  <script src="bundle.js"></script>
+  <script src="index.js"></script>
+  <script src="js/feedback-bundle.js"></script>
 </body>
 
 </html>
