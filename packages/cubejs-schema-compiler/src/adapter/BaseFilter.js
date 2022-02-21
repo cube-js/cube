@@ -162,19 +162,48 @@ export class BaseFilter extends BaseDimension {
     return this.likeOr(column, true, 'contains');
   }
 
+  /**
+   * Returns SQL statement for the `startsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
   startsWithWhere(column) {
     return this.likeOr(column, false, 'starts');
   }
 
+  /**
+   * Returns SQL statement for the `endsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
   endsWithWhere(column) {
     return this.likeOr(column, false, 'ends');
   }
 
+  /**
+   * Returns SQL filter statement (union with the logical OR) for the
+   * provided parameters.
+   * @param {string} column Column name.
+   * @param {boolean} not Flag to build NOT LIKE statement.
+   * @param {string} type Type of the condition (i.e. contains/
+   * startsWith/endsWith).
+   * @returns string
+   */
   likeOr(column, not, type) {
     type = type || 'contains';
-    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(p => this.likeIgnoreCase(column, not, p, type)))}${this.orIsNullCheck(column, not)}`;
+    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(
+      p => this.likeIgnoreCase(column, not, p, type)
+    ))}${this.orIsNullCheck(column, not)}`;
   }
 
+  /**
+   * Returns SQL LIKE statement for specified parameters.
+   * @param {string} column Column name.
+   * @param {boolean} not Flag to build NOT LIKE statement.
+   * @param {*} param Value for statement.
+   * @param {string} type Type of the condition (i.e. contains/startsWith/endsWith).
+   * @returns string
+   */
   likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';

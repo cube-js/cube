@@ -68,6 +68,158 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
   ],
 ];
 
+const containsAsserts: [options: QueryTestOptions, query: Query][] = [
+  [
+    {
+      name: '#1 Orders.status.contains: ["e"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'contains',
+          values: ['e'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#2 Orders.status.contains: ["es"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'contains',
+          values: ['es'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#3 Orders.status.contains: ["es", "w"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'contains',
+          values: ['es', 'w'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#3 Orders.status.contains: ["a"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'contains',
+          values: ['a'],
+        },
+      ],
+    },
+  ],
+];
+
+const startsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+  [
+    {
+      name: '#1 Orders.status.startsWith: ["a"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'startsWith',
+          values: ['a'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#2 Orders.status.startsWith: ["n"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'startsWith',
+          values: ['n'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#3 Orders.status.startsWith: ["p"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'startsWith',
+          values: ['p'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#4 Orders.status.startsWith: ["sh"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'startsWith',
+          values: ['sh'],
+        },
+      ],
+    },
+  ], [
+    {
+      name: '#5 Orders.status.startsWith: ["n", "p", "s"]',
+    },
+    {
+      measures: [
+        'Orders.count'
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'startsWith',
+          values: ['n', 'p', 's'],
+        },
+      ],
+    },
+  ],
+];
+
 // eslint-disable-next-line import/prefer-default-export
 export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
   describe(name, () => {
@@ -111,6 +263,15 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
       await birdbox.stop();
     });
 
+    it('Failing query rewrite', async () => {
+      try {
+        await httpClient.load({ measures: ['Orders.toRemove'] });
+        throw new Error('Should not successfully run Orders.toRemove query');
+      } catch (e) {
+        expect((e as Error).toString()).toContain('Query should contain either');
+      }
+    });
+
     describe('HTTP Transport', () => {
       // eslint-disable-next-line no-restricted-syntax
       for (const [options, query] of asserts) {
@@ -132,15 +293,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
             expect(response.rawData()).toMatchSnapshot(options.name);
           });
         }
-      }
-    });
-
-    it('Failing query rewrite', async () => {
-      try {
-        await httpClient.load({ measures: ['Orders.toRemove'] });
-        throw new Error('Should not successfully run Orders.toRemove query');
-      } catch (e) {
-        expect((e as Error).toString()).toContain('Query should contain either');
       }
     });
 
@@ -291,6 +443,30 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         expect(responses[0].rawData()).toEqual(responses[6].rawData());
         // @ts-ignore
         expect(responses[0].rawData()).toEqual(responses[7].rawData());
+      });
+    });
+
+    describe('filters', () => {
+      describe('contains', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of containsAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      });
+
+      describe('startsWith', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of startsWithAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
       });
     });
   });
