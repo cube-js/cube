@@ -1094,6 +1094,7 @@ dependencies = [
  "cubestore",
  "futures 0.3.16",
  "futures-timer 3.0.2",
+ "indoc",
  "ipc-channel",
  "itertools 0.9.0",
  "lazy_static",
@@ -1102,6 +1103,7 @@ dependencies = [
  "scopeguard",
  "serde",
  "serde_derive",
+ "tempfile",
  "tokio 1.9.0",
 ]
 
@@ -1963,6 +1965,15 @@ checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
 dependencies = [
  "autocfg 1.0.1",
  "hashbrown 0.11.2",
+]
+
+[[package]]
+name = "indoc"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7906a9fababaeacb774f72410e497a1d18de916322e33797bb2cd29baa23c9e"
+dependencies = [
+ "unindent",
 ]
 
 [[package]]
@@ -4817,6 +4828,12 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
+
+[[package]]
+name = "unindent"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "514672a55d7380da379785a4d70ca8386c8883ff7eaae877be4d2081cebe73d8"
 
 [[package]]
 name = "untrusted"

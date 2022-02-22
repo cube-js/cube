@@ -202,6 +202,7 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError>;
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn repartition_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
@@ -327,6 +328,7 @@ impl ChunkDataStore for ChunkStore {
         panic!("not used");
     }
 
+    // TODO shouldn't be used anymore. Deprecate and remove
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError> {
         let partition = self.meta_store.get_partition(partition_id).await?;
         if partition.get_row().is_active() {
@@ -376,6 +378,55 @@ impl ChunkDataStore for ChunkStore {
                     .await?,
             );
         }
+
+        let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
+            .await
+            .into_iter()
+            .map(|c| {
+                let (c, file_size) = c??;
+                Ok((c.get_id(), file_size))
+            })
+            .collect();
+
+        self.meta_store
+            .swap_chunks(old_chunks, new_chunk_ids?)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn repartition_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+        let chunk = self.meta_store.get_chunk(chunk_id).await?;
+        if !chunk.get_row().active() {
+            log::debug!("Skipping repartition of inactive chunk: {:?}", chunk);
+            return Ok(());
+        }
+        let partition = self
+            .meta_store
+            .get_partition(chunk.get_row().get_partition_id())
+            .await?;
+        if partition.get_row().is_active() {
+            return Err(CubeError::internal(format!(
+                "Tried to repartition active partition: {:?}",
+                partition
+            )));
+        }
+        let mut new_chunks = Vec::new();
+        let mut old_chunks = Vec::new();
+        let chunk_id = chunk.get_id();
+        old_chunks.push(chunk_id);
+        let batches = self.get_chunk_columns(chunk).await?;
+        let mut columns = Vec::new();
+        for i in 0..batches[0].num_columns() {
+            columns.push(arrow::compute::concat(
+                &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
+            )?)
+        }
+        new_chunks.append(
+            &mut self
+                .partition_rows(partition.get_row().get_index_id(), columns, false)
+                .await?,
+        );
 
         let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
             .await
