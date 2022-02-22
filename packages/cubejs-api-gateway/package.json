@@ -30,6 +30,7 @@
     "@cubejs-backend/native": "^0.29.47",
     "@cubejs-backend/shared": "^0.29.37",
     "@hapi/joi": "^15.1.1",
+    "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.2.6",
     "express-graphql": "^0.12.0",

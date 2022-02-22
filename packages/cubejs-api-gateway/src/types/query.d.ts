@@ -59,6 +59,7 @@ interface Query {
   segments?: Member[];
   limit?: number;
   offset?: number;
+  total?: boolean;
   order?: QueryOrderType;
   timezone?: string;
   renewQuery?: boolean;
