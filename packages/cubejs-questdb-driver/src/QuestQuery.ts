@@ -87,12 +87,12 @@ export class QuestQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  primaryKeyCount(cubeName: string, distinct: boolean) {
+  public primaryKeyCount(cubeName: string, distinct: boolean): string {
     if (distinct) {
       const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
       return `count_distinct(${primaryKeySql})`;
     } else {
-      return `count(*)`;
+      return 'count(*)';
     }
   }
 
@@ -157,6 +157,6 @@ export class QuestQuery extends BaseQuery {
     }
 
     const names = this.dimensionAliasNames();
-    return names.length ? ` GROUP BY ${names.join(', ')}` : '';    
+    return names.length ? ` GROUP BY ${names.join(', ')}` : '';
   }
 }
