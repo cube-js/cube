@@ -87,6 +87,15 @@ export class QuestQuery extends BaseQuery {
       .join(' AND ');
   }
 
+  primaryKeyCount(cubeName: string, distinct: boolean) {
+    if (distinct) {
+      const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
+      return `count_distinct(${primaryKeySql})`;
+    } else {
+      return `count(*)`;
+    }
+  }
+
   public orderHashToString(hash: any): string | null {
     // QuestDB has partial support for order by index column, so map these to the alias names.
     // So, instead of:
@@ -148,6 +157,6 @@ export class QuestQuery extends BaseQuery {
     }
 
     const names = this.dimensionAliasNames();
-    return names.length ? ` GROUP BY ${names.join(', ')}` : '';
+    return names.length ? ` GROUP BY ${names.join(', ')}` : '';    
   }
 }
