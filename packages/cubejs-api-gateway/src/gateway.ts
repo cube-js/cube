@@ -3,6 +3,7 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
+import structuredClone from '@ungap/structured-clone';
 import { getEnv, getRealType } from '@cubejs-backend/shared';
 import type {
   Application as ExpressApplication,
@@ -709,6 +710,134 @@ class ApiGateway {
   }
 
   /**
+   * Returns an array of sqlQuery objects.
+   * @internal
+   */
+  private async getSqlQueriesInternal(
+    context: RequestContext,
+    normalizedQueries: NormalizedQuery[],
+  ): Promise<Array<any>> {
+    const sqlQueries = await Promise.all(
+      normalizedQueries.map(
+        async (normalizedQuery, index) => {
+          const loadRequestSQLStarted = new Date();
+          const sqlQuery = await this.getCompilerApi(context).getSql(
+            this.coerceForSqlQuery(normalizedQuery, context)
+          );
+  
+          this.log({
+            type: 'Load Request SQL',
+            duration: this.duration(loadRequestSQLStarted),
+            query: normalizedQueries[index],
+            sqlQuery
+          }, context);
+  
+          return sqlQuery;
+        }
+      )
+    );
+    return sqlQueries;
+  }
+
+  /**
+   * Execute query and return adapter result.
+   * @internal
+   */
+  private async getSqlResponseInternal(
+    context: RequestContext,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+    totalMap: Map<NormalizedQuery, NormalizedQuery>,
+    totalQuery: any,
+  ) {
+    const response = await this
+      .getAdapterApi(context)
+      .executeQuery({
+        ...sqlQuery,
+        query: sqlQuery.sql[0],
+        values: sqlQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedQuery.renewQuery,
+        requestId: context.requestId,
+        context
+      });
+    if (normalizedQuery.total) {
+      const totalNormalized =
+        totalMap.get(normalizedQuery) as NormalizedQuery;
+      const total = await this
+        .getAdapterApi(context)
+        .executeQuery({
+          ...totalQuery,
+          query: totalQuery.sql[0],
+          values: totalQuery.sql[1],
+          continueWait: true,
+          renewQuery: totalNormalized.renewQuery,
+          requestId: context.requestId,
+          context
+        });
+      response.total = total.data.length;
+    }
+    return response;
+  }
+
+  /**
+   * Prepare result object.
+   * @internal
+   */
+  private getResultInternal(
+    context: RequestContext,
+    queryType: QueryType,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+    annotation: {
+      measures: {
+          [index: string]: unknown;
+      };
+      dimensions: {
+          [index: string]: unknown;
+      };
+      segments: {
+          [index: string]: unknown;
+      };
+      timeDimensions: {
+          [index: string]: unknown;
+      };
+    },
+    response: any,
+    responseType?: ResultType,
+  ) {
+    return {
+      query: normalizedQuery,
+      data: transformData(
+        sqlQuery.aliasNameToMember,
+        {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        } as { [member: string]: ConfigItem },
+        response.data,
+        normalizedQuery,
+        queryType,
+        responseType,
+      ),
+      lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
+        refreshKeyValues: response.refreshKeyValues,
+        usedPreAggregations: response.usedPreAggregations,
+        transformedQuery: sqlQuery.canUseTransformedQuery,
+        requestId: context.requestId,
+      } : null),
+      annotation,
+      dataSource: response.dataSource,
+      dbType: response.dbType,
+      extDbType: response.extDbType,
+      external: response.external,
+      slowQuery: Boolean(response.slowQuery),
+      total: normalizedQuery.total ? response.total : null,
+    };
+  }
+
+  /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
    * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
    * data.
@@ -732,80 +861,60 @@ class ApiGateway {
         query
       }, context);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
 
-      const [metaConfigResult, ...sqlQueries] = await Promise.all(
-        [
-          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-        ].concat(normalizedQueries.map(
-          async (normalizedQuery, index) => {
-            const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
-            );
+      const totalMap: Map<NormalizedQuery, NormalizedQuery> =
+        new Map();
 
-            this.log({
-              type: 'Load Request SQL',
-              duration: this.duration(loadRequestSQLStarted),
-              query: normalizedQueries[index],
-              sqlQuery
-            }, context);
+      normalizedQueries.forEach(nq => {
+        if (nq.total) {
+          const tq = structuredClone(nq);
+          tq.limit = 50000;
+          tq.rowLimit = 50000;
+          totalMap.set(nq, tq);
+        }
+      });
+      
+      const metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
 
-            return sqlQuery;
-          }
-        ))
-      );
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
+
+      const totalQueries = await this
+        .getSqlQueriesInternal(
+          context, Array.from(totalMap.values()),
+        );
 
       let slowQuery = false;
+
       const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
-        const sqlQuery = sqlQueries[index];
-        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
+        slowQuery = slowQuery || Boolean(sqlQueries[index].slowQuery);
 
-        const toExecute = {
-          ...sqlQuery,
-          query: sqlQuery.sql[0],
-          values: sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId,
-          context
-        };
+        const annotation = prepareAnnotation(
+          metaConfigResult, normalizedQuery
+        );
 
-        const response = await this.getAdapterApi(context).executeQuery(toExecute);
-
-        const flattenAnnotation = {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        } as { [member: string]: ConfigItem };
-
-        slowQuery = slowQuery || Boolean(response.slowQuery);
-
-        return {
-          query: normalizedQuery,
-          data: transformData(
-            aliasToMemberNameMap,
-            flattenAnnotation,
-            response.data,
-            normalizedQuery,
-            queryType,
-            resType,
-          ),
-          lastRefreshTime: response.lastRefreshTime?.toISOString(),
-          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
-            refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
-            transformedQuery: sqlQuery.canUseTransformedQuery,
-            requestId: context.requestId,
-          } : null),
+        const response = await this.getSqlResponseInternal(
+          context,
+          normalizedQuery,
+          sqlQueries[index],
+          totalMap,
+          totalQueries[index],
+        );
+        
+        return this.getResultInternal(
+          context,
+          queryType,
+          normalizedQuery,
+          sqlQueries[index],
           annotation,
-          dataSource: response.dataSource,
-          dbType: response.dbType,
-          extDbType: response.extDbType,
-          external: response.external,
-          slowQuery: Boolean(response.slowQuery)
-        };
+          response,
+          resType,
+        );
       }));
 
       this.log(
