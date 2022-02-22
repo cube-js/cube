@@ -1,6 +1,5 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
-import { ConnectionConfig } from './types';
 import { HttpCommand, HttpError, HttpMessage, HttpQuery, HttpResultSet } from '../codegen/HttpMessage';
 
 export class WebSocketConnection {

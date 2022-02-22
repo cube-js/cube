@@ -1,8 +1,11 @@
 import yargs from 'yargs/yargs';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { CubejsApi } from '@cubejs-client/core';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
 
+// eslint-disable-next-line import/no-extraneous-dependencies
 require('jest-specific-snapshot');
 
 const DB_TYPES = ['athena', 'bigquery'];

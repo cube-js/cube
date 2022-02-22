@@ -17,6 +17,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
@@ -184,6 +185,8 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 pp_sort_columns(topk.group_expr.len(), &topk.order_by)
                             );
                         }
+                    } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                        self.output += &format!("PanicWorker")
                     } else {
                         panic!("unknown extension node");
                     }
@@ -367,6 +370,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     pp_sort_columns(topk.key_len, &topk.order_by)
                 );
             }
+        } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
+            *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += "Worker";
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {

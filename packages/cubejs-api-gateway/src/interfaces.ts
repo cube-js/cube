@@ -4,123 +4,82 @@ import type {
   NextFunction as ExpressNextFunction
 } from 'express';
 
-export interface QueryFilter {
-  member: string;
-  operator:
-    | 'equals'
-    | 'notEquals'
-    | 'contains'
-    | 'notContains'
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'set'
-    | 'notSet'
-    | 'inDateRange'
-    | 'notInDateRange'
-    | 'beforeDate'
-    | 'afterDate';
-  values?: string[];
-}
+import {
+  QueryTimeDimensionGranularity
+} from './types/strings';
 
-export type LogicalAndFilter = {
-  and: (QueryFilter | {
-    or: (QueryFilter | LogicalAndFilter)[]
-  })[]
+import {
+  QueryType,
+} from './types/enums';
+
+import {
+  QueryFilter,
+  LogicalAndFilter,
+  LogicalOrFilter,
+  QueryTimeDimension,
+  Query,
+  NormalizedQueryFilter,
+  NormalizedQuery,
+} from './types/query';
+
+import {
+  JWTOptions,
+  CheckAuthFn,
+  CheckSQLAuthSuccessResponse,
+  CheckSQLAuthFn,
+} from './types/auth';
+
+import {
+  RequestContext,
+  RequestExtension,
+  ExtendedRequestContext,
+  Request,
+  QueryRewriteFn,
+  SecurityContextExtractorFn,
+  ExtendContextFn,
+} from './types/request';
+
+export {
+  QueryTimeDimensionGranularity,
+  QueryType,
+  QueryFilter,
+  LogicalAndFilter,
+  LogicalOrFilter,
+  QueryTimeDimension,
+  Query,
+  NormalizedQueryFilter,
+  NormalizedQuery,
+  JWTOptions,
+  CheckAuthFn,
+  CheckSQLAuthSuccessResponse,
+  CheckSQLAuthFn,
+  RequestContext,
+  RequestExtension,
+  ExtendedRequestContext,
+  Request,
+  QueryRewriteFn,
+  SecurityContextExtractorFn,
+  ExtendContextFn,
 };
 
-export type LogicalOrFilter = {
-  or: (QueryFilter | LogicalAndFilter)[]
-};
+/**
+ * Auth middleware.
+ * @deprecated
+ */
+export type CheckAuthMiddlewareFn =
+ (
+   req: Request,
+   res: ExpressResponse,
+   next: ExpressNextFunction,
+ ) => void;
 
-export type QueryTimeDimensionGranularity =
-  | 'hour'
-  | 'day'
-  | 'week'
-  | 'month'
-  | 'year'
-  | 'quarter';
-
-export interface QueryTimeDimension {
-  dimension: string;
-  dateRange?: string[] | string;
-  granularity?: QueryTimeDimensionGranularity;
-}
-
-export interface Query {
-  measures: string[];
-  dimensions?: string[];
-  filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
-  timeDimensions?: QueryTimeDimension[];
-  segments?: string[];
-  limit?: number;
-  offset?: number;
-  order?: 'asc' | 'desc';
-  timezone?: string;
-  renewQuery?: boolean;
-  ungrouped?: boolean;
-}
-
-export interface NormalizedQueryFilter extends QueryFilter {
-  dimension?: string;
-}
-
-export interface NormalizedQuery extends Query {
-  filters?: NormalizedQueryFilter[];
-  rowLimit?: number;
-}
-
-export interface RequestContext {
-  securityContext: any;
-  requestId: string;
-  signedWithPlaygroundAuthSecret?: boolean;
-}
-
-export type RequestExtension = Record<string, any>;
-export type ExtendedRequestContext = RequestContext & RequestExtension;
-
-export interface Request extends ExpressRequest {
-  context?: ExtendedRequestContext,
-  // It's deprecated
-  authInfo?: any,
-  // New one, replace authInfo
-  securityContext?: any,
-  signedWithPlaygroundAuthSecret?: boolean;
-}
-
-export interface JWTOptions {
-  // JWK options
-  jwkRetry?: number,
-  jwkDefaultExpire?: number,
-  jwkUrl?: ((payload: any) => string) | string,
-  jwkRefetchWindow?: number,
-  // JWT options
-  key?: string,
-  algorithms?: string[],
-  issuer?: string[],
-  audience?: string,
-  subject?: string,
-  claimsNamespace?: string,
-}
-
-export type QueryRewriteFn = (query: Query, context: RequestContext) => Promise<Query>;
-
-// @deprecated
-export type CheckAuthMiddlewareFn = (req: Request, res: ExpressResponse, next: ExpressNextFunction) => void;
-
-export type SecurityContextExtractorFn = (ctx: Readonly<RequestContext>) => any;
-
-// @deprecated
-export type RequestLoggerMiddlewareFn = (req: ExpressRequest, res: ExpressResponse, next: ExpressNextFunction) => void;
-
-// @todo ctx can be passed from SubscriptionServer that will cause incapability with Express.Request
-export type CheckAuthFn = (ctx: any, authorization?: string) => Promise<void> | void;
-
-export type CheckSQLAuthSuccessResponse = {
-  password: string | null,
-  securityContext?: any
-};
-export type CheckSQLAuthFn = (ctx: any, user: string | null) => Promise<CheckSQLAuthSuccessResponse> | CheckSQLAuthSuccessResponse;
-
-export type ExtendContextFn = (req: ExpressRequest) => Promise<RequestExtension> | RequestExtension;
+/**
+ * Logger middleware.
+ * @deprecated
+ */
+export type RequestLoggerMiddlewareFn =
+  (
+    req: ExpressRequest,
+    res: ExpressResponse,
+    next: ExpressNextFunction,
+  ) => void;

@@ -27,13 +27,21 @@ declare module '@cubejs-client/core' {
   };
 
   export interface ITransportResponse<R> {
-    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+    subscribe: <CBResult>(
+      cb: (
+        result: R,
+        resubscribe: () => Promise<CBResult>
+      ) => CBResult
+    ) => Promise<CBResult>;
     // Optional, supported in WebSocketTransport
     unsubscribe?: () => Promise<void>;
   }
 
   export interface ITransport<R> {
-    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
+    request(
+      method: string,
+      params: Record<string, unknown>
+    ): ITransportResponse<R>;
   }
 
   /**
@@ -80,6 +88,7 @@ declare module '@cubejs-client/core' {
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
+    resType?: 'default' | 'compact';
   };
 
   export type LoadMethodOptions = {
@@ -790,6 +799,7 @@ declare module '@cubejs-client/core' {
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
+    responseFormat?: 'compact' | 'default'
   }
 
   export class ProgressResult {
@@ -993,6 +1003,7 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>, responseFormat?: string):  Promise<ResultSet>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)

@@ -19,7 +19,7 @@ export interface DriverTestsOptions {
 
 export class DriverTests {
   public constructor(
-    private readonly driver: DriverInterface,
+    public readonly driver: DriverInterface,
     private readonly options: DriverTestsOptions = {}
   ) {
   }

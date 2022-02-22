@@ -1,3 +1,4 @@
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -7,6 +8,8 @@ use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
+use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -157,6 +160,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
+        t("divide_by_zero", divide_by_zero),
+        t("panic_worker", panic_worker),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -1752,12 +1757,19 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION './data/csv.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
@@ -1774,12 +1786,18 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION './data/csv_no_header.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
@@ -4470,6 +4488,32 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
         to_rows(&r),
         rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
     );
+}
+
+async fn divide_by_zero(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i int, z int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT i / z FROM s.t")
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+    );
+}
+
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

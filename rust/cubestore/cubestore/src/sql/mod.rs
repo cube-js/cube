@@ -47,15 +47,17 @@ use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
+use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
-use crate::queryplanner::serialized_plan::RowFilter;
-use crate::queryplanner::{QueryPlan, QueryPlanner};
+use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
+use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
+use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -374,8 +376,10 @@ impl SqlServiceImpl {
                 indexes.iter().map(|i| i.get_id()).collect(),
             )
             .await?;
-        for (partition, chunks) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, chunks));
+        // Omit warming up chunks as those shouldn't affect select times much however will affect
+        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
+        for (partition, _) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
         }
         join_all(futures)
             .await
@@ -595,6 +599,27 @@ impl SqlService for SqlServiceImpl {
                     let partition = self.db.get_partition(partition_id).await?;
                     self.cluster.schedule_repartition(&partition).await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+                SystemCommand::PanicWorker => {
+                    let cluster = self.cluster.clone();
+                    let workers = self.config_obj.select_workers();
+                    let plan = SerializedPlan::try_new(
+                        PanicWorkerNode {}.into_plan(),
+                        PlanningMeta {
+                            indices: Vec::new(),
+                            multi_part_subtree: HashMap::new(),
+                        },
+                    )
+                    .await?;
+                    if workers.len() == 0 {
+                        let executor = self.query_executor.clone();
+                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
+                            .await?;
+                    } else {
+                        let worker = &workers[0];
+                        cluster.run_select(worker, plan).await?;
+                    }
+                    panic!("worker did not panic")
                 }
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
@@ -1817,7 +1842,7 @@ mod tests {
     async fn high_frequency_inserts() {
         Config::test("high_frequency_inserts")
             .update_config(|mut c| {
-                c.partition_split_threshold = 1000000;
+                c.partition_split_threshold = 100;
                 c.compaction_chunks_count_threshold = 100;
                 c
             })
