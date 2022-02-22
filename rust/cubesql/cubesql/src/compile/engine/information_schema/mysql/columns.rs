@@ -17,6 +17,7 @@ use datafusion::{
 use crate::transport::{CubeColumn, V1CubeMetaExt};
 
 use super::{ext::CubeColumnMySqlExt, utils::new_string_array_with_placeholder};
+use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,
@@ -149,6 +150,12 @@ impl InformationSchemaColumnsBuilder {
 
 pub struct InfoSchemaColumnsProvider {
     data: Arc<Vec<ArrayRef>>,
+}
+
+impl TableName for InfoSchemaColumnsProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.columns"
+    }
 }
 
 impl InfoSchemaColumnsProvider {

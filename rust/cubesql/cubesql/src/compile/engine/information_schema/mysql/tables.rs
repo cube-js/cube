@@ -1,5 +1,6 @@
 use std::{any::Any, sync::Arc};
 
+use crate::compile::engine::provider::TableName;
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -132,6 +133,12 @@ impl InformationSchemaTablesBuilder {
 
 pub struct InfoSchemaTableProvider {
     data: Arc<Vec<ArrayRef>>,
+}
+
+impl TableName for InfoSchemaTableProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.tables"
+    }
 }
 
 impl InfoSchemaTableProvider {

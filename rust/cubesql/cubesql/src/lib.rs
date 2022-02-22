@@ -16,6 +16,10 @@
 #![feature(map_first_last)]
 #![feature(arc_new_cyclic)]
 #![feature(bindings_after_at)]
+#![feature(trace_macros)]
+#![recursion_limit = "512"]
+
+trace_macros!(false);
 
 #[macro_use]
 extern crate lazy_static;
