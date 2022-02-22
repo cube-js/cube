@@ -11,7 +11,7 @@ Array [
 exports[`postgresql-cubestore HTTP Transport #2 Events.count: #2 Events.count 1`] = `
 Array [
   Object {
-    "Events.count": "171334",
+    "Events.count": "999",
   },
 ]
 `;
@@ -19,60 +19,56 @@ Array [
 exports[`postgresql-cubestore HTTP Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
 Array [
   Object {
-    "Events.count": "92670",
+    "Events.count": "513",
     "Events.type": "PushEvent",
   },
   Object {
-    "Events.count": "18969",
+    "Events.count": "120",
     "Events.type": "CreateEvent",
   },
   Object {
-    "Events.count": "17448",
-    "Events.type": "WatchEvent",
-  },
-  Object {
-    "Events.count": "13289",
+    "Events.count": "104",
     "Events.type": "IssueCommentEvent",
   },
   Object {
-    "Events.count": "7727",
+    "Events.count": "92",
+    "Events.type": "WatchEvent",
+  },
+  Object {
+    "Events.count": "57",
     "Events.type": "IssuesEvent",
   },
   Object {
-    "Events.count": "7007",
+    "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "5548",
+    "Events.count": "21",
     "Events.type": "ForkEvent",
   },
   Object {
-    "Events.count": "3036",
-    "Events.type": "DeleteEvent",
-  },
-  Object {
-    "Events.count": "1721",
+    "Events.count": "21",
     "Events.type": "GollumEvent",
   },
   Object {
-    "Events.count": "1670",
+    "Events.count": "21",
     "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
-    "Events.count": "1094",
-    "Events.type": "CommitCommentEvent",
+    "Events.count": "14",
+    "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "640",
+    "Events.count": "2",
     "Events.type": "ReleaseEvent",
   },
   Object {
-    "Events.count": "370",
+    "Events.count": "1",
     "Events.type": "MemberEvent",
   },
   Object {
-    "Events.count": "145",
-    "Events.type": "PublicEvent",
+    "Events.count": "1",
+    "Events.type": "CommitCommentEvent",
   },
 ]
 `;
@@ -80,7 +76,7 @@ Array [
 exports[`postgresql-cubestore HTTP Transport Dbt orders count: Dbt orders count 1`] = `
 Array [
   Object {
-    "OrdersFiltered.ordersCount": "171334",
+    "OrdersFiltered.ordersCount": "999",
   },
 ]
 `;
@@ -96,7 +92,7 @@ Array [
 exports[`postgresql-cubestore WS Transport #2 Events.count: #2 Events.count 1`] = `
 Array [
   Object {
-    "Events.count": "171334",
+    "Events.count": "999",
   },
 ]
 `;
@@ -104,60 +100,160 @@ Array [
 exports[`postgresql-cubestore WS Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
 Array [
   Object {
-    "Events.count": "92670",
+    "Events.count": "513",
     "Events.type": "PushEvent",
   },
   Object {
-    "Events.count": "18969",
+    "Events.count": "120",
     "Events.type": "CreateEvent",
   },
   Object {
-    "Events.count": "17448",
-    "Events.type": "WatchEvent",
-  },
-  Object {
-    "Events.count": "13289",
+    "Events.count": "104",
     "Events.type": "IssueCommentEvent",
   },
   Object {
-    "Events.count": "7727",
+    "Events.count": "92",
+    "Events.type": "WatchEvent",
+  },
+  Object {
+    "Events.count": "57",
     "Events.type": "IssuesEvent",
   },
   Object {
-    "Events.count": "7007",
+    "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "5548",
+    "Events.count": "21",
     "Events.type": "ForkEvent",
   },
   Object {
-    "Events.count": "3036",
-    "Events.type": "DeleteEvent",
-  },
-  Object {
-    "Events.count": "1721",
+    "Events.count": "21",
     "Events.type": "GollumEvent",
   },
   Object {
-    "Events.count": "1670",
+    "Events.count": "21",
     "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
-    "Events.count": "1094",
-    "Events.type": "CommitCommentEvent",
+    "Events.count": "14",
+    "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "640",
+    "Events.count": "2",
     "Events.type": "ReleaseEvent",
   },
   Object {
-    "Events.count": "370",
+    "Events.count": "1",
     "Events.type": "MemberEvent",
   },
   Object {
-    "Events.count": "145",
-    "Events.type": "PublicEvent",
+    "Events.count": "1",
+    "Events.type": "CommitCommentEvent",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat http+responseFormat=compact option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat http+responseFormat=compact option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat http+responseFormat=compact option#2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat http+responseFormat=default: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat ws+responseFormat=compact option#1+2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat ws+responseFormat=compact option#1: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat ws+responseFormat=compact option#2: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+]
+`;
+
+exports[`postgresql-cubestore responseFormat ws+responseFormat=default: result-type 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
   },
 ]
 `;
