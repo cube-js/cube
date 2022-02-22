@@ -117,11 +117,12 @@ describe('QuestQuery', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
+
       expect(queryAndParams[0]).toContain(expected);
     }
   });
 
-  it('test positional order by gets rewritten to non-positional',
+  it('test non-positional order by',
     () => compiler.compile().then(() => {
       const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.count'],
@@ -145,7 +146,7 @@ describe('QuestQuery', () => {
       expect(queryAndParams[0]).toContain('ORDER BY "visitors__created_at_day"');
     }));
 
-  it('test positional group by gets rewritten to non-positional',
+  it('test non-positional group by',
     () => compiler.compile().then(() => {
       const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['visitors.count'],
