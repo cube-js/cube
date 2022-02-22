@@ -17,7 +17,6 @@
     "lint": "eslint src/* test/ test/bin --ext .ts",
     "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts",
     "dataset:minimal": "node dist/test/bin/download-dataset.js",
-    "dataset:github-events.1000": "node dist/test/bin/download-dataset.js",
     "birdbox": "jest --runInBand --verbose dist/test",
     "birdbox:snapshot": "jest --runInBand --updateSnapshot --verbose dist/test",
     "birdbox:start": "node dist/test/bin/start-birdbox.js",
