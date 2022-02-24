@@ -38,6 +38,9 @@
       "path": "packages/cubejs-postgres-driver"
     },
     {
+      "path": "packages/cubejs-questdb-driver"
+    },
+    {
       "path": "packages/cubejs-mongobi-driver"
     },
     {
