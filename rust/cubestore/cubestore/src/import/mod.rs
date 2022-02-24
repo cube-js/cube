@@ -697,5 +697,17 @@ mod tests {
             parse_decimal("-0.12345", 5).unwrap().to_string(5),
             "-0.12345",
         );
+        assert_eq!(
+            parse_decimal("-0.002694881400", 5).unwrap().to_string(5),
+            "-0.00269",
+        );
+        assert_eq!(parse_decimal("-0.01", 5).unwrap().to_string(5), "-0.01",);
+        assert_eq!(parse_decimal("200", 5).unwrap().to_string(5), "200",);
+        assert_eq!(parse_decimal("200.35", 5).unwrap().to_string(5), "200.35",);
+        assert_eq!(parse_decimal("-200.4", 5).unwrap().to_string(5), "-200.4",);
+        assert_eq!(
+            parse_decimal("-200.040000", 5).unwrap().to_string(5),
+            "-200.04",
+        );
     }
 }
