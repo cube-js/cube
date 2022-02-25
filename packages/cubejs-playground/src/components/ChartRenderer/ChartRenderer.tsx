@@ -14,7 +14,7 @@ import {
   useChartRendererState,
   useChartRendererStateMethods,
 } from '../QueryTabs/ChartRendererStateProvider';
-import { useWindowSize } from '../../hooks/use-window-size';
+import { useWindowSize } from '../../hooks';
 
 const { Text } = Typography;
 
