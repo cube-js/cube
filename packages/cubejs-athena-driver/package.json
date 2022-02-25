@@ -16,7 +16,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
-    "integration": "jest --verbose dist/test",
+    "integration": "npm run integration:athena",
+    "integration:athena": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
