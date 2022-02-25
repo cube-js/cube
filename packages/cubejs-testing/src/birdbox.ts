@@ -3,7 +3,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { execInDir, pausePromise } from '@cubejs-backend/shared';
 import fsExtra from 'fs-extra';
 import dotenv from '@cubejs-backend/dotenv';
 
@@ -43,6 +43,23 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     };
   }
 
+  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
+    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
+  }
+
+  if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
+    process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
+    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
+    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`) !== 0) {
+      throw new Error('[Birdbox] Docker build failed.');
+    }
+  }
+
+  if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
+    process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
+    // execInDir('../../rust/cubestore', 'docker build . -t dev');
+  }
+
   const composeFile = `${options.name}.yml`;
   let dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
@@ -60,8 +77,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
+    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION)
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION)
     .up();
 
   const host = '127.0.0.1';
