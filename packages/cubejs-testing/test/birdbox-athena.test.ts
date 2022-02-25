@@ -1,3 +1,3 @@
-import { createDriverTestCase } from "./birdbox-driver.test";
+import { createDriverTestCase } from './birdbox-driver.test';
 
 createDriverTestCase('athena');
