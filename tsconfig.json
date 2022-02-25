@@ -29,6 +29,9 @@
       "path": "packages/cubejs-testing"
     },
     {
+      "path": "packages/cubejs-testing-shared"
+    },
+    {
       "path": "packages/cubejs-druid-driver"
     },
     {

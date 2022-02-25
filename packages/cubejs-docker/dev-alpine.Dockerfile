@@ -34,14 +34,15 @@ COPY rust/cubestore/package.json rust/cubestore/package.json
 COPY rust/cubestore/bin rust/cubestore/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
 COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
-COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
+# COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
+COPY packages/cubejs-testing-shared/package.json packages/cubejs-testing-shared/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
 COPY packages/cubejs-cli/package.json packages/cubejs-cli/package.json
 COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-driver/package.json
-COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
+# COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
 COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
@@ -84,14 +85,15 @@ COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
-COPY packages/cubejs-testing/ packages/cubejs-testing/
+# COPY packages/cubejs-testing/ packages/cubejs-testing/
+COPY packages/cubejs-testing-shared/ packages/cubejs-testing-shared/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/
 COPY packages/cubejs-cli/ packages/cubejs-cli/
 COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
-COPY packages/cubejs-docker/ packages/cubejs-docker/
+# COPY packages/cubejs-docker/ packages/cubejs-docker/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
 COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
