@@ -1,8 +1,8 @@
 use std::{any::Any, sync::Arc};
 
 use crate::compile::engine::provider::TableName;
+use crate::transport::MetaContext;
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder},
@@ -142,7 +142,7 @@ impl TableName for InfoSchemaTableProvider {
 }
 
 impl InfoSchemaTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(meta: Arc<MetaContext>) -> Self {
         let mut builder = InformationSchemaTablesBuilder::new();
         // information_schema
         builder.add_table("def", "information_schema", "tables");
@@ -153,7 +153,7 @@ impl InfoSchemaTableProvider {
         builder.add_table("def", "performance_schema", "session_variables");
         builder.add_table("def", "performance_schema", "global_variables");
 
-        for cube in cubes {
+        for cube in meta.cubes.iter() {
             builder.add_table("def", "db", cube.name.clone());
         }
 

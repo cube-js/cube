@@ -158,12 +158,14 @@ impl DatabaseProtocol {
         }
 
         if tp.eq_ignore_ascii_case("information_schema.tables") {
-            return Some(Arc::new(MySqlSchemaTableProvider::new(&context.meta.cubes)));
+            return Some(Arc::new(MySqlSchemaTableProvider::new(
+                context.meta.clone(),
+            )));
         }
 
         if tp.eq_ignore_ascii_case("information_schema.columns") {
             return Some(Arc::new(MySqlSchemaColumnsProvider::new(
-                &context.meta.cubes,
+                context.meta.clone(),
             )));
         }
 
