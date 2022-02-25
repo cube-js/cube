@@ -26,8 +26,12 @@ Run e2e tests:
 
 ```shell
 $ cd packages/cubejs-testing
-$ yarn birdbox:driver --env-file=${HOME}/.env --mode=local --type=athena
-$ yarn birdbox:driver --env-file=${HOME}/.env --mode=local --type=bigquery
+
+$ yarn birdbox:athena --env-file=${HOME}/.env --mode=local
+$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=local
+
+$ yarn birdbox:athena --env-file=${HOME}/.env --mode=docker
+$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=docker
 ```
 
 ### Run Cypress tests
