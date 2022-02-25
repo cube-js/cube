@@ -123,7 +123,7 @@ jobs:
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
-          if [[ " athena bigquery " =~ " ${matrix.target} " ]]; then
+          if [[ " athena bigquery " =~ " ${{ matrix.target }} " ]]; then
             yarn run birdbox:${{ matrix.target }} --env-file=${TODO}/.env --mode=docker
           else
             yarn run dataset:minimal
