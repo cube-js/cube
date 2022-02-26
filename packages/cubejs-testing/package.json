@@ -46,6 +46,7 @@
     "@cubejs-backend/query-orchestrator": "^0.29.28",
     "@cubejs-backend/schema-compiler": "^0.29.28",
     "@cubejs-backend/shared": "^0.29.28",
+    "@cubejs-backend/testing-shared": "^0.29.28",
     "@cubejs-client/ws-transport": "^0.29.23",
     "@types/dedent": "^0.7.0",
     "dedent": "^0.7.0",
