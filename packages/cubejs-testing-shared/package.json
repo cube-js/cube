@@ -13,8 +13,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/ test/bin --ext .ts",
-    "lint:fix": "eslint --fix src/* test/ test/bin --ext .ts"
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "files": [
     "dist/src/*"
