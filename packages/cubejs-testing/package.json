@@ -59,7 +59,6 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-backend/testing-shared": "^0.29.28",
     "@cubejs-client/core": "^0.29.23",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",

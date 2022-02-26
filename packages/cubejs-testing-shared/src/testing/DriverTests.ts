@@ -17,7 +17,7 @@ export interface DriverTestsOptions {
   wrapLoadQueryWithCtas?: boolean
 }
 
-export class DriverTests {
+export class qq DriverTests {
   public constructor(
     public readonly driver: DriverInterface,
     private readonly options: DriverTestsOptions = {}

@@ -24,7 +24,6 @@
     "@cubejs-backend/query-orchestrator": "^0.29.28",
     "@cubejs-backend/schema-compiler": "^0.29.28",
     "@cubejs-backend/shared": "^0.29.28",
-    "@cubejs-client/ws-transport": "^0.29.23",
     "@types/dedent": "^0.7.0",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
@@ -35,7 +34,6 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-client/core": "^0.29.23",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",
