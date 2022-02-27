@@ -1,3 +1,5 @@
+pub mod language;
+
 use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
 use crate::sql::auth_service::AuthContext;
@@ -19,742 +21,16 @@ use datafusion::physical_plan::window_functions::WindowFunction;
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::FileType;
 use datafusion::sql::planner::ContextProvider;
-use egg::{rewrite, CostFunction, Language, Subst};
+use egg::{rewrite, Applier, CostFunction, Language, Pattern, PatternAst, Subst, Symbol, Var};
 use egg::{EGraph, Extractor, Id, RecExpr, Rewrite, Runner};
 use itertools::Itertools;
 use std::ops::Index;
 use std::str::FromStr;
 use std::sync::Arc;
 
-#[macro_export]
-macro_rules! plan_to_language {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident $variants:tt) => {
-        $crate::__plan_to_language!($(#[$meta])* $vis enum $name $variants -> {});
-    };
-}
-
-macro_rules! variant_field_struct {
-    ($variant:ident, $var_field:ident, String) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](String);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "")));
-                    }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, Option<String>) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](Option<String>);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{:?}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, Column) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](Column);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, Vec<Column>) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](Vec<Column>);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{:?}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, Arc<AggregateUDF>) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](String);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, Arc<ScalarUDF>) => {
-        paste::item! {
-            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-            pub struct [<$variant $var_field:camel>](String);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
-        }
-    };
-
-    ($variant:ident, $var_field:ident, AggregateFunction) => {
-        variant_field_struct!(
-            @enum_struct $variant, $var_field, { AggregateFunction } -> {
-                AggregateFunction::Count => "Count",
-                AggregateFunction::Sum => "Sum",
-                AggregateFunction::Min => "Min",
-                AggregateFunction::Max => "Max",
-                AggregateFunction::Avg => "Avg",
-                AggregateFunction::ApproxDistinct => "ApproxDistinct",
-            }
-        );
-    };
-
-    ($variant:ident, $var_field:ident, Operator) => {
-        variant_field_struct!(
-            @enum_struct $variant, $var_field, { Operator } -> {
-                Operator::Eq => "=",
-                Operator::NotEq => "!=",
-                Operator::Lt => "<",
-                Operator::LtEq => "<=",
-                Operator::Gt => ">",
-                Operator::GtEq => ">=",
-                Operator::Plus => "+",
-                Operator::Minus => "-",
-                Operator::Multiply => "*",
-                Operator::Divide => "/",
-                Operator::Modulo => "%",
-                Operator::And => "AND",
-                Operator::Or => "OR",
-                Operator::Like => "LIKE",
-                Operator::NotLike => "NOT_LIKE",
-                Operator::RegexMatch => "~",
-                Operator::RegexIMatch => "~*",
-                Operator::RegexNotMatch => "!~",
-                Operator::RegexNotIMatch => "!~*",
-                Operator::IsDistinctFrom => "IS_DISTINCT_FROM",
-                Operator::IsNotDistinctFrom => "IS_NOT_DISTINCT_FROM",
-            }
-        );
-    };
-
-    ($variant:ident, $var_field:ident, JoinType) => {
-        variant_field_struct!(
-            @enum_struct $variant, $var_field, { JoinType } -> {
-                JoinType::Inner => "Inner",
-                JoinType::Left => "Left",
-                JoinType::Right => "Right",
-                JoinType::Full => "Full",
-                JoinType::Semi => "Semi",
-                JoinType::Anti => "Anti",
-            }
-        );
-    };
-
-    ($variant:ident, $var_field:ident, JoinConstraint) => {
-        variant_field_struct!(
-            @enum_struct $variant, $var_field, { JoinConstraint } -> {
-                JoinConstraint::On => "On",
-                JoinConstraint::Using => "Using",
-            }
-        );
-    };
-
-    (@enum_struct $variant:ident, $var_field:ident, { $var_field_type:ty } -> {$($variant_type:ty => $name:literal,)*}) => {
-        paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct [<$variant $var_field:camel>]($var_field_type);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    match s {
-                        $($name => Ok([<$variant $var_field:camel>]($variant_type)),)*
-                        x => Err(CubeError::internal(format!("{} can't be matched against {}", x, std::stringify!($var_field_type))))
-                    }
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    let name = match self.0 {
-                        $($variant_type => $name,)*
-                    };
-                    write!(f, "{}", name)
-                }
-            }
-
-            impl core::cmp::Ord for [<$variant $var_field:camel>] {
-                fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-                    let name = match self.0 {
-                        $($variant_type => $name,)*
-                    };
-                    let other_name = match other.0 {
-                        $($variant_type => $name,)*
-                    };
-                    name.cmp(other_name)
-                }
-            }
-
-            impl core::cmp::PartialOrd for [<$variant $var_field:camel>] {
-                fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-                    let name = match self.0 {
-                        $($variant_type => $name,)*
-                    };
-                    let other_name = match other.0 {
-                        $($variant_type => $name,)*
-                    };
-                    name.partial_cmp(other_name)
-                }
-            }
-
-            impl core::hash::Hash for [<$variant $var_field:camel>] {
-                fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-                    std::mem::discriminant(&self.0).hash(state);
-                }
-            }
-
-            impl core::cmp::PartialEq for [<$variant $var_field:camel>] {
-                fn eq(&self, other: &[<$variant $var_field:camel>]) -> bool {
-                    let name = match self.0 {
-                        $($variant_type => $name,)*
-                    };
-                    let other_name = match other.0 {
-                        $($variant_type => $name,)*
-                    };
-                    name == other_name
-                }
-            }
-
-            impl core::cmp::Eq for [<$variant $var_field:camel>] {}
-        }
-    };
-
-    ($variant:ident, $var_field:ident, $var_field_type:ty) => {
-        paste::item! {
-            #[derive(Debug, PartialOrd, Clone)]
-            pub struct [<$variant $var_field:camel>]($var_field_type);
-
-            impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
-                }
-            }
-
-            impl std::fmt::Display for [<$variant $var_field:camel>] {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{:?}", self)
-                }
-            }
-
-            impl core::cmp::Ord for [<$variant $var_field:camel>] {
-                fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-                    self.partial_cmp(&other).unwrap()
-                }
-            }
-
-            impl core::hash::Hash for [<$variant $var_field:camel>] {
-                fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-                    std::mem::discriminant(&self.0).hash(state);
-                }
-            }
-
-            impl core::cmp::PartialEq for [<$variant $var_field:camel>] {
-                fn eq(&self, other: &[<$variant $var_field:camel>]) -> bool {
-                    self.0 == other.0
-                }
-            }
-
-            impl core::cmp::Eq for [<$variant $var_field:camel>] {}
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! __plan_to_language {
-    (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident {} ->
-     $decl:tt {$($matches:tt)*} $children:tt $children_mut:tt
-     $display:tt {$($from_op:tt)*} {$($type_decl:tt)*}
-    ) => { paste::item! {
-        $(#[$meta])*
-        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-        $vis enum $name $decl
-
-        $($type_decl)*
-
-        impl egg::Language for $name {
-            #[inline(always)]
-            fn matches(&self, other: &Self) -> bool {
-                ::std::mem::discriminant(self) == ::std::mem::discriminant(other) &&
-                match (self, other) { $($matches)* _ => false }
-            }
-
-            fn children(&self) -> &[egg::Id] { match self $children }
-            fn children_mut(&mut self) -> &mut [egg::Id] { match self $children_mut }
-        }
-
-        impl ::std::fmt::Display for $name {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                // We need to pass `f` to the match expression for hygiene
-                // reasons.
-                match (self, f) $display
-            }
-        }
-
-        impl egg::FromOp for $name {
-            type Error = egg::FromOpError;
-
-            fn from_op(op: &str, children: ::std::vec::Vec<egg::Id>) -> ::std::result::Result<Self, Self::Error> {
-                match (op, children) {
-                    $($from_op)*
-                    (op, children) => Err(egg::FromOpError::new(op, children)),
-                }
-            }
-        }
-    }};
-
-    (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident ($ids:ty),
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* } { $($matches:tt)* } { $($children:tt)* } { $($children_mut:tt)* }
-     { $($display:tt)* } { $($from_op:tt)* } { $($type_decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            @define_language
-            $(#[$meta])* $vis enum $name
-            { $($variants)* } ->
-            { $($decl)*          $variant($ids), }
-            { $($matches)*       ($name::$variant(l), $name::$variant(r)) => egg::LanguageChildren::len(l) == egg::LanguageChildren::len(r), }
-            { $($children)*      $name::$variant(ids) => egg::LanguageChildren::as_slice(ids), }
-            { $($children_mut)*  $name::$variant(ids) => egg::LanguageChildren::as_mut_slice(ids), }
-            { $($display)*       ($name::$variant(..), f) => f.write_str(std::stringify!($variant)), }
-            { $($from_op)*       (op, children) if op == std::stringify!($variant) && <$ids as egg::LanguageChildren>::can_be_length(children.len()) => {
-                  let children = <$ids as egg::LanguageChildren>::from_vec(children);
-                  Ok($name::$variant(children))
-              },
-            }
-            { $($type_decl)* }
-        );
-    };
-
-    (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident $var_field:ident ($ids:ty),
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* } { $($matches:tt)* } { $($children:tt)* } { $($children_mut:tt)* }
-     { $($display:tt)* } { $($from_op:tt)* } { $($type_decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            @define_language
-            $(#[$meta])* $vis enum $name
-            { $($variants)* } ->
-            { $($decl)*          [<$variant $var_field:camel>]($ids), }
-            { $($matches)*       ($name::[<$variant $var_field:camel>](l), $name::[<$variant $var_field:camel>](r)) => egg::LanguageChildren::len(l) == egg::LanguageChildren::len(r), }
-            { $($children)*      $name::[<$variant $var_field:camel>](ids) => egg::LanguageChildren::as_slice(ids), }
-            { $($children_mut)*  $name::[<$variant $var_field:camel>](ids) => egg::LanguageChildren::as_mut_slice(ids), }
-            { $($display)*       ($name::[<$variant $var_field:camel>](..), f) => f.write_str(std::stringify!([<$variant $var_field:camel>])), }
-            { $($from_op)*       (op, children) if op == std::stringify!([<$variant $var_field:camel>]) && <$ids as egg::LanguageChildren>::can_be_length(children.len()) => {
-                  let children = <$ids as egg::LanguageChildren>::from_vec(children);
-                  Ok($name::[<$variant $var_field:camel>](children))
-              },
-            }
-            { $($type_decl)* }
-        );
-    };
-
-    (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         @data $variant:ident $var_field:ident ($data:ty),
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* } { $($matches:tt)* } { $($children:tt)* } { $($children_mut:tt)* }
-     { $($display:tt)* } { $($from_op:tt)* } { $($type_decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            @define_language $(#[$meta])* $vis enum $name
-            { $($variants)* } ->
-            { $($decl)*          [<$variant $var_field:camel>]([<$variant $var_field:camel>]), }
-            { $($matches)*       ($name::[<$variant $var_field:camel>](data1), $name::[<$variant $var_field:camel>](data2)) => data1 == data2, }
-            { $($children)*      $name::[<$variant $var_field:camel>](_data) => &[], }
-            { $($children_mut)*  $name::[<$variant $var_field:camel>](_data) => &mut [], }
-            { $($display)*       ($name::[<$variant $var_field:camel>](data), f) => ::std::fmt::Display::fmt(data, f), }
-            { $($from_op)*       (op, children) if op.parse::<[<$variant $var_field:camel>]>().is_ok() && children.is_empty() => Ok($name::[<$variant $var_field:camel>](op.parse().unwrap())), }
-            {
-                $($type_decl)*
-                variant_field_struct!($variant, $var_field, $data);
-            }
-        );
-    };
-
-    // Here transform from variants to @define_language begins.
-    // It transforms variant fields to language variants.
-    // The reason it's so complex and not part of @define_language is we can't call macros inside
-    // enum declaration block, i.e. we can't do { $($decl)* $(enum_decl!($var_field, $var_field_type),)* }.
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident {} ->
-     $decl:tt
-    ) => {
-        $crate::__plan_to_language! {
-            @define_language
-            $(#[$meta])*
-            $vis enum $name $decl
-            -> {} {} {} {} {} {} {}
-        }
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            { $($variants)* } ->
-            { $($decl)* $variant([egg::Id; $variant_size]), }
-        );
-    };
-
-    // Reference rules
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Arc<LogicalPlan>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Expr,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Arc<Expr>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Box<Expr>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-
-    // References inside container
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Vec<LogicalPlan>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* $variant $var_field (Vec<egg::Id>), }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Vec<Expr>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* $variant $var_field (Vec<egg::Id>), }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Vec<(Box<Expr>, Box<Expr>)>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* $variant $var_field (Vec<egg::Id>), }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : Option<Box<Expr>>,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* $variant $var_field (Vec<egg::Id>), }
-        );
-    };
-
-    // Skip schema as it isn't part of rewrite. TODO remove?
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : DFSchemaRef,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            @variant_size $variant_size:expr,
-            $var_field:ident : $var_field_type:ty,
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size $variant_size + 1,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* @data $variant $var_field ($var_field_type), }
-        );
-    };
-
-    ($(#[$meta:meta])* $vis:vis enum $name:ident
-     {
-         $variant:ident {
-            $($var_fields:tt)*
-         },
-         $($variants:tt)*
-     } ->
-     { $($decl:tt)* }
-    ) => {
-        $crate::__plan_to_language!(
-            $(#[$meta])* $vis enum $name
-            {
-                $variant {
-                    @variant_size 0usize,
-                    $($var_fields)*
-                },
-                $($variants)*
-            } ->
-            { $($decl)* }
-        );
-    };
-}
-
 trace_macros!(false);
 
-plan_to_language! {
+crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
         Projection {
             expr: Vec<Expr>,
@@ -836,14 +112,17 @@ plan_to_language! {
         },
         Measure {
             name: String,
+            expr: Arc<Expr>,
         },
         Dimension {
             name: String,
+            expr: Arc<Expr>,
         },
         TimeDimension {
             name: String,
             granularity: String,
             dateRange: Vec<String>,
+            expr: Arc<Expr>,
         },
 
         AliasExpr {
@@ -978,6 +257,15 @@ macro_rules! add_plan_list_node {
             }
             current
         }
+    }};
+}
+
+macro_rules! var_iter {
+    ($eclass:expr, $field_variant:ident) => {{
+        $eclass.nodes.iter().filter_map(|node| match node {
+            LogicalPlanLanguage::$field_variant($field_variant(v)) => Some(v),
+            _ => None,
+        })
     }};
 }
 
@@ -1372,14 +660,47 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
                     ?group_expr \
-                    (AggregateAggrExpr (AggregateFunctionExpr Count (AggregateFunctionExprArgs (LiteralExpr ?literal)) ?distinct)) \
-                 )" =>
+                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal)) ?distinct)) \
+                 )" => {
+                    TransformingPattern::new(
+                        "(Aggregate \
+                            (Extension (CubeScan ?source_table_name \
+                                (CubeScanMeasures \
+                                    ?measures \
+                                    (Measure ?measure_name (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal)) ?distinct))\
+                                ) \
+                                ?dimensions \
+                                ?filters\
+                            )) \
+                            ?group_expr \
+                            AggregateAggrExpr \
+                         )",
+                         self.transform_measure("?source_table_name", None, "?distinct", "?aggr_fun")
+                    )
+                 }
+            ),
+            rewrite!("named-count";
                 "(Aggregate \
-                    (Extension (CubeScan ?source_table_name (CubeScanMeasures ?measures (Measure MeasureName:count)) ?dimensions ?filters)) \
+                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
                     ?group_expr \
-                    AggregateAggrExpr \
-                 )"
-                if self.has_count_measure("?source_table_name")
+                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column)) ?distinct)) \
+                 )" => {
+                    TransformingPattern::new(
+                        "(Aggregate \
+                            (Extension (CubeScan ?source_table_name \
+                                (CubeScanMeasures \
+                                    ?measures \
+                                    (Measure ?measure_name (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column)) ?distinct))\
+                                ) \
+                                ?dimensions \
+                                ?filters\
+                            )) \
+                            ?group_expr \
+                            AggregateAggrExpr \
+                         )",
+                         self.transform_measure("?source_table_name", Some("?column"), "?distinct", "?aggr_fun")
+                    )
+                 }
             ),
             rewrite!("remove-processed-aggregate";
                 "(Aggregate \
@@ -1399,55 +720,133 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         let var = var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
         move |egraph, _, subst| {
-            for node in egraph[subst[var]].nodes.iter() {
-                match node {
-                    LogicalPlanLanguage::TableScanSourceTableName(TableScanSourceTableName(
-                        name,
-                    )) => {
-                        if meta_context
-                            .cubes
-                            .iter()
-                            .any(|c| c.name.eq_ignore_ascii_case(name))
-                        {
-                            return true;
-                        }
-                    }
-                    _ => {}
+            for name in var_iter!(egraph[subst[var]], TableScanSourceTableName) {
+                if meta_context
+                    .cubes
+                    .iter()
+                    .any(|c| c.name.eq_ignore_ascii_case(name))
+                {
+                    return true;
                 }
             }
             false
         }
     }
 
-    fn has_count_measure(
+    fn transform_measure(
         &self,
-        cube_name: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, Id, &Subst) -> bool {
-        let var = cube_name.parse().unwrap();
+        cube_var: &'static str,
+        measure_var: Option<&'static str>,
+        distinct_var: &'static str,
+        fun_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool {
+        let var = cube_var.parse().unwrap();
+        let distinct_var = distinct_var.parse().unwrap();
+        let fun_var = fun_var.parse().unwrap();
+        let measure_var = measure_var.map(|var| var.parse().unwrap());
+        let measure_name_var = "?measure_name".parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
-        move |egraph, _, subst| {
-            for node in egraph[subst[var]].nodes.iter() {
-                match node {
-                    LogicalPlanLanguage::TableScanSourceTableName(TableScanSourceTableName(
-                        name,
-                    )) => {
-                        if let Some(cube) = meta_context
-                            .cubes
-                            .iter()
-                            .find(|c| c.name.eq_ignore_ascii_case(name))
+        move |egraph, subst| {
+            for measure_name in measure_var
+                .map(|measure_var| {
+                    var_iter!(egraph[subst[measure_var]], ColumnExprColumn)
+                        .map(|c| c.name.to_string())
+                        .collect()
+                })
+                .unwrap_or(vec!["count".to_string()])
+            {
+                for cube_name in var_iter!(egraph[subst[var]], TableScanSourceTableName) {
+                    if let Some(cube) = meta_context
+                        .cubes
+                        .iter()
+                        .find(|c| c.name.eq_ignore_ascii_case(cube_name))
+                    {
+                        for distinct in
+                            var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
                         {
-                            if cube.measures.iter().any(|m| {
-                                /*m.name == "count" &&*/
-                                m.agg_type == Some("count".to_string())
-                            }) {
-                                return true;
+                            for fun in var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun) {
+                                let measure_name = format!("{}.{}", cube_name, measure_name);
+                                if let Some(measure) = cube.measures.iter().find(|m| {
+                                    measure_name.eq_ignore_ascii_case(&m.name) && {
+                                        if let Some(agg_type) = &m.agg_type {
+                                            match fun {
+                                                AggregateFunction::Count => {
+                                                    if *distinct {
+                                                        agg_type == "countDistinct"
+                                                            || agg_type == "countDistinctApprox"
+                                                    } else {
+                                                        agg_type == "count"
+                                                    }
+                                                }
+                                                AggregateFunction::Sum => agg_type == "sum",
+                                                AggregateFunction::Min => agg_type == "min",
+                                                AggregateFunction::Max => agg_type == "max",
+                                                AggregateFunction::Avg => agg_type == "avg",
+                                                AggregateFunction::ApproxDistinct => {
+                                                    agg_type == "countDistinctApprox"
+                                                }
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                }) {
+                                    subst.insert(
+                                        measure_name_var,
+                                        egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
+                                            measure.name.to_string(),
+                                        ))),
+                                    );
+                                    return true;
+                                }
                             }
                         }
                     }
-                    _ => {}
                 }
             }
             false
+        }
+    }
+}
+
+pub struct TransformingPattern<T>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+{
+    pattern: Pattern<LogicalPlanLanguage>,
+    vars_to_substitute: T,
+}
+
+impl<T> TransformingPattern<T>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+{
+    pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
+        Self {
+            pattern: pattern.parse().unwrap(),
+            vars_to_substitute,
+        }
+    }
+}
+
+impl<T> Applier<LogicalPlanLanguage, ()> for TransformingPattern<T>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+{
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph<LogicalPlanLanguage, ()>,
+        eclass: Id,
+        subst: &Subst,
+        searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
+        rule_name: Symbol,
+    ) -> Vec<Id> {
+        let mut new_subst = subst.clone();
+        if (self.vars_to_substitute)(egraph, &mut new_subst) {
+            self.pattern
+                .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
+        } else {
+            Vec::new()
         }
     }
 }
@@ -1913,16 +1312,14 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                         let mut query_measures = Vec::new();
                         let mut fields = Vec::new();
                         for m in measures {
-                            let measure = match_data_node!(
-                                self,
-                                match_params!(self, m, Measure)[0],
-                                MeasureName
-                            );
-                            query_measures.push(format!("{}.{}", cube, measure));
+                            let measure_params = match_params!(self, m, Measure);
+                            let measure = match_data_node!(self, measure_params[0], MeasureName);
+                            let expr = self.to_expr(measure_params[1])?;
+                            query_measures.push(measure);
                             fields.push(DFField::new(
                                 None,
-                                // TODO alias
-                                "COUNT(Uint8(1))",
+                                // TODO schema
+                                &expr.name(&DFSchema::empty())?,
                                 DataType::Int64,
                                 true,
                             ));
