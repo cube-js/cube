@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{mysql::session::Session, CubeError};
+use crate::{sql::Session, CubeError};
 
 use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 

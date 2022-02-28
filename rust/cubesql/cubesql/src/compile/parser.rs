@@ -1,6 +1,6 @@
 use sqlparser::{ast::Statement, dialect::Dialect, dialect::PostgreSqlDialect, parser::Parser};
 
-use crate::{compile::CompilationError, mysql::session::DatabaseProtocol};
+use crate::{compile::CompilationError, sql::DatabaseProtocol};
 
 use super::CompilationResult;
 

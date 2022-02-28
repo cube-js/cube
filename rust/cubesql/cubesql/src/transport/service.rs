@@ -6,7 +6,7 @@ use cubeclient::models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{compile::MetaContext, mysql::AuthContext, CubeError};
+use crate::{compile::MetaContext, sql::AuthContext, CubeError};
 
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {

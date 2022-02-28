@@ -9,10 +9,7 @@ use datafusion::{
 
 use crate::{
     compile::MetaContext,
-    mysql::{
-        session::{DatabaseProtocol, SessionState},
-        session_manager::SessionManager,
-    },
+    sql::{DatabaseProtocol, SessionManager, SessionState},
 };
 
 use super::information_schema::mysql::{

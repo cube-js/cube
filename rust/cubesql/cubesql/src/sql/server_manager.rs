@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use crate::transport::TransportService;
-use crate::CubeError;
-
-use super::SqlAuthService;
+use crate::{sql::SqlAuthService, transport::TransportService, CubeError};
 
 #[derive(Debug)]
 pub struct ServerConfiguration {

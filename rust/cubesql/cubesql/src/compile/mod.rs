@@ -18,9 +18,9 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
-use crate::mysql::dataframe;
-use crate::mysql::session::{Session, SessionState};
-use crate::mysql::session_manager::SessionManager;
+use crate::sql::{
+    dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
+};
 pub use crate::transport::ctx::*;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
@@ -28,7 +28,6 @@ use crate::{
     compile::builder::QueryBuilder,
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 
 use self::builder::*;
 use self::context::*;
@@ -122,7 +121,7 @@ fn compile_select_expr(
                 CompiledQueryFieldMeta {
                     column_from: dimension.name.clone(),
                     column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                    column_type: ColumnType::MYSQL_TYPE_STRING,
+                    column_type: ColumnType::String,
                 },
             );
         }
@@ -136,7 +135,7 @@ fn compile_select_expr(
                 CompiledQueryFieldMeta {
                     column_from: measure.name.clone(),
                     column_to: mb_alias.unwrap_or(measure.get_real_name()),
-                    column_type: measure.get_mysql_type(),
+                    column_type: measure.get_sql_type(),
                 },
             );
         }
@@ -151,8 +150,8 @@ fn compile_select_expr(
                     column_from: dimension.name.clone(),
                     column_to: mb_alias.unwrap_or(dimension.get_real_name()),
                     column_type: match dimension._type.as_str() {
-                        "number" => ColumnType::MYSQL_TYPE_DOUBLE,
-                        _ => ColumnType::MYSQL_TYPE_STRING,
+                        "number" => ColumnType::Double,
+                        _ => ColumnType::String,
                     },
                 },
             );
@@ -1302,8 +1301,8 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                                 column_from: dimension.name.clone(),
                                 column_to: dimension.get_real_name(),
                                 column_type: match dimension._type.as_str() {
-                                    "number" => ColumnType::MYSQL_TYPE_DOUBLE,
-                                    _ => ColumnType::MYSQL_TYPE_STRING,
+                                    "number" => ColumnType::Double,
+                                    _ => ColumnType::String,
                                 },
                             },
                         )
@@ -1451,7 +1450,7 @@ impl QueryPlanner {
                 Arc::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "_".to_string(),
-                        ColumnType::MYSQL_TYPE_TINY,
+                        ColumnType::Int8,
                         ColumnFlags::empty(),
                     )],
                     vec![],
@@ -1589,7 +1588,7 @@ impl QueryPlanner {
                 Arc::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "Database".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     )],
                     vec![
@@ -1621,18 +1620,18 @@ impl QueryPlanner {
                     vec![
                         dataframe::Column::new(
                             "Level".to_string(),
-                            ColumnType::MYSQL_TYPE_VAR_STRING,
-                            ColumnFlags::NOT_NULL_FLAG,
+                            ColumnType::VarStr,
+                            ColumnFlags::NOT_NULL,
                         ),
                         dataframe::Column::new(
                             "Code".to_string(),
-                            ColumnType::MYSQL_TYPE_LONG,
-                            ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
+                            ColumnType::Int32,
+                            ColumnFlags::NOT_NULL | ColumnFlags::UNSIGNED,
                         ),
                         dataframe::Column::new(
                             "Message".to_string(),
-                            ColumnType::MYSQL_TYPE_VAR_STRING,
-                            ColumnFlags::NOT_NULL_FLAG,
+                            ColumnType::VarStr,
+                            ColumnFlags::NOT_NULL,
                         ),
                     ],
                     vec![],
@@ -1669,7 +1668,8 @@ impl QueryPlanner {
         };
 
         let stmt = parse_sql_to_statement(
-            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter), self.state.protocol.clone()
+            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter),
+            self.state.protocol.clone(),
         )?;
 
         self.create_df_logical_plan(stmt)
@@ -1704,7 +1704,7 @@ impl QueryPlanner {
                     "`{}` {}{}",
                     column.get_name(),
                     column.get_column_type(),
-                    if column.mysql_can_be_null() { " NOT NULL" } else { "" }
+                    if column.sql_can_be_null() { " NOT NULL" } else { "" }
                 ));
             }
 
@@ -1712,12 +1712,12 @@ impl QueryPlanner {
                 vec![
                     dataframe::Column::new(
                         "Table".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     ),
                     dataframe::Column::new(
                         "Create Table".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     )
                 ],
@@ -1913,7 +1913,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             Arc::new(dataframe::DataFrame::new(
                 vec![dataframe::Column::new(
                     "Execution Plan".to_string(),
-                    ColumnType::MYSQL_TYPE_STRING,
+                    ColumnType::String,
                     ColumnFlags::empty(),
                 )],
                 vec![dataframe::Row::new(vec![dataframe::TableValue::String(
@@ -1926,6 +1926,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
     fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
         self.state.set_database(Some(db_name.value.clone()));
+
         Ok(QueryPlan::MetaOk(StatusFlags::empty()))
     }
 
@@ -1933,13 +1934,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
-        let mut flags = StatusFlags::SERVER_SESSION_STATE_CHANGED;
+        let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
         if key_values
             .iter()
             .any(|set| set.key.value.to_lowercase() == "autocommit".to_string())
         {
-            flags |= StatusFlags::SERVER_STATUS_AUTOCOMMIT;
+            flags |= StatusFlags::AUTOCOMMIT;
         }
 
         Ok(QueryPlan::MetaTabular(
@@ -2049,12 +2050,10 @@ impl CompiledQuery {
                 None,
                 meta_field.column_to.as_str(),
                 match meta_field.column_type {
-                    ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
-                        DataType::Int64
-                    }
-                    ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
-                    ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
-                    ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                    ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+                    ColumnType::String => DataType::Utf8,
+                    ColumnType::Double => DataType::Float64,
+                    ColumnType::Int8 => DataType::Boolean,
                     _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
                 },
                 false,
@@ -2076,12 +2075,10 @@ impl CompiledQuery {
                     None,
                     meta_field.column_from.as_str(),
                     match meta_field.column_type {
-                        ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
-                            DataType::Int64
-                        }
-                        ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
-                        ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
-                        ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                        ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+                        ColumnType::String => DataType::Utf8,
+                        ColumnType::Double => DataType::Float64,
+                        ColumnType::Int8 => DataType::Boolean,
                         _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
                     },
                     false,
@@ -2156,20 +2153,18 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
+    use datafusion::execution::dataframe_impl::DataFrameImpl;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
 
     use crate::{
-        mysql::{
-            dataframe::batch_to_dataframe,
-            server_manager::{ServerConfiguration, ServerManager},
-            session::DatabaseProtocol,
-            AuthContext, AuthenticateResponse, SqlAuthService,
+        sql::{
+            dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
+            AuthContext, AuthenticateResponse, DatabaseProtocol, ServerManager, SqlAuthService,
         },
         transport::TransportService,
     };
-    use datafusion::execution::dataframe_impl::DataFrameImpl;
-
-    use super::*;
-    use pretty_assertions::assert_eq;
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -4610,7 +4605,7 @@ mod tests {
                 .await?,
             (
                 "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
+                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
         );
 
@@ -4620,10 +4615,7 @@ mod tests {
                 DatabaseProtocol::MySQL
             )
             .await?,
-            (
-                "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED
-            )
+            ("++\n++\n++".to_string(), StatusFlags::SERVER_STATE_CHANGED)
         );
 
         assert_eq!(
@@ -4635,7 +4627,7 @@ mod tests {
             .await?,
             (
                 "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
+                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
         );
 

@@ -13,22 +13,26 @@ use log::debug;
 use log::error;
 use log::trace;
 
-use msql_srv::*;
+//use msql_srv::*;
+use msql_srv::{
+    AsyncMysqlIntermediary, AsyncMysqlShim, Column, ErrorKind, InitWriter, ParamParser, Params,
+    QueryResultWriter, StatementMetaWriter,
+};
 
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
-use crate::mysql::dataframe::batch_to_dataframe;
-use crate::mysql::session::DatabaseProtocol;
+
+use crate::sql::DatabaseProtocol;
+use crate::sql::Session;
+use crate::sql::SessionManager;
+use crate::sql::{
+    dataframe::{self, batch_to_dataframe},
+    AuthContext, ColumnFlags, ColumnType, QueryResponse, StatusFlags,
+};
 use crate::CubeError;
-
-use super::dataframe;
-use super::session::Session;
-use super::session_manager::SessionManager;
-
-use super::AuthContext;
 
 #[derive(Debug)]
 struct PreparedStatements {
@@ -47,7 +51,7 @@ impl PreparedStatements {
 
 #[derive(Debug)]
 struct MySqlConnection {
-    // MySql specific things
+    // Prepared statements
     statements: Arc<RwLock<PreparedStatements>>,
     // Shared
     session: Arc<Session>,
@@ -66,11 +70,6 @@ impl Drop for MySqlConnection {
     }
 }
 
-enum QueryResponse {
-    Ok(StatusFlags),
-    ResultSet(StatusFlags, Arc<dataframe::DataFrame>),
-}
-
 impl MySqlConnection {
     // This method write response back to client after execution
     async fn handle_query<'a, W: io::Write + Send>(
@@ -86,7 +85,7 @@ impl MySqlConnection {
                 Ok(())
             }
             Ok(QueryResponse::Ok(status)) => {
-                results.completed(0, 0, status)?;
+                results.completed(0, 0, status.to_mysql_flags())?;
                 Ok(())
             }
             Ok(QueryResponse::ResultSet(_, data_frame)) => {
@@ -96,8 +95,8 @@ impl MySqlConnection {
                     .map(|c| Column {
                         table: "result".to_string(), // TODO
                         column: c.get_name(),
-                        coltype: c.get_type(),
-                        colflags: c.get_flags(),
+                        coltype: c.get_type().to_mysql(),
+                        colflags: c.get_flags().to_mysql(),
                     })
                     .collect::<Vec<_>>();
 
@@ -147,7 +146,7 @@ impl MySqlConnection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
@@ -162,7 +161,7 @@ impl MySqlConnection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
@@ -177,7 +176,7 @@ impl MySqlConnection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
@@ -432,7 +431,6 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
-            // TODO: Switch Protocol
             let session = self.session_manager.create_session(
                 DatabaseProtocol::MySQL,
                 socket.peer_addr().unwrap().to_string(),

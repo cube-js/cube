@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     di_service,
-    mysql::AuthContext,
+    sql::AuthContext,
     transport::{MetaContext, TransportService},
     CubeError,
 };

@@ -2,21 +2,19 @@ use std::fmt::{self, Debug, Formatter};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
 use comfy_table::{Cell, Table};
-use datafusion::arrow::array::{
-    Array, Float64Array, Int32Array, Int64Array, IntervalDayTimeArray, IntervalYearMonthArray,
-    StringArray, TimestampMicrosecondArray, UInt32Array,
-};
-use datafusion::arrow::datatypes::IntervalUnit;
 use datafusion::arrow::{
-    array::{BooleanArray, TimestampNanosecondArray, UInt64Array},
-    datatypes::{DataType, TimeUnit},
+    array::{
+        Array, BooleanArray, Float64Array, Int32Array, Int64Array, IntervalDayTimeArray,
+        IntervalYearMonthArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+        UInt32Array, UInt64Array,
+    },
+    datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
 };
 
-use msql_srv::{ColumnFlags, ColumnType};
+use super::{ColumnFlags, ColumnType};
 
-use crate::CubeError;
-use crate::{make_string_interval_day_time, make_string_interval_year_month};
+use crate::{make_string_interval_day_time, make_string_interval_year_month, CubeError};
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -200,12 +198,12 @@ macro_rules! convert_array {
 
 pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeError> {
     match arrow_type {
-        DataType::Binary => Ok(ColumnType::MYSQL_TYPE_BLOB),
-        DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::MYSQL_TYPE_STRING),
-        DataType::Timestamp(_, _) => Ok(ColumnType::MYSQL_TYPE_STRING),
-        DataType::Interval(_) => Ok(ColumnType::MYSQL_TYPE_STRING),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::MYSQL_TYPE_DOUBLE),
-        DataType::Boolean => Ok(ColumnType::MYSQL_TYPE_TINY),
+        DataType::Binary => Ok(ColumnType::Blob),
+        DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
+        DataType::Timestamp(_, _) => Ok(ColumnType::String),
+        DataType::Interval(_) => Ok(ColumnType::String),
+        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Double),
+        DataType::Boolean => Ok(ColumnType::Int8),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
@@ -213,7 +211,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt32
-        | DataType::UInt64 => Ok(ColumnType::MYSQL_TYPE_LONGLONG),
+        | DataType::UInt64 => Ok(ColumnType::Int64),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }
@@ -343,7 +341,7 @@ mod tests {
         let frame = DataFrame::new(
             vec![Column::new(
                 "test".to_string(),
-                ColumnType::MYSQL_TYPE_STRING,
+                ColumnType::String,
                 ColumnFlags::empty(),
             )],
             vec![Row::new(vec![TableValue::String("simple_str".to_string())])],
