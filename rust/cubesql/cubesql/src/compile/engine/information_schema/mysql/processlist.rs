@@ -13,7 +13,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::mysql::{session::SessionProcessList, session_manager::SessionManager};
+use crate::sql::{SessionManager, SessionProcessList};
 
 use super::utils::new_string_array_with_placeholder;
 
