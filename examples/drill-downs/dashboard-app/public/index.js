@@ -30,27 +30,79 @@ const populateExamplesNav = (data) => {
     applyDropdownAccessibility()
 }
 
-// dropdown menu functionality
+// dropdown menu accessibilty
 function applyDropdownAccessibility() {
-    const dropdownMenuBtn = document.querySelector(".dropdown-button")
-    dropdownMenuBtn.addEventListener("focus", function () {
-        this.setAttribute("aria-expanded", true)
-    })
-    dropdownMenuBtn.addEventListener("blur", function () {
-        this.setAttribute("aria-expanded", false)
-    });
-    
     const dropdownLinks = document.querySelectorAll(".dropdown-link")
     dropdownLinks.forEach(link => {
-        link.addEventListener("focus", function(){
+        link.addEventListener("focus", function () {
             dropdownMenuBtn.setAttribute("aria-expanded", true)
         })
     })
 
     const lastDropdownLinkItem = dropdownLinks.length - 1
-    dropdownLinks[lastDropdownLinkItem].addEventListener("blur", function(){
+    dropdownLinks[lastDropdownLinkItem].addEventListener("blur", function () {
         dropdownMenuBtn.setAttribute("aria-expanded", false)
     })
 }
+
+// dropdown menu functionality
+const dropdownMenuBtn = document.querySelector(".dropdown-button")
+const dropdownMenuList = document.querySelector(".menu-list")
+dropdownMenuBtn.addEventListener("click", function (e) {
+    // dropdownMenuList.scrollTop = 0;
+    if (this.getAttribute("aria-expanded") === "true") {
+        this.setAttribute("aria-expanded", false)
+    } else {
+        this.setAttribute("aria-expanded", true)
+    }
+})
+
+// close dropdown when click outside
+window.addEventListener("click", (e) => {
+    if (!dropdownMenuBtn.contains(e.target)) {
+        dropdownMenuBtn.setAttribute("aria-expanded", false)
+    }
+})
+
+// mobile nav functionality
+const navToggle = document.getElementById('nav-toggle');
+const header = document.getElementById('header');
+const navOverlay = document.getElementById('nav-overlay')
+
+navToggle.addEventListener('click', (e) => {
+    if (header.classList.contains('open')) {
+        header.classList.remove('open');
+        header.classList.add('hide');
+        document.body.classList.toggle('noscroll')
+    } else if (header.classList.contains('hide')) {
+        header.classList.remove('hide');
+        header.classList.add('open');
+        document.body.classList.toggle('noscroll')
+    } else {
+        header.classList.add('open');
+        document.body.classList.toggle('noscroll')
+    }
+})
+
+navOverlay.addEventListener("click", ()=>{
+    header.classList.remove('open');
+    header.classList.add('hide');
+    document.body.classList.toggle('noscroll')
+})
+
+// hide nav on window resize properly
+window.addEventListener("resize", ()=>{
+    const minDesktopWidth = this.getComputedStyle(document.documentElement)
+                                .getPropertyValue("--breakpoint-desktop-xs")
+                                .replace("px", "");
+
+    if(this.innerWidth >= minDesktopWidth) {
+        header.classList.remove('open');
+        header.classList.remove('hide');
+        dropdownMenuBtn.setAttribute("aria-expanded", false)
+        document.body.classList.remove('noscroll')
+    }
+})
+
 
 
