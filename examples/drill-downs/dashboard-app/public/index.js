@@ -1,15 +1,19 @@
+const minDesktopWidth = getComputedStyle(document.documentElement)
+                            .getPropertyValue("--breakpoint-desktop-xs")
+                            .replace("px", "");
+
+console.log(minDesktopWidth)
+const menuList = document.getElementById("menu-list")
+const menuButton = document.getElementById("menu-button")
+
 // fetch examples nav items
 const NAV_CONFIG_PATH = "examples-nav.config.json";
-
 // fetch nav items from config file
 fetch(NAV_CONFIG_PATH).then(res => res.json())
     .then(data => populateExamplesNav(data))
     .catch();
 
 const populateExamplesNav = (data) => {
-    const menu = document.getElementsByClassName("menu-list")[0]
-    const menuButton = document.getElementById("menu-button")
-
     // find current nav item index
     const currentNavItemIndex = data.map(item => item.url).indexOf(window.location.href)
     // remove current nav item from data
@@ -22,12 +26,20 @@ const populateExamplesNav = (data) => {
         .join("");
 
     // set options to menu select
-    menu.innerHTML = navItems
+    menuList.innerHTML = navItems
     // set current item name as menu button text
     menuButton.innerHTML = currentNavItem.name
 
     // apply dropdown accessibility only when dropdown-list-items are rendered
     applyDropdownAccessibility()
+
+    // if there is more then 8 menu items
+    // set such a height so that the user understands 
+    // that it is possible to scroll down
+    if (data.length > 7 && window.innerWidth >= minDesktopWidth) {
+        menuList.style.maxHeight = '430px'
+    }
+
 }
 
 // dropdown menu accessibilty
@@ -84,23 +96,30 @@ navToggle.addEventListener('click', (e) => {
     }
 })
 
-navOverlay.addEventListener("click", ()=>{
+navOverlay.addEventListener("click", () => {
     header.classList.remove('open');
     header.classList.add('hide');
     document.body.classList.toggle('noscroll')
 })
 
-// hide nav on window resize properly
-window.addEventListener("resize", ()=>{
-    const minDesktopWidth = this.getComputedStyle(document.documentElement)
-                                .getPropertyValue("--breakpoint-desktop-xs")
-                                .replace("px", "");
-
-    if(this.innerWidth >= minDesktopWidth) {
+window.addEventListener("resize", () => {
+    if (this.innerWidth >= minDesktopWidth) {
+        // hide nav on window resize properly
         header.classList.remove('open');
         header.classList.remove('hide');
         dropdownMenuBtn.setAttribute("aria-expanded", false)
         document.body.classList.remove('noscroll')
+
+        // fix menu max-height
+        // if there is more then 8 menu items
+        // set such a height so that the user understands 
+        // that it is possible to scroll down
+        if (menuList.childNodes.length > 7) {
+            menuList.style.maxHeight = '430px'
+        }
+
+    }else{
+        menuList.style.maxHeight = '100%'
     }
 })
 
