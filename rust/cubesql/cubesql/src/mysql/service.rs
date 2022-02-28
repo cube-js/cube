@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io;
 
-use std::sync::{Arc, RwLock as RwLockSync};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
@@ -13,21 +13,26 @@ use log::debug;
 use log::error;
 use log::trace;
 
-use msql_srv::*;
+//use msql_srv::*;
+use msql_srv::{
+    AsyncMysqlIntermediary, AsyncMysqlShim, Column, ErrorKind, InitWriter, Params, ParamParser,
+    QueryResultWriter, StatementMetaWriter,
+};
 
 use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
-use crate::mysql::dataframe::batch_to_dataframe;
+use crate::sql_shared::{
+    dataframe::{self, batch_to_dataframe},
+    AuthContext, ColumnFlags, ColumnType, ConnectionProperties, ConnectionState, QueryResponse, SqlAuthService,
+    StatusFlags,
+};
 use crate::transport::TransportService;
 use crate::CubeError;
 
-use super::dataframe;
 use super::server_manager::ServerManager;
-use super::AuthContext;
-use super::SqlAuthService;
 
 #[derive(Debug)]
 struct PreparedStatements {
@@ -45,102 +50,12 @@ impl PreparedStatements {
 }
 
 #[derive(Debug)]
-pub struct ConnectionProperties {
-    user: Option<String>,
-    database: Option<String>,
-}
-
-impl ConnectionProperties {
-    pub fn new(user: Option<String>, database: Option<String>) -> Self {
-        Self { user, database }
-    }
-}
-
-#[derive(Debug)]
-pub struct ConnectionState {
-    // connection id, it's immutable
-    pub connection_id: u32,
-    // Connection properties
-    properties: RwLockSync<ConnectionProperties>,
-    // @todo Remove RWLock after split of Connection & SQLWorker
-    // Context for Transport
-    auth_context: RwLockSync<Option<AuthContext>>,
-}
-
-impl ConnectionState {
-    pub fn new(
-        connection_id: u32,
-        properties: ConnectionProperties,
-        auth_context: Option<AuthContext>,
-    ) -> Self {
-        Self {
-            connection_id,
-            properties: RwLockSync::new(properties),
-            auth_context: RwLockSync::new(auth_context),
-        }
-    }
-
-    pub fn user(&self) -> Option<String> {
-        let guard = self
-            .properties
-            .read()
-            .expect("failed to unlock properties for reading user");
-        guard.user.clone()
-    }
-
-    pub fn set_user(&self, user: Option<String>) {
-        let mut guard = self
-            .properties
-            .write()
-            .expect("failed to unlock properties for writting user");
-        guard.user = user;
-    }
-
-    pub fn database(&self) -> Option<String> {
-        let guard = self
-            .properties
-            .read()
-            .expect("failed to unlock properties for reading database");
-        guard.database.clone()
-    }
-
-    pub fn set_database(&self, database: Option<String>) {
-        let mut guard = self
-            .properties
-            .write()
-            .expect("failed to unlock properties for writting database");
-        guard.database = database;
-    }
-
-    pub fn auth_context(&self) -> Option<AuthContext> {
-        let guard = self
-            .auth_context
-            .read()
-            .expect("failed to unlock auth_context for reading");
-        guard.clone()
-    }
-
-    pub fn set_auth_context(&self, auth_context: Option<AuthContext>) {
-        let mut guard = self
-            .auth_context
-            .write()
-            .expect("failed to auth_context properties for writting");
-        *guard = auth_context;
-    }
-}
-
-#[derive(Debug)]
 struct Connection {
     server: Arc<ServerManager>,
     // Props for execution queries
     state: Arc<ConnectionState>,
     // Prepared statements
     statements: Arc<RwLock<PreparedStatements>>,
-}
-
-enum QueryResponse {
-    Ok(StatusFlags),
-    ResultSet(StatusFlags, Arc<dataframe::DataFrame>),
 }
 
 impl Connection {
@@ -158,7 +73,7 @@ impl Connection {
                 Ok(())
             }
             Ok(QueryResponse::Ok(status)) => {
-                results.completed(0, 0, status)?;
+                results.completed(0, 0, status.to_mysql_flags())?;
                 Ok(())
             }
             Ok(QueryResponse::ResultSet(_, data_frame)) => {
@@ -168,8 +83,8 @@ impl Connection {
                     .map(|c| Column {
                         table: "result".to_string(), // TODO
                         column: c.get_name(),
-                        coltype: c.get_type(),
-                        colflags: c.get_flags(),
+                        coltype: c.get_type().to_mysql(),
+                        colflags: c.get_flags().to_mysql(),
                     })
                     .collect::<Vec<_>>();
 
@@ -219,7 +134,7 @@ impl Connection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
@@ -234,7 +149,7 @@ impl Connection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![
@@ -249,7 +164,7 @@ impl Connection {
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
-                            ColumnType::MYSQL_TYPE_STRING,
+                            ColumnType::String,
                             ColumnFlags::empty(),
                         )],
                         vec![dataframe::Row::new(vec![

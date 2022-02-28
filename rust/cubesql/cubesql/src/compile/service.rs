@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::mysql::ConnectionState;
+use crate::sql_shared::ConnectionState;
 use crate::transport::TransportService;
 use crate::CubeError;
 

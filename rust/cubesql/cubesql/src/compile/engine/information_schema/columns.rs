@@ -76,7 +76,7 @@ impl InformationSchemaColumnsBuilder {
             .unwrap();
         self.column_default.append_value("").unwrap();
         self.is_nullable
-            .append_value(if column.mysql_can_be_null() {
+            .append_value(if column.sql_can_be_null() {
                 "YES"
             } else {
                 "NO"

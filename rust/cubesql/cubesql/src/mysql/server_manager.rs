@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::transport::TransportService;
-
-use super::SqlAuthService;
+use crate::{sql_shared::SqlAuthService, transport::TransportService};
 
 #[derive(Debug)]
 pub struct ServerConfiguration {

@@ -25,7 +25,7 @@ use datafusion::{
 use futures::Stream;
 use log::{error, warn};
 
-use crate::{mysql::AuthContext, transport::TransportService};
+use crate::{sql_shared::AuthContext, transport::TransportService};
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {

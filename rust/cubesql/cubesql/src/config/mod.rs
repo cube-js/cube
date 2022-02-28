@@ -3,7 +3,9 @@ pub mod processing_loop;
 
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
-use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
+//use crate::mysql::MySqlServer;
+use crate::postgres::PostgresServer;
+use crate::sql_shared::{SqlAuthDefaultImpl, SqlAuthService};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::transport::{HttpTransport, TransportService};
 use crate::CubeError;
@@ -49,8 +51,8 @@ impl CubeServices {
 
     pub async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
-        if self.injector.has_service_typed::<MySqlServer>().await {
-            let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
+        if self.injector.has_service_typed::<PostgresServer>().await {
+            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
                 if let Err(e) = mysql_server.processing_loop().await {
                     error!("{}", e.to_string());
@@ -69,9 +71,9 @@ impl CubeServices {
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        if self.injector.has_service_typed::<MySqlServer>().await {
+        if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
-                .get_service_typed::<MySqlServer>()
+                .get_service_typed::<PostgresServer>()
                 .await
                 .stop_processing()
                 .await?;
@@ -194,13 +196,13 @@ impl Config {
                 })
                 .await;
             self.injector
-                .register_typed::<MySqlServer, _, _, _>(async move |i| {
+                .register_typed::<PostgresServer, _, _, _>(async move |i| {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
-                    MySqlServer::new(
+                    PostgresServer::new(
                         config.bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                         i.get_service_typed().await,
-                        config.nonce().clone(),
+                        // config.nonce().clone(),
                     )
                 })
                 .await;

@@ -26,7 +26,7 @@ use crate::{
         coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
-    mysql::ConnectionState,
+    sql_shared::ConnectionState,
 };
 
 pub fn create_version_udf() -> ScalarUDF {
