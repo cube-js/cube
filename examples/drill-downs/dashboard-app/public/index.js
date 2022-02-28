@@ -2,16 +2,20 @@ const minDesktopWidth = getComputedStyle(document.documentElement)
                             .getPropertyValue("--breakpoint-desktop-xs")
                             .replace("px", "");
 
-console.log(minDesktopWidth)
 const menuList = document.getElementById("menu-list")
+const menuCurrent = document.getElementById("menu-current")
 const menuButton = document.getElementById("menu-button")
 
 // fetch examples nav items
 const NAV_CONFIG_PATH = "examples-nav.config.json";
 // fetch nav items from config file
-fetch(NAV_CONFIG_PATH).then(res => res.json())
-    .then(data => populateExamplesNav(data))
-    .catch();
+
+
+const loadNavItems = () => fetch(NAV_CONFIG_PATH).then(res => res.json())
+.then(data => populateExamplesNav(data))
+.catch();
+
+setTimeout(()=>loadNavItems(), 700)
 
 const populateExamplesNav = (data) => {
     // find current nav item index
@@ -25,10 +29,12 @@ const populateExamplesNav = (data) => {
             `<li class="dropdown-list-item"><a class="dropdown-link" href="${item.url}">${item.name}</a></li>`)
         .join("");
 
+    // remove loader
+    menuButton.classList.toggle("load")
     // set options to menu select
     menuList.innerHTML = navItems
     // set current item name as menu button text
-    menuButton.innerHTML = currentNavItem.name
+    menuCurrent.innerHTML = currentNavItem.name
 
     // apply dropdown accessibility only when dropdown-list-items are rendered
     applyDropdownAccessibility()
