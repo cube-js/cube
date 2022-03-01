@@ -6,29 +6,27 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube.js is an open-source analytical API platform.__ It is primarily used to build internal business intelligence tools or add customer-facing analytics to existing applications.
+__Cube is headless business intelligence for building data applications.__ It is used to provide access data, organize it, and deliver it to every tool so developers can build powerful, fast, and consistent data applications.
 
-Cube.js was designed to work with serverless data warehouses and query engines like Google BigQuery and AWS Athena. A multi-stage querying approach makes it suitable for handling
-trillions of data points. Most modern RDBMS work with Cube.js as well and can be
-further tuned for performance.
+Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines like Amazon Athena, and regular databases like Postgres. Cube can handle trillions of data points and provide sub-second latency and high concurrency for API requests.
 
-For more details, see the [Cube.js introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
+For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
 
-## Why Cube.js?
+## Why Cube?
 
-If you are building your own business intelligence tool or customer-facing analytics most probably you'll face the following problems:
+If you are building your data application, most probably you'll face the following problems:
 
 1. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
 2. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
 3. __Infrastructure.__ Key components every production-ready analytics solution requires: analytic SQL generation, query results caching and execution orchestration, data pre-aggregation, security, API for query results fetch, and visualization.
 
-Cube.js has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
+Cube has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
 
 ## Getting Started 🚀
 
-There're two ways to create a Cube.js application.
+There're two ways to create a Cube application.
 
 If you have Node.js installed, run this command and follow with the [Getting Started](https://cube.dev/docs/getting-started) guide.
 
@@ -36,7 +34,7 @@ If you have Node.js installed, run this command and follow with the [Getting Sta
 $ npx cubejs-cli create hello-world
 ```
 
-In case you don't have Node.js, or you'd like to run Cube.js with Docker, have a look at the [Getting started with Docker](https://cube.dev/docs/getting-started-docker) guide.
+In case you don't have Node.js, or you'd like to run Cube with Docker, have a look at the [Getting started with Docker](https://cube.dev/docs/getting-started-docker) guide.
 
 ## Resources
 
@@ -57,22 +55,22 @@ You are also welcome to join our **monthly community calls** where we discuss co
 
 ### Contributing
 
-There are many ways you can contribute and help Cube.js. Here a few ones:
+There are many ways you can contribute to Cube. Here a few ones:
 
 * Star this repo and follow us on [Twitter](https://twitter.com/thecubejs).
-* Add Cube.js to your stack on [Stackshare](https://stackshare.io/cube-js).
+* Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
 * Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
 * Create issues every time you feel something is missing or goes wrong.
 * Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
-* Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels as those are out of Cube.js Core Team roadmap scope.
+* Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels as those are out of Cube team roadmap scope.
 
 All sort of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md) for more information.
 
 ## License
 
-Cube.js Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
+Cube Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
 
-Cube.js Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
+Cube Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
 
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_large)
