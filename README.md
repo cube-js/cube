@@ -6,7 +6,7 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is headless business intelligence for building data applications.__ It is used to provide access data, organize it, and deliver it to every tool so developers can build powerful, fast, and consistent data applications.
+__Cube is headless business intelligence for building data applications.__ It helps provide access data, organize it, and deliver it to every tool so developers can build powerful, fast, and consistent data applications.
 
 Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines like Amazon Athena, and regular databases like Postgres. Cube can handle trillions of data points and provide sub-second latency and high concurrency for API requests.
 
