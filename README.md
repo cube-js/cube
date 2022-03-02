@@ -16,7 +16,7 @@ For more details, see the [introduction](https://cube.dev/docs/cubejs-introducti
 
 If you are building your data application, most probably you'll face the following problems:
 
-1. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
+1. __SQL code organization.__ Modeling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
 2. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
 3. __Access Control.__ It is important to secure and govern access to data from all the downstream data consuming applications.
 
