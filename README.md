@@ -55,7 +55,7 @@ You are also welcome to join our **monthly community calls** where we discuss co
 
 ### Contributing
 
-There are many ways you can contribute to Cube. Here a few ones:
+There are many ways you can contribute to Cube, and here are a few possibilities:
 
 * Star this repo and follow us on [Twitter](https://twitter.com/thecubejs).
 * Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
