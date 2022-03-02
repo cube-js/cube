@@ -6,9 +6,9 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is headless business intelligence for building data applications.__ It helps provide access data, organize it, and deliver it to every tool so developers can build powerful, fast, and consistent data applications.
+__Cube is the headless business intelligence platform.__ It helps data engineers and application developers to access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
-Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines like Amazon Athena, and regular databases like Postgres. Cube can handle trillions of data points and provide sub-second latency and high concurrency for API requests.
+Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines Presto or Amazon Athena, and application databases like Postgres. Cube has built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
 For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
 
@@ -16,11 +16,11 @@ For more details, see the [introduction](https://cube.dev/docs/cubejs-introducti
 
 If you are building your data application, most probably you'll face the following problems:
 
-1. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
-2. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
-3. __Infrastructure.__ Key components every production-ready analytics solution requires: analytic SQL generation, query results caching and execution orchestration, data pre-aggregation, security, API for query results fetch, and visualization.
+1. __SQL code organization.__ Modelling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
+2. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
+3. __Access Control.__ It is important to secure and govern access to data from all the downstream data consuming applications.
 
-Cube has necessary infrastructure for every analytic application that heavily relies on its caching and pre-aggregation layer to provide several minutes raw data to insight delay and sub second API response times on a trillion of data points scale.
+Cube has necessary infrastructure and features to implement efficient data modeling, access control and performance optiomizations so every application like embedded analytics, dashboarding and reporting tools, data notebooks and other tools can access consistent data via REST, SQL, and GraphQL APIs.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
 
