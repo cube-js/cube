@@ -655,7 +655,6 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                 "(Extension (CubeScan ?source_table_name CubeScanMeasures CubeScanDimensions CubeScanFilters))"
                 if self.is_cube_table("?source_table_name")
             ),
-            // TODO distinct should be checked to be false
             rewrite!("simple-count";
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
@@ -679,7 +678,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     )
                  }
             ),
-            rewrite!("named-count";
+            rewrite!("named-aggr";
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
                     ?group_expr \
