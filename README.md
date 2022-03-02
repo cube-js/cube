@@ -26,15 +26,22 @@ Cube has necessary infrastructure and features to implement efficient data model
 
 ## Getting Started 🚀
 
-There're two ways to create a Cube application.
+The fastest way to try Cube locally is using [Docker](https://www.docker.com/). Once Docker is installed, in a new folder for your project, run the following command:
 
-If you have Node.js installed, run this command and follow with the [Getting Started](https://cube.dev/docs/getting-started) guide.
+```bash
+docker run -p 4000:4000 \
+  -v ${PWD}:/cube/conf \
+  -e CUBEJS_DEV_MODE=true \
+  cubejs/cube
+```
+
+And then open http://localhost:4000 in your browser to continue set up. You can learn more by following our [Getting started](https://cube.dev/docs/getting-started-docker) guide.
+
+Alternatively, if you have Node.js installed, you can run this command and follow the [Getting Started](https://cube.dev/docs/getting-started) guide.
 
 ```
 $ npx cubejs-cli create hello-world
 ```
-
-In case you don't have Node.js, or you'd like to run Cube with Docker, have a look at the [Getting started with Docker](https://cube.dev/docs/getting-started-docker) guide.
 
 ## Resources
 
@@ -45,7 +52,7 @@ In case you don't have Node.js, or you'd like to run Cube with Docker, have a lo
 
 ## Community
 
-If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and contributors.
+If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and data engineers.
 
 You are also welcome to join our **monthly community calls** where we discuss community news, Cube Dev team's plans, backlogs, use cases, etc. If you miss the call, the recordings will also be available after the meeting. 
 * When: Second Wednesday of each month at [9am Pacific Time](https://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29).  
