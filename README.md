@@ -8,7 +8,7 @@
 
 __Cube is the headless business intelligence platform.__ It helps data engineers and application developers to access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
-Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines Presto or Amazon Athena, and application databases like Postgres. Cube has built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
+Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
 For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
 
