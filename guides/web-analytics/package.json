@@ -30,7 +30,7 @@
     "guides-base": "file:../guides-base",
     "lodash": "^4.17.11",
     "moment": "^2.24.0",
-    "prismjs": "^1.16.0",
+    "prismjs": "^1.27.0",
     "react": "^16.10.1",
     "react-dom": "^16.10.1",
     "react-helmet": "^5.2.1",
