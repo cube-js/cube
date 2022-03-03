@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/schema-compiler:** Add strictness to booleans ([#4157](https://github.com/cube-js/cube.js/issues/4157)) Thanks [@zpencerq](https://github.com/zpencerq)! ([e918837](https://github.com/cube-js/cube.js/commit/e918837ec8c5eb7965620f43408a92f4c2b2bec5))
+* Timestamp for quarter range in time series has incorrect ending period of 23:59:99  ([#4162](https://github.com/cube-js/cube.js/issues/4162)) Thanks @Yashkochar20 ! ([8e27ae7](https://github.com/cube-js/cube.js/commit/8e27ae73bcb4c8524690122779f2d9e5f1ba7c12))
+* **@cubejs-backend/bigquery-driver:** Cancel queries on polling timeout so those aren't dangling around for hours ([f36ff74](https://github.com/cube-js/cube.js/commit/f36ff74e52099839f6ea796bf4571100cdc332cf))
+* **cubestore:** Add list file size validation after file upload to check upload consistency ([#4093](https://github.com/cube-js/cube.js/issues/4093)) ([1c62859](https://github.com/cube-js/cube.js/commit/1c62859747b2773b418b756178e03e685381ca82))
+* **cubestore:** Deactivate tables on data corruption to allow refresh worker to reconcile failing partitions ([#4092](https://github.com/cube-js/cube.js/issues/4092)) ([2c3c83a](https://github.com/cube-js/cube.js/commit/2c3c83a97c2dfd6e6f6d5dcd3acc4afe5fda294f))
+* **cubestore:** Do not spawn select workers for router nodes ([8c07bba](https://github.com/cube-js/cube.js/commit/8c07bbab4efdd3a3d929726870193401f1d42479))
+* **cubestore:** Do not warmup chunks on table creation to avoid stuck on warmup of unpartitioned chunks situation ([4c27d51](https://github.com/cube-js/cube.js/commit/4c27d51a0e01b26cd7d9447454a45da25e9ce4a7))
+* **cubestore:** Jobs are fetched only once 5 seconds if there's a queue ([dee115f](https://github.com/cube-js/cube.js/commit/dee115f39375ebae478dfa023c6e33e511b310b9))
+* **cubestore:** Leading decimal zeros are truncated during formatting ([a97f34b](https://github.com/cube-js/cube.js/commit/a97f34b0adb088223234ae187192e6be2b483cd4))
+* **cubestore:** Postpone deletion of partitions and chunks after metastore log commits to avoid missing files on sudden metastore loss ([#4094](https://github.com/cube-js/cube.js/issues/4094)) ([493c53e](https://github.com/cube-js/cube.js/commit/493c53e97f225c086524e59297b10c5a8ef4646b))
+* **helm-charts:** correct s3 output location env variable ([#4098](https://github.com/cube-js/cube.js/issues/4098)) ([88db58d](https://github.com/cube-js/cube.js/commit/88db58d1997e70b907fd03dfbe7e34e838f979ab))
+* **playground:** auto size chart window ([#4042](https://github.com/cube-js/cube.js/issues/4042)) ([ee496b3](https://github.com/cube-js/cube.js/commit/ee496b33306bb2fafb3635add53d85ae05c7620f))
+* **playground:** prevent params to shift around when removing filters ([e3d17ae](https://github.com/cube-js/cube.js/commit/e3d17ae7b2b8340ee39ea6464773b2676dc5a9f6))
+
+
+### Features
+
+* **cubestore:** Decimal partition pruning ([#4089](https://github.com/cube-js/cube.js/issues/4089)) ([c00efad](https://github.com/cube-js/cube.js/commit/c00efadfa3a841bd9bb5707fd5e98904ca9112bc))
+* **cubestore:** Introduce CUBESTORE_EVENT_LOOP_WORKER_THREADS to allow set tokio worker threads explicitly ([9349a11](https://github.com/cube-js/cube.js/commit/9349a112a795787b749f88e4179cfc8ae56575e1))
+* **cubestore:** Repartition single chunks instead of partition as a whole to speed up ingestion of big tables ([#4125](https://github.com/cube-js/cube.js/issues/4125)) ([af65cdd](https://github.com/cube-js/cube.js/commit/af65cddb0728c6d101bc076b7af88db1b684cc9e))
+* **packages:** add QuestDB driver ([#4096](https://github.com/cube-js/cube.js/issues/4096)) ([de8823b](https://github.com/cube-js/cube.js/commit/de8823b524d372dd1d9b661e643d9d4664260b58))
+* Compact JSON array based response data format support ([#4046](https://github.com/cube-js/cube.js/issues/4046)) ([e74d73c](https://github.com/cube-js/cube.js/commit/e74d73c140f56e71a24c35a5f03e9af63022bced)), closes [#1](https://github.com/cube-js/cube.js/issues/1)
+* Unwinds CubeStore select worker panics to provide descriptive error messages ([#4097](https://github.com/cube-js/cube.js/issues/4097)) ([6e21434](https://github.com/cube-js/cube.js/commit/6e214345fe12d55534174d80a05a18597ffdd17a))
+
+
+
+
+
 ## [0.29.28](https://github.com/cube-js/cube.js/compare/v0.29.27...v0.29.28) (2022-02-10)
 
 
