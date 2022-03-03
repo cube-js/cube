@@ -6,21 +6,21 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is the headless business intelligence platform.__ It helps data engineers and application developers to access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
+__Cube is the headless business intelligence platform.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
-Cube was designed to work with all SQL-enabled data sources including cloud data warehouses (CDWs) like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
+Cube was designed to work with all SQL-enabled data sources, including cloud data warehouses like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
 For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
 
 ## Why Cube?
 
-If you are building your data application, most probably you'll face the following problems:
+If you are building a data application—such as a business intelligence tool or a customer-facing analytics feature—you’ll probably face the following problems:
 
-1. __SQL code organization.__ Modeling even a dozen of metrics with a dozen of dimensions using pure SQL queries sooner or later becomes a maintenance nightmare which ends up in building modelling framework.
-2. __Performance.__ Most of effort time in modern analytics software development is spent to provide adequate time to insight. In the world where every company data is a big data writing just SQL query to get insight isn't enough anymore.
-3. __Access Control.__ It is important to secure and govern access to data from all the downstream data consuming applications.
+1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modelling framework.
+2. __Performance.__ Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
+3. __Access Control.__ It is important to secure and govern access to data for all downstream data consuming applications.
 
-Cube has necessary infrastructure and features to implement efficient data modeling, access control and performance optiomizations so every application like embedded analytics, dashboarding and reporting tools, data notebooks and other tools can access consistent data via REST, SQL, and GraphQL APIs.
+Cube has the necessary infrastructure and features to implement efficient data modeling, access control, and performance optimizations so that every application—like embedded analytics, dashboarding and reporting tools, data notebooks, and other tools—can access consistent data via REST, SQL, and GraphQL APIs.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
 
@@ -35,9 +35,10 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-And then open http://localhost:4000 in your browser to continue set up. You can learn more by following our [Getting started](https://cube.dev/docs/getting-started-docker) guide.
 
-Alternatively, if you have Node.js installed, you can run this command and follow the [Getting Started](https://cube.dev/docs/getting-started) guide.
+Then, open http://localhost:4000 in your browser to continue setup. You can learn more by following our [Getting started guide](https://cube.dev/docs/getting-started-docker).
+
+Alternatively, if you have Node.js installed, you can run this command and follow the [Getting started guide](https://cube.dev/docs/getting-started).
 
 ```
 $ npx cubejs-cli create hello-world
@@ -62,7 +63,7 @@ You are also welcome to join our **monthly community calls** where we discuss co
 
 ### Contributing
 
-There are many ways you can contribute to Cube, and here are a few possibilities:
+There are many ways you can contribute to Cube! Here are a few possibilities:
 
 * Star this repo and follow us on [Twitter](https://twitter.com/thecubejs).
 * Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
