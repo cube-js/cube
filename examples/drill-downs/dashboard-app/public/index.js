@@ -1,7 +1,10 @@
+// CSS
 const minDesktopWidth = getComputedStyle(document.documentElement)
                             .getPropertyValue("--breakpoint-desktop-xs")
                             .replace("px", "");
-
+const menuOverflowMaxHeight = getComputedStyle(document.documentElement)
+                                .getPropertyValue("--menu-overflow-max-height")
+// DOM
 const menuList = document.getElementById("menu-list")
 const menuCurrent = document.getElementById("menu-current")
 const menuButton = document.getElementById("menu-button")
@@ -43,7 +46,7 @@ const populateExamplesNav = (data) => {
     // set such a height so that the user understands 
     // that it is possible to scroll down
     if (data.length > 7 && window.innerWidth >= minDesktopWidth) {
-        menuList.style.maxHeight = '430px'
+        menuList.style.maxHeight = menuOverflowMaxHeight
     }
 
 }
@@ -121,7 +124,7 @@ window.addEventListener("resize", () => {
         // set such a height so that the user understands 
         // that it is possible to scroll down
         if (menuList.childNodes.length > 7) {
-            menuList.style.maxHeight = '430px'
+            menuList.style.maxHeight = menuOverflowMaxHeight
         }
 
     }else{

@@ -4,11 +4,22 @@
     --color-primary-hover: rgba(250, 50, 110, 1);
     --color-primary-outline: rgba(255, 100, 146, 0.3);
 
-    --secondary-color: rgba(102, 93, 232, 1);
+    --color-purple: rgba(102, 93, 232, 1);
+    --color-purple-bright: rgba(107, 79, 238, 1);
+    --color-purple-text: rgba(102, 93, 232, 1);
+
+    --color-secondary-default: var(--color-purple);
+    --color-secondary-hover-bg: rgba(102, 93, 232, 0.08);
+    --color-secondary-hover-border: rgba(122, 119, 255, 0.3);
+    --color-secondary-outline: rgba(122, 119, 255, 0.6);
+    --color-secondary-active-border: rgba(122, 119, 255, 1);
+
 
     /* BLACK SHADOWS */
     --color-black: 20, 20, 70;
+    --color-black-0: rgba(var(--color-black), 0);
     --color-black-4: rgba(var(--color-black), 0.04);
+    --color-black-6: rgba(var(--color-black), 0.06);
     --color-black-7: rgba(var(--color-black), 0.07);
     --color-black-10: rgba(var(--color-black), 0.1);
     --color-black-12: rgba(var(--color-black), 0.12);
@@ -17,6 +28,8 @@
     --color-black-100: rgba(var(--color-black), 1);
 
     --color-light: rgba(249, 249, 253, 1);
+    --color-light-2: rgba(246, 246, 248, 1);
+
     --color-success-default: rgba(65, 181, 111, 0.12);
     --color-success-hover: rgba(65, 181, 111, 0.22);
     --color-danger-default: rgba(255, 100, 109, 0.1);
@@ -39,7 +52,9 @@
 
     /* BREAKPOINTS */
     --breakpoint-mobile-s: 480px;
+    /* DON'T REMOVE: USES AT JS  */
     --breakpoint-desktop-xs: 880px;
+    /* DON'T REMOVE: USES AT JS  */
 
     /* ASSETS */
     --nav-font-color: var(--color-black-85);
@@ -47,14 +62,20 @@
     --header-height: 65px;
     --overlay-height: calc(100vh - var(--header-height));
 
+    --menu-max-height: 400px;
+    --menu-overflow-offset: 25px;
+    --menu-overflow-max-height: calc(var(--menu-max-height) + var(--menu-overflow-offset));
+    /* DON'T REMOVE: USES AT JS  */
+
     /* SKELETON LOADER */
-    --skeleton-base-color: var(--color-black-4);
-    --skeleton-shine-color: var(--color-light);
-    --skeleton-animation-duration: 1.6s;
+    --skeleton-base-color: var(--color-light-2);
+    --skeleton-shine-color: var(--color-black-6);
+    --skeleton-animation-duration: 3s;
     --skeleton-background-image: linear-gradient(90deg,
-            var(--skeleton-base-color) 0px,
-            var(--skeleton-shine-color) 60px,
-            var(--skeleton-base-color) 90px);
+     var(--color-black-0) 20%, 
+     var(--color-black-4) 55%, 
+     var(--color-black-0) 80%);
+     
 }
 
 *,
@@ -71,8 +92,15 @@
 }
 
 @font-face {
+    font-family: Cera Pro Medium;
+    src: url(https://static.cube.dev/fonts/CeraPro-Medium.woff2) format('woff2'),
+        url(https://static.cube.dev/fonts/CeraPro-Medium.woff) format('woff');
+}
+
+@font-face {
     font-family: Cera Pro Bold;
-    src: url(https://static.cube.dev/fonts/CeraPro-Bold.woff2);
+    src: url(https://static.cube.dev/fonts/CeraPro-Bold.woff2) format('woff2'),
+        url(https://static.cube.dev/fonts/CeraPro-Bold.woff) format('woff');
 }
 
 @keyframes open {
@@ -106,11 +134,11 @@
         background-position: -220px
     }
 
-    60%{
+    60% {
         background-position: 30px
     }
 
-     100% {
+    100% {
         background-position: 220px
     }
 }
@@ -128,6 +156,7 @@ body {
     flex-direction: column;
 
     font-family: Cera Pro, sans-serif;
+    color: var(--text-color-regular);
 }
 
 body.noscroll {
@@ -314,15 +343,19 @@ ul {
     border: none;
     outline: none;
     border-radius: 8px;
-    font-family: Cera Pro;
+    font-family: Cera Pro Medium, sans-serif;
     font-size: 16px;
     text-overflow: ellipsis;
 }
 
-.dropdown-button.load {
-    min-width: 70%;
-    background-image: var(--skeleton-background-image);
-    animation: shine var(--skeleton-animation-duration) infinite linear;
+.dropdown-button.load,
+.dropdown-button.load:hover,
+.dropdown-button.load:active,
+.dropdown-button.load:focus-visible {
+    min-width: 150px;
+    background-image: var(--skeleton-background-image) !important;
+    background-color: var(--skeleton-base-color) !important;
+    animation: shine var(--skeleton-animation-duration) infinite linear !important;
 }
 
 .dropdown-button.load svg {
@@ -334,7 +367,7 @@ ul {
 }
 
 .dropdown-button:focus-visible {
-    outline: 2px solid var(--secondary-color);
+    outline: 2px solid var(--color-secondary-default);
 }
 
 .dropdown-content {
@@ -362,6 +395,7 @@ ul {
     text-decoration: none;
     color: var(--color-black-85);
     font-size: var(--font-size-regular);
+    font-family: Cera Pro Medium, sans-serif;
     line-height: var(--line-height-regular);
     letter-spacing: var(--letter-spacing-regular);
     font-weight: 500;
@@ -370,6 +404,10 @@ ul {
     width: 100%;
     padding: 11px 0;
     transition: 0.1s;
+}
+
+.dropdown-list-item>*:focus-visible {
+    outline: 3px solid var(--color-secondary-outline);
 }
 
 .dropdown-list-item:first-child>* {
@@ -447,19 +485,16 @@ ul {
     }
 
     .dropdown-button {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 220px;
-        background-color: transparent;
-        border: 1px solid var(--color-black-12);
-        padding: 6px 16px;
-        outline: none;
-        border-radius: 8px;
+        width: auto;
+        min-width: 150px;
     }
 
-    .dropdown-button.load{
-        border: none;
+    .dropdown-button.load {
+        border: none !important;
+    }
+
+    .dropdown-button span {
+        margin-right: 8px;
     }
 
     .dropdown-content {
@@ -489,7 +524,7 @@ ul {
         width: auto;
         min-width: 240px;
         height: auto;
-        max-height: 400px;
+        max-height: var(--menu-max-height);
         clip: auto;
         overflow-y: auto;
         z-index: 9999;
@@ -513,7 +548,7 @@ ul {
     .dropdown-list-item>*:hover,
     .dropdown-list-item>*:focus {
         background-color: var(--color-light);
-        color: var(--secondary-color);
+        color: var(--color-purple);
     }
 
     .user-actions {
@@ -541,6 +576,7 @@ ul {
     font-size: 32px;
     margin-bottom: 8px;
     text-align: center;
+    color: var(--color-black-100);
 }
 
 .description p {
@@ -551,7 +587,7 @@ ul {
 }
 
 .link {
-    color: var(--secondary-color);
+    color: var(--color-purple-text);
     font-size: 16px;
     line-height: 1.625;
     text-decoration: none;
@@ -584,7 +620,7 @@ ul {
 
 .button {
     display: inline-block;
-    padding: 6px 12px;
+    padding: 7px 16px;
     border-radius: 8px;
 
     font-size: var(--font-size-regular);
@@ -593,7 +629,10 @@ ul {
     font-weight: 500;
 
     background-color: transparent;
-    transition: background-color var(--hover);
+    transition: background-color var(--hover),
+        border-color var(--hover),
+        color var(--hover);
+    cursor: pointer;
 }
 
 .button.default {
@@ -636,6 +675,30 @@ ul {
 .button.clear:focus-visible {
     outline: 3px solid var(--color-black-10);
 }
+
+.button.outline {
+    border: 1px solid var(--color-black-12);
+}
+
+.button.outline:hover {
+    border-color: var(--color-secondary-hover-border);
+    background-color: var(--color-secondary-hover-bg);
+    color: var(--color-purple-bright);
+}
+
+.button.outline[aria-expanded="true"] {
+    border-color: var(--color-secondary-active-border);
+    color: var(--color-purple-bright);
+}
+
+.button.outline:focus-visible {
+    outline: 3px solid var(--color-secondary-outline);
+}
+
+.button.outline svg path {
+    stroke: currentColor;
+}
+
 
 .feedback-block {
     position: fixed;
