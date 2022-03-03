@@ -6,7 +6,7 @@ redirect_from:
   - /cubejs-introduction
 ---
 
-**Cube.js is an open-source analytical API platform.** It is primarily used to build internal business intelligence tools or add customer-facing analytics to existing applications.
+**Cube is the headless business intelligence platform.** It helps data engineers and application developers to access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 Cube.js was designed to work with serverless data warehouses and query engines like Google BigQuery and AWS Athena. A multi-stage querying approach makes it suitable for handling
 trillions of data points. Most modern RDBMS work with Cube.js as well and can be
