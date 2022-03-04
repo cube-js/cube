@@ -4,7 +4,7 @@
     --color-primary-hover: rgba(250, 50, 110, 1);
     --color-primary-outline: rgba(255, 100, 146, 0.3);
 
-    --color-purple: rgba(102, 93, 232, 1);
+    --color-purple: rgba(122, 119, 255, 1);
     --color-purple-bright: rgba(107, 79, 238, 1);
     --color-purple-text: rgba(102, 93, 232, 1);
 
@@ -12,7 +12,7 @@
     --color-secondary-hover-bg: rgba(102, 93, 232, 0.08);
     --color-secondary-hover-border: rgba(122, 119, 255, 0.3);
     --color-secondary-outline: rgba(122, 119, 255, 0.6);
-    --color-secondary-active-border: rgba(122, 119, 255, 1);
+    --color-secondary-active-border: var(--color-purple);
 
 
     /* BLACK SHADOWS */
@@ -51,31 +51,33 @@
     --z-index-3: 10000;
 
     /* BREAKPOINTS */
+    /* DON'T REMOVE: USES AT JS  */
     --breakpoint-mobile-s: 480px;
     /* DON'T REMOVE: USES AT JS  */
     --breakpoint-desktop-xs: 880px;
-    /* DON'T REMOVE: USES AT JS  */
 
     /* ASSETS */
     --nav-font-color: var(--color-black-85);
     --nav-padding-mobile: 18px;
     --header-height: 65px;
     --overlay-height: calc(100vh - var(--header-height));
+    --border-grey: 1px solid var(--color-black-12);
+    --button-padding-horizontal: 16px;
 
     --menu-max-height: 400px;
     --menu-overflow-offset: 25px;
-    --menu-overflow-max-height: calc(var(--menu-max-height) + var(--menu-overflow-offset));
     /* DON'T REMOVE: USES AT JS  */
+    --menu-overflow-max-height: calc(var(--menu-max-height) + var(--menu-overflow-offset));
 
     /* SKELETON LOADER */
     --skeleton-base-color: var(--color-light-2);
     --skeleton-shine-color: var(--color-black-6);
     --skeleton-animation-duration: 3s;
     --skeleton-background-image: linear-gradient(90deg,
-     var(--color-black-0) 20%, 
-     var(--color-black-4) 55%, 
-     var(--color-black-0) 80%);
-     
+            var(--color-black-0) 20%,
+            var(--color-black-4) 55%,
+            var(--color-black-0) 80%);
+
 }
 
 *,
@@ -101,6 +103,11 @@
     font-family: Cera Pro Bold;
     src: url(https://static.cube.dev/fonts/CeraPro-Bold.woff2) format('woff2'),
         url(https://static.cube.dev/fonts/CeraPro-Bold.woff) format('woff');
+}
+
+@font-face {
+    font-family: Inter;
+    src: url(https://cube.dev/docs/static/Inter-Regular-e6e8bb3a4f2ded1c22ad5e6277f7d601.woff2) format('woff2');
 }
 
 @keyframes open {
@@ -204,9 +211,8 @@ ul {
     display: none;
 }
 
-.header.hide .nav-overlay,
+
 .header.open .nav-overlay {
-    display: block;
     animation-fill-mode: forwards;
 }
 
@@ -217,6 +223,7 @@ ul {
 }
 
 .header.open .nav-overlay {
+    display: block;
     animation-name: open;
     animation-duration: var(--time);
 }
@@ -250,6 +257,10 @@ ul {
 
 .header.open .nav {
     transform: none;
+}
+
+.nav .button{
+    padding-right: 0;
 }
 
 .nav-toggle {
@@ -395,7 +406,7 @@ ul {
     text-decoration: none;
     color: var(--color-black-85);
     font-size: var(--font-size-regular);
-    font-family: Cera Pro Medium, sans-serif;
+    font-family: Cera Pro, sans-serif;
     line-height: var(--line-height-regular);
     letter-spacing: var(--letter-spacing-regular);
     font-weight: 500;
@@ -472,6 +483,10 @@ ul {
 
     }
 
+    .nav .button{
+        padding-right: var(--button-padding-horizontal);
+    }
+
     .menu-list {
         list-style: none;
     }
@@ -533,6 +548,7 @@ ul {
     .dropdown-list-item>* {
         display: block;
         width: 100%;
+        font-family: Cera Pro Medium, sans-serif;
 
         padding: 12px 16px;
     }
@@ -620,14 +636,17 @@ ul {
 
 .button {
     display: inline-block;
-    padding: 7px 16px;
+    padding: 7px var(--button-padding-horizontal);
     border-radius: 8px;
 
+    font-family: Cera Pro;
     font-size: var(--font-size-regular);
     line-height: var(--line-height-regular);
     text-decoration: none;
     font-weight: 500;
 
+    outline: none;
+    border: none;
     background-color: transparent;
     transition: background-color var(--hover),
         border-color var(--hover),
@@ -635,32 +654,52 @@ ul {
     cursor: pointer;
 }
 
-.button.default {
-    color: var(--color-primary-default);
-
+.button.sm {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 14px;
 }
 
-.button.default:hover,
-.button.default:active {
+.button.primary {
+    color: var(--color-primary-default);
+}
+
+.button.primary:hover,
+.button.primary:active {
     color: var(--color-primary-hover);
 }
 
 @media only screen and (min-width: 880px) {
 
-    .button.default {
+    .button.primary {
         color: #fff;
         background-color: var(--color-primary-default);
     }
 
-    .button.default:hover,
-    .button.default:active {
+    .button.primary:hover,
+    .button.primary:active {
         color: #fff;
         background-color: var(--color-primary-hover);
     }
 }
 
-.button.default:focus-visible {
+.button.primary:focus-visible {
     outline: 3px solid var(--color-primary-outline);
+}
+
+.button.secondary {
+    color: #fff;
+    background-color: var(--color-purple);
+}
+
+.button.secondary:hover,
+.button.secondary:active {
+    color: #fff;
+    background-color: var(--color-purple-bright);
+}
+
+.button.secondary:focus-visible {
+    outline: 3px solid var(--color-secondary-outline);
 }
 
 .button.clear {
@@ -676,14 +715,37 @@ ul {
     outline: 3px solid var(--color-black-10);
 }
 
-.button.outline {
-    border: 1px solid var(--color-black-12);
+
+.button.outline:not(.dropdown-button) {
+    border: 1px solid var(--color-secondary-hover-border);
+    color: var(--color-purple-bright);
+}
+
+@media only screen and (min-width: 880px) {
+    .button.outline.dropdown-button {
+        border: var(--border-grey);
+        color: var(--color-black-100);
+        font-family: Cera Pro Medium;
+    }
 }
 
 .button.outline:hover {
     border-color: var(--color-secondary-hover-border);
     background-color: var(--color-secondary-hover-bg);
     color: var(--color-purple-bright);
+}
+
+.button.outline.dropdown-button:hover {
+    border: none;
+    background-color: transparent;
+}
+
+@media only screen and (min-width: 880px) {
+    .button.outline.dropdown-button:hover {
+        border: 1px solid var(--color-secondary-hover-border);
+        background-color: var(--color-secondary-hover-bg);
+        color: var(--color-purple-bright);
+    }
 }
 
 .button.outline[aria-expanded="true"] {
@@ -699,13 +761,13 @@ ul {
     stroke: currentColor;
 }
 
-
-.feedback-block {
+.feedback {
     position: fixed;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    min-width: 360px;
+    width: 370px;
+    max-width: 100%;
     min-height: 46px;
 
     font-size: 14px;
@@ -714,21 +776,30 @@ ul {
     line-height: 1.4;
     letter-spacing: var(--letter-spacing-regular);
 
-    padding: 8px;
+    /* padding: 12px 18px 16px 24px; */
+    padding: 12px 8px 12px 24px;
     background-color: #fff;
     box-shadow: 0px 8px 16px var(--color-black-7);
     border-radius: 8px;
 
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
 
-.feedback {
-    padding-left: 24px;
+.feedback-block {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media only screen and (min-width: 880px) {
+    .feedback-block {
+        justify-content: space-between;
+    }
 }
 
 .feedback-buttons {
@@ -751,7 +822,12 @@ ul {
     transition: background-color var(--hover);
 }
 
-.feedback-button:hover {
+.feedback-button:disabled,
+.feedback-button[disabled] {
+    opacity: 0.4;
+}
+
+.feedback-button:hover:not(:disabled) {
     cursor: pointer;
 }
 
@@ -759,20 +835,58 @@ ul {
     background-color: var(--color-success-default);
 }
 
-#feedback-like:hover,
-#feedback-like:active {
+#feedback-like:hover:not(:disabled),
+#feedback-like:active:not(:disabled) {
     background-color: var(--color-success-hover);
+}
+
+#feedback-like:focus-visible {
+    outline: 3px solid var(--color-success-hover);
 }
 
 #feedback-dislike {
     background-color: var(--color-danger-default);
 }
 
-#feedback-dislike:hover,
-#feedback-dislike:active {
+#feedback-dislike:hover:not(:disabled),
+#feedback-dislike:active:not(:disabled) {
     background-color: var(--color-danger-hover);
 }
 
+#feedback-dislike:focus-visible {
+    outline: 3px solid var(--color-danger-hover);
+}
+
 .feedback-button:not(:first-child) {
+    margin-left: 8px;
+}
+
+.form {
+    width: 100%;
+    margin-top: 18px;
+}
+
+.form-textarea {
+    font-family: Inter, sans-serif;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--color-black-85);
+
+    width: 100%;
+    min-height: 80px;
+    outline: transparent;
+    border: none;
+    background: #f6f6f8;
+    padding: 6px 10px;
+    resize: none;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.feedback-message-buttons {
+    display: flex;  /* use flex to remove gap between buttons */
+}
+
+.feedback-message-buttons .button:not(:first-child){
     margin-left: 8px;
 }

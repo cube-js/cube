@@ -106,9 +106,11 @@ navToggle.addEventListener('click', (e) => {
 })
 
 navOverlay.addEventListener("click", () => {
-    header.classList.remove('open');
-    header.classList.add('hide');
-    document.body.classList.toggle('noscroll')
+    if(header.classList.contains('open')) {
+        header.classList.remove('open');
+        header.classList.add('hide');
+        document.body.classList.toggle('noscroll')
+    }
 })
 
 window.addEventListener("resize", () => {
