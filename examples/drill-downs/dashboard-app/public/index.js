@@ -46,7 +46,8 @@ const populateExamplesNav = (data) => {
     // set such a height so that the user understands 
     // that it is possible to scroll down
     if (data.length > 7 && window.innerWidth >= minDesktopWidth) {
-        menuList.style.maxHeight = menuOverflowMaxHeight
+        // menuList.style.maxHeight = menuOverflowMaxHeight
+        menuList.classList.add("overflow")
     }
 
 }
@@ -126,11 +127,11 @@ window.addEventListener("resize", () => {
         // set such a height so that the user understands 
         // that it is possible to scroll down
         if (menuList.childNodes.length > 7) {
-            menuList.style.maxHeight = menuOverflowMaxHeight
+            menuList.classList.add("overflow")
         }
 
     }else{
-        menuList.css.maxHeight = 'auto'
+        menuList.classList.remove("overflow")
     }
 })
 
