@@ -1,5 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { expect } from '@jest/globals';
 import { DriverInterface, PreAggregations } from '@cubejs-backend/query-orchestrator';
 import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';

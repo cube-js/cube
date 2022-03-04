@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-backend/testing",
   "version": "0.29.30",
-  "description": "Cube.js Testing Helpers",
+  "description": "Cube.js e2e Tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "main": "dist/src/index.js",
