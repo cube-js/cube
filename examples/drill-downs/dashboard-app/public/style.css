@@ -184,10 +184,6 @@ ul {
     display: grid;
 }
 
-.app {
-    padding-bottom: 64px;
-}
-
 /* HEADER */
 
 .header {
@@ -259,7 +255,7 @@ ul {
     transform: none;
 }
 
-.nav .button{
+.nav .button {
     padding-right: 0;
 }
 
@@ -359,10 +355,7 @@ ul {
     text-overflow: ellipsis;
 }
 
-.dropdown-button.load,
-.dropdown-button.load:hover,
-.dropdown-button.load:active,
-.dropdown-button.load:focus-visible {
+.dropdown-button.load {
     min-width: 150px;
     background-image: var(--skeleton-background-image) !important;
     background-color: var(--skeleton-base-color) !important;
@@ -483,7 +476,7 @@ ul {
 
     }
 
-    .nav .button{
+    .nav .button {
         padding-right: var(--button-padding-horizontal);
     }
 
@@ -507,6 +500,7 @@ ul {
     .dropdown-button.load {
         border: none !important;
     }
+
 
     .dropdown-button span {
         margin-right: 8px;
@@ -721,7 +715,7 @@ ul {
 }
 
 @media only screen and (min-width: 880px) {
-    .button.outline.dropdown-button {
+    .button.outline.dropdown-button:not(.load) {
         border: var(--border-grey);
         color: var(--color-black-100);
         font-family: Cera Pro Medium;
@@ -766,7 +760,7 @@ ul {
     left: 50%;
     transform: translateX(-50%);
     width: 370px;
-    max-width: 100%;
+    max-width: 90%;
     min-height: 46px;
 
     font-size: 14px;
@@ -775,8 +769,7 @@ ul {
     line-height: 1.4;
     letter-spacing: var(--letter-spacing-regular);
 
-    /* padding: 12px 18px 16px 24px; */
-    padding: 12px 8px 12px 24px;
+    padding: 12px;
     background-color: #fff;
     box-shadow: 0px 8px 16px var(--color-black-7);
     border-radius: 8px;
@@ -785,6 +778,12 @@ ul {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+}
+
+@media only screen and (min-width: 880px) {
+    .feedback {
+        padding: 12px 8px 12px 24px;
+    }
 }
 
 .feedback-block {
@@ -883,9 +882,23 @@ ul {
 }
 
 .feedback-message-buttons {
-    display: flex;  /* use flex to remove gap between buttons */
+    display: flex;
+    /* use flex to remove gap between buttons */
 }
 
-.feedback-message-buttons .button:not(:first-child){
+.feedback-message-buttons .button:not(:first-child) {
     margin-left: 8px;
+}
+
+.footer {
+    background-color: #fff;
+    height: 120px;
+    justify-self: flex-end;
+}
+
+/* flex wrap at feedback block triggers at 414px and less */
+@media only screen and (min-width: 415px) {
+    .footer {
+        height: 100px;
+    }
 }
