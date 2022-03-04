@@ -74,6 +74,7 @@ function showThanks() {
 
 function showFeedbackMessageForm() {
     // update message form UI
+    feedbackMessageField.value=""
     feedbackMessageField.placeholder = feedbackMessagePlaceholder[feedback]
     feedbackMessageForm.classList.remove("d-none")
 }
