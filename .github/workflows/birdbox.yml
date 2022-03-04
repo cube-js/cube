@@ -123,12 +123,65 @@ jobs:
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
-          if [[ " athena bigquery " =~ " ${{ matrix.target }} " ]]; then
-            yarn run birdbox:${{ matrix.target }} --env-file=${TODO}/.env --mode=docker
-          else
-            yarn run dataset:minimal
-            yarn run birdbox:${{ matrix.target }}  
-          fi
+          yarn run dataset:minimal
+          yarn run birdbox:${{ matrix.target }}  
+      - name: Slack Failure
+        if: failure()
+        uses: voxmedia/github-action-slack-notify-build@v1
+        with:
+          channel: oss-ci
+          status: FAILED
+          color: danger
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  docker-cloud:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ 'athena', 'bigquery' ]
+        arch: [ '', '-alpine' ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          # npm cache files are stored in `~/.npm` on Linux/macOS
+          path: |
+            ~/.npm
+            node_modules
+            rust/cubestore/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-14.x-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Birdbox
+        run: |
+          cd packages/cubejs-testing/
+          export DEBUG=testcontainers
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
+          yarn run birdbox:${{ matrix.target }} --env-file=${TODO}/.env --mode=docker
       - name: Slack Failure
         if: failure()
         uses: voxmedia/github-action-slack-notify-build@v1
