@@ -520,6 +520,10 @@ ul {
         transform: translateY(-4px);
     }
 
+    .dropdown-content::-webkit-scrollbar{
+        width: 0;
+    }
+
     .dropdown-button[aria-expanded="true"]~.dropdown-content {
         display: block;
         top: 100%;
@@ -536,6 +540,7 @@ ul {
         max-height: var(--menu-max-height);
         clip: auto;
         overflow-y: auto;
+        scrollbar-width: thin;
         z-index: 9999;
     }
 
