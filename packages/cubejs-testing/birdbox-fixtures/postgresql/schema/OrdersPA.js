@@ -1,4 +1,4 @@
-cube(`Orders`, {
+cube(`OrdersPA`, {
   sql: `
     select 1 as id, 100 as amount, 'new' status
     UNION ALL
@@ -10,6 +10,21 @@ cube(`Orders`, {
     UNION ALL
     select 5 as id, 600 as amount, 'shipped' status
   `,
+
+  preAggregations: {
+    orderStatus: {
+      measures: [CUBE.totalAmount],
+      dimensions: [CUBE.status],
+      indexes: {
+        categoryIndex: {
+          columns: [CUBE.status],
+        },
+      },
+      refreshKey: {
+        every: `1 hour`,
+      }
+    },
+  },
 
   measures: {
     count: {
