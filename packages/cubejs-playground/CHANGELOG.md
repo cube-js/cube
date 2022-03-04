@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+
+### Bug Fixes
+
+* **playground:** auto size chart window ([#4042](https://github.com/cube-js/cube.js/issues/4042)) ([ee496b3](https://github.com/cube-js/cube.js/commit/ee496b33306bb2fafb3635add53d85ae05c7620f))
+* **playground:** prevent params to shift around when removing filters ([e3d17ae](https://github.com/cube-js/cube.js/commit/e3d17ae7b2b8340ee39ea6464773b2676dc5a9f6))
+
+
+### Features
+
+* **packages:** add QuestDB driver ([#4096](https://github.com/cube-js/cube.js/issues/4096)) ([de8823b](https://github.com/cube-js/cube.js/commit/de8823b524d372dd1d9b661e643d9d4664260b58))
+
+
+
+
+
 ## [0.29.26](https://github.com/cube-js/cube.js/compare/v0.29.25...v0.29.26) (2022-02-07)
 
 

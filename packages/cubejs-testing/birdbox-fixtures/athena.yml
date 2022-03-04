@@ -17,7 +17,7 @@ services:
       CUBEJS_REFRESH_WORKER: "false"
     volumes:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
-      - ./postgresql/schema/Orders.js:/cube/conf/schema/Orders.js
+      - ./postgresql/schema/OrdersPA.js:/cube/conf/schema/OrdersPA.js
     ports:
       - "4000:4000"
     restart: always

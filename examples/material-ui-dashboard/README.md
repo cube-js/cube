@@ -15,7 +15,7 @@ if you already have Cube.js Backend up and running you can skip this step.
 Let's start by setting up a database with some sample data. We'll use PostgresQL and our example e-commerce dataset for this tutorial. You can download and import it by running the following commands.
 
 ```
-$ curl http://cube.dev/downloads/ecom-dump.sql > ecom-dump.sql
+$ curl https://cube.dev/downloads/ecom-dump.sql > ecom-dump.sql
 $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```

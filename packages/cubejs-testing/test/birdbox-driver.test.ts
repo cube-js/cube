@@ -53,6 +53,7 @@ export function createDriverTestCase(type: string) {
                 extraEnv: {
                   CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
                   CUBEJS_EXTERNAL_DEFAULT: 'true',
+                  CUBEJS_ROLLUP_ONLY: 'true',
                 }
               }
             );
@@ -90,8 +91,8 @@ export function createDriverTestCase(type: string) {
     it('query', async () => {
       const response = await httpClient.load(
         {
-          measures: ['Orders.totalAmount'],
-          dimensions: ['Orders.status'],
+          measures: ['OrdersPA.totalAmount'],
+          dimensions: ['OrdersPA.status'],
         }
       );
       expect(response.rawData()).toMatchSnapshot('query');

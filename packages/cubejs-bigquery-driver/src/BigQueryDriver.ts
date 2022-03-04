@@ -259,6 +259,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       );
     }
 
+    await job.cancel();
+
     throw new Error(
       `BigQuery job timeout reached ${this.options.pollTimeout}ms`,
     );
