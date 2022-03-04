@@ -649,7 +649,6 @@ ul {
     border: none;
     background-color: transparent;
     transition: background-color var(--hover),
-        border-color var(--hover),
         color var(--hover);
     cursor: pointer;
 }
