@@ -130,7 +130,7 @@ window.addEventListener("resize", () => {
         }
 
     }else{
-        menuList.style.maxHeight = '100%'
+        menuList.css.maxHeight = 'auto'
     }
 })
 
