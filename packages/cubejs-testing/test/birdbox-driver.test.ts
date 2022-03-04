@@ -66,6 +66,7 @@ describe(name, () => {
               extraEnv: {
                 CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
                 CUBEJS_EXTERNAL_DEFAULT: 'true',
+                CUBEJS_ROLLUP_ONLY: 'true',
               }
             }
           );
@@ -103,8 +104,8 @@ describe(name, () => {
   it('Driver.query', async () => {
     const response = await httpClient.load(
       {
-        measures: ['Orders.totalAmount'],
-        dimensions: ['Orders.status'],
+        measures: ['OrdersPA.totalAmount'],
+        dimensions: ['OrdersPA.status'],
       }
     );
     // ../.. to move out of dist/test directory

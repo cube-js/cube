@@ -87,6 +87,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("create_table_with_csv", create_table_with_csv),
         t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
+        t(
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
         ),
@@ -1770,6 +1774,35 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
         .unwrap();
     let _ = service
         .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
