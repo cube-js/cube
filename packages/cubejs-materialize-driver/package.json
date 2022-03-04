@@ -1,0 +1,48 @@
+{
+  "name": "@cubejs-backend/materialize-driver",
+  "description": "Cube.js Materialize database driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.29.28",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-materialize-driver"
+  },
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "integration": "npm run integration:materialize",
+    "integration:materialize": "jest --verbose dist/test",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "dependencies": {
+    "@cubejs-backend/postgres-driver": "^0.29.28",
+    "@cubejs-backend/query-orchestrator": "^0.29.28",
+    "@cubejs-backend/shared": "^0.29.28",
+    "@types/pg": "^8.6.0",
+    "pg": "^8.6.0"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-backend/testing": "^0.29.28",
+    "typescript": "~4.1.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}
