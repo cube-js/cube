@@ -27,7 +27,7 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube.js Docs" />
+        <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
 
         <Row>
@@ -58,7 +58,7 @@ class IndexPage extends Component<Props> {
             <MainTab
               title="Data Schema"
               img={imgForDevs}
-              desc="Learn how to build Data Schemas for"
+              desc="Learn about data modeling and defining your metrics"
               to="/schema/getting-started"
             />
             <MainTab
@@ -79,7 +79,7 @@ class IndexPage extends Component<Props> {
             <MainTab
               title="Frontend"
               img={imgDashboards}
-              desc="Frontend libraries tutorials and API reference"
+              desc="Frontend libraries, tutorials, and API reference"
               to="/frontend-introduction"
               right
             />
