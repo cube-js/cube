@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-backend/testing": "^0.29.29",
+    "@cubejs-backend/testing-shared": "^0.29.29",
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"
   },
