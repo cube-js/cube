@@ -86,7 +86,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             create_table_with_location_invalid_digit,
         ),
         t("create_table_with_csv", create_table_with_csv),
-        t("create_table_with_csv_and_index", create_table_with_csv_and_index),
+        t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
         t(
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
@@ -1792,7 +1795,7 @@ async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
         apple,2
         banana,3
     "})
-        .unwrap();
+    .unwrap();
     let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
