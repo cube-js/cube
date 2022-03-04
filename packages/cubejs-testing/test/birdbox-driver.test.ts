@@ -66,6 +66,7 @@ describe(name, () => {
               extraEnv: {
                 CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
                 CUBEJS_EXTERNAL_DEFAULT: 'true',
+                CUBEJS_ROLLUP_ONLY: 'true',
               }
             }
           );
