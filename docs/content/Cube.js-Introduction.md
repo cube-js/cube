@@ -38,7 +38,7 @@ Cube has the necessary infrastructure and features to implement efficient data m
 **Cube acts as a data access layer**, translating API requests into SQL, managing caching, queuing, and database connection.
 
 The Cube accepts queries via REST, GraphQL or SQL interfaces. Based on the data model and an incoming query, Cube generates
-SQL query and executes it in your database. The server manages query generation, database connections, as well as caching and access control layers. The result is then sent back to the client.
+a SQL query and executes it in your database. Cube fully manages query orchestration, database connections, as well as caching and access control layers. The result is then sent back to the client.
 
 <div
   style="text-align: center"
