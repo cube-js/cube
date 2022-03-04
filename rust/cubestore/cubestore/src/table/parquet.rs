@@ -6,18 +6,71 @@ use arrow::record_batch::RecordBatch;
 use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
 use parquet::file::properties::{WriterProperties, WriterVersion};
 use parquet::file::reader::SerializedFileReader;
-use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::fs::File;
-use std::sync::Arc;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use parquet::file::footer;
+use parquet::file::metadata::ParquetMetaData;
+use parquet::file::serialized_reader::ParquetMetadataParser;
+use crate::config::injection::DIService;
+
+pub trait ParquetMetadataCache: DIService + Send + Sync + Debug + ParquetMetadataParser<File> {
+    fn into_parser(self: Arc<Self>) -> Arc<dyn ParquetMetadataParser<File>>;
+}
+
+#[derive(Debug)]
+pub struct ParquetMetadataCacheImpl {
+    cache: Mutex<lru::LruCache<String, parquet::errors::Result<ParquetMetaData>>>
+}
+
+crate::di_service!(ParquetMetadataCacheImpl, [ParquetMetadataCache]);
+
+impl ParquetMetadataCacheImpl {
+    pub fn new(capacity: usize) -> Arc<ParquetMetadataCacheImpl> {
+        Arc::new(ParquetMetadataCacheImpl {
+            cache: Mutex::new(lru::LruCache::new(capacity)),
+        })
+    }
+}
+
+impl ParquetMetadataParser<File> for ParquetMetadataCacheImpl {
+    fn parse(&self, reader: &File) -> parquet::errors::Result<ParquetMetaData> {
+        let key = "TODO".to_string();
+        {
+            let mut cache = self.cache.lock().unwrap();
+            let result = cache.get(&key);
+            if let Some(result) = result {
+                return result.clone()
+            }
+        }
+        let result = footer::parse_metadata(reader);
+        {
+            let mut cache = self.cache.lock().unwrap();
+            cache.put(key, result.clone());
+        }
+        result
+    }
+}
+
+impl ParquetMetadataCache for ParquetMetadataCacheImpl {
+    fn into_parser(self: Arc<Self>) -> Arc<dyn ParquetMetadataParser<File>> {
+        self
+    }
+}
 
 pub struct ParquetTableStore {
     table: Index,
     row_group_size: usize,
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>
 }
 
 impl ParquetTableStore {
-    pub fn read_columns(&self, file: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let mut r = ParquetFileArrowReader::new(Arc::new(SerializedFileReader::try_from(file)?));
+    pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
+        println!("read_columns {:?}", path);
+        let file = File::open(Path::new(&path))?;
+        let parser: Arc<dyn ParquetMetadataParser<File>> = self.parquet_metadata_cache.clone().into_parser();
+        let mut r = ParquetFileArrowReader::new(Arc::new(SerializedFileReader::new2(file, Some(parser))?));
         let mut batches = Vec::new();
         for b in r.get_record_reader(self.row_group_size)? {
             batches.push(b?)
@@ -27,10 +80,11 @@ impl ParquetTableStore {
 }
 
 impl ParquetTableStore {
-    pub fn new(table: Index, row_group_size: usize) -> ParquetTableStore {
+    pub fn new(table: Index, row_group_size: usize, parquet_metadata_cache: Arc<dyn ParquetMetadataCache>) -> ParquetTableStore {
         ParquetTableStore {
             table,
             row_group_size,
+            parquet_metadata_cache,
         }
     }
 
@@ -80,7 +134,7 @@ mod tests {
     use crate::metastore::{Column, ColumnType, Index};
     use crate::store::{compaction, ROW_GROUP_SIZE};
     use crate::table::data::{cmp_row_key_heap, concat_record_batches, rows_to_columns, to_stream};
-    use crate::table::parquet::{arrow_schema, ParquetTableStore};
+    use crate::table::parquet::{arrow_schema, ParquetMetadataCacheImpl, ParquetTableStore};
     use crate::table::{Row, TableValue};
     use crate::util::decimal::Decimal;
     use arrow::array::{
@@ -124,7 +178,7 @@ mod tests {
         .unwrap();
 
         let dest_file = NamedTempFile::new().unwrap();
-        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE, ParquetMetadataCacheImpl::new(100));
 
         let data: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(vec![
@@ -212,6 +266,7 @@ mod tests {
             )
             .unwrap(),
             row_group_size: 10,
+            parquet_metadata_cache: ParquetMetadataCacheImpl::new(100)
         };
         let file = NamedTempFile::new().unwrap();
         let file_name = file.path().to_str().unwrap();
@@ -271,7 +326,7 @@ mod tests {
         let count_min = compaction::write_to_files(
             to_stream(to_split_batch).await,
             to_split.len(),
-            ParquetTableStore::new(store.table.clone(), store.row_group_size),
+            ParquetTableStore::new(store.table.clone(), store.row_group_size, ParquetMetadataCacheImpl::new(100)),
             vec![split_1.to_string(), split_2.to_string()],
         )
         .await
@@ -322,7 +377,7 @@ mod tests {
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
-            let store = ParquetTableStore::new(index.clone(), NUM_ROWS);
+            let store = ParquetTableStore::new(index.clone(), NUM_ROWS, ParquetMetadataCacheImpl::new(100));
             store
                 .write_data(
                     tmp_file.path().to_str().unwrap(),
@@ -378,7 +433,7 @@ mod tests {
 
         let data = rows_to_columns(&index.columns(), &rows);
 
-        let w = ParquetTableStore::new(index.clone(), NUM_ROWS);
+        let w = ParquetTableStore::new(index.clone(), NUM_ROWS, ParquetMetadataCacheImpl::new(100));
         w.write_data(file, data.clone()).unwrap();
         let r = concat_record_batches(&w.read_columns(file).unwrap());
         assert_eq_columns!(r.columns(), &data);

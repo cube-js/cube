@@ -27,7 +27,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, ParquetTableStore};
+use crate::table::parquet::{arrow_schema, ParquetMetadataCache, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
@@ -160,6 +160,7 @@ pub struct ChunkStore {
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
     config: Arc<dyn ConfigObj>,
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
@@ -283,15 +284,17 @@ impl ChunkStore {
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
         config: Arc<dyn ConfigObj>,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            chunk_size,
             config,
+            parquet_metadata_cache,
             memory_chunks: RwLock::new(HashMap::new()),
+            chunk_size,
         };
 
         Arc::new(store)
@@ -468,8 +471,9 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk).await?;
+            let parquet_metadata_cache = self.parquet_metadata_cache.clone();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, parquet_metadata_cache);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -531,6 +535,7 @@ mod tests {
     use rocksdb::{Options, DB};
     use std::fs;
     use std::path::PathBuf;
+    use crate::table::parquet::ParquetMetadataCacheImpl;
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -631,11 +636,13 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let parquet_metadata_cache = ParquetMetadataCacheImpl::new(100);
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                parquet_metadata_cache,
                 10,
             );
 
@@ -810,8 +817,9 @@ impl ChunkStore {
             let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
             let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
             let local_file_copy = local_file.clone();
+            let parquet_metadata_cache = self.parquet_metadata_cache.clone();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, parquet_metadata_cache);
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

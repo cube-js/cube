@@ -1474,6 +1474,7 @@ mod tests {
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use regex::Regex;
+    use crate::table::parquet::ParquetMetadataCacheImpl;
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1491,6 +1492,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let parquet_metadata_cache = ParquetMetadataCacheImpl::new(100);
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let store = ChunkStore::new(
@@ -1498,6 +1500,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                parquet_metadata_cache,
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1552,6 +1555,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                ParquetMetadataCacheImpl::new(100),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));

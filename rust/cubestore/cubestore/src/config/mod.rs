@@ -25,6 +25,7 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::table::parquet::{ParquetMetadataCache, ParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
@@ -342,6 +343,8 @@ pub trait ConfigObj: DIService {
 
     fn max_cached_queries(&self) -> usize;
 
+    fn max_cached_metadata(&self) -> usize;
+
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
@@ -382,6 +385,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
+    pub max_cached_metadata: usize,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -513,6 +517,7 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
+    fn max_cached_metadata(&self) -> usize { self.max_cached_metadata }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
@@ -659,6 +664,7 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 10_000),
             }),
         }
     }
@@ -707,6 +713,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                max_cached_metadata: 10_000,
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
@@ -977,6 +984,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -985,8 +993,19 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn ParquetMetadataCache, _, _, _>(async move |i| {
+                ParquetMetadataCacheImpl::new(
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .max_cached_metadata(),
+                )
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
                 CompactionServiceImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
