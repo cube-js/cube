@@ -18,4 +18,8 @@ export class MaterializeDriver extends PostgresDriver {
 
     await this.loadUserDefinedTypes(conn);
   }
+
+  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+    // Not supported yet: https://github.com/MaterializeInc/materialize/issues/2157
+  }
 }

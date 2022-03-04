@@ -75,7 +75,8 @@ export type DatabaseType =
   | 'redshift'
   | 'snowflake'
   | 'sqlite'
-  | 'questdb';
+  | 'questdb'
+  | 'materialize';
 
 export type ContextToAppIdFn = (context: RequestContext) => string;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
