@@ -4,7 +4,6 @@ import { DriverInterface, PreAggregations } from '@cubejs-backend/query-orchestr
 import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import dedent from 'dedent';
-import dotenv from '@cubejs-backend/dotenv';
 import { Readable } from 'stream';
 
 export interface DriverTestsOptions {
@@ -22,12 +21,6 @@ export class DriverTests {
     public readonly driver: DriverInterface,
     private readonly options: DriverTestsOptions = {}
   ) {
-  }
-
-  public static config() {
-    if ('CUBEJS_TEST_ENV' in process.env) {
-      dotenv.config({ path: process.env.CUBEJS_TEST_ENV });
-    }
   }
 
   public release(): Promise<void> {

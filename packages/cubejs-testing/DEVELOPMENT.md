@@ -16,10 +16,10 @@ Run integration tests:
 
 ```shell
 $ cd packages/cubejs-athena-driver
-$ CUBEJS_TEST_ENV=${HOME}/.env yarn test
+$ env $(cat ~/.env | xargs) yarn test
 
 $ cd packages/cubejs-bigquery-driver
-$ CUBEJS_TEST_ENV=${HOME}/.env yarn test
+$ env $(cat ~/.env | xargs) yarn test
 ```
 
 Run e2e tests:
@@ -27,11 +27,11 @@ Run e2e tests:
 ```shell
 $ cd packages/cubejs-testing
 
-$ yarn birdbox:athena --env-file=${HOME}/.env --mode=local
-$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=local
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=local
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=local
 
-$ yarn birdbox:athena --env-file=${HOME}/.env --mode=docker
-$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=docker
+$ env $(cat ~/.env | xargs) yarn birdbox:athena --mode=docker
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=docker
 ```
 
 ### Run Cypress tests

@@ -13,7 +13,7 @@ import { getLocalHostnameByOs } from './utils';
 export interface BirdBoxTestCaseOptions {
   name: string;
   loadScript?: string;
-  envFile?: string;
+  env?: Record<string, string>;
 }
 
 export interface BirdBox {
@@ -66,10 +66,9 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     composeFile
   );
 
-  if (options.envFile) {
-    const env = dotenv.parse(fs.readFileSync(options.envFile));
-    for (const k of Object.keys(env)) {
-      dc = dc.withEnv(k, env[k]);
+  if (options.env) {
+    for (const k of Object.keys(options.env)) {
+      dc = dc.withEnv(k, options.env[k]);
     }
   }
 
@@ -147,8 +146,7 @@ export interface StartCliWithEnvOptions {
   useCubejsServerBinary?: boolean;
   loadScript?: string;
   cubejsConfig?: string;
-  extraEnv?: Record<string, string>;
-  envFile?: string;
+  env?: Record<string, string>;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -224,14 +222,10 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
         CUBEJS_DB_TYPE: options.dbType === 'postgresql' ? 'postgres' : options.dbType,
         CUBEJS_DEV_MODE: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
-        ...options.extraEnv
-          ? options.extraEnv
-          : {
-            CUBEJS_WEB_SOCKETS: 'true',
-            CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-          },
-        ...options.envFile
-          ? dotenv.parse(fs.readFileSync(options.envFile))
+        CUBEJS_WEB_SOCKETS: 'true',
+        CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+        ...options.env
+          ? options.env
           : {
             CUBEJS_DB_HOST: db!.getHost(),
             CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,

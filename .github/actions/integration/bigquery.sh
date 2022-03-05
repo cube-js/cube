@@ -5,5 +5,5 @@ set -eo pipefail
 export DEBUG=testcontainers
 
 echo "::group::BigQuery [cloud]"
-CUBEJS_TEST_ENV=${TODO}/.env yarn lerna run --concurrency 1 --stream --no-prefix integration:bigquery
+yarn lerna run --concurrency 1 --stream --no-prefix integration:bigquery
 echo "::endgroup::"
