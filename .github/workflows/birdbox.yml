@@ -177,11 +177,19 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox
+        env:
+          CUBEJS_DB_BQ_PROJECT_ID: ${{ secrets.CUBEJS_DB_BQ_PROJECT_ID }}
+          CUBEJS_DB_BQ_EXPORT_BUCKET: ${{ secrets.CUBEJS_DB_BQ_EXPORT_BUCKET }}
+          CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
+          CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
+          CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+          CUBEJS_AWS_REGION: ${{ secrets.CUBEJS_AWS_REGION }}
+          CUBEJS_AWS_S3_OUTPUT_LOCATION: ${{ secrets.CUBEJS_AWS_S3_OUTPUT_LOCATION }}
         run: |
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
-          yarn run birdbox:${{ matrix.target }} --env-file=${TODO}/.env --mode=docker
+          yarn run birdbox:${{ matrix.target }} --mode=docker
       - name: Slack Failure
         if: failure()
         uses: voxmedia/github-action-slack-notify-build@v1

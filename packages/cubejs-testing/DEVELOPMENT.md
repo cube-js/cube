@@ -16,10 +16,10 @@ Run integration tests:
 
 ```shell
 $ cd packages/cubejs-athena-driver
-$ CUBEJS_TEST_ENV=${HOME}/.env yarn test
+$ env $(cat ~/.env | xargs) yarn test
 
 $ cd packages/cubejs-bigquery-driver
-$ CUBEJS_TEST_ENV=${HOME}/.env yarn test
+$ env $(cat ~/.env | xargs) yarn test
 ```
 
 Run e2e tests:
