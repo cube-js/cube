@@ -1,3 +1,4 @@
+import R from 'ramda';
 import yargs from 'yargs/yargs';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { CubejsApi } from '@cubejs-client/core';
@@ -9,7 +10,6 @@ const SERVER_MODES = ['cli', 'docker', 'local'];
 type ServerMode = typeof SERVER_MODES[number];
 
 interface Args {
-  envFile: string
   mode: ServerMode
 }
 
@@ -17,12 +17,6 @@ const args: Args = yargs(process.argv.slice(2))
   .exitProcess(false)
   .options(
     {
-      envFile: {
-        alias: 'env-file',
-        demandOption: true,
-        describe: 'path to .env file with db config & auth env variables',
-        type: 'string',
-      },
       mode: {
         choices: SERVER_MODES,
         default: 'docker',
@@ -32,12 +26,25 @@ const args: Args = yargs(process.argv.slice(2))
   )
   .argv as Args;
 
-export function createDriverTestCase(type: string) {
+export function createDriverTestCase(type: string, envVars: string[]) {
   describe(type, () => {
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
     let httpClient: CubejsApi;
+    let env = R.fromPairs(envVars.map(k => {
+      const v = process.env[k];
+      if (v === undefined) {
+        throw new Error(`${k} is required`);
+      }
+      return [k, v];
+    }));
+    env = {
+      ...env,
+      CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
+      CUBEJS_EXTERNAL_DEFAULT: 'true',
+      CUBEJS_ROLLUP_ONLY: 'true',
+    };
 
     beforeAll(async () => {
       try {
@@ -49,12 +56,7 @@ export function createDriverTestCase(type: string) {
                 cubejsConfig: 'single/cube.js',
                 dbType: type,
                 useCubejsServerBinary: args.mode === 'local',
-                envFile: args.envFile,
-                extraEnv: {
-                  CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
-                  CUBEJS_EXTERNAL_DEFAULT: 'true',
-                  CUBEJS_ROLLUP_ONLY: 'true',
-                }
+                env,
               }
             );
             break;
@@ -64,7 +66,7 @@ export function createDriverTestCase(type: string) {
             birdbox = await startBirdBoxFromContainer(
               {
                 name: type,
-                envFile: args.envFile
+                env
               }
             );
             break;

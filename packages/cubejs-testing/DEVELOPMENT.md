@@ -27,11 +27,11 @@ Run e2e tests:
 ```shell
 $ cd packages/cubejs-testing
 
-$ yarn birdbox:athena --env-file=${HOME}/.env --mode=local
-$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=local
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=local
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=local
 
-$ yarn birdbox:athena --env-file=${HOME}/.env --mode=docker
-$ yarn birdbox:bigquery --env-file=${HOME}/.env --mode=docker
+$ env $(cat ~/.env | xargs) yarn birdbox:athena --mode=docker
+$ env $(cat ~/.env | xargs) yarn birdbox:bigquery --mode=docker
 ```
 
 ### Run Cypress tests
