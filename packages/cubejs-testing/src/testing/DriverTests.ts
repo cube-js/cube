@@ -5,7 +5,7 @@ import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import dedent from 'dedent';
 import dotenv from '@cubejs-backend/dotenv';
-import { Readable } from "stream";
+import { Readable } from 'stream';
 
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.

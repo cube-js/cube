@@ -44,3 +44,5 @@ serde = "1.0.115"
 serde_derive = "1.0.115"
 tokio = { version = "1.0", features = ["full", "rt"] }
 futures-timer = "3.0.2"
+indoc = "1.0"
+tempfile = "3.2.0"

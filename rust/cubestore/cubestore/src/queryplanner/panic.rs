@@ -103,7 +103,6 @@ impl ExecutionPlan for PanicWorkerExec {
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         assert_eq!(partition, 0);
         panic!("worker panic")
-        // Err(DataFusionError::Internal("PANIC".to_string()))
     }
 }
 

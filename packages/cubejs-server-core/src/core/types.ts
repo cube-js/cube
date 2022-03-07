@@ -74,7 +74,8 @@ export type DatabaseType =
   | 'prestodb'
   | 'redshift'
   | 'snowflake'
-  | 'sqlite';
+  | 'sqlite'
+  | 'questdb';
 
 export type ContextToAppIdFn = (context: RequestContext) => string;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string;

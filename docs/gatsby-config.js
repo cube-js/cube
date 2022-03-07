@@ -6,7 +6,7 @@ const PACKAGE_VERSION = require('../lerna.json').version;
 
 const config = {
   siteMetadata: {
-    title: 'Cube.js Docs',
+    title: 'Cube Docs',
     siteUrl: `https://cube.dev`,
   },
   pathPrefix: process.env.PATH_PREFIX,

@@ -1,3 +1,4 @@
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -8,6 +9,7 @@ use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
 use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -84,6 +86,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             create_table_with_location_invalid_digit,
         ),
         t("create_table_with_csv", create_table_with_csv),
+        t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
         t(
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
@@ -1755,12 +1761,48 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION './data/csv.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
@@ -1777,12 +1819,18 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
 }
 
 async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS test")
         .await
         .unwrap();
     let _ = service
-        .exec_query("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION './data/csv_no_header.csv'")
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service

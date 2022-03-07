@@ -420,6 +420,6 @@ export class BaseDriver {
   }
 
   nowTimestamp() {
-    return new Date().getTime();
+    return Date.now();
   }
 }

@@ -11,6 +11,7 @@ import logoMssql from '../img/db/mssql.svg';
 import logoBigquery from '../img/db/bigquery.svg';
 import logoMongodb from '../img/db/mongodb.svg';
 import logoDruid from '../img/db/druid.svg';
+import logoQuestdb from '../img/db/questdb.svg';
 
 const BASE_SERVER = [
   { env: 'CUBEJS_DB_HOST', title: 'Hostname' },
@@ -33,6 +34,7 @@ const envVarsDbMap = [
       { title: 'ClickHouse', driver: 'clickhouse', logo: logoClickhouse },
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
+      { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
   },

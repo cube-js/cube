@@ -235,7 +235,7 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => cube.config.name === cubeName);
   if (!cubeConfig) return undefined;
 
-  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[`${memberType}s`]
+  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}`) !== -1
   ));
 }

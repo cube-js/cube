@@ -201,6 +201,14 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+    
+    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      await this.sql({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
