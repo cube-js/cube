@@ -30,6 +30,14 @@ class IndexPage extends Component<Props> {
         <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
 
+<InfoBox>
+
+        The advanced pre-aggregations workshop is on March 30th at 9-10:30 am PT! Following our <a href="https://cube.dev/events/pre-aggregations/">first pre-aggregations workshop</a> in August, this workshop will cover more advanced use cases.
+        <br />
+        You can register for the workshop at <a href="https://cube.dev/events/adv-pre-aggregations/">the event page</a>.
+
+        </InfoBox>
+
         <Row>
           <Col span={24}>
             <p>

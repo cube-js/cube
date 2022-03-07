@@ -5,6 +5,14 @@ category: Caching
 menuOrder: 2
 ---
 
+<InfoBox>
+
+The Advanced Pre-aggregations Workshop is on March 30th at 9-10:30 am PT! Following our [first pre-aggregations workshop](https://cube.dev/events/pre-aggregations/) in August, this workshop will cover more advanced use cases.
+
+You can register for the workshop at [the event page](https://cube.dev/events/adv-pre-aggregations/). 👈
+
+</InfoBox>
+
 Often at the beginning of an analytical application's lifecycle - when there is
 a smaller dataset that queries execute over - the application works well and
 delivers responses within acceptable thresholds. However, as the size of the
