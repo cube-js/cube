@@ -20,6 +20,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   secretAccessKey?: string
   workGroup?: string
   S3OutputLocation?: string
+  exportBucket?: string
   pollTimeout?: number
   pollMaxInterval?: number
 }
@@ -63,9 +64,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       region: config.region || process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
       workGroup: config.workGroup || process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
-      ...config,
+      exportBucket: AthenaDriver.trimPath(config.exportBucket || getEnv('dbExportBucket')),
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
+      ...config,
     };
 
     this.athena = new Athena(this.config);
@@ -76,7 +78,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async isUnloadSupported() {
-    return this.config.S3OutputLocation !== undefined;
+    return this.config.exportBucket !== undefined;
   }
 
   public async testConnection() {
@@ -118,11 +120,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async unload(tableName: string): Promise<DownloadTableCSVData> {
-    if (this.config.S3OutputLocation === undefined) {
+    if (this.config.exportBucket === undefined) {
       throw new Error('Unload is not configured');
     }
 
-    const path = `${this.config.S3OutputLocation}/${tableName}`;
+    const path = `${this.config.exportBucket}/${tableName}`;
 
     const unloadSql = `
       UNLOAD (SELECT * FROM ${tableName})
@@ -303,6 +305,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
 
     return result;
+  }
+
+  public static trimPath(path: string) {
+    return path.replace(/\/+$/, '')
   }
 
   public static splitS3Path(path: string) {
