@@ -434,20 +434,54 @@ class BaseQuery {
     return `"${name}"`;
   }
 
+  /**
+   * Returns SQL query string.
+   * @returns {string}
+   */
   buildParamAnnotatedSql() {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
-      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+      const preAggregationForQuery =
+        this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery) {
-        const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
+        const {
+          multipliedMeasures,
+          regularMeasures,
+          cumulativeMeasures,
+        } = this.fullKeyQueryAggregateMeasures();
 
         if (!cumulativeMeasures.length) {
-          return this.preAggregations.rollupPreAggregation(preAggregationForQuery, this.measures, true);
+          return this.preAggregations.rollupPreAggregation(
+            preAggregationForQuery,
+            this.measures,
+            true,
+          );
         }
 
-        return this.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
+        return this.regularAndTimeSeriesRollupQuery(
+          regularMeasures,
+          multipliedMeasures,
+          cumulativeMeasures,
+          preAggregationForQuery,
+        );
       }
     }
-    return this.fullKeyQueryAggregate();
+    if (this.options.totalQuery) {
+      return this.countAllQuery(this.fullKeyQueryAggregate());
+    } else {
+      return this.fullKeyQueryAggregate();
+    }
+  }
+
+  /**
+   * Generate SQL query to calculate total number of rows of the
+   * specified SQL query.
+   * @param {string} sql
+   * @returns {string}
+   */
+  countAllQuery(sql) {
+    return `SELECT count(*) TOTAL_COUNT FROM (\n${
+      sql
+    }\n) ORIGINAL_SQL_QUERY`;
   }
 
   regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
@@ -486,6 +520,10 @@ class BaseQuery {
     return false;
   }
 
+  /**
+   * Returns an array of SQL query strings for the query.
+   * @returns {Array<string>}
+   */
   buildSqlAndParams() {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
@@ -497,7 +535,9 @@ class BaseQuery {
       this,
       () => this.cacheValue(
         ['buildSqlAndParams'],
-        () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql()),
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql()
+        ),
         { cache: this.queryCache }
       )
     );
@@ -578,8 +618,16 @@ class BaseQuery {
       this.groupByDimensionLimit();
   }
 
+  /**
+   * Returns SQL query string.
+   * @returns {string}
+   */
   fullKeyQueryAggregate() {
-    const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
+    const {
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+    } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
       return this.simpleQuery();
@@ -589,28 +637,44 @@ class BaseQuery {
 
     if (this.options.preAggregationQuery) {
       const allRegular = regularMeasures.concat(
-        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? null : measure)).filter(m => !!m)
+        cumulativeMeasures
+          .map(
+            ([multiplied, measure]) => (multiplied ? null : measure)
+          )
+          .filter(m => !!m)
       );
       const allMultiplied = multipliedMeasures.concat(
-        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? measure : null)).filter(m => !!m)
+        cumulativeMeasures
+          .map(
+            ([multiplied, measure]) => (multiplied ? measure : null)
+          )
+          .filter(m => !!m)
       );
-
       toJoin = (allRegular.length ? [
-        this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(allRegular))
+        this.withCubeAliasPrefix(
+          'main',
+          () => this.regularMeasuresSubQuery(allRegular),
+        )
       ] : [])
         .concat(
           R.pipe(
             R.groupBy(m => m.cube().name),
             R.toPairs,
             R.map(
-              ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+              ([keyCubeName, measures]) => this.withCubeAliasPrefix(
+                `${keyCubeName}_key`,
+                () => this.aggregateSubQuery(keyCubeName, measures),
+              )
             )
           )(allMultiplied)
         );
     } else {
       toJoin =
         (regularMeasures.length ? [
-          this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
+          this.withCubeAliasPrefix(
+            'main',
+            () => this.regularMeasuresSubQuery(regularMeasures),
+          ),
         ] : [])
           .concat(
             R.pipe(
@@ -620,34 +684,48 @@ class BaseQuery {
                 ([keyCubeName, measures]) => this
                   .withCubeAliasPrefix(
                     `${this.aliasName(keyCubeName)}_key`,
-                    () => this.aggregateSubQuery(keyCubeName, measures)
+                    () => this.aggregateSubQuery(
+                      keyCubeName,
+                      measures,
+                    )
                   )
               )
             )(multipliedMeasures)
           ).concat(
             R.map(
               ([multiplied, measure]) => this.withCubeAliasPrefix(
-                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+                `${
+                  this.aliasName(measure.measure.replace('.', '_'))
+                }_cumulative`,
                 () => this.overTimeSeriesQuery(
-                  multiplied ?
-                    (measures, filters) => this.aggregateSubQuery(measures[0].cube().name, measures, filters) :
-                    this.regularMeasuresSubQuery.bind(this),
+                  multiplied
+                    ? (measures, filters) => this.aggregateSubQuery(
+                      measures[0].cube().name,
+                      measures,
+                      filters,
+                    )
+                    : this.regularMeasuresSubQuery.bind(this),
                   measure,
-                  false
-                )
+                  false,
+                ),
               )
             )(cumulativeMeasures)
           );
     }
 
-    // Move regular measures to multiplied ones if there're same cubes to calculate.
-    // Most of the times it'll be much faster to calculate as there will be only single scan per cube
+    // Move regular measures to multiplied ones if there're same
+    // cubes to calculate. Most of the times it'll be much faster to
+    // calculate as there will be only single scan per cube.
     if (
       regularMeasures.length &&
       multipliedMeasures.length &&
       !cumulativeMeasures.length
     ) {
-      const cubeNames = R.pipe(R.map(m => m.cube().name), R.uniq, R.sortBy(R.identity));
+      const cubeNames = R.pipe(
+        R.map(m => m.cube().name),
+        R.uniq,
+        R.sortBy(R.identity),
+      );
       const regularMeasuresCubes = cubeNames(regularMeasures);
       const multipliedMeasuresCubes = cubeNames(multipliedMeasures);
       if (R.equals(regularMeasuresCubes, multipliedMeasuresCubes)) {
@@ -655,16 +733,28 @@ class BaseQuery {
           R.groupBy(m => m.cube().name),
           R.toPairs,
           R.map(
-            ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+            ([keyCubeName, measures]) => this.withCubeAliasPrefix(
+              `${keyCubeName}_key`,
+              () => this.aggregateSubQuery(keyCubeName, measures),
+            )
           )
         )(regularMeasures.concat(multipliedMeasures));
       }
     }
-
-    return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
+    return this.joinFullKeyQueryAggregate(
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+      toJoin,
+    );
   }
 
-  joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin) {
+  joinFullKeyQueryAggregate(
+    multipliedMeasures,
+    regularMeasures,
+    cumulativeMeasures,
+    toJoin,
+  ) {
     const renderedReferenceContext = {
       renderedReference: R.pipe(
         R.map(m => [m.measure, m.aliasName()]),

@@ -758,33 +758,39 @@ class ApiGateway {
     totalMap: Map<NormalizedQuery, NormalizedQuery>,
     totalQuery: any,
   ) {
-    const response = await this
-      .getAdapterApi(context)
-      .executeQuery({
-        ...sqlQuery,
-        query: sqlQuery.sql[0],
-        values: sqlQuery.sql[1],
+    const queries = [{
+      ...sqlQuery,
+      query: sqlQuery.sql[0],
+      values: sqlQuery.sql[1],
+      continueWait: true,
+      renewQuery: normalizedQuery.renewQuery,
+      requestId: context.requestId,
+      context
+    }];
+    if (normalizedQuery.total) {
+      const normalizedTotal =
+        totalMap.get(normalizedQuery) as NormalizedQuery;
+      queries.push({
+        ...totalQuery,
+        query: totalQuery.sql[0],
+        values: totalQuery.sql[1],
         continueWait: true,
-        renewQuery: normalizedQuery.renewQuery,
+        renewQuery: normalizedTotal.renewQuery,
         requestId: context.requestId,
         context
       });
-    if (normalizedQuery.total) {
-      const totalNormalized =
-        totalMap.get(normalizedQuery) as NormalizedQuery;
-      const total = await this
-        .getAdapterApi(context)
-        .executeQuery({
-          ...totalQuery,
-          query: totalQuery.sql[0],
-          values: totalQuery.sql[1],
-          continueWait: true,
-          renewQuery: totalNormalized.renewQuery,
-          requestId: context.requestId,
-          context
-        });
-      response.total = total.data.length;
     }
+    const [response, total] = await Promise.all(
+      queries.map(async (query) => {
+        const res = await this
+          .getAdapterApi(context)
+          .executeQuery(query);
+        return res;
+      })
+    );
+    response.total = normalizedQuery.total
+      ? total.data[0].total_count
+      : undefined;
     return response;
   }
 
@@ -878,8 +884,9 @@ class ApiGateway {
       normalizedQueries.forEach(nq => {
         if (nq.total) {
           const tq = structuredClone(nq);
-          tq.limit = 50000;
-          tq.rowLimit = 50000;
+          tq.totalQuery = true;
+          tq.limit = null;
+          tq.rowLimit = null;
           totalMap.set(nq, tq);
         }
       });
@@ -899,31 +906,34 @@ class ApiGateway {
 
       let slowQuery = false;
 
-      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
-        slowQuery = slowQuery || Boolean(sqlQueries[index].slowQuery);
+      const results = await Promise.all(
+        normalizedQueries.map(async (normalizedQuery, index) => {
+          slowQuery = slowQuery ||
+            Boolean(sqlQueries[index].slowQuery);
 
-        const annotation = prepareAnnotation(
-          metaConfigResult, normalizedQuery
-        );
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
+          );
 
-        const response = await this.getSqlResponseInternal(
-          context,
-          normalizedQuery,
-          sqlQueries[index],
-          totalMap,
-          totalQueries[index],
-        );
-        
-        return this.getResultInternal(
-          context,
-          queryType,
-          normalizedQuery,
-          sqlQueries[index],
-          annotation,
-          response,
-          resType,
-        );
-      }));
+          const response = await this.getSqlResponseInternal(
+            context,
+            normalizedQuery,
+            sqlQueries[index],
+            totalMap,
+            totalQueries[index],
+          );
+          
+          return this.getResultInternal(
+            context,
+            queryType,
+            normalizedQuery,
+            sqlQueries[index],
+            annotation,
+            response,
+            resType,
+          );
+        })
+      );
 
       this.log(
         {

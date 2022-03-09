@@ -59,6 +59,7 @@ interface Query {
   limit?: number;
   offset?: number;
   total?: boolean;
+  totalQuery?: boolean;
   order?: QueryOrderType;
   timezone?: string;
   renewQuery?: boolean;
