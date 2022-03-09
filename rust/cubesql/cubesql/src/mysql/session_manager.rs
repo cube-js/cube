@@ -10,14 +10,14 @@ use crate::CubeError;
 
 use super::{
     server_manager::ServerManager,
-    session::{Session, SessionDescriptor, SessionProcessList, SessionProperties, SessionState},
+    session::{Session, SessionProcessList, SessionProperties, SessionState},
 };
 
 #[derive(Debug)]
 pub struct SessionManager {
     // Sessions
     last_id: AtomicU32,
-    sessions: RwLockSync<HashMap<u32, SessionDescriptor>>,
+    sessions: RwLockSync<HashMap<u32, Arc<Session>>>,
     // Backref
     pub server: Arc<ServerManager>,
 }
@@ -42,6 +42,7 @@ impl SessionManager {
             state: Arc::new(SessionState::new(
                 connection_id,
                 host,
+                protocol,
                 SessionProperties::new(None, None),
                 None,
             )),
@@ -55,10 +56,7 @@ impl SessionManager {
             .expect("failed to unlock sessions for inserting session");
         guard.insert(
             connection_id,
-            SessionDescriptor {
-                protocol,
-                session: session_ref.clone(),
-            },
+            session_ref.clone()
         );
 
         session_ref
@@ -72,7 +70,7 @@ impl SessionManager {
 
         guard
             .values()
-            .map(SessionDescriptor::to_process_list)
+            .map(Session::to_process_list)
             .collect::<Vec<SessionProcessList>>()
     }
 

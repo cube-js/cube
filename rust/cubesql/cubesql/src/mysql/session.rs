@@ -16,9 +16,12 @@ impl SessionProperties {
 
 #[derive(Debug)]
 pub struct SessionState {
-    // connection id, it's immutable
+    // connection id, immutable
     pub connection_id: u32,
+    // client address, immutable
     pub host: String,
+    // client protocol, mysql/postgresql, immutable
+    pub protocol: String,
     // Connection properties
     properties: RwLockSync<SessionProperties>,
     // @todo Remove RWLock after split of Connection & SQLWorker
@@ -30,12 +33,14 @@ impl SessionState {
     pub fn new(
         connection_id: u32,
         host: String,
+        protocol: String,
         properties: SessionProperties,
         auth_context: Option<AuthContext>,
     ) -> Self {
         Self {
             connection_id,
             host,
+            protocol,
             properties: RwLockSync::new(properties),
             auth_context: RwLockSync::new(auth_context),
         }
@@ -99,18 +104,12 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-#[derive(Debug)]
-pub struct SessionDescriptor {
-    pub(crate) protocol: String,
-    pub(crate) session: Arc<Session>,
-}
-
-impl SessionDescriptor {
-    pub fn to_process_list(&self) -> SessionProcessList {
+impl Session {
+    pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
         SessionProcessList {
-            id: self.session.state.connection_id,
-            host: self.session.state.host.clone(),
-            user: self.session.state.user(),
+            id: self.state.connection_id,
+            host: self.state.host.clone(),
+            user: self.state.user(),
         }
     }
 }

@@ -35,9 +35,8 @@ classDiagram
     }
 
     ServerManager <|-- SessionManager
-    SessionDescriptor <|-- SessionManager
     class SessionManager{
-        +Session[] sessions
+        +HashMap<u32, Session> sessions
         +create_session() Session
         +drop_session() void
         +process_list() Vec<SessionProcessList>
@@ -45,12 +44,6 @@ classDiagram
 
     Session <|-- MysqlConnection
     Session <|-- PostgresConnection
-
-    Session <|-- SessionDescriptor
-    class SessionDescriptor{
-        +String protocol
-        +Session session
-    }
 
     class Session {
         +SessionState state
