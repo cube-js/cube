@@ -3,7 +3,7 @@ import { BaseQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-b
 import { StartedTestContainer } from 'testcontainers';
 import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
-import { createCubeSchema } from '../utils';
+import { createCubeSchema } from './utils';
 
 export const prepareCompiler = (content: any, options?: any) => originalPrepareCompiler({
   localPath: () => __dirname,

@@ -104,8 +104,8 @@ describe(name, () => {
   it('Driver.query', async () => {
     const response = await httpClient.load(
       {
-        measures: ['OrdersPA.totalAmount'],
-        dimensions: ['OrdersPA.status'],
+        measures: ['OrdersPA.amount2', 'OrdersPA.amount'],
+        dimensions: ['OrdersPA.id2', 'OrdersPA.status2', 'OrdersPA.id', 'OrdersPA.status'],
       }
     );
     // ../.. to move out of dist/test directory
