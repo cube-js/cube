@@ -1,4 +1,4 @@
-import { createBirdBoxTestCase } from './events-only-test-case';
+import { createBirdBoxTestCase } from './driver-test-case';
 import { startBirdBoxFromContainer } from '../src';
 
 createBirdBoxTestCase('questdb', () => startBirdBoxFromContainer({
