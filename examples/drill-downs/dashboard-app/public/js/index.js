@@ -5,6 +5,8 @@ const minDesktopWidth = getComputedStyle(document.documentElement)
 const menuOverflowMaxHeight = getComputedStyle(document.documentElement)
                                 .getPropertyValue("--menu-overflow-max-height")
 
+const menuList = document.getElementById("menu-list")
+
 // dropdown menu functionality
 const dropdownMenuBtn = document.querySelector(".dropdown-button")
 const dropdownMenuList = document.querySelector(".menu-list")
