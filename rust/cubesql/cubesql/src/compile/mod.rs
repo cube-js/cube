@@ -18,7 +18,8 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
-use crate::mysql::{dataframe, ConnectionState};
+use crate::mysql::dataframe;
+use crate::mysql::session::SessionState;
 pub use crate::transport::ctx::*;
 use crate::transport::{TransportService, V1CubeMetaExt};
 use crate::CubeError;
@@ -1327,14 +1328,14 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 }
 
 struct QueryPlanner {
-    state: Arc<ConnectionState>,
+    state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     transport: Arc<dyn TransportService>,
 }
 
 impl QueryPlanner {
     pub fn new(
-        state: Arc<ConnectionState>,
+        state: Arc<SessionState>,
         meta: Arc<MetaContext>,
         transport: Arc<dyn TransportService>,
     ) -> Self {
@@ -1992,7 +1993,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
-    state: Arc<ConnectionState>,
+    state: Arc<SessionState>,
     transport: Arc<dyn TransportService>,
 ) -> CompilationResult<QueryPlan> {
     let planner = QueryPlanner::new(state, meta, transport);
@@ -2113,7 +2114,7 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
-    state: Arc<ConnectionState>,
+    state: Arc<SessionState>,
     transport: Arc<dyn TransportService>,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
@@ -2139,7 +2140,11 @@ mod tests {
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
 
-    use crate::mysql::{dataframe::batch_to_dataframe, AuthContext, ConnectionProperties};
+    use crate::mysql::{
+        dataframe::batch_to_dataframe,
+        session::{SessionProperties, SessionState},
+        AuthContext,
+    };
     use datafusion::execution::dataframe_impl::DataFrameImpl;
 
     use super::*;
@@ -2232,10 +2237,11 @@ mod tests {
         })
     }
 
-    fn get_test_connection_state() -> Arc<ConnectionState> {
-        Arc::new(ConnectionState::new(
+    fn get_test_connection_state() -> Arc<SessionState> {
+        Arc::new(SessionState::new(
             8,
-            ConnectionProperties::new(Some("ovr".to_string()), Some("db".to_string())),
+            "127.0.0.1".to_string(),
+            SessionProperties::new(Some("ovr".to_string()), Some("db".to_string())),
             Some(AuthContext {
                 access_token: "access_token".to_string(),
                 base_path: "base_path".to_string(),

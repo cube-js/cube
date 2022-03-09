@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::mysql::ConnectionState;
+use crate::mysql::session::SessionState;
 use crate::transport::TransportService;
 use crate::CubeError;
 
@@ -13,7 +13,7 @@ pub trait SqlService: Send + Sync {
     async fn plan(
         &self,
         query: &String,
-        state: Arc<ConnectionState>,
+        state: Arc<SessionState>,
         meta: Arc<MetaContext>,
     ) -> CompilationResult<QueryPlan>;
 }
@@ -29,7 +29,7 @@ impl SqlService for SqlAuthDefaultImpl {
     async fn plan(
         &self,
         query: &String,
-        state: Arc<ConnectionState>,
+        state: Arc<SessionState>,
         meta: Arc<MetaContext>,
     ) -> CompilationResult<QueryPlan> {
         convert_sql_to_cube_query(&query, meta, state, self.transport.clone())
