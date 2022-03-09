@@ -1,14 +1,14 @@
 cube(`OrdersPA`, {
   sql: `
-    select 1 as id, 100 as amount, 'new' as status2, 1 as id2, 100 as amount2, 'new' as status2
+    select 1 as id2, 100.1 as amount2, 'new' as status2, 1 as id, 100.1 as amount, 'new' as status
     UNION ALL
-    select 2 as id, 200 as amount, 'new' status, 2 as id2, 200 as amount2, 'new' as status2
+    select 2 as id2, 200.2 as amount2, 'new' as status2, 2 as id, 200.2 as amount, 'new' as status
     UNION ALL
-    select 3 as id, 300 as amount, 'processed' as status, 3 as id2, 300 as amount2, 'processed' as status2
+    select 3 as id2, 300.3 as amount2, 'processed' as status2, 3 as id, 300.3 as amount, 'processed' as status
     UNION ALL
-    select 4 as id, 500 as amount, 'processed' as status, 4 as id2, 500 as amount2, 'processed' as status2
+    select 4 as id2, 500.5 as amount2, 'processed' as status2, 4 as id, 500.5 as amount, 'processed' as status
     UNION ALL
-    select 5 as id, 600 as amount, 'shipped' as status, 5 as id2, 600 as amount2, 'shipped' as status2
+    select 5 as id2, 600.6 as amount2, 'shipped' as status2, 5 as id, 600.6 as amount, 'shipped' as status
   `,
 
   preAggregations: {
@@ -36,18 +36,19 @@ cube(`OrdersPA`, {
       type: `sum`,
     },
   },
+
   dimensions: {
     id: {
-      sql: 'id',
-      type: `string`,
+      sql: `id`,
+      type: `number`,
     },
     status: {
       sql: `status`,
       type: `string`,
     },
     id2: {
-      sql: 'id2',
-      type: `string`,
+      sql: `id2`,
+      type: `number`,
     },
     status2: {
       sql: `status`,

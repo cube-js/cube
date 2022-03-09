@@ -114,13 +114,12 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    const columns = await this.getColumns(TableName.split(tableName));
-    console.log('QQQ', JSON.stringify(columns, null, 4));
-
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
     const path = `${this.config.exportBucket}/${tableName}`;
 
     const unloadSql = `
-      UNLOAD (SELECT * FROM ${tableName})
+      UNLOAD (SELECT ${columns} FROM ${tableName})
       TO '${path}'
       WITH (format = 'TEXTFILE', field_delimiter = ',', compression='GZIP')
     `;
@@ -153,6 +152,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     return {
       csvFile,
+      types,
       csvNoHeader: true
     };
   }
