@@ -6,6 +6,11 @@ const menuList = document.getElementById("menu-list")
 const menuCurrent = document.getElementById("menu-current")
 const menuButton = document.getElementById("menu-button")
 
+// CSS
+const minDesktopWidth = getComputedStyle(document.documentElement)
+                            .getPropertyValue("--breakpoint-desktop-xs")
+                            .replace("px", "");
+
 // TODO: move credentials to env
 const cubejsApi = cubejs(
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NDY0ODI4NDl9.xxO5HFPrXMnTRFbF5vyNkpAgJGx04h-ZOJA-7O9uiIE',
