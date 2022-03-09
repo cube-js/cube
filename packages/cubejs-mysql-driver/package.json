@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-backend/testing-shared": "^0.29.31",
+    "@cubejs-backend/shared": "^0.29.29",
     "@types/generic-pool": "^3.1.9",
     "@types/jest": "^26.0.23",
     "jest": "^26.6.3",

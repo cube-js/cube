@@ -1,4 +1,4 @@
-import { QuestDBRunner } from '@cubejs-backend/testing-shared';
+import { QuestDBRunner } from '@cubejs-backend/shared';
 
 import { StartedTestContainer } from 'testcontainers';
 

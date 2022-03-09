@@ -3,8 +3,8 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
-import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
+import { pausePromise, PostgresDBRunner } from '@cubejs-backend/shared';
+import { getLocalHostnameByOs } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
 import dotenv from '@cubejs-backend/dotenv';
 
