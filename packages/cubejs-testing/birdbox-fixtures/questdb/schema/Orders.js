@@ -1,6 +1,6 @@
 cube(`Orders`, {
   sql: `
-  with x as (
+  with orders as (
     select 1 as id, 100 as amount, 'new' status
     UNION ALL
     select 2 as id, 200 as amount, 'new' status
@@ -11,7 +11,7 @@ cube(`Orders`, {
     UNION ALL
     select 5 as id, 600 as amount, 'shipped' status
   )
-  select * from x
+  select * from orders
   `,
   measures: {
     count: {
