@@ -25,8 +25,6 @@
   "scripts": {
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
     "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
