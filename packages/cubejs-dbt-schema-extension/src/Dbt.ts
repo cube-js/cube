@@ -19,7 +19,10 @@ type MetricDefinition = {
 
 type NodeDefinition = {
   // eslint-disable-next-line camelcase
-  relation_name: string;
+  relation_name?: string;
+  database?: string;
+  schema?: string;
+  name?: string;
 };
 
 type DbtManifest = {
@@ -162,7 +165,9 @@ export class Dbt extends AbstractExtension {
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       nodes: res.data.models.map(modelDef => ({
         [modelDef.uniqueId]: {
-          relation_name: `${modelDef.database}.${modelDef.schema}.${modelDef.name}`
+          database: modelDef.database,
+          schema: modelDef.schema,
+          name: modelDef.name,
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
     };
@@ -206,7 +211,7 @@ export class Dbt extends AbstractExtension {
         throw new UserError(`Model '${model}' is not found`);
       }
       const cubeDef = {
-        sql: () => `SELECT * FROM ${modelDef.relation_name}`,
+        sql: () => `SELECT * FROM ${modelDef.relation_name ? modelDef.relation_name : `${this.compiler.contextQuery().escapeColumnName(modelDef.database)}.${this.compiler.contextQuery().escapeColumnName(modelDef.schema)}.${this.compiler.contextQuery().escapeColumnName(modelDef.name)}`}`,
         fileName: manifestPath,
 
         measures: cubeDefs[model].metrics.map(metric => ({
