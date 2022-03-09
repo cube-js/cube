@@ -104,7 +104,6 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  tablesSchema: () => Promise<DatabaseStructure>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<({ table_name?: string, TABLE_NAME?: string })[]>;
   // Remove table from database
