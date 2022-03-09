@@ -626,7 +626,7 @@ ul {
     padding: 7px var(--button-padding-horizontal);
     border-radius: 8px;
 
-    font-family: Cera Pro;
+    font-family: inherit;
     font-size: var(--font-size-regular);
     line-height: var(--line-height-regular);
     text-decoration: none;
