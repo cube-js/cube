@@ -113,12 +113,12 @@ query LoadModels($jobId: Int!) {
 // - dbt Metrics types: https://docs.getdbt.com/docs/building-a-dbt-project/metrics, https://github.com/dbt-labs/dbt-core/issues/4071#issue-102758091
 // - Cube measure types: https://cube.dev/docs/schema/reference/types-and-formats#measures-types
 const dbtToCubeMetricTypeMap: Record<string, string> = {
-  'count': 'count',
-  'count_distinct': 'countDistinct',
-  'sum': 'sum',
-  'average': 'avg',
-  'min': 'min',
-  'max': 'max',
+  count: 'count',
+  count_distinct: 'countDistinct',
+  sum: 'sum',
+  average: 'avg',
+  min: 'min',
+  max: 'max',
 };
 
 function mapMetricType(dbtMetricType: string): string {
