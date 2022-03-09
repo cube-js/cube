@@ -19,7 +19,8 @@ services:
     links:
       - db
     volumes:
-      - ./postgresql/schema:/cube/conf/schema
+      - ./questdb/schema:/cube/conf/schema
+      - ./postgresql/dbt-project:/cube/conf/dbt-project
     ports:
       - "4000"
     restart: always
