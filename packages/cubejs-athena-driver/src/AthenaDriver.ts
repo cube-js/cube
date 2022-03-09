@@ -47,6 +47,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     const secretAccessKey = config.secretAccessKey || process.env.CUBEJS_AWS_SECRET;
 
     this.config = {
+      ...config,
       credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
       region: config.region || process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
@@ -54,7 +55,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       exportBucket: config.exportBucket || getEnv('dbExportBucket'),
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
-      ...config,
     };
     if (this.config.exportBucket) {
       this.config.exportBucket = AthenaDriver.trimS3Path(this.config.exportBucket);
