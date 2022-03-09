@@ -1,4 +1,4 @@
-import { MysqlDBRunner } from '@cubejs-backend/testing';
+import { MysqlDBRunner } from '@cubejs-backend/shared';
 
 import { StartedTestContainer } from 'testcontainers';
 import { createDriver } from './mysql.db.runner';
