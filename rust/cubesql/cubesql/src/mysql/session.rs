@@ -110,6 +110,7 @@ impl Session {
             id: self.state.connection_id,
             host: self.state.host.clone(),
             user: self.state.user(),
+            database: self.state.database(),
         }
     }
 }
@@ -119,4 +120,5 @@ pub struct SessionProcessList {
     pub id: u32,
     pub user: Option<String>,
     pub host: String,
+    pub database: Option<String>,
 }

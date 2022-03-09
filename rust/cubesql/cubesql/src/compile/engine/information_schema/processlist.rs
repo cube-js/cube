@@ -54,7 +54,13 @@ impl InformationSchemaProcesslistBuilder {
         }
 
         self.host.append_value(process_list.host).unwrap();
-        self.db.append_value("db").unwrap();
+
+        if let Some(database) = process_list.database {
+            self.db.append_value(database).unwrap();
+        } else {
+            self.db.append_null().unwrap();
+        }
+
         self.command.append_value("daemon").unwrap();
         self.time.append_value(0).unwrap();
         self.state.append_value("Waiting on empty queue").unwrap();
@@ -102,7 +108,7 @@ impl TableProvider for InfoSchemaProcesslistProvider {
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
             Field::new("ID", DataType::UInt32, false),
-            // @todo Null?
+            // @todo Null support?
             Field::new("USER", DataType::Utf8, true),
             Field::new("HOST", DataType::Utf8, false),
             Field::new("DB", DataType::Utf8, true),

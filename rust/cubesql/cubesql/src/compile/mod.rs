@@ -2139,7 +2139,6 @@ mod tests {
     use crate::mysql::{
         dataframe::batch_to_dataframe,
         server_manager::{ServerConfiguration, ServerManager},
-        session::{SessionProperties, SessionState},
         AuthContext, AuthenticateResponse, SqlAuthService,
     };
     use datafusion::execution::dataframe_impl::DataFrameImpl;
@@ -2264,7 +2263,7 @@ mod tests {
         impl SqlAuthService for TestSqlAuth {
             async fn authenticate(
                 &self,
-                user: Option<String>,
+                _user: Option<String>,
             ) -> Result<AuthenticateResponse, CubeError> {
                 Ok(AuthenticateResponse {
                     context: AuthContext {

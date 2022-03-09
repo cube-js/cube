@@ -54,10 +54,7 @@ impl SessionManager {
             .sessions
             .write()
             .expect("failed to unlock sessions for inserting session");
-        guard.insert(
-            connection_id,
-            session_ref.clone()
-        );
+        guard.insert(connection_id, session_ref.clone());
 
         session_ref
     }
