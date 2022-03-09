@@ -142,6 +142,8 @@ const schemaOptions = Joi.object().keys({
   sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
+  maxQueryCacheSize: Joi.number(),
+  maxQueryCacheAge: Joi.number(),
 });
 
 export default (options: any) => {

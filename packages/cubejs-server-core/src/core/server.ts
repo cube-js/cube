@@ -430,7 +430,9 @@ export class CubejsServerCore {
         jwkUrl: getEnv('jwkUrl'),
         claimsNamespace: getEnv('jwtClaimsNamespace'),
         ...opts.jwt,
-      }
+      },
+      maxQueryCacheSize: getEnv('maxQueryCacheSize'),
+      maxQueryCacheAge: getEnv('maxQueryCacheAge')
     };
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
@@ -757,7 +759,9 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
-      standalone: this.standalone
+      standalone: this.standalone,
+      maxQueryCacheSize: this.options.maxQueryCacheSize,
+      maxQueryCacheAge: this.options.maxQueryCacheAge,
     });
   }
 
