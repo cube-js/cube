@@ -2136,11 +2136,11 @@ mod tests {
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
 
-    use crate::mysql::{
+    use crate::{mysql::{
         dataframe::batch_to_dataframe,
         server_manager::{ServerConfiguration, ServerManager},
         AuthContext, AuthenticateResponse, SqlAuthService,
-    };
+    }, transport::TransportService};
     use datafusion::execution::dataframe_impl::DataFrameImpl;
 
     use super::*;
