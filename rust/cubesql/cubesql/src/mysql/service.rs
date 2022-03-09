@@ -28,7 +28,6 @@ use super::session::Session;
 use super::session_manager::SessionManager;
 
 use super::AuthContext;
-use super::SqlAuthService;
 
 #[derive(Debug)]
 struct PreparedStatements {

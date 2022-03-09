@@ -22,7 +22,7 @@ use crate::mysql::dataframe;
 use crate::mysql::session::{Session, SessionState};
 use crate::mysql::session_manager::SessionManager;
 pub use crate::transport::ctx::*;
-use crate::transport::{TransportService, V1CubeMetaExt};
+use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,

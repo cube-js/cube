@@ -2,25 +2,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::mysql::session::SessionState;
-use crate::transport::TransportService;
-use crate::CubeError;
+use crate::{mysql::session::Session, CubeError};
 
-use super::{CompilationResult, MetaContext, QueryPlan};
+use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
     async fn plan(
         &self,
         query: &String,
-        state: Arc<SessionState>,
         meta: Arc<MetaContext>,
+        session: Arc<Session>,
     ) -> CompilationResult<QueryPlan>;
 }
 
-pub struct SqlAuthDefaultImpl {
-    transport: Arc<dyn TransportService>,
-}
+pub struct SqlAuthDefaultImpl {}
 
 crate::di_service!(SqlAuthDefaultImpl, [SqlService]);
 
@@ -28,11 +24,10 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlService]);
 impl SqlService for SqlAuthDefaultImpl {
     async fn plan(
         &self,
-        _query: &String,
-        _state: Arc<SessionState>,
-        _meta: Arc<MetaContext>,
+        query: &String,
+        meta: Arc<MetaContext>,
+        session: Arc<Session>,
     ) -> CompilationResult<QueryPlan> {
-        // convert_sql_to_cube_query(&query, meta, state, self.transport.clone())
-        unimplemented!();
+        convert_sql_to_cube_query(&query, meta, session)
     }
 }
