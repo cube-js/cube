@@ -3,11 +3,11 @@ import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as stream from 'stream';
 import {
-  BaseDriver,
+  BaseDriver, DatabaseStructure,
   DownloadTableCSVData,
   DriverInterface,
   QueryOptions, StreamOptions,
-  StreamTableData
+  StreamTableData, TableName
 } from '@cubejs-backend/query-orchestrator';
 import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
@@ -31,19 +31,6 @@ export interface AthenaQueryId {
   QueryExecutionId: string;
 }
 
-interface AthenaTable {
-  schema: string
-  name: string
-}
-
-interface AthenaColumn {
-  name: string
-  type: string
-  attributes: string[]
-}
-
-type AthenaSchema = Record<string, Record<string, AthenaColumn[]>>;
-
 function applyParams(query: string, params: any[]): string {
   return SqlString.format(query, params);
 }
@@ -64,11 +51,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       region: config.region || process.env.CUBEJS_AWS_REGION,
       S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
       workGroup: config.workGroup || process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
-      exportBucket: AthenaDriver.trimPath(config.exportBucket || getEnv('dbExportBucket')),
+      exportBucket: config.exportBucket || getEnv('dbExportBucket'),
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
       ...config,
     };
+    if (this.config.exportBucket) {
+      this.config.exportBucket = AthenaDriver.trimS3Path(this.config.exportBucket);
+    }
 
     this.athena = new Athena(this.config);
   }
@@ -124,6 +114,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
+    const columns = await this.getColumns(TableName.split(tableName));
+    console.log('QQQ', JSON.stringify(columns, null, 4));
+
     const path = `${this.config.exportBucket}/${tableName}`;
 
     const unloadSql = `
@@ -164,7 +157,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async tablesSchema(): Promise<AthenaSchema> {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const tablesSchema = await super.tablesSchema();
     const viewsSchema = await this.viewsSchema(tablesSchema);
 
@@ -252,8 +245,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  protected async viewsSchema(tablesSchema: AthenaSchema): Promise<AthenaSchema> {
-    const isView = (table: AthenaTable) => !tablesSchema[table.schema]
+  protected async viewsSchema(tablesSchema: DatabaseStructure): Promise<DatabaseStructure> {
+    const isView = (table: TableName) => !tablesSchema[table.schema]
       || !tablesSchema[table.schema][table.name];
 
     const allTables = await this.getAllTables();
@@ -266,8 +259,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return this.mergeSchemas(arrViewsSchema);
   }
 
-  protected async getAllTables(): Promise<AthenaTable[]> {
-    const data = await this.query(
+  protected async getAllTables(): Promise<TableName[]> {
+    const rows = await this.query(
       `
         SELECT table_schema AS schema, table_name AS name
         FROM information_schema.tables
@@ -276,11 +269,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       []
     );
 
-    return data as AthenaTable[];
+    return rows as TableName[];
   }
 
-  protected async getColumns(table: AthenaTable): Promise<AthenaSchema> {
-    const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.schema}\`.\`${table.name}\``, []);
+  protected async getColumns(table: TableName): Promise<DatabaseStructure> {
+    const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.join()}\``, []);
 
     return {
       [table.schema]: {
@@ -292,8 +285,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  protected mergeSchemas(arrSchemas: AthenaSchema[]): AthenaSchema {
-    const result: AthenaSchema = {};
+  protected mergeSchemas(arrSchemas: DatabaseStructure[]): DatabaseStructure {
+    const result: DatabaseStructure = {};
 
     arrSchemas.forEach(schemas => {
       Object.keys(schemas).forEach(schema => {
@@ -307,8 +300,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return result;
   }
 
-  public static trimPath(path: string) {
-    return path.replace(/\/+$/, '')
+  public static trimS3Path(path: string) {
+    return path.replace(/\/+$/, '');
   }
 
   public static splitS3Path(path: string) {

@@ -104,7 +104,7 @@ describe(name, () => {
   it('Driver.query', async () => {
     const response = await httpClient.load(
       {
-        measures: ['OrdersPA.totalAmount'],
+        measures: ['OrdersPA.amount'],
         dimensions: ['OrdersPA.status'],
       }
     );
