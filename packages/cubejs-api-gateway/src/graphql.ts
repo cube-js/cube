@@ -333,6 +333,96 @@ function parseDates(result: any) {
   });
 }
 
+function getCubeQuery(metaConfig: any, infos: GraphQLResolveInfo, graphqlQuery: any) {
+  const { where, limit, offset, timezone, orderBy, renewQuery } = graphqlQuery;
+  const measures: string[] = [];
+  const dimensions: string[] = [];
+  const timeDimensions: any[] = [];
+  let filters: any[] = [];
+  const order: [string, 'asc' | 'desc'][] = [];
+  
+  if (where) {
+    filters = whereArgToQueryFilters(where);
+  }
+  
+  if (orderBy) {
+    Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
+      Object.entries<any>(members).forEach(([member, value]) => {
+        order.push([`${capitalize(cubeName)}.${member}`, value]);
+      });
+    });
+  }
+
+  getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
+    const cubeName = capitalize(cubeNode.name.value);
+    const orderByArg = getArgumentValue(cubeNode, 'orderBy');
+    // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
+    if (orderByArg) {
+      Object.keys(orderByArg).forEach(key => {
+        order.push([`${cubeName}.${key}`, orderByArg[key]]);
+      });
+    }
+
+    const whereArg = getArgumentValue(cubeNode, 'where');
+    if (whereArg) {
+      filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
+    }
+    
+    const inDateRangeFilters = {};
+    filters = filters.filter((f) => {
+      if (f.operator === 'inDateRange') {
+        inDateRangeFilters[f.member] = f.values;
+        return false;
+      }
+      
+      return true;
+    });
+
+    getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
+      const memberName = memberNode.name.value;
+      const memberType = getMemberType(metaConfig, cubeName, memberName);
+      const key = `${cubeName}.${memberName}`;
+
+      if (memberType === MemberType.MEASURES) {
+        measures.push(key);
+      } else if (memberType === MemberType.DIMENSIONS) {
+        const granularityNodes = getFieldNodeChildren(memberNode, infos);
+        if (granularityNodes.length > 0) {
+          granularityNodes.forEach(granularityNode => {
+            const granularityName = granularityNode.name.value;
+            if (granularityName === 'value') {
+              dimensions.push(key);
+            } else {
+              timeDimensions.push({
+                dimension: key,
+                granularity: granularityName,
+                ...(inDateRangeFilters[key] ? {
+                  dateRange: inDateRangeFilters[key],
+                } : null)
+              });
+            }
+          });
+        } else {
+          dimensions.push(`${cubeName}.${memberName}`);
+        }
+      }
+    });
+  });
+
+  const query = {
+    ...(measures.length && { measures }),
+    ...(dimensions.length && { dimensions }),
+    ...(timeDimensions.length && { timeDimensions }),
+    ...(Object.keys(order).length && { order }),
+    ...(limit && { limit }),
+    ...(offset && { offset }),
+    ...(timezone && { timezone }),
+    ...(filters.length && { filters }),
+    ...(renewQuery && { renewQuery }),
+  };
+  return query
+}
+
 export function makeSchema(metaConfig: any) {
   const types: any[] = [
     DateTimeScalar,
@@ -342,6 +432,19 @@ export function makeSchema(metaConfig: any) {
     OrderBy,
     TimeDimension
   ];
+  const cubeQueryArgs = {
+    where: arg({
+      type: 'RootWhereInput'
+    }),
+    limit: intArg(),
+    offset: intArg(),
+    timezone: stringArg(),
+    renewQuery: booleanArg(),
+    orderBy: arg({
+      type: 'RootOrderByInput'
+    }),
+  };
+  const queryType = QueryType.REGULAR_QUERY;
   
   function hasMembers(cube: any) {
     return cube.config.measures.length || cube.config.dimensions.length;
@@ -464,116 +567,43 @@ export function makeSchema(metaConfig: any) {
     }
   }));
 
+  types.push(objectType({
+    name: 'SQLQuery',
+    definition(t) {
+      t.nonNull.field('sql', { type: nonNull('String') });
+      metaConfig.forEach(cube => {
+        if (hasMembers(cube)) {
+          t.nullable.field(unCapitalize(cube.config.name), {
+            type: `${cube.config.name}Members`,
+            args: {
+              where: arg({
+                type: `${cube.config.name}WhereInput`
+              }),
+              orderBy: arg({
+                type: `${cube.config.name}OrderByInput`
+              }),
+            }
+          });
+        }
+      });
+    }
+  }));
+
   types.push(extendType({
     type: 'Query',
     definition(t) {
-      t.nonNull.field('cube', {
+      t.nullable.field('cube', {
         type: list(nonNull('Result')),
-        args: {
-          where: arg({
-            type: 'RootWhereInput'
-          }),
-          limit: intArg(),
-          offset: intArg(),
-          timezone: stringArg(),
-          renewQuery: booleanArg(),
-          orderBy: arg({
-            type: 'RootOrderByInput'
-          }),
-        },
-        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
-          const measures: string[] = [];
-          const dimensions: string[] = [];
-          const timeDimensions: any[] = [];
-          let filters: any[] = [];
-          const order: [string, 'asc' | 'desc'][] = [];
-          
-          if (where) {
-            filters = whereArgToQueryFilters(where);
-          }
-          
-          if (orderBy) {
-            Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
-              Object.entries<any>(members).forEach(([member, value]) => {
-                order.push([`${capitalize(cubeName)}.${member}`, value]);
-              });
-            });
-          }
+        args: cubeQueryArgs,
+        resolve: async (_, graphqlQuery, { req, apiGateway }, infos) => {
+          const query = getCubeQuery(metaConfig, infos, graphqlQuery);
 
-          getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
-            const cubeName = capitalize(cubeNode.name.value);
-            const orderByArg = getArgumentValue(cubeNode, 'orderBy');
-            // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
-            if (orderByArg) {
-              Object.keys(orderByArg).forEach(key => {
-                order.push([`${cubeName}.${key}`, orderByArg[key]]);
-              });
-            }
-
-            const whereArg = getArgumentValue(cubeNode, 'where');
-            if (whereArg) {
-              filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
-            }
-            
-            const inDateRangeFilters = {};
-            filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange') {
-                inDateRangeFilters[f.member] = f.values;
-                return false;
-              }
-              
-              return true;
-            });
-
-            getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
-              const memberName = memberNode.name.value;
-              const memberType = getMemberType(metaConfig, cubeName, memberName);
-              const key = `${cubeName}.${memberName}`;
-
-              if (memberType === MemberType.MEASURES) {
-                measures.push(key);
-              } else if (memberType === MemberType.DIMENSIONS) {
-                const granularityNodes = getFieldNodeChildren(memberNode, infos);
-                if (granularityNodes.length > 0) {
-                  granularityNodes.forEach(granularityNode => {
-                    const granularityName = granularityNode.name.value;
-                    if (granularityName === 'value') {
-                      dimensions.push(key);
-                    } else {
-                      timeDimensions.push({
-                        dimension: key,
-                        granularity: granularityName,
-                        ...(inDateRangeFilters[key] ? {
-                          dateRange: inDateRangeFilters[key],
-                        } : null)
-                      });
-                    }
-                  });
-                } else {
-                  dimensions.push(`${cubeName}.${memberName}`);
-                }
-              }
-            });
-          });
-
-          const query = {
-            ...(measures.length && { measures }),
-            ...(dimensions.length && { dimensions }),
-            ...(timeDimensions.length && { timeDimensions }),
-            ...(Object.keys(order).length && { order }),
-            ...(limit && { limit }),
-            ...(offset && { offset }),
-            ...(timezone && { timezone }),
-            ...(filters.length && { filters }),
-            ...(renewQuery && { renewQuery }),
-          };
-          
           // eslint-disable-next-line no-async-promise-executor
           const results = await (new Promise<any>(async (resolve, reject) => {
             try {
               await apiGateway.load({
                 query,
-                queryType: QueryType.REGULAR_QUERY,
+                queryType,
                 context: req.context,
                 res: (message) => {
                   if (message.error) {
@@ -600,6 +630,34 @@ export function makeSchema(metaConfig: any) {
               return (results.annotation.timeDimensions[pair[0]] && path.length !== 3)
                 ? res : R.set(R.lensPath(path), pair[1], res);
             }, {}));
+        }
+      });
+      t.nullable.field('cubeSQL', {
+        type: nonNull('SQLQuery'),
+        args: cubeQueryArgs,
+        resolve: async (_, graphqlQuery, { req, apiGateway }, infos) => {
+          const query = getCubeQuery(metaConfig, infos, graphqlQuery);
+
+          // eslint-disable-next-line no-async-promise-executor
+          const cubeSqlResult = await new Promise<any>(async (resolve, reject) => {
+            try {
+              await apiGateway.sql({
+                query,
+                queryType,
+                context: req.context,
+                res: (message) => {
+                  if (message.error) {
+                    reject(new Error(message.error));
+                  }
+                  resolve(message);
+                },
+                apiType: 'graphql',
+              });
+            } catch (e) {
+              reject(e);
+            }
+          });
+          return { sql: cubeSqlResult.sql.sql[0] };
         }
       });
     }
