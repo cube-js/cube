@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     datasource,
     execution::context::ExecutionContextState,
@@ -8,9 +7,11 @@ use datafusion::{
     sql::planner::ContextProvider,
 };
 
+use crate::{compile::MetaContext, mysql::session_manager::SessionManager};
+
 use super::information_schema::{
     collations::InfoSchemaCollationsProvider, columns::InfoSchemaColumnsProvider,
-    key_column_usage::InfoSchemaKeyColumnUsageProvider,
+    key_column_usage::InfoSchemaKeyColumnUsageProvider, processlist::InfoSchemaProcesslistProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider,
     schemata::InfoSchemaSchemataProvider, statistics::InfoSchemaStatisticsProvider,
     tables::InfoSchemaTableProvider, variables::PerfSchemaVariablesProvider,
@@ -19,13 +20,22 @@ use super::information_schema::{
 pub struct CubeContext<'a> {
     /// Internal state for the context (default)
     pub state: &'a ExecutionContextState,
-    /// Our context
-    pub cubes: &'a Vec<V1CubeMeta>,
+    /// References
+    pub meta: Arc<MetaContext>,
+    pub sessions: Arc<SessionManager>,
 }
 
 impl<'a> CubeContext<'a> {
-    pub fn new(state: &'a ExecutionContextState, cubes: &'a Vec<V1CubeMeta>) -> Self {
-        Self { state, cubes }
+    pub fn new(
+        state: &'a ExecutionContextState,
+        meta: Arc<MetaContext>,
+        sessions: Arc<SessionManager>,
+    ) -> Self {
+        Self {
+            state,
+            meta,
+            sessions,
+        }
     }
 }
 
@@ -48,11 +58,11 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
         if let Some(tp) = table_path {
             if tp.eq_ignore_ascii_case("information_schema.tables") {
-                return Some(Arc::new(InfoSchemaTableProvider::new(self.cubes)));
+                return Some(Arc::new(InfoSchemaTableProvider::new(&self.meta.cubes)));
             }
 
             if tp.eq_ignore_ascii_case("information_schema.columns") {
-                return Some(Arc::new(InfoSchemaColumnsProvider::new(self.cubes)));
+                return Some(Arc::new(InfoSchemaColumnsProvider::new(&self.meta.cubes)));
             }
 
             if tp.eq_ignore_ascii_case("information_schema.statistics") {
@@ -65,6 +75,12 @@ impl<'a> ContextProvider for CubeContext<'a> {
 
             if tp.eq_ignore_ascii_case("information_schema.schemata") {
                 return Some(Arc::new(InfoSchemaSchemataProvider::new()));
+            }
+
+            if tp.eq_ignore_ascii_case("information_schema.processlist") {
+                return Some(Arc::new(InfoSchemaProcesslistProvider::new(
+                    self.sessions.clone(),
+                )));
             }
 
             if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {

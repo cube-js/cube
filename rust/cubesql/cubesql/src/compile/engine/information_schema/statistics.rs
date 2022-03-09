@@ -4,10 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, StringBuilder, UInt32Array,
-            UInt32Builder,
-        },
+        array::{Array, ArrayRef, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -17,32 +14,12 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::tables::new_string_array_with_placeholder;
+use super::utils::{new_string_array_with_placeholder, new_uint32_array_with_placeholder};
 
 struct InformationSchemaStatisticsBuilder {
     catalog_names: StringBuilder,
     schema_names: StringBuilder,
     table_names: StringBuilder,
-}
-
-pub fn new_uint32_array_with_placeholder(size: usize, default: u32) -> UInt32Array {
-    let mut builder = UInt32Builder::new(size);
-
-    for _ in 0..size {
-        builder.append_value(default).unwrap();
-    }
-
-    builder.finish()
-}
-
-pub fn new_boolean_array_with_placeholder(size: usize, default: bool) -> BooleanArray {
-    let mut builder = BooleanBuilder::new(size);
-
-    for _ in 0..size {
-        builder.append_value(default).unwrap();
-    }
-
-    builder.finish()
 }
 
 impl InformationSchemaStatisticsBuilder {
