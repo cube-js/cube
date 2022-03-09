@@ -2,8 +2,6 @@
 const minDesktopWidth = getComputedStyle(document.documentElement)
                             .getPropertyValue("--breakpoint-desktop-xs")
                             .replace("px", "");
-const menuOverflowMaxHeight = getComputedStyle(document.documentElement)
-                                .getPropertyValue("--menu-overflow-max-height")
 
 const menuList = document.getElementById("menu-list")
 
