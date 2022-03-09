@@ -1,4 +1,4 @@
-import { PostgresDBRunner } from '@cubejs-backend/testing';
+import { PostgresDBRunner } from '@cubejs-backend/shared';
 
 import { StartedTestContainer } from 'testcontainers';
 

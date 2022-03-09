@@ -4,8 +4,11 @@ export type GenericDataBaseType = string;
 export interface TableColumn {
   name: string;
   type: GenericDataBaseType;
+  attributes?: string[]
 }
 export type TableStructure = TableColumn[];
+export type SchemaStructure = Record<string, TableStructure>;
+export type DatabaseStructure = Record<string, SchemaStructure>;
 
 // It's more easy to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
