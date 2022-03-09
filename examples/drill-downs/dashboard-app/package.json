@@ -23,10 +23,11 @@
     "recharts": "^1.8.5"
   },
   "scripts": {
-    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
-    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
+    "bundle": "browserify public/js/menu.js public/js/index.js public/js/feedback.js -o public/bundle.js",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true yarn run bundle && react-scripts start",
+    "build": "SKIP_PREFLIGHT_CHECK=true yarn run bundle && react-scripts build",
+    "deploy": "cross-env NODE_ENV=production yarn run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production yarn run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
