@@ -1,7 +1,5 @@
 use std::sync::{Arc, RwLock as RwLockSync};
 
-use log::trace;
-
 use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContext};
 
 #[derive(Debug)]
@@ -101,10 +99,25 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-impl Drop for Session {
-    fn drop(&mut self) {
-        trace!("[session] Drop {}", self.state.connection_id);
+#[derive(Debug)]
+pub struct SessionDescriptor {
+    pub(crate) protocol: String,
+    pub(crate) session: Arc<Session>,
+}
 
-        self.session_manager.drop_session(self.state.connection_id)
+impl SessionDescriptor {
+    pub fn to_process_list(&self) -> SessionProcessList {
+        SessionProcessList {
+            id: self.session.state.connection_id,
+            host: self.session.state.host.clone(),
+            user: self.session.state.user(),
+        }
     }
+}
+
+#[derive(Debug)]
+pub struct SessionProcessList {
+    pub id: u32,
+    pub user: Option<String>,
+    pub host: String,
 }

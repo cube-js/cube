@@ -6,7 +6,7 @@ use crate::mysql::session::SessionState;
 use crate::transport::TransportService;
 use crate::CubeError;
 
-use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
+use super::{CompilationResult, MetaContext, QueryPlan};
 
 #[async_trait]
 pub trait SqlService: Send + Sync {
@@ -28,10 +28,11 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlService]);
 impl SqlService for SqlAuthDefaultImpl {
     async fn plan(
         &self,
-        query: &String,
-        state: Arc<SessionState>,
-        meta: Arc<MetaContext>,
+        _query: &String,
+        _state: Arc<SessionState>,
+        _meta: Arc<MetaContext>,
     ) -> CompilationResult<QueryPlan> {
-        convert_sql_to_cube_query(&query, meta, state, self.transport.clone())
+        // convert_sql_to_cube_query(&query, meta, state, self.transport.clone())
+        unimplemented!();
     }
 }

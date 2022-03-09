@@ -1,11 +1,11 @@
 # Development
 
-## Prerequisites:
+## Build and run
+
+### Prerequisites:
 
 - `rustup`
 - `cargo install cargo-insta`
-
-# Build and run
 
 ```bash
 cd rust/cubesql
@@ -20,4 +20,88 @@ In a separate terminal, run:
 
 ```bash
 mysql -u root -h 127.0.0.1 --ssl-mode=disabled -u root --password=test --port 4444
+```
+
+# Architecture
+
+## Connections management
+
+```mermaid
+classDiagram
+    ServerConfiguration <|-- ServerManager
+    Transport <|-- ServerManager
+    Auth <|-- ServerManager
+    class ServerManager {
+    }
+
+    ServerManager <|-- SessionManager
+    SessionDescriptor <|-- SessionManager
+    class SessionManager{
+        +Session[] sessions
+        +create_session() Session
+        +drop_session() void
+        +process_list() Vec<SessionProcessList>
+    }
+
+    Session <|-- MysqlConnection
+    Session <|-- PostgresConnection
+
+    Session <|-- SessionDescriptor
+    class SessionDescriptor{
+        +String protocol
+        +Session session
+    }
+
+    class Session {
+        +SessionState state
+    }
+
+    class SessionProperties{
+        +String readonly user
+        +String readonly database
+    }
+
+    SessionProperties <|-- SessionState
+    AuthContext <|-- SessionState
+    class SessionState{
+        +U32 connection_id
+        +String host
+    }
+
+    SessionState <|-- Session
+    SessionProperties <|-- Session
+    SessionManager <|-- Session
+    class Session{
+    }
+```
+
+## Query Execution
+
+```mermaid
+classDiagram
+    ServerConfiguration <|-- ServerManager
+    Transport <|-- ServerManager
+    Auth <|-- ServerManager
+    class ServerManager {
+    }
+
+    ServerManager <|-- SessionManager
+    class SessionManager{
+    }
+
+    class MetaContext{
+    }
+
+    SessionState <|-- QueryPlanner
+    MetaContext <|-- QueryPlanner
+    SessionManager <|-- QueryPlanner
+    class QueryPlanner{
+    }
+
+    CubeQueryPlanner <|-- ExecutionContext
+    class ExecutionContext {
+    }
+
+    class CubeQueryPlanner {
+    }
 ```

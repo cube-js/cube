@@ -13,9 +13,9 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::{
-    statistics::{new_boolean_array_with_placeholder, new_uint32_array_with_placeholder},
-    tables::new_string_array_with_placeholder,
+use super::utils::{
+    new_boolean_array_with_placeholder, new_string_array_with_placeholder,
+    new_uint32_array_with_placeholder,
 };
 
 pub struct InfoSchemaKeyColumnUsageProvider {}

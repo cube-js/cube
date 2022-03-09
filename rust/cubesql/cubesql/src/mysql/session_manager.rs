@@ -10,14 +10,8 @@ use crate::CubeError;
 
 use super::{
     server_manager::ServerManager,
-    session::{Session, SessionProperties, SessionState},
+    session::{Session, SessionDescriptor, SessionProcessList, SessionProperties, SessionState},
 };
-
-#[derive(Debug)]
-struct SessionDescriptor {
-    protocol: String,
-    session: Arc<Session>,
-}
 
 #[derive(Debug)]
 pub struct SessionManager {
@@ -25,7 +19,7 @@ pub struct SessionManager {
     last_id: AtomicU32,
     sessions: RwLockSync<HashMap<u32, SessionDescriptor>>,
     // Backref
-    server: Arc<ServerManager>,
+    pub server: Arc<ServerManager>,
 }
 
 crate::di_service!(SessionManager, []);
@@ -68,6 +62,18 @@ impl SessionManager {
         );
 
         session_ref
+    }
+
+    pub fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
+        let guard = self
+            .sessions
+            .read()
+            .expect("failed to unlock sessions for reading process list");
+
+        guard
+            .values()
+            .map(SessionDescriptor::to_process_list)
+            .collect::<Vec<SessionProcessList>>()
     }
 
     pub fn drop_session(&self, connection_id: u32) {

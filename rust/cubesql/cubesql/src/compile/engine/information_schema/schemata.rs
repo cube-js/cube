@@ -14,7 +14,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::tables::new_string_array_with_placeholder;
+use super::utils::new_string_array_with_placeholder;
 
 struct InformationSchemaSchemataBuilder {
     catalog_names: StringBuilder,

@@ -19,7 +19,8 @@ use cubeclient::models::{
 };
 
 use crate::mysql::dataframe;
-use crate::mysql::session::SessionState;
+use crate::mysql::session::{Session, SessionState};
+use crate::mysql::session_manager::SessionManager;
 pub use crate::transport::ctx::*;
 use crate::transport::{TransportService, V1CubeMetaExt};
 use crate::CubeError;
@@ -1330,19 +1331,19 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 struct QueryPlanner {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
-    transport: Arc<dyn TransportService>,
+    session_manager: Arc<SessionManager>,
 }
 
 impl QueryPlanner {
     pub fn new(
         state: Arc<SessionState>,
         meta: Arc<MetaContext>,
-        transport: Arc<dyn TransportService>,
+        session_manager: Arc<SessionManager>,
     ) -> Self {
         Self {
             state,
-            transport,
             meta,
+            session_manager,
         }
     }
 
@@ -1888,12 +1889,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         &self,
         statement: &Box<ast::Statement>,
     ) -> Result<QueryPlan, CompilationError> {
-        let plan = convert_statement_to_cube_query(
-            &statement,
-            self.meta.clone(),
-            self.state.clone(),
-            self.transport.clone(),
-        )?;
+        let plan = self.plan(&statement)?;
 
         return Ok(QueryPlan::MetaTabular(
             StatusFlags::empty(),
@@ -1939,7 +1935,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_execution_ctx(&self) -> ExecutionContext {
         let mut ctx = ExecutionContext::with_config(
             ExecutionConfig::new()
-                .with_query_planner(Arc::new(CubeQueryPlanner::new(self.transport.clone())))
+                .with_query_planner(Arc::new(CubeQueryPlanner::new(
+                    self.session_manager.server.transport.clone(),
+                )))
                 .with_information_schema(false),
         );
 
@@ -1969,7 +1967,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let ctx = self.create_execution_ctx();
 
         let state = ctx.state.lock().unwrap().clone();
-        let cube_ctx = CubeContext::new(&state, &self.meta.cubes);
+        let cube_ctx = CubeContext::new(&state, self.meta.clone(), self.session_manager.clone());
         let df_query_planner = SqlToRel::new(&cube_ctx);
 
         let plan = df_query_planner
@@ -1993,10 +1991,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
-    state: Arc<SessionState>,
-    transport: Arc<dyn TransportService>,
+    session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
-    let planner = QueryPlanner::new(state, meta, transport);
+    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(stmt)
 }
 
@@ -2114,8 +2111,7 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
-    state: Arc<SessionState>,
-    transport: Arc<dyn TransportService>,
+    session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
     // metabase
@@ -2130,7 +2126,7 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
     let stmt = parse_sql_to_statement(&query)?;
-    convert_statement_to_cube_query(&stmt, meta, state, transport)
+    convert_statement_to_cube_query(&stmt, meta, session)
 }
 
 #[cfg(test)]
@@ -2142,8 +2138,9 @@ mod tests {
 
     use crate::mysql::{
         dataframe::batch_to_dataframe,
+        server_manager::{ServerConfiguration, ServerManager},
         session::{SessionProperties, SessionState},
-        AuthContext,
+        AuthContext, AuthenticateResponse, SqlAuthService,
     };
     use datafusion::execution::dataframe_impl::DataFrameImpl;
 
@@ -2237,16 +2234,49 @@ mod tests {
         })
     }
 
-    fn get_test_connection_state() -> Arc<SessionState> {
-        Arc::new(SessionState::new(
-            8,
-            "127.0.0.1".to_string(),
-            SessionProperties::new(Some("ovr".to_string()), Some("db".to_string())),
-            Some(AuthContext {
-                access_token: "access_token".to_string(),
-                base_path: "base_path".to_string(),
-            }),
-        ))
+    fn get_test_session() -> Arc<Session> {
+        let server = Arc::new(ServerManager {
+            auth: get_test_auth(),
+            transport: get_test_transport(),
+            configuration: ServerConfiguration::default(),
+            nonce: None,
+        });
+
+        let session_manager = Arc::new(SessionManager::new(server.clone()));
+        let session = session_manager.create_session("mysql".to_string(), "127.0.0.1".to_string());
+
+        // Populate like shims
+        session.state.set_database(Some("db".to_string()));
+        session.state.set_user(Some("ovr".to_string()));
+        session.state.set_auth_context(Some(AuthContext {
+            access_token: "access_token".to_string(),
+            base_path: "base_path".to_string(),
+        }));
+
+        session
+    }
+
+    fn get_test_auth() -> Arc<dyn SqlAuthService> {
+        #[derive(Debug)]
+        struct TestSqlAuth {}
+
+        #[async_trait]
+        impl SqlAuthService for TestSqlAuth {
+            async fn authenticate(
+                &self,
+                user: Option<String>,
+            ) -> Result<AuthenticateResponse, CubeError> {
+                Ok(AuthenticateResponse {
+                    context: AuthContext {
+                        access_token: "fake".to_string(),
+                        base_path: "fake".to_string(),
+                    },
+                    password: None,
+                })
+            }
+        }
+
+        Arc::new(TestSqlAuth {})
     }
 
     fn get_test_transport() -> Arc<dyn TransportService> {
@@ -2274,12 +2304,7 @@ mod tests {
     }
 
     fn convert_select_to_query_plan(query: String) -> QueryPlan {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_connection_state(),
-            get_test_transport(),
-        );
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session());
 
         query.unwrap()
     }
@@ -2989,12 +3014,8 @@ mod tests {
         ];
 
         for (input_query, expected_error) in variants.iter() {
-            let query = convert_sql_to_cube_query(
-                &input_query,
-                get_test_tenant_ctx(),
-                get_test_connection_state(),
-                get_test_transport(),
-            );
+            let query =
+                convert_sql_to_cube_query(&input_query, get_test_tenant_ctx(), get_test_session());
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
@@ -3593,8 +3614,7 @@ mod tests {
                     sql
                 ),
                 get_test_tenant_ctx(),
-                get_test_connection_state(),
-                get_test_transport(),
+                get_test_session(),
             );
 
             match &query {
@@ -3968,12 +3988,7 @@ mod tests {
     }
 
     async fn execute_query_with_flags(query: String) -> Result<(String, StatusFlags), CubeError> {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_connection_state(),
-            get_test_transport(),
-        );
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session());
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
@@ -4093,6 +4108,16 @@ mod tests {
         insta::assert_snapshot!(
             "information_schema_collations",
             execute_query("SELECT * FROM information_schema.collations".to_string()).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_processlist() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_processlist",
+            execute_query("SELECT * FROM information_schema.processlist".to_string()).await?
         );
 
         Ok(())

@@ -53,6 +53,19 @@ struct MySqlConnection {
     session: Arc<Session>,
 }
 
+impl Drop for MySqlConnection {
+    fn drop(&mut self) {
+        trace!(
+            "[MySqlConnection] Drop {}",
+            self.session.state.connection_id
+        );
+
+        self.session
+            .session_manager
+            .drop_session(self.session.state.connection_id)
+    }
+}
+
 enum QueryResponse {
     Ok(StatusFlags),
     ResultSet(StatusFlags, Arc<dataframe::DataFrame>),
@@ -180,7 +193,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.session.state.clone(),self.session.server.transport.clone())?;
+            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.session.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));
