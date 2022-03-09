@@ -220,20 +220,15 @@ macro_rules! add_expr_list_node {
             .iter()
             .map(|expr| $converter.add_expr(expr))
             .collect::<Result<Vec<_>, _>>()?;
-        if list.len() < 2 {
-            $converter
+        let mut current = $converter
+            .graph
+            .add(LogicalPlanLanguage::$field_variant(Vec::new()));
+        for i in list.into_iter().rev() {
+            current = $converter
                 .graph
-                .add(LogicalPlanLanguage::$field_variant(list))
-        } else {
-            let mut iter = list.into_iter().rev();
-            let mut current = iter.next().unwrap();
-            for i in iter {
-                current = $converter
-                    .graph
-                    .add(LogicalPlanLanguage::$field_variant(vec![i, current]));
-            }
-            current
+                .add(LogicalPlanLanguage::$field_variant(vec![i, current]));
         }
+        current
     }};
 }
 
@@ -243,20 +238,15 @@ macro_rules! add_plan_list_node {
             .iter()
             .map(|expr| $converter.add_logical_plan(expr))
             .collect::<Result<Vec<_>, _>>()?;
-        if list.len() < 2 {
-            $converter
+        let mut current = $converter
+            .graph
+            .add(LogicalPlanLanguage::$field_variant(Vec::new()));
+        for i in list.into_iter().rev() {
+            current = $converter
                 .graph
-                .add(LogicalPlanLanguage::$field_variant(list))
-        } else {
-            let mut iter = list.into_iter().rev();
-            let mut current = iter.next().unwrap();
-            for i in iter {
-                current = $converter
-                    .graph
-                    .add(LogicalPlanLanguage::$field_variant(vec![i, current]));
-            }
-            current
+                .add(LogicalPlanLanguage::$field_variant(vec![i, current]));
         }
+        current
     }};
 }
 
@@ -649,7 +639,6 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
 
     pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, ()>> {
         vec![
-            rewrite!("commute-eq"; "(BinaryExpr ?a = ?b)" => "(BinaryExpr ?b = ?a)"),
             rewrite!("cube-scan";
                 "(TableScan ?source_table_name ?table_name ?projection ?filters ?limit)" =>
                 "(Extension (CubeScan ?source_table_name CubeScanMeasures CubeScanDimensions CubeScanFilters))"
@@ -659,7 +648,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
                     ?group_expr \
-                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal)) ?distinct)) \
+                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal) AggregateFunctionExprArgs) ?distinct) ?tail_aggr_expr) \
                  )" => {
                     TransformingPattern::new(
                         "(Aggregate \
@@ -672,7 +661,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                                 ?filters\
                             )) \
                             ?group_expr \
-                            AggregateAggrExpr \
+                            ?tail_aggr_expr \
                          )",
                          self.transform_measure("?source_table_name", None, "?distinct", "?aggr_fun")
                     )
@@ -682,7 +671,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
                     ?group_expr \
-                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column)) ?distinct)) \
+                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column) AggregateFunctionExprArgs) ?distinct) ?tail_aggr_expr) \
                  )" => {
                     TransformingPattern::new(
                         "(Aggregate \
@@ -695,7 +684,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                                 ?filters\
                             )) \
                             ?group_expr \
-                            AggregateAggrExpr \
+                            ?tail_aggr_expr \
                          )",
                          self.transform_measure("?source_table_name", Some("?column"), "?distinct", "?aggr_fun")
                     )
