@@ -5,12 +5,12 @@
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js Athena Database Driver
+# Cube.js Testing
 
-Pure Javascript and Serverless AWS Athena driver.
+Internal package for testing.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
-Cube.js CLI is [Apache 2.0 licensed](./LICENSE).
+Cube.js Client Core is [MIT licensed](./LICENSE).
