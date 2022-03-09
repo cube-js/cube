@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.31](https://github.com/cube-js/cube.js/compare/v0.29.30...v0.29.31) (2022-03-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dbt-schema-extension:** Identifiers are not properly escaped in case for Dbt cloud ([be28d61](https://github.com/cube-js/cube.js/commit/be28d61f09b3de8e1960e46646f88c85ece4bf56))
+* **athena:** Fixes export bucket location. Fixes column order. ([#4183](https://github.com/cube-js/cube.js/issues/4183)) ([abd40a7](https://github.com/cube-js/cube.js/commit/abd40a79e360cd9a9eceeb56a450102bd782f3d9))
+* allow post requests for sql ([#4180](https://github.com/cube-js/cube.js/issues/4180)) ([2d101ee](https://github.com/cube-js/cube.js/commit/2d101ee46dfdd4ab6a5540671983af510b4a716b))
+
+
+
+
+
+## [0.29.30](https://github.com/cube-js/cube.js/compare/v0.29.29...v0.29.30) (2022-03-04)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Empty tables in Cube Store if index is being used ([#4170](https://github.com/cube-js/cube.js/issues/4170)) ([2585c12](https://github.com/cube-js/cube.js/commit/2585c124f5ba3bc843e19a7f8177c8dbb35ad1cc))
+* **api-gateway:** GraphQL cannot read property findIndex of undefined ([51d48f1](https://github.com/cube-js/cube.js/commit/51d48f1754c10f5c953b71f7807773abc9652d72))
+
+
+
+
+
 ## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
 
 

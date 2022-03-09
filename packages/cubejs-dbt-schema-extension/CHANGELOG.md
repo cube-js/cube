@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.31](https://github.com/cube-js/cube.js/compare/v0.29.30...v0.29.31) (2022-03-09)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/dbt-schema-extension:** Identifiers are not properly escaped in case for Dbt cloud ([be28d61](https://github.com/cube-js/cube.js/commit/be28d61f09b3de8e1960e46646f88c85ece4bf56))
+
+
+
+
+
+## [0.29.30](https://github.com/cube-js/cube.js/compare/v0.29.29...v0.29.30) (2022-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/dbt-schema-extension
+
+
+
+
+
 ## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
 
 **Note:** Version bump only for package @cubejs-backend/dbt-schema-extension

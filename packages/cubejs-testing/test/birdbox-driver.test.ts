@@ -93,8 +93,8 @@ export function createDriverTestCase(type: string, envVars: string[]) {
     it('query', async () => {
       const response = await httpClient.load(
         {
-          measures: ['OrdersPA.totalAmount'],
-          dimensions: ['OrdersPA.status'],
+          measures: ['OrdersPA.amount2', 'OrdersPA.amount'],
+          dimensions: ['OrdersPA.id2', 'OrdersPA.status2', 'OrdersPA.id', 'OrdersPA.status'],
         }
       );
       expect(response.rawData()).toMatchSnapshot('query');

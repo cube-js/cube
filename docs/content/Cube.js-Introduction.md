@@ -8,11 +8,10 @@ redirect_from:
 
 **Cube is the headless business intelligence platform.** It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
-Cube.js was designed to work with data warehouses and query engines like Google BigQuery and AWS Athena. A multi-stage querying approach makes it suitable for handling trillions of data points. Most modern RDBMS work with Cube.js as well and can be further tuned for performance.
+Cube was designed to work with all SQL-enabled data sources, including cloud data warehouses like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has a built-in caching engine to provide sub-second latency and high concurrency for API requests.
 
-With Cube.js, you can create a semantic API layer on top of your data,
-manage access control, cache, and aggregate data. Since Cube.js is visualization agnostic,
-you can use any frontend library to build your own custom UI.
+With Cube, you can build a data model, manage access control and caching, and expose your data to every application via REST, GraphQL, and SQL APIs. 
+Cube is headless, API-first, and decoupled from visualizations. You can use any charting library to build custom UI, or connect existing dashboarding and reporting tools to Cube.
 
 ## Why Cube?
 
@@ -36,15 +35,10 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 ## Architecture
 
-**Cube.js acts as an analytics backend**, translating business logic (metrics
-and dimensions) into SQL, and managing caching, queuing and database connection.
+**Cube acts as a data access layer**, translating API requests into SQL, managing caching, queuing, and database connection.
 
-The Cube.js JavaScript client sends queries conforming to the [Query
-Format][ref-query-format] to the REST API. The server uses a Schema to generate
-an SQL query, which is executed by your chosen database. The server handles all
-database connections, as well as pre-aggregations and caching layers. The result
-is then sent back to the client. The client itself is visualization-agnostic and
-works well with any chart library.
+The Cube accepts queries via REST, GraphQL or SQL interfaces. Based on the data model and an incoming query, Cube generates
+a SQL query and executes it in your database. Cube fully manages query orchestration, database connections, as well as caching and access control layers. The result is then sent back to the client.
 
 <div
   style="text-align: center"

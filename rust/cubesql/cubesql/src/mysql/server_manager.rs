@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::transport::TransportService;
+use crate::CubeError;
 
 use super::SqlAuthService;
 
@@ -27,6 +28,8 @@ pub struct ServerManager {
     pub configuration: ServerConfiguration,
     pub nonce: Option<Vec<u8>>,
 }
+
+crate::di_service!(ServerManager, []);
 
 impl ServerManager {
     pub fn new(

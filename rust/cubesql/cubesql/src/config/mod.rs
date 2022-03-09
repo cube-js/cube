@@ -3,6 +3,8 @@ pub mod processing_loop;
 
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
+use crate::mysql::server_manager::ServerManager;
+use crate::mysql::session_manager::SessionManager;
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::transport::{HttpTransport, TransportService};
@@ -187,6 +189,23 @@ impl Config {
             .register_typed::<dyn TransportService, _, _, _>(async move |_| Arc::new(HttpTransport))
             .await;
 
+        self.injector
+            .register_typed::<ServerManager, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    config.nonce().clone(),
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<SessionManager, _, _, _>(async move |i| {
+                Arc::new(SessionManager::new(i.get_service_typed().await))
+            })
+            .await;
+
         if self.config_obj.bind_address().is_some() {
             self.injector
                 .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
@@ -199,8 +218,6 @@ impl Config {
                     MySqlServer::new(
                         config.bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
-                        i.get_service_typed().await,
-                        config.nonce().clone(),
                     )
                 })
                 .await;
