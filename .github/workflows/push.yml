@@ -370,7 +370,7 @@ jobs:
           CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
           CUBEJS_AWS_REGION: ${{ secrets.CUBEJS_AWS_REGION }}
           CUBEJS_AWS_S3_OUTPUT_LOCATION: ${{ secrets.CUBEJS_AWS_S3_OUTPUT_LOCATION }}
-          CUBEJS_DB_EXPORT_BUCKET: ${{ secrets.CUBEJS_DB_EXPORT_BUCKET }}
+          # CUBEJS_DB_EXPORT_BUCKET: ${{ secrets.CUBEJS_DB_EXPORT_BUCKET }}
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
   docker-image-latest-set-tag:
