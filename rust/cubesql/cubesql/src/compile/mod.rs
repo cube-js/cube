@@ -1606,6 +1606,12 @@ impl QueryPlanner {
                     ],
                 )),
             ))
+        } else if name.eq_ignore_ascii_case("processlist") {
+            let stmt = parse_sql_to_statement(
+                &"SELECT * FROM information_schema.processlist".to_string(),
+            )?;
+
+            self.create_df_logical_plan(stmt)
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -4100,6 +4106,26 @@ mod tests {
         insta::assert_snapshot!(
             "performance_schema_global_variables",
             execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_processlist() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "show_processlist",
+            execute_query("SHOW processlist".to_string()).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_warnings() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "show_warnings",
+            execute_query("SHOW warnings".to_string()).await?
         );
 
         Ok(())
