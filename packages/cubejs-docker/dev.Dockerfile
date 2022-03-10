@@ -142,6 +142,11 @@ RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
 FROM base AS final
 
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y ca-certificates \
+    && apt-get clean
+
 COPY --from=build /cubejs .
 COPY --from=prod_dependencies /cubejs .
 
