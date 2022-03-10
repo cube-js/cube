@@ -17,7 +17,7 @@ Cube is headless, API-first, and decoupled from visualizations. You can use any 
 
 If you are building a data application—such as a business intelligence tool or a customer-facing analytics feature—you’ll probably face the following problems:
 
-1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modelling framework.
+1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modeling framework.
 2. __Performance.__ Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
 3. __Access Control.__ It is important to secure and govern access to data for all downstream data consuming applications.
 
