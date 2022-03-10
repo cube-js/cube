@@ -1,11 +1,9 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { jest, describe, it, beforeAll, afterAll } from '@jest/globals';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { StartedTestContainer } from 'testcontainers';
 import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
-import { createCubeSchema } from '../utils';
+import { createCubeSchema } from './utils';
 
 export const prepareCompiler = (content: any, options?: any) => originalPrepareCompiler({
   localPath: () => __dirname,
