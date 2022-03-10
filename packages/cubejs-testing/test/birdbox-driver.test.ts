@@ -42,6 +42,7 @@ export function createDriverTestCase(type: string, envVars: string[]) {
     env = {
       ...env,
       CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
+      CUBEJS_REFRESH_WORKER: 'false',
       CUBEJS_EXTERNAL_DEFAULT: 'true',
       CUBEJS_ROLLUP_ONLY: 'true',
     };

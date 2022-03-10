@@ -12,10 +12,12 @@ services:
       CUBEJS_AWS_S3_OUTPUT_LOCATION: ${CUBEJS_AWS_S3_OUTPUT_LOCATION}
       CUBEJS_DB_EXPORT_BUCKET: ${CUBEJS_DB_EXPORT_BUCKET}
 
+      CUBEJS_SCHEDULED_REFRESH_DEFAULT: ${CUBEJS_SCHEDULED_REFRESH_DEFAULT}
+      CUBEJS_REFRESH_WORKER: ${CUBEJS_REFRESH_WORKER}
+      CUBEJS_EXTERNAL_DEFAULT: ${CUBEJS_EXTERNAL_DEFAULT}
+
       CUBEJS_DEV_MODE: "true"
       CUBEJS_API_SECRET: mysupersecret
-      CUBEJS_SCHEDULED_REFRESH_DEFAULT: "false"
-      CUBEJS_REFRESH_WORKER: "false"
     volumes:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
       - ./postgresql/schema/OrdersPA.js:/cube/conf/schema/OrdersPA.js
