@@ -45,6 +45,7 @@ use self::engine::udf::{
     create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
+use crate::compile::engine::udf::create_date_udf;
 use crate::compile::rewrite::LogicalPlanToLanguageConverter;
 
 pub mod builder;
@@ -2015,6 +2016,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
+        ctx.register_udf(create_date_udf());
 
         ctx
     }

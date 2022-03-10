@@ -146,8 +146,12 @@ macro_rules! variant_field_struct {
 
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "")));
+                    }
+                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
                 }
             }
 
@@ -168,6 +172,77 @@ macro_rules! variant_field_struct {
                 AggregateFunction::Max => "Max",
                 AggregateFunction::Avg => "Avg",
                 AggregateFunction::ApproxDistinct => "ApproxDistinct",
+            }
+        );
+    };
+
+    ($variant:ident, $var_field:ident, BuiltinScalarFunction) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { BuiltinScalarFunction } -> {
+                BuiltinScalarFunction::Abs => "Abs",
+                BuiltinScalarFunction::Acos => "Acos",
+                BuiltinScalarFunction::Asin => "Asin",
+                BuiltinScalarFunction::Atan => "Atan",
+                BuiltinScalarFunction::Ceil => "Ceil",
+                BuiltinScalarFunction::Cos => "Cos",
+                BuiltinScalarFunction::Digest => "Digest",
+                BuiltinScalarFunction::Exp => "Exp",
+                BuiltinScalarFunction::Floor => "Floor",
+                BuiltinScalarFunction::Ln => "Ln",
+                BuiltinScalarFunction::Log => "Log",
+                BuiltinScalarFunction::Log10 => "Log10",
+                BuiltinScalarFunction::Log2 => "Log2",
+                BuiltinScalarFunction::Round => "Round",
+                BuiltinScalarFunction::Signum => "Signum",
+                BuiltinScalarFunction::Sin => "Sin",
+                BuiltinScalarFunction::Sqrt => "Sqrt",
+                BuiltinScalarFunction::Tan => "Tan",
+                BuiltinScalarFunction::Trunc => "Trunc",
+                BuiltinScalarFunction::Array => "Array",
+                BuiltinScalarFunction::Ascii => "Ascii",
+                BuiltinScalarFunction::BitLength => "BitLength",
+                BuiltinScalarFunction::Btrim => "Btrim",
+                BuiltinScalarFunction::CharacterLength => "CharacterLength",
+                BuiltinScalarFunction::Chr => "Chr",
+                BuiltinScalarFunction::Concat => "Concat",
+                BuiltinScalarFunction::ConcatWithSeparator => "ConcatWithSeparator",
+                BuiltinScalarFunction::DatePart => "DatePart",
+                BuiltinScalarFunction::DateTrunc => "DateTrunc",
+                BuiltinScalarFunction::InitCap => "InitCap",
+                BuiltinScalarFunction::Left => "Left",
+                BuiltinScalarFunction::Lpad => "Lpad",
+                BuiltinScalarFunction::Lower => "Lower",
+                BuiltinScalarFunction::Ltrim => "Ltrim",
+                BuiltinScalarFunction::MD5 => "MD5",
+                BuiltinScalarFunction::NullIf => "NullIf",
+                BuiltinScalarFunction::OctetLength => "OctetLength",
+                BuiltinScalarFunction::Random => "Random",
+                BuiltinScalarFunction::RegexpReplace => "RegexpReplace",
+                BuiltinScalarFunction::Repeat => "Repeat",
+                BuiltinScalarFunction::Replace => "Replace",
+                BuiltinScalarFunction::Reverse => "Reverse",
+                BuiltinScalarFunction::Right => "Right",
+                BuiltinScalarFunction::Rpad => "Rpad",
+                BuiltinScalarFunction::Rtrim => "Rtrim",
+                BuiltinScalarFunction::SHA224 => "SHA224",
+                BuiltinScalarFunction::SHA256 => "SHA256",
+                BuiltinScalarFunction::SHA384 => "SHA384",
+                BuiltinScalarFunction::SHA512 => "SHA512",
+                BuiltinScalarFunction::SplitPart => "SplitPart",
+                BuiltinScalarFunction::StartsWith => "StartsWith",
+                BuiltinScalarFunction::Strpos => "Strpos",
+                BuiltinScalarFunction::Substr => "Substr",
+                BuiltinScalarFunction::ToHex => "ToHex",
+                BuiltinScalarFunction::ToTimestamp => "ToTimestamp",
+                BuiltinScalarFunction::ToTimestampMillis => "ToTimestampMillis",
+                BuiltinScalarFunction::ToTimestampMicros => "ToTimestampMicros",
+                BuiltinScalarFunction::ToTimestampSeconds => "ToTimestampSeconds",
+                BuiltinScalarFunction::Now => "Now",
+                BuiltinScalarFunction::UtcTimestamp => "UtcTimestamp",
+                BuiltinScalarFunction::Translate => "Translate",
+                BuiltinScalarFunction::Trim => "Trim",
+                BuiltinScalarFunction::Upper => "Upper",
+                BuiltinScalarFunction::RegexpMatch => "RegexpMatch",
             }
         );
     };
@@ -285,6 +360,50 @@ macro_rules! variant_field_struct {
                         $($variant_type => $name,)*
                     };
                     name == other_name
+                }
+            }
+
+            impl core::cmp::Eq for [<$variant $var_field:camel>] {}
+        }
+    };
+
+    ($variant:ident, $var_field:ident, ScalarValue) => {
+        paste::item! {
+            #[derive(Debug, PartialOrd, Clone)]
+            pub struct [<$variant $var_field:camel>](ScalarValue);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        return Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(s.replace(&prefix, "")))));
+                    }
+                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+
+            impl core::cmp::Ord for [<$variant $var_field:camel>] {
+                fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+                    self.partial_cmp(&other).unwrap()
+                }
+            }
+
+            impl core::hash::Hash for [<$variant $var_field:camel>] {
+                fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+                    std::mem::discriminant(&self.0).hash(state);
+                }
+            }
+
+            impl core::cmp::PartialEq for [<$variant $var_field:camel>] {
+                fn eq(&self, other: &[<$variant $var_field:camel>]) -> bool {
+                    self.0 == other.0
                 }
             }
 

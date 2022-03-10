@@ -28,6 +28,9 @@ use crate::{
     },
     sql::SessionState,
 };
+use datafusion::physical_plan::datetime_expressions::date_trunc;
+use datafusion::physical_plan::ColumnarValue;
+use datafusion::scalar::ScalarValue;
 
 pub fn create_version_udf() -> ScalarUDF {
     let version = make_scalar_function(|_args: &[ArrayRef]| {
@@ -617,6 +620,40 @@ pub fn create_time_format_udf() -> ScalarUDF {
     ScalarUDF::new(
         "time_format",
         &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+        let mut args = args
+            .into_iter()
+            .map(|i| ColumnarValue::Array(i.clone()))
+            .collect::<Vec<_>>();
+        args.insert(
+            0,
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("day".to_string()))),
+        );
+        let res = date_trunc(args.as_slice())?;
+        match res {
+            ColumnarValue::Array(a) => Ok(a),
+            ColumnarValue::Scalar(_) => Err(DataFusionError::Internal(
+                "Date trunc returned scalar value for array input".to_string(),
+            )),
+        }
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+
+    ScalarUDF::new(
+        "date",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )

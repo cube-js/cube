@@ -4,8 +4,8 @@ use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
 use crate::sql::auth_service::AuthContext;
 use crate::CubeError;
-use cubeclient::models::V1LoadRequestQuery;
-use datafusion::arrow::datatypes::DataType;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
 use datafusion::logical_plan::window_frames::WindowFrame;
 use datafusion::logical_plan::Column;
@@ -120,8 +120,8 @@ crate::plan_to_language! {
         },
         TimeDimension {
             name: String,
-            granularity: String,
-            dateRange: Vec<String>,
+            granularity: Option<String>,
+            dateRange: Option<Vec<String>>,
             expr: Arc<Expr>,
         },
 
@@ -690,6 +690,49 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     )
                  }
             ),
+            rewrite!("date-trunc";
+                "(Aggregate \
+                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
+                    (AggregateGroupExpr \
+                        (ScalarFunctionExpr \
+                            DateTrunc \
+                            (ScalarFunctionExprArgs \
+                                (LiteralExpr ?granularity) \
+                                (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
+                            ) \
+                        ) \
+                        ?tail_group_expr\
+                    ) \
+                    ?aggr_expr \
+                 )" => {
+                    TransformingPattern::new(
+                        "(Aggregate \
+                            (Extension (CubeScan ?source_table_name \
+                                ?measures
+                                (CubeScanDimensions \
+                                    ?dimensions \
+                                    (TimeDimension \
+                                        ?time_dimension_name \
+                                        ?time_dimension_granularity \
+                                        ?date_range \
+                                        (ScalarFunctionExpr \
+                                            DateTrunc \
+                                            (ScalarFunctionExprArgs \
+                                                (LiteralExpr ?granularity) \
+                                                (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
+                                            ) \
+                                        )\
+                                    )\
+                                ) \
+                                ?filters\
+                            )) \
+                            ?tail_group_expr \
+                            ?aggr_expr \
+                         )",
+                         self.transform_time_dimension("?source_table_name", "?column", "?time_dimension_name", "?granularity", "?time_dimension_granularity", "?date_range")
+                    )
+                 }
+            ),
             rewrite!("remove-processed-aggregate";
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
@@ -697,6 +740,19 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     AggregateAggrExpr \
                  )" =>
                 "(Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters))"
+            ),
+            rewrite!("date-to-date-trunc";
+                "(ScalarUDFExpr \
+                    ScalarUDFExprFun:date\
+                    (ScalarUDFExprArgs (ColumnExpr ?column) ScalarUDFExprArgs)
+                )" =>
+                "(ScalarFunctionExpr \
+                    DateTrunc \
+                    (ScalarFunctionExprArgs \
+                        (LiteralExpr LiteralExprValue:day) \
+                        (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
+                    ) \
+                )"
             ),
         ]
     }
@@ -715,6 +771,79 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     .any(|c| c.name.eq_ignore_ascii_case(name))
                 {
                     return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_time_dimension(
+        &self,
+        cube_var: &'static str,
+        dimension_var: &'static str,
+        time_dimension_name_var: &'static str,
+        granularity_var: &'static str,
+        time_dimension_granularity_var: &'static str,
+        date_range_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool {
+        let cube_var = cube_var.parse().unwrap();
+        let dimension_var = dimension_var.parse().unwrap();
+        let time_dimension_name_var = time_dimension_name_var.parse().unwrap();
+        let granularity_var = granularity_var.parse().unwrap();
+        let time_dimension_granularity_var = time_dimension_granularity_var.parse().unwrap();
+        let date_range_var = date_range_var.parse().unwrap();
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for time_dimension_name in var_iter!(egraph[subst[dimension_var]], ColumnExprColumn)
+                .map(|c| c.name.to_string())
+            {
+                for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName) {
+                    if let Some(cube) = meta_context
+                        .cubes
+                        .iter()
+                        .find(|c| c.name.eq_ignore_ascii_case(cube_name))
+                    {
+                        let time_dimension_name = format!("{}.{}", cube_name, time_dimension_name);
+                        if let Some(time_dimension) = cube.dimensions.iter().find(|d| {
+                            d._type == "time" && d.name.eq_ignore_ascii_case(&time_dimension_name)
+                        }) {
+                            for granularity in
+                                var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
+                            {
+                                match granularity {
+                                    ScalarValue::Utf8(Some(granularity_value)) => {
+                                        let granularity_value = granularity_value.to_string();
+                                        subst.insert(
+                                            time_dimension_name_var,
+                                            egraph.add(LogicalPlanLanguage::TimeDimensionName(
+                                                TimeDimensionName(time_dimension.name.to_string()),
+                                            )),
+                                        );
+                                        subst.insert(
+                                            date_range_var,
+                                            egraph.add(
+                                                LogicalPlanLanguage::TimeDimensionDateRange(
+                                                    TimeDimensionDateRange(None), // TODO
+                                                ),
+                                            ),
+                                        );
+                                        subst.insert(
+                                            time_dimension_granularity_var,
+                                            egraph.add(
+                                                LogicalPlanLanguage::TimeDimensionGranularity(
+                                                    TimeDimensionGranularity(Some(
+                                                        granularity_value,
+                                                    )),
+                                                ),
+                                            ),
+                                        );
+                                        return true;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
                 }
             }
             false
@@ -850,6 +979,8 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         let this_cube_nodes = match enode {
             LogicalPlanLanguage::CubeScan(_) => -1,
             LogicalPlanLanguage::Measure(_) => -1,
+            LogicalPlanLanguage::Dimension(_) => -1,
+            LogicalPlanLanguage::TimeDimension(_) => -1,
             _ => 0,
         };
         enode
@@ -1292,13 +1423,13 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                             match_data_node!(self, cube_scan_params[0], TableScanSourceTableName);
                         let measures =
                             match_list_node!(self, cube_scan_params[1], CubeScanMeasures);
-                        let _dimensions =
-                            match_list_node!(self, cube_scan_params[2], CubeScanMeasures);
+                        let dimensions =
+                            match_list_node!(self, cube_scan_params[2], CubeScanDimensions);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
-                        let mut query_measures = Vec::new();
                         let mut fields = Vec::new();
+                        let mut query_measures = Vec::new();
                         for m in measures {
                             let measure_params = match_params!(self, m, Measure);
                             let measure = match_data_node!(self, measure_params[0], MeasureName);
@@ -1306,14 +1437,55 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                             query_measures.push(measure);
                             fields.push(DFField::new(
                                 None,
-                                // TODO schema
+                                // TODO empty schema
                                 &expr.name(&DFSchema::empty())?,
                                 DataType::Int64,
                                 true,
                             ));
                         }
+
+                        let mut query_time_dimensions = Vec::new();
+                        for d in dimensions {
+                            match d {
+                                LogicalPlanLanguage::TimeDimension(params) => {
+                                    let dimension =
+                                        match_data_node!(self, params[0], TimeDimensionName);
+                                    let granularity =
+                                        match_data_node!(self, params[1], TimeDimensionGranularity);
+                                    let date_range =
+                                        match_data_node!(self, params[2], TimeDimensionDateRange);
+                                    let expr = self.to_expr(params[3])?;
+                                    query_time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                                        dimension,
+                                        granularity,
+                                        date_range: date_range.map(|date_range| {
+                                            serde_json::Value::Array(
+                                                date_range
+                                                    .into_iter()
+                                                    .map(|d| serde_json::Value::String(d))
+                                                    .collect(),
+                                            )
+                                        }),
+                                    });
+                                    fields.push(DFField::new(
+                                        None,
+                                        // TODO empty schema
+                                        &expr.name(&DFSchema::empty())?,
+                                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                                        true,
+                                    ));
+                                }
+                                x => panic!("Expected dimension but found {:?}", x),
+                            }
+                        }
+
                         query.measures = Some(query_measures);
                         query.dimensions = Some(Vec::new());
+                        query.time_dimensions = if query_time_dimensions.len() > 0 {
+                            Some(query_time_dimensions)
+                        } else {
+                            None
+                        };
                         query.segments = Some(Vec::new());
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new(fields)?),
