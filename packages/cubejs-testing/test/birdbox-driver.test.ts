@@ -19,7 +19,7 @@ const args: Args = yargs(process.argv.slice(2))
     {
       mode: {
         choices: SERVER_MODES,
-        default: 'docker',
+        default: 'local',
         describe: 'how to stand up the server',
       }
     }
