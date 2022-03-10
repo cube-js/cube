@@ -4,11 +4,8 @@ import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
 import { execInDir, pausePromise } from '@cubejs-backend/shared';
+import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
-import dotenv from '@cubejs-backend/dotenv';
-
-import { PostgresDBRunner } from './db/postgres';
-import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
