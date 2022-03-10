@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, Int64Array, Int64Builder, StringArray, StringBuilder},
+        array::{Array, ArrayRef, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,37 +14,13 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{new_int64_array_with_placeholder, new_string_array_with_placeholder};
+
 struct InformationSchemaTablesBuilder {
     catalog_names: StringBuilder,
     schema_names: StringBuilder,
     table_names: StringBuilder,
     table_types: StringBuilder,
-}
-
-pub fn new_string_array_with_placeholder(size: usize, default: Option<String>) -> StringArray {
-    let mut builder = StringBuilder::new(size);
-
-    if let Some(d) = default {
-        for _ in 0..size {
-            builder.append_value(d.as_str()).unwrap();
-        }
-    } else {
-        for _ in 0..size {
-            builder.append_null().unwrap();
-        }
-    };
-
-    builder.finish()
-}
-
-pub fn new_int64_array_with_placeholder(size: usize, default: i64) -> Int64Array {
-    let mut builder = Int64Builder::new(size);
-
-    for _ in 0..size {
-        builder.append_value(default).unwrap();
-    }
-
-    builder.finish()
 }
 
 impl InformationSchemaTablesBuilder {

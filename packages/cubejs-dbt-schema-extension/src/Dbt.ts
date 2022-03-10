@@ -109,6 +109,26 @@ query LoadModels($jobId: Int!) {
 }
 `;
 
+// For reference:
+// - dbt Metrics types: https://docs.getdbt.com/docs/building-a-dbt-project/metrics, https://github.com/dbt-labs/dbt-core/issues/4071#issue-102758091
+// - Cube measure types: https://cube.dev/docs/schema/reference/types-and-formats#measures-types
+const dbtToCubeMetricTypeMap: Record<string, string> = {
+  count: 'count',
+  count_distinct: 'countDistinct',
+  sum: 'sum',
+  average: 'avg',
+  min: 'min',
+  max: 'max',
+};
+
+function mapMetricType(dbtMetricType: string): string {
+  if (!dbtToCubeMetricTypeMap[dbtMetricType]) {
+    throw new UserError(`Unsupported dbt metric type '${dbtMetricType}'`);
+  }
+
+  return dbtToCubeMetricTypeMap[dbtMetricType];
+}
+
 export class Dbt extends AbstractExtension {
   public async loadMetricCubesFromDbtProject(projectPath: string, options: DbtLoadOptions): Promise<{ [cubeName: string]: any }> {
     const dbtProjectPath = path.join(projectPath, 'dbt_project.yml');
@@ -217,7 +237,7 @@ export class Dbt extends AbstractExtension {
         measures: cubeDefs[model].metrics.map(metric => ({
           [camelize(metric.name, true)]: {
             sql: () => metric.sql,
-            type: metric.type,
+            type: mapMetricType(metric.type),
           },
         })).reduce((a, b) => ({ ...a, ...b }), {}),
 

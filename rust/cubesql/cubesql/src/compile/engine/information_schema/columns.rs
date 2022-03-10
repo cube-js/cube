@@ -16,7 +16,7 @@ use datafusion::{
 
 use crate::transport::{CubeColumn, V1CubeMetaExt};
 
-use super::tables::new_string_array_with_placeholder;
+use super::utils::new_string_array_with_placeholder;
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,
