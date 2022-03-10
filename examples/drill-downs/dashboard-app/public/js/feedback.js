@@ -9,9 +9,9 @@ const feedbackMessageSendBtn = document.getElementById("feedback-message-send")
 const feedbackMessageCancelBtn = document.getElementById("feedback-message-cancel")
 
 // UI
-const feedbackBlock = document.getElementsByClassName("feedback-block")[0]
-const feedbackMessageForm = document.getElementsByClassName("feedback-message-form")[0]
-const thanksBlock = document.getElementsByClassName("thanks")[0]
+const feedbackBlock = document.querySelector(".feedback-block")
+const feedbackMessageForm = document.querySelector("feedback-message-form")
+const thanksBlock = document.querySelector("thanks")
 
 const FEEDBACK_LIKE = "like";
 const FEEDBACK_DISLIKE = "dislike";
