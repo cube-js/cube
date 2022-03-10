@@ -20,7 +20,7 @@
     <div class="logo">
       <img src="assets/logo.svg" alt="Cube Examples" class="logo-img">
     </div>
-    <button class="nav-toggle" id="nav-toggle">
+    <button class="nav-toggle" id="nav-toggle" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation">
       <span></span>
       <span></span>
       <span></span>
@@ -36,8 +36,7 @@
         </li>
       </ul>
       <div class="menu dropdown">
-        <button class="menu-button dropdown-button button outline load" id="menu-button" aria-expanded="false"
-          tabindex="0">
+        <button class="menu-button dropdown-button button outline load" id="menu-button" aria-expanded="false" tabindex="0">
           <span id="menu-current"></span>
           <svg width="10" height="7" viewBox="0 0 10 7" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M1 1L5 5L9 1" stroke="#141446" stroke-width="1.6" />
@@ -58,18 +57,16 @@
       <p>Would to learn more? Read the <a href="#" class="link">tutorial</a> or explore the <a href="#"
           class="link">source code</a></p>
     </section>
+    
     <!-- Fill your root id -->
     <div id="root"></div>
   </main>
-
-
 
   <footer class="footer">
     <div class="feedback">
       <p class="thanks d-none">Thank you for the feedback!</p>
       <div class="feedback-block">
         <p>Did you find this example useful?</p>
-        <!-- Feedback Buttons -->
         <div class="feedback-buttons">
           <button class="feedback-button" id="feedback-like">
             <svg width="14" height="14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -87,7 +84,6 @@
           </button>
         </div>
       </div>
-      <!-- Feedback Message -->
       <form class="feedback-message-form form d-none">
         <textarea id="feedback-message" class="form-textarea" placeholder=""></textarea>
         <div class="feedback-message-buttons">

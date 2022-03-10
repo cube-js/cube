@@ -9,7 +9,7 @@ const menuList = document.getElementById("menu-list")
 const dropdownMenuBtn = document.querySelector(".dropdown-button")
 const dropdownMenuList = document.querySelector(".menu-list")
 dropdownMenuBtn.addEventListener("click", function (e) {
-    // dropdownMenuList.scrollTop = 0;
+    dropdownMenuList.scrollTop = 0;
     if (this.getAttribute("aria-expanded") === "true") {
         this.setAttribute("aria-expanded", false)
     } else {
@@ -34,13 +34,16 @@ navToggle.addEventListener('click', (e) => {
         header.classList.remove('open');
         header.classList.add('hide');
         document.body.classList.toggle('noscroll')
+        navToggle.setAttribute("aria-expanded", false)
     } else if (header.classList.contains('hide')) {
         header.classList.remove('hide');
         header.classList.add('open');
         document.body.classList.toggle('noscroll')
+        navToggle.setAttribute("aria-expanded", true)
     } else {
         header.classList.add('open');
         document.body.classList.toggle('noscroll')
+        navToggle.setAttribute("aria-expanded", true)
     }
 })
 
@@ -49,6 +52,7 @@ navOverlay.addEventListener("click", () => {
         header.classList.remove('open');
         header.classList.add('hide');
         document.body.classList.toggle('noscroll')
+        navToggle.setAttribute("aria-expanded", false)
     }
 })
 
@@ -59,6 +63,7 @@ window.addEventListener("resize", () => {
         header.classList.remove('hide');
         dropdownMenuBtn.setAttribute("aria-expanded", false)
         document.body.classList.remove('noscroll')
+        navToggle.setAttribute("aria-expanded", false)
 
         // fix menu max-height
         // if there is more then 8 menu items
