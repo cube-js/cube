@@ -24,7 +24,7 @@
     "recharts": "^1.8.5"
   },
   "scripts": {
-    "bundle": "browserify public/js/menu.js public/js/index.js public/js/feedback.js -o public/bundle.js",
+    "bundle": "browserify public/js/menu.js public/js/index.js public/js/feedback.js public/js/tracking.js -o public/bundle.js",
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true yarn run bundle && react-scripts start",
     "build": "SKIP_PREFLIGHT_CHECK=true yarn run bundle && react-scripts build",
     "deploy": "cross-env NODE_ENV=production yarn run build && netlify deploy --prod --dir build",
