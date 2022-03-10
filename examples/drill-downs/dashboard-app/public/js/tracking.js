@@ -1,5 +1,5 @@
-const cubeTracking = require("cubedev-tracking")
+const cubeTracking = require('cubedev-tracking');
 
-window.addEventListener("load", ()=>{
-    cubeTracking.page()
-})
+window.addEventListener('load', () => {
+  cubeTracking.page();
+});
