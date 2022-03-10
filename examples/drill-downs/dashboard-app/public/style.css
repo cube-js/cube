@@ -59,7 +59,7 @@
     /* ASSETS */
     --nav-font-color: var(--color-black-85);
     --nav-padding-mobile: 18px;
-    --header-height: 65px;
+    --header-height: 88px;
     --overlay-height: calc(100vh - var(--header-height));
     --border-grey: 1px solid var(--color-black-12);
     --button-padding-horizontal: 16px;
@@ -428,7 +428,7 @@ ul {
 /* from --breakpoint-desktop-s var */
 @media only screen and (min-width: 880px) {
     .header {
-        padding: 16px 24px;
+        padding: 24px;
     }
 
     .logo {
