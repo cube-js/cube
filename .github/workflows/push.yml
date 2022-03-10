@@ -428,6 +428,7 @@ jobs:
           yarn run dataset:minimal
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
+          yarn run birdbox:questdb
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
