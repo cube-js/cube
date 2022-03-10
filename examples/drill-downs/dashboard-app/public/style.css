@@ -40,6 +40,15 @@
     --line-height-regular: 1.625;
     --letter-spacing-regular: 0.5%;
     --text-color-regular: var(--color-black-75);
+    --font-family-regular: Cera Pro, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                            'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                            sans-serif;
+    --font-family-medium: Cera Pro Medium, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                            'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                            sans-serif;
+    --font-family-bold: Cera Pro Bold, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                        sans-serif;
 
     /* TRANSITION */
     --time: 0.7s;
@@ -162,10 +171,9 @@ body {
     display: flex;
     flex-direction: column;
 
-    font-family: Cera Pro, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-                sans-serif;
+    font-family: var(--font-family-regular);
     color: var(--text-color-regular);
+    -webkit-font-smoothing: antialiased;
 }
 
 body.noscroll {
@@ -325,14 +333,7 @@ ul {
 }
 
 .dropdown-button {
-    display: inline-block;
     height: 40px;
-    background-color: transparent;
-    border: none;
-    outline: none;
-    border-radius: 8px;
-    font-family: Cera Pro Medium, sans-serif;
-    font-size: 16px;
     text-overflow: ellipsis;
 }
 
@@ -349,6 +350,7 @@ ul {
 
 .dropdown-button svg {
     display: inline-block;
+    margin-bottom: 1px;
 }
 
 .dropdown-button:focus-visible {
@@ -378,9 +380,9 @@ ul {
 
 .dropdown-list-item>* {
     text-decoration: none;
-    color: var(--color-black-85);
+    color: var(--color-black-100);
     font-size: var(--font-size-regular);
-    font-family: Cera Pro, sans-serif;
+    font-family: var(--font-family-medium);
     line-height: var(--line-height-regular);
     letter-spacing: var(--letter-spacing-regular);
     font-weight: 500;
@@ -406,7 +408,7 @@ ul {
 .dropdown-list-item>*:hover,
 .dropdown-list-item>*:focus,
 .dropdown-list-item>*:active {
-    color: var(--color-black-100);
+    color: var(--color-purple);
 }
 
 .user-actions {
@@ -473,8 +475,6 @@ ul {
         padding: 0;
     }
 
-
-
     .dropdown-button {
         width: auto;
         min-width: 150px;
@@ -483,7 +483,6 @@ ul {
     .dropdown-button.load {
         border: none !important;
     }
-
 
     .dropdown-button span {
         margin-right: 8px;
@@ -537,7 +536,6 @@ ul {
     .dropdown-list-item>* {
         display: block;
         width: 100%;
-        font-family: Cera Pro Medium, sans-serif;
 
         padding: 12px 16px;
     }
@@ -577,7 +575,8 @@ ul {
 }
 
 .title {
-    font-family: Cera Pro Bold, sans-serif;
+    font-family: var(--font-family-bold);
+    font-weight: 700;
     font-size: 32px;
     margin-bottom: 8px;
     text-align: center;
@@ -628,7 +627,7 @@ ul {
     padding: 7px var(--button-padding-horizontal);
     border-radius: 8px;
 
-    font-family: inherit;
+    font-family: var(--font-family-medium);
     font-size: var(--font-size-regular);
     line-height: var(--line-height-regular);
     text-decoration: none;
@@ -696,7 +695,7 @@ ul {
 
 .button.clear:hover,
 .button.clear:active {
-    color: var(--color-black-100);
+    color: var(--color-purple-bright);
 }
 
 .button.clear:focus-visible {
@@ -713,7 +712,6 @@ ul {
     .button.outline.dropdown-button:not(.load) {
         border: var(--border-grey);
         color: var(--color-black-100);
-        font-family: Cera Pro Medium;
     }
 }
 
