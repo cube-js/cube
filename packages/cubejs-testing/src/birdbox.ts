@@ -52,11 +52,6 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     }
   }
 
-  if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
-    process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
-    // execInDir('../../rust/cubestore', 'docker build . -t dev');
-  }
-
   const composeFile = `${options.name}.yml`;
   let dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
