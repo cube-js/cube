@@ -262,7 +262,7 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
         const result = shell.exec('ps -l');
         console.log('WWW', result.stdout);
       }
-      cli.kill();
+      cli.kill("SIGINT");
 
       const result = shell.exec('ps -l');
       console.log('ZZZ', result.stdout);
