@@ -359,8 +359,6 @@ jobs:
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Yarn build
-        run: yarn build
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
