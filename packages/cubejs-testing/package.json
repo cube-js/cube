@@ -49,7 +49,6 @@
     "@cubejs-backend/schema-compiler": "^0.29.31",
     "@cubejs-backend/shared": "^0.29.29",
     "@cubejs-backend/testing-shared": "^0.29.31",
-    "@cubejs-client/core": "^0.29.29",
     "@cubejs-client/ws-transport": "^0.29.29",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
@@ -62,6 +61,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-client/core": "^0.29.29",
     "@types/dedent": "^0.7.0",
     "@jest/globals": "^26.6.2",
     "@types/http-proxy": "^1.17.5",
