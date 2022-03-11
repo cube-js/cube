@@ -208,7 +208,7 @@ ul {
 }
 
 .nav-overlay {
-    background-color: #000;
+    background-color: var(--color-black-12);
     position: absolute;
     top: 100%;
     left: 0;
