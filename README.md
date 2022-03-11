@@ -1,4 +1,4 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
+<a href="https://cube.dev"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
 
 [Website](https://cube.dev) • [Getting Started](https://cube.dev/docs/getting-started) • [Docs](https://cube.dev/docs) • [Examples](https://cube.dev/docs/examples) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Discourse](https://forum.cube.dev/) • [Twitter](https://twitter.com/thecubejs)
 
