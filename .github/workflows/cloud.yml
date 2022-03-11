@@ -1,7 +1,6 @@
 name: 'Cloud Tests'
 on:
-#  push:
-  pull_request:
+  push:
     paths:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
@@ -14,8 +13,8 @@ on:
       - 'yarn.lock'
       - 'docs-gen/**'
       - 'docs/**'
-#    branches:
-#      - master
+    branches:
+      - master
 
 jobs:
   integration-cloud:
