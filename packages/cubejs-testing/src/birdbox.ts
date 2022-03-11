@@ -6,7 +6,6 @@ import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
 import { execInDir, pausePromise } from '@cubejs-backend/shared';
 import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
-import shell from "shelljs";
 
 export interface BirdBoxTestCaseOptions {
   name: string;
