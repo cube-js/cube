@@ -256,7 +256,7 @@ ul {
     top: 0;
     height: var(--overlay-height);
     background-color: #fff;
-    width: 70%;
+    width: auto;
     z-index: var(--z-index-3);
     margin-top: var(--header-height-mobile-s);
     overflow-y: auto;
@@ -420,13 +420,6 @@ ul {
     padding: var(--nav-padding-mobile);
     width: 100%;
     border-bottom: 1px solid var(--color-black-12);
-}
-
-/* from --breakpoint-mobile-s var */
-@media only screen and (min-width: 480px) {
-    .nav {
-        width: 50%;
-    }
 }
 
 /* from --breakpoint-desktop-s var */
