@@ -706,7 +706,6 @@ ul {
     outline: 3px solid var(--color-black-10);
 }
 
-
 .button.outline:not(.dropdown-button) {
     border: 1px solid var(--color-secondary-hover-border);
     color: var(--color-purple-bright);
@@ -723,6 +722,10 @@ ul {
     border-color: var(--color-secondary-hover-border);
     background-color: var(--color-secondary-hover-bg);
     color: var(--color-purple-bright);
+}
+
+.button.outline.dropdown-button{
+    color: var(--color-black-100);
 }
 
 .button.outline.dropdown-button:hover {
