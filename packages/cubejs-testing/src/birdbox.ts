@@ -257,16 +257,8 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
 
       console.log('[Birdbox] Done with DB');
 
-      console.log('QQQ', cli.pid, `pkill -P ${cli.pid}`);
-      {
-        const result = shell.exec('ps -l');
-        console.log('WWW', result.stdout);
-      }
-      cli.kill("SIGINT");
-
-      const result = shell.exec('ps -l');
-      console.log('ZZZ', result.stdout);
-
+      cli.kill();
+      
       console.log('[Birdbox] Closed');
     },
     configuration: {
