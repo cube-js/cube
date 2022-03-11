@@ -337,6 +337,12 @@ ul {
 .dropdown-button {
     height: 40px;
     text-overflow: ellipsis;
+    display: flex !important;
+    align-items: center;
+}
+
+.dropdown-button:focus-visible {
+    outline: 2px solid var(--color-secondary-default);
 }
 
 .dropdown-button.load {
@@ -355,8 +361,9 @@ ul {
     margin-bottom: 1px;
 }
 
-.dropdown-button:focus-visible {
-    outline: 2px solid var(--color-secondary-default);
+.dropdown-button span {
+    margin-right: 8px;
+    white-space: nowrap;
 }
 
 .dropdown-content {
@@ -380,7 +387,7 @@ ul {
     transition: .2s;
 }
 
-.dropdown-list-item>* {
+.dropdown-link {
     text-decoration: none;
     color: var(--color-black-100);
     font-size: var(--font-size-regular);
@@ -388,6 +395,7 @@ ul {
     line-height: var(--line-height-regular);
     letter-spacing: var(--letter-spacing-regular);
     font-weight: 500;
+    white-space: nowrap;
 
     display: block;
     width: 100%;
@@ -395,7 +403,7 @@ ul {
     transition: 0.1s;
 }
 
-.dropdown-list-item>*:focus-visible {
+.dropdown-link:focus-visible {
     outline: 3px solid var(--color-secondary-outline);
 }
 
@@ -407,9 +415,9 @@ ul {
     border-radius: 0 0 8px 8px;
 }
 
-.dropdown-list-item>*:hover,
-.dropdown-list-item>*:focus,
-.dropdown-list-item>*:active {
+.dropdown-link:hover,
+.dropdown-link:focus,
+.dropdown-link:active {
     color: var(--color-purple);
 }
 
@@ -484,10 +492,6 @@ ul {
         border: none !important;
     }
 
-    .dropdown-button span {
-        margin-right: 8px;
-    }
-
     .dropdown-content {
         position: absolute;
         left: 0;
@@ -533,7 +537,7 @@ ul {
         max-height: var(--menu-overflow-max-height);
     }
 
-    .dropdown-list-item>* {
+    .dropdown-link {
         display: block;
         width: 100%;
 
@@ -548,8 +552,8 @@ ul {
         border-radius: 0 0 8px 8px;
     }
 
-    .dropdown-list-item>*:hover,
-    .dropdown-list-item>*:focus {
+    .dropdown-link:hover,
+    .dropdown-link:focus {
         background-color: var(--color-light);
         color: var(--color-purple);
     }
