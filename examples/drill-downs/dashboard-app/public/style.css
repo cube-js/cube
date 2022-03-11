@@ -219,11 +219,6 @@ ul {
     display: none;
 }
 
-
-.header.open .nav-overlay {
-    animation-fill-mode: forwards;
-}
-
 .header.hide .nav-overlay {
     opacity: 0.6;
     animation-duration: 100000s;
@@ -234,6 +229,7 @@ ul {
     display: block;
     animation-name: open;
     animation-duration: var(--time);
+    animation-fill-mode: forwards;
 }
 
 .logo {
@@ -427,6 +423,10 @@ ul {
     .header {
         height: var(--header-height-desktop-xs);
         padding: 24px;
+    }
+
+    .header.open .nav-overlay{
+        display: none;
     }
 
     .logo {
