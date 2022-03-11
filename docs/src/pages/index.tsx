@@ -47,7 +47,7 @@ class IndexPage extends Component<Props> {
         <div className={styles.mainTabs}>
           <Row>
             <MainTab
-              title="Get Started"
+              title="Getting Started"
               img={imgGettingStarted}
               desc="Start here if you're new to Cube"
               to="/getting-started"
