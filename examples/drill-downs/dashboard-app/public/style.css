@@ -68,8 +68,9 @@
     /* ASSETS */
     --nav-font-color: var(--color-black-85);
     --nav-padding-mobile: 18px;
-    --header-height: 88px;
-    --overlay-height: calc(100vh - var(--header-height));
+    --header-height-mobile-s: 64px;
+    --header-height-desktop-xs: 88px;
+    --overlay-height: calc(100vh - var(--header-height-mobile-s));
     --border-grey: 1px solid var(--color-black-12);
     --button-padding-horizontal: 16px;
 
@@ -197,7 +198,8 @@ ul {
 /* HEADER */
 
 .header {
-    height: var(--header-height);
+    flex-shrink: 0; /* prevent collapsing when mobile nav is open because of body.noscroll fixed height */
+    height: var(--header-height-mobile-s);
     padding: 18px 16px;
     position: relative;
 
@@ -256,7 +258,7 @@ ul {
     background-color: #fff;
     width: 70%;
     z-index: var(--z-index-3);
-    margin-top: var(--header-height);
+    margin-top: var(--header-height-mobile-s);
     overflow-y: auto;
 }
 
@@ -430,6 +432,7 @@ ul {
 /* from --breakpoint-desktop-s var */
 @media only screen and (min-width: 880px) {
     .header {
+        height: var(--header-height-desktop-xs);
         padding: 24px;
     }
 
