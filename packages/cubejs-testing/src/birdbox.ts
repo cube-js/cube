@@ -261,8 +261,8 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
 
       cli.kill(9);
 
-      const result = shell.exec('ps');
-      console.log('WWW', result);
+      const result = shell.exec('ps -al');
+      console.log('WWW', result.stdout);
 
       console.log('[Birdbox] Closed');
     },
