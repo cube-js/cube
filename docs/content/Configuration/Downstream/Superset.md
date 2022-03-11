@@ -1,6 +1,8 @@
 ---
 title: Connecting to Superset/Preset
 permalink: /config/downstream/superset
+redirect_from:
+  - /recipes/using-apache-superset-with-cube-sql
 ---
 
 You can connect a Cube project to [Apache Superset][superset] using the Cube SQL
@@ -53,7 +55,7 @@ database:
 <div style="text-align: center">
   <img
     alt="Apache Superset: databases page"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-1.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-1.png"
     style="border: none"
     width="100%"
   />
@@ -64,7 +66,7 @@ Pick MySQL from the modal:
 <div style="text-align: center">
   <img
     alt="Apache Superset: add new database modal"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-2.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-2.png"
     style="border: none"
     width="100%"
   />
@@ -75,7 +77,7 @@ Now enter the Cube SQL API credentials from earlier:
 <div style="text-align: center">
   <img
     alt="Apache Superset: add database credentials"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-3.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-3.png"
     style="border: none"
     width="100%"
   />
@@ -117,7 +119,7 @@ create datasets based on tables. Let's create one from `Orders` table:
 <div style="text-align: center">
   <img
     alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-4.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-4.png"
     style="border: none"
     width="100%"
   />
@@ -131,7 +133,7 @@ Now, we can explore this dataset. Let's create a new chart of type line with
 <div style="text-align: center">
   <img
     alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-5.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-5.png"
     style="border: none"
     width="100%"
   />
@@ -169,7 +171,7 @@ measures to metrics.
 <div style="text-align: center">
   <img
     alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Examples-Tutorials-Recipes/Recipes/apache-superset-6.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-6.png"
     style="border: none"
     width="100%"
   />
