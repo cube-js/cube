@@ -360,7 +360,7 @@ jobs:
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
       - name: Yarn install birdbox
-        run: cd packages/cubejs-testing && CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        run: (cd packages/cubejs-testing && CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile)
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
