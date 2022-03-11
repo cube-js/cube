@@ -11,7 +11,10 @@ import warnings
 import pandas
 
 warnings.filterwarnings('ignore')
+
 conn = create_engine('mysql+pymysql://user:password@host/db')
+
+data_frame = pandas.read_sql('SELECT total_sum, status from Orders');
 ```
 
 <img
