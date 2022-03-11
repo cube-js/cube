@@ -9,6 +9,20 @@
 - name: CUBEJS_SQL_PORT
   value: {{ .Values.config.sqlPort | quote }}
 {{- end }}
+{{- if .Values.config.sqlUser }}
+- name: CUBEJS_SQL_USER
+  value: {{ .Values.config.sqlUser | quote }}
+{{- end }}
+{{- if .Values.config.sqlPassword }}
+- name: CUBEJS_SQL_PASSWORD
+  value: {{ .Values.config.sqlPassword | quote }}
+{{- else if .Values.config.sqlPasswordFromSecret }}
+- name: CUBEJS_SQL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.config.sqlPasswordFromSecret.name | required "config.sqlPasswordFromSecret.name is required" }}
+      key: {{ .Values.config.sqlPasswordFromSecret.key | required "config.sqlPasswordFromSecret.key is required" }}
+{{- end }}
 {{- if .Values.config.devMode }}
 - name: CUBEJS_DEV_MODE
   value: {{ .Values.config.devMode | quote }}
