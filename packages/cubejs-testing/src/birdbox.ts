@@ -6,6 +6,7 @@ import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
 import { execInDir, pausePromise } from '@cubejs-backend/shared';
 import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
+import psList from 'ps-list';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
@@ -256,9 +257,11 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
 
       console.log('[Birdbox] Done with DB');
 
-      console.log('QQQ', cli.pid, cli);
+      console.log('QQQ', cli.pid);
 
-      cli.kill('SIGKILL');
+      cli.kill(9);
+
+      console.log(await psList());
 
       console.log('[Birdbox] Closed');
     },
