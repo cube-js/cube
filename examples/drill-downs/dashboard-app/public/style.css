@@ -240,6 +240,10 @@ ul {
     margin-right: 16px;
 }
 
+.logo-img{
+    max-width: 100%;
+}
+
 .nav {
     flex-grow: 2;
 
