@@ -8,7 +8,7 @@ type QuestStartOptions = DBRunnerContainerOptions & {
 
 export class QuestDBRunner extends DbRunnerAbstract {
   public static startContainer(options: QuestStartOptions) {
-    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '6.2';
+    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '6.2.1';
 
     const container = new GenericContainer(`questdb/questdb:${version}`)
       .withExposedPorts(8812)
