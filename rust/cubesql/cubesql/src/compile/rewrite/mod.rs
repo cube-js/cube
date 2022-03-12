@@ -21,9 +21,13 @@ use datafusion::physical_plan::window_functions::WindowFunction;
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::FileType;
 use datafusion::sql::planner::ContextProvider;
-use egg::{rewrite, Applier, CostFunction, Language, Pattern, PatternAst, Subst, Symbol, Var};
+use egg::{
+    rewrite, Analysis, Applier, CostFunction, DidMerge, Language, Pattern, PatternAst, Subst,
+    Symbol, Var,
+};
 use egg::{EGraph, Extractor, Id, RecExpr, Rewrite, Runner};
 use itertools::Itertools;
+use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -104,6 +108,7 @@ crate::plan_to_language! {
         Extension {
             node: Arc<LogicalPlan>,
         },
+
         CubeScan {
             cube: Arc<LogicalPlan>,
             measures: Vec<LogicalPlan>,
@@ -123,6 +128,9 @@ crate::plan_to_language! {
             granularity: Option<String>,
             dateRange: Option<Vec<String>>,
             expr: Arc<Expr>,
+        },
+        MemberAlias {
+            name: String,
         },
 
         AliasExpr {
@@ -259,15 +267,17 @@ macro_rules! var_iter {
     }};
 }
 
-pub struct LogicalPlanToLanguageConverter<'a> {
-    graph: EGraph<LogicalPlanLanguage, ()>,
-    cube_context: CubeContext<'a>,
+pub struct LogicalPlanToLanguageConverter {
+    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    cube_context: CubeContext,
 }
 
-impl<'a> LogicalPlanToLanguageConverter<'a> {
-    pub fn new(cube_context: CubeContext<'a>) -> Self {
+impl LogicalPlanToLanguageConverter {
+    pub fn new(cube_context: CubeContext) -> Self {
         Self {
-            graph: EGraph::default(),
+            graph: EGraph::<LogicalPlanLanguage, LogicalPlanAnalysis>::new(LogicalPlanAnalysis {
+                cube_context: cube_context.clone(),
+            }),
             cube_context,
         }
     }
@@ -609,15 +619,17 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         })
     }
 
-    pub fn rewrite_runner(&self) -> Runner<LogicalPlanLanguage, ()> {
-        Runner::<LogicalPlanLanguage, ()>::new(Default::default())
-            .with_iter_limit(100)
-            .with_node_limit(10000)
-            .with_egraph(self.graph.clone())
+    pub fn rewrite_runner(&self) -> Runner<LogicalPlanLanguage, LogicalPlanAnalysis> {
+        Runner::<LogicalPlanLanguage, LogicalPlanAnalysis>::new(LogicalPlanAnalysis {
+            cube_context: self.cube_context.clone(),
+        })
+        .with_iter_limit(100)
+        .with_node_limit(10000)
+        .with_egraph(self.graph.clone())
     }
 
     pub fn find_best_plan(
-        &self,
+        &mut self,
         root: Id,
         auth_context: Arc<AuthContext>,
     ) -> Result<LogicalPlan, CubeError> {
@@ -628,6 +640,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         let (_, best) = extractor.find_best(root);
         let new_root = Id::from(best.as_ref().len() - 1);
         println!("Best: {:?}", best);
+        self.graph = runner.egraph.clone();
         let converter = LanguageToLogicalPlanConverter {
             graph: runner.egraph,
             best_expr: best,
@@ -637,7 +650,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         converter.to_logical_plan(new_root)
     }
 
-    pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, ()>> {
+    pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         vec![
             rewrite!("cube-scan";
                 "(TableScan ?source_table_name ?table_name ?projection ?filters ?limit)" =>
@@ -733,6 +746,24 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     )
                  }
             ),
+            rewrite!("time-dimension-alias";
+                "(TimeDimension \
+                    ?time_dimension_name \
+                    ?time_dimension_granularity \
+                    ?date_range \
+                    ?original_expr \
+                )" => {
+                    TransformingPattern::new(
+                        "(TimeDimension \
+                            ?time_dimension_name \
+                            ?time_dimension_granularity \
+                            ?date_range \
+                            ?alias \
+                        )",
+                         self.transform_original_expr_alias("?original_expr", "?alias")
+                    )
+                 }
+            ),
             rewrite!("remove-processed-aggregate";
                 "(Aggregate \
                     (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
@@ -754,13 +785,215 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
                     ) \
                 )"
             ),
+            rewrite(
+                "binary-expr-addition-assoc",
+                binary_expr(binary_expr("?a", "+", "?b"), "+", "?c"),
+                binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
+            ),
+            rewrite(
+                "binary-expr-multi-assoc",
+                binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
+                binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+            ),
+            // TODO ?interval ?one
+            rewrite(
+                "superset-quarter-to-date-trunc",
+                binary_expr(
+                    binary_expr(
+                        udf_expr(
+                            "makedate",
+                            vec![
+                                udf_expr("year", vec![column_expr("?column")]),
+                                literal_expr("?one"),
+                            ],
+                        ),
+                        "+",
+                        fun_expr(
+                            "ToMonthInterval",
+                            vec![
+                                udf_expr("quarter", vec![column_expr("?column")]),
+                                literal_string("quarter"),
+                            ],
+                        ),
+                    ),
+                    "-",
+                    literal_expr("?interval"),
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("quarter"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?one ?interval
+            rewrite(
+                "superset-week-to-date-trunc",
+                udf_expr(
+                    "date",
+                    vec![udf_expr(
+                        "date_sub",
+                        vec![
+                            column_expr("?column"),
+                            to_day_interval_expr(
+                                binary_expr(
+                                    udf_expr(
+                                        "dayofweek",
+                                        vec![udf_expr(
+                                            "date_sub",
+                                            vec![column_expr("?column"), literal_expr("?interval")],
+                                        )],
+                                    ),
+                                    "-",
+                                    literal_expr("?one"),
+                                ),
+                                literal_string("day"),
+                            ),
+                        ],
+                    )],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("week"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?one ?interval
+            rewrite(
+                "superset-month-to-date-trunc",
+                udf_expr(
+                    "date",
+                    vec![udf_expr(
+                        "date_sub",
+                        vec![
+                            column_expr("?column"),
+                            to_day_interval_expr(
+                                binary_expr(
+                                    udf_expr("dayofmonth", vec![column_expr("?column")]),
+                                    "-",
+                                    literal_expr("?one"),
+                                ),
+                                literal_string("day"),
+                            ),
+                        ],
+                    )],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("month"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?one ?interval
+            rewrite(
+                "superset-year-to-date-trunc",
+                udf_expr(
+                    "date",
+                    vec![udf_expr(
+                        "date_sub",
+                        vec![
+                            column_expr("?column"),
+                            to_day_interval_expr(
+                                binary_expr(
+                                    udf_expr("dayofyear", vec![column_expr("?column")]),
+                                    "-",
+                                    literal_expr("?one"),
+                                ),
+                                literal_string("day"),
+                            ),
+                        ],
+                    )],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("year"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?one ?interval
+            rewrite(
+                "superset-hour-to-date-trunc",
+                udf_expr(
+                    "date_add",
+                    vec![
+                        udf_expr("date", vec![column_expr("?column")]),
+                        to_day_interval_expr(
+                            udf_expr("hour", vec![column_expr("?column")]),
+                            literal_string("hour"),
+                        ),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("hour"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?sixty
+            rewrite(
+                "superset-minute-to-date-trunc",
+                udf_expr(
+                    "date_add",
+                    vec![
+                        udf_expr("date", vec![column_expr("?column")]),
+                        to_day_interval_expr(
+                            binary_expr(
+                                binary_expr(
+                                    udf_expr("hour", vec![column_expr("?column")]),
+                                    "*",
+                                    "?sixty",
+                                ),
+                                "+",
+                                udf_expr("minute", vec![column_expr("?column")]),
+                            ),
+                            literal_string("minute"),
+                        ),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("minute"), column_expr("?column")],
+                ),
+            ),
+            // TODO ?sixty
+            rewrite(
+                "superset-second-to-date-trunc",
+                udf_expr(
+                    "date_add",
+                    vec![
+                        udf_expr("date", vec![column_expr("?column")]),
+                        to_day_interval_expr(
+                            binary_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        udf_expr("hour", vec![column_expr("?column")]),
+                                        "*",
+                                        "?sixty",
+                                    ),
+                                    "*",
+                                    "?sixty",
+                                ),
+                                "+",
+                                binary_expr(
+                                    binary_expr(
+                                        udf_expr("minute", vec![column_expr("?column")]),
+                                        "*",
+                                        "?sixty",
+                                    ),
+                                    "+",
+                                    udf_expr("second", vec![column_expr("?column")]),
+                                ),
+                            ),
+                            literal_string("second"),
+                        ),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("second"), column_expr("?column")],
+                ),
+            ),
         ]
     }
 
     fn is_cube_table(
         &self,
         var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, Id, &Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &Subst) -> bool {
         let var = var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
         move |egraph, _, subst| {
@@ -777,6 +1010,45 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         }
     }
 
+    fn transform_original_expr_alias(
+        &self,
+        original_expr_var: &'static str,
+        alias_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = original_expr_var.parse().unwrap();
+        let alias_expr_var = alias_expr_var.parse().unwrap();
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            if !egraph[original_expr_id]
+                .nodes
+                .iter()
+                .any(|node| match node {
+                    LogicalPlanLanguage::MemberAlias(_) => true,
+                    _ => false,
+                })
+            {
+                let res = egraph[original_expr_id].data.original_expr.as_ref().ok_or(
+                    CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )),
+                );
+                if let Ok(expr) = res {
+                    // TODO unwrap
+                    let name = expr.name(&DFSchema::empty()).unwrap();
+                    let alias =
+                        egraph.add(LogicalPlanLanguage::MemberAliasName(MemberAliasName(name)));
+                    subst.insert(
+                        alias_expr_var,
+                        egraph.add(LogicalPlanLanguage::MemberAlias([alias])),
+                    );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
     fn transform_time_dimension(
         &self,
         cube_var: &'static str,
@@ -785,7 +1057,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         granularity_var: &'static str,
         time_dimension_granularity_var: &'static str,
         date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = cube_var.parse().unwrap();
         let dimension_var = dimension_var.parse().unwrap();
         let time_dimension_name_var = time_dimension_name_var.parse().unwrap();
@@ -856,7 +1128,7 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
         measure_var: Option<&'static str>,
         distinct_var: &'static str,
         fun_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let var = cube_var.parse().unwrap();
         let distinct_var = distinct_var.parse().unwrap();
         let fun_var = fun_var.parse().unwrap();
@@ -926,9 +1198,135 @@ impl<'a> LogicalPlanToLanguageConverter<'a> {
     }
 }
 
+fn rewrite(
+    name: &str,
+    searcher: String,
+    applier: String,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        applier.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+    )
+    .unwrap()
+}
+
+fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
+    let mut current = list_type.to_string();
+    for i in list.into_iter().rev() {
+        current = format!("({} {} {})", list_type, i, current);
+    }
+    current
+}
+
+fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+    format!(
+        "(ScalarUDFExpr ScalarUDFExprFun:{} {})",
+        fun_name,
+        list_expr("ScalarUDFExprArgs", args)
+    )
+}
+
+fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+    format!(
+        "(ScalarFunctionExpr {} {})",
+        fun_name,
+        list_expr("ScalarFunctionExprArgs", args)
+    )
+}
+
+fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
+    fun_expr("ToDayInterval", vec![period, unit])
+}
+
+fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
+    format!("(BinaryExpr {} {} {})", left, op, right)
+}
+
+fn literal_expr(literal: impl Display) -> String {
+    format!("(LiteralExpr {})", literal)
+}
+
+fn column_expr(column: impl Display) -> String {
+    format!("(ColumnExpr {})", column)
+}
+
+fn literal_string(literal_str: impl Display) -> String {
+    format!("(LiteralExpr LiteralExprValue:{})", literal_str)
+}
+
+#[derive(Clone, Debug)]
+pub struct LogicalPlanData {
+    original_expr: Option<Expr>,
+}
+
+#[derive(Clone)]
+pub struct LogicalPlanAnalysis {
+    cube_context: CubeContext,
+}
+
+pub struct SingleNodeIndex<'a> {
+    egraph: &'a EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+}
+
+impl<'a> Index<Id> for SingleNodeIndex<'a> {
+    type Output = LogicalPlanLanguage;
+
+    fn index(&self, index: Id) -> &Self::Output {
+        assert!(
+            self.egraph.index(index).nodes.len() == 1,
+            "Single node expected but {:?} found",
+            self.egraph.index(index).nodes
+        );
+        &self.egraph.index(index).nodes[0]
+    }
+}
+
+impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
+    type Data = LogicalPlanData;
+
+    fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
+        let id_to_expr = |id| {
+            egraph[id]
+                .data
+                .original_expr
+                .clone()
+                .ok_or(CubeError::internal(
+                    "Original expr wasn't prepared".to_string(),
+                ))
+        };
+        let original_expr = if is_expr_node(enode) {
+            // TODO .unwrap
+            Some(
+                node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &id_to_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .unwrap(),
+            )
+        } else {
+            None
+        };
+        LogicalPlanData { original_expr }
+    }
+
+    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
+        if a.original_expr.is_none() && b.original_expr.is_some() {
+            a.original_expr = b.original_expr.clone();
+            DidMerge(true, false)
+        } else if a.original_expr.is_some() {
+            DidMerge(false, true)
+        } else {
+            DidMerge(false, false)
+        }
+    }
+}
+
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -936,7 +1334,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -946,13 +1344,13 @@ where
     }
 }
 
-impl<T> Applier<LogicalPlanLanguage, ()> for TransformingPattern<T>
+impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, ()>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
-        egraph: &mut EGraph<LogicalPlanLanguage, ()>,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         eclass: Id,
         subst: &Subst,
         searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
@@ -994,7 +1392,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
 }
 
 macro_rules! match_params {
-    ($converter:expr, $id_expr:expr, $field_variant:ident) => {
+    ($id_expr:expr, $field_variant:ident) => {
         match $id_expr {
             LogicalPlanLanguage::$field_variant(params) => params,
             x => panic!(
@@ -1007,8 +1405,8 @@ macro_rules! match_params {
 }
 
 macro_rules! match_data_node {
-    ($converter:expr, $id_expr:expr, $field_variant:ident) => {
-        match $converter.best_expr.index($id_expr.clone()) {
+    ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {
+        match $node_by_id.index($id_expr.clone()) {
             LogicalPlanLanguage::$field_variant($field_variant(data)) => data.clone(),
             x => panic!(
                 "Expected {} but found {:?}",
@@ -1020,16 +1418,16 @@ macro_rules! match_data_node {
 }
 
 macro_rules! match_list_node {
-    ($converter:expr, $id_expr:expr, $field_variant:ident) => {{
+    ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {{
         fn match_list(
-            converter: &LanguageToLogicalPlanConverter<'_>,
+            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
             id: Id,
             result: &mut Vec<LogicalPlanLanguage>,
         ) -> Result<(), CubeError> {
-            match converter.best_expr.index(id) {
+            match node_by_id.index(id) {
                 LogicalPlanLanguage::$field_variant(list) => {
                     for i in list {
-                        match_list(converter, *i, result)?;
+                        match_list(node_by_id, *i, result)?;
                     }
                 }
                 x => {
@@ -1039,214 +1437,262 @@ macro_rules! match_list_node {
             Ok(())
         }
         let mut result = Vec::new();
-        match_list($converter, $id_expr.clone(), &mut result)?;
+        match_list($node_by_id, $id_expr.clone(), &mut result)?;
         result
     }};
 }
 
 macro_rules! match_expr_list_node {
-    ($converter:expr, $id_expr:expr, $field_variant:ident) => {{
+    ($node_by_id:expr, $to_expr:expr, $id_expr:expr, $field_variant:ident) => {{
         fn match_expr_list(
-            converter: &LanguageToLogicalPlanConverter<'_>,
+            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+            to_expr: &impl Fn(Id) -> Result<Expr, CubeError>,
             id: Id,
             result: &mut Vec<Expr>,
         ) -> Result<(), CubeError> {
-            match converter.best_expr.index(id) {
+            match node_by_id.index(id) {
                 LogicalPlanLanguage::$field_variant(list) => {
                     for i in list {
-                        match_expr_list(converter, *i, result)?;
+                        match_expr_list(node_by_id, to_expr, *i, result)?;
                     }
                 }
                 _ => {
-                    result.push(converter.to_expr(id.clone())?);
+                    result.push(to_expr(id.clone())?);
                 }
             }
             Ok(())
         }
         let mut result = Vec::new();
-        match_expr_list($converter, $id_expr.clone(), &mut result)?;
+        match_expr_list($node_by_id, $to_expr, $id_expr.clone(), &mut result)?;
         result
     }};
 }
 
-pub struct LanguageToLogicalPlanConverter<'a> {
-    graph: EGraph<LogicalPlanLanguage, ()>,
+pub struct LanguageToLogicalPlanConverter {
+    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     best_expr: RecExpr<LogicalPlanLanguage>,
-    cube_context: CubeContext<'a>,
+    cube_context: CubeContext,
     auth_context: Arc<AuthContext>,
 }
 
-impl<'a> LanguageToLogicalPlanConverter<'a> {
+pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
+    match node {
+        LogicalPlanLanguage::AliasExpr(_) => true,
+        LogicalPlanLanguage::ColumnExpr(_) => true,
+        LogicalPlanLanguage::ScalarVariableExpr(_) => true,
+        LogicalPlanLanguage::LiteralExpr(_) => true,
+        LogicalPlanLanguage::BinaryExpr(_) => true,
+        LogicalPlanLanguage::NotExpr(_) => true,
+        LogicalPlanLanguage::IsNotNullExpr(_) => true,
+        LogicalPlanLanguage::IsNullExpr(_) => true,
+        LogicalPlanLanguage::NegativeExpr(_) => true,
+        LogicalPlanLanguage::BetweenExpr(_) => true,
+        LogicalPlanLanguage::CaseExpr(_) => true,
+        LogicalPlanLanguage::CastExpr(_) => true,
+        LogicalPlanLanguage::TryCastExpr(_) => true,
+        LogicalPlanLanguage::SortExpr(_) => true,
+        LogicalPlanLanguage::ScalarFunctionExpr(_) => true,
+        LogicalPlanLanguage::ScalarUDFExpr(_) => true,
+        LogicalPlanLanguage::AggregateFunctionExpr(_) => true,
+        LogicalPlanLanguage::WindowFunctionExpr(_) => true,
+        LogicalPlanLanguage::AggregateUDFExpr(_) => true,
+        LogicalPlanLanguage::InListExpr(_) => true,
+        LogicalPlanLanguage::WildcardExpr(_) => true,
+        _ => false,
+    }
+}
+
+pub fn node_to_expr(
+    node: &LogicalPlanLanguage,
+    cube_context: &CubeContext,
+    to_expr: &impl Fn(Id) -> Result<Expr, CubeError>,
+    node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+) -> Result<Expr, CubeError> {
+    Ok(match node {
+        LogicalPlanLanguage::AliasExpr(params) => {
+            let expr = to_expr(params[0].clone())?;
+            let alias = match_data_node!(node_by_id, params[1], AliasExprAlias);
+            Expr::Alias(Box::new(expr), alias)
+        }
+        LogicalPlanLanguage::ColumnExpr(params) => {
+            let column = match_data_node!(node_by_id, params[0], ColumnExprColumn);
+            Expr::Column(column)
+        }
+        LogicalPlanLanguage::ScalarVariableExpr(params) => {
+            let variable = match_data_node!(node_by_id, params[0], ScalarVariableExprVariable);
+            Expr::ScalarVariable(variable)
+        }
+        LogicalPlanLanguage::LiteralExpr(params) => {
+            let value = match_data_node!(node_by_id, params[0], LiteralExprValue);
+            Expr::Literal(value)
+        }
+        LogicalPlanLanguage::BinaryExpr(params) => {
+            let left = Box::new(to_expr(params[0].clone())?);
+            let op = match_data_node!(node_by_id, params[1], BinaryExprOp);
+            let right = Box::new(to_expr(params[2].clone())?);
+            Expr::BinaryExpr { left, op, right }
+        }
+        LogicalPlanLanguage::NotExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            Expr::Not(expr)
+        }
+        LogicalPlanLanguage::IsNotNullExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            Expr::IsNotNull(expr)
+        }
+        LogicalPlanLanguage::IsNullExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            Expr::IsNull(expr)
+        }
+        LogicalPlanLanguage::NegativeExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            Expr::Negative(expr)
+        }
+        LogicalPlanLanguage::BetweenExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let negated = match_data_node!(node_by_id, params[1], BetweenExprNegated);
+            let low = Box::new(to_expr(params[2].clone())?);
+            let high = Box::new(to_expr(params[3].clone())?);
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            }
+        }
+        LogicalPlanLanguage::CaseExpr(params) => {
+            let expr = match_expr_list_node!(node_by_id, to_expr, params[0], CaseExprExpr);
+            let when_then_expr =
+                match_expr_list_node!(node_by_id, to_expr, params[1], CaseExprWhenThenExpr);
+            let else_expr = match_expr_list_node!(node_by_id, to_expr, params[2], CaseExprElseExpr);
+            Expr::Case {
+                expr: expr.into_iter().next().map(|e| Box::new(e)),
+                when_then_expr: when_then_expr
+                    .into_iter()
+                    .chunks(2)
+                    .into_iter()
+                    .map(|mut chunk| {
+                        (
+                            Box::new(chunk.next().unwrap()),
+                            Box::new(chunk.next().unwrap()),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+                else_expr: else_expr.into_iter().next().map(|e| Box::new(e)),
+            }
+        }
+        LogicalPlanLanguage::CastExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let data_type = match_data_node!(node_by_id, params[1], CastExprDataType);
+            Expr::Cast { expr, data_type }
+        }
+        LogicalPlanLanguage::TryCastExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let data_type = match_data_node!(node_by_id, params[1], TryCastExprDataType);
+            Expr::TryCast { expr, data_type }
+        }
+        LogicalPlanLanguage::SortExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let asc = match_data_node!(node_by_id, params[1], SortExprAsc);
+            let nulls_first = match_data_node!(node_by_id, params[2], SortExprNullsFirst);
+            Expr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            }
+        }
+        LogicalPlanLanguage::ScalarFunctionExpr(params) => {
+            let fun = match_data_node!(node_by_id, params[0], ScalarFunctionExprFun);
+            let args =
+                match_expr_list_node!(node_by_id, to_expr, params[1], ScalarFunctionExprArgs);
+            Expr::ScalarFunction { fun, args }
+        }
+        LogicalPlanLanguage::ScalarUDFExpr(params) => {
+            let fun_name = match_data_node!(node_by_id, params[0], ScalarUDFExprFun);
+            let args = match_expr_list_node!(node_by_id, to_expr, params[1], ScalarUDFExprArgs);
+            let fun = cube_context
+                .get_function_meta(&fun_name)
+                .ok_or(CubeError::user(format!(
+                    "Scalar UDF '{}' is not found",
+                    fun_name
+                )))?;
+            Expr::ScalarUDF { fun, args }
+        }
+        LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+            let fun = match_data_node!(node_by_id, params[0], AggregateFunctionExprFun);
+            let args =
+                match_expr_list_node!(node_by_id, to_expr, params[1], AggregateFunctionExprArgs);
+            let distinct = match_data_node!(node_by_id, params[2], AggregateFunctionExprDistinct);
+            Expr::AggregateFunction {
+                fun,
+                args,
+                distinct,
+            }
+        }
+        LogicalPlanLanguage::WindowFunctionExpr(params) => {
+            let fun = match_data_node!(node_by_id, params[0], WindowFunctionExprFun);
+            let args =
+                match_expr_list_node!(node_by_id, to_expr, params[1], WindowFunctionExprArgs);
+            let partition_by = match_expr_list_node!(
+                node_by_id,
+                to_expr,
+                params[2],
+                WindowFunctionExprPartitionBy
+            );
+            let order_by =
+                match_expr_list_node!(node_by_id, to_expr, params[3], WindowFunctionExprOrderBy);
+            let window_frame =
+                match_data_node!(node_by_id, params[4], WindowFunctionExprWindowFrame);
+            Expr::WindowFunction {
+                fun,
+                args,
+                partition_by,
+                order_by,
+                window_frame,
+            }
+        }
+        LogicalPlanLanguage::AggregateUDFExpr(params) => {
+            let fun_name = match_data_node!(node_by_id, params[0], AggregateUDFExprFun);
+            let args = match_expr_list_node!(node_by_id, to_expr, params[1], AggregateUDFExprArgs);
+            let fun = cube_context
+                .get_aggregate_meta(&fun_name)
+                .ok_or(CubeError::user(format!(
+                    "Aggregate UDF '{}' is not found",
+                    fun_name
+                )))?;
+            Expr::AggregateUDF { fun, args }
+        }
+        LogicalPlanLanguage::InListExpr(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
+            let negated = match_data_node!(node_by_id, params[2], InListExprNegated);
+            Expr::InList {
+                expr,
+                list,
+                negated,
+            }
+        }
+        LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
+        x => panic!("Unexpected expression node: {:?}", x),
+    })
+}
+
+impl LanguageToLogicalPlanConverter {
     pub fn to_expr(&self, id: Id) -> Result<Expr, CubeError> {
         let node = self.best_expr.index(id);
-        Ok(match node {
-            LogicalPlanLanguage::AliasExpr(params) => {
-                let expr = self.to_expr(params[0].clone())?;
-                let alias = match_data_node!(self, params[1], AliasExprAlias);
-                Expr::Alias(Box::new(expr), alias)
-            }
-            LogicalPlanLanguage::ColumnExpr(params) => {
-                let column = match_data_node!(self, params[0], ColumnExprColumn);
-                Expr::Column(column)
-            }
-            LogicalPlanLanguage::ScalarVariableExpr(params) => {
-                let variable = match_data_node!(self, params[0], ScalarVariableExprVariable);
-                Expr::ScalarVariable(variable)
-            }
-            LogicalPlanLanguage::LiteralExpr(params) => {
-                let value = match_data_node!(self, params[0], LiteralExprValue);
-                Expr::Literal(value)
-            }
-            LogicalPlanLanguage::BinaryExpr(params) => {
-                let left = Box::new(self.to_expr(params[0].clone())?);
-                let op = match_data_node!(self, params[1], BinaryExprOp);
-                let right = Box::new(self.to_expr(params[2].clone())?);
-                Expr::BinaryExpr { left, op, right }
-            }
-            LogicalPlanLanguage::NotExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                Expr::Not(expr)
-            }
-            LogicalPlanLanguage::IsNotNullExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                Expr::IsNotNull(expr)
-            }
-            LogicalPlanLanguage::IsNullExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                Expr::IsNull(expr)
-            }
-            LogicalPlanLanguage::NegativeExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                Expr::Negative(expr)
-            }
-            LogicalPlanLanguage::BetweenExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                let negated = match_data_node!(self, params[1], BetweenExprNegated);
-                let low = Box::new(self.to_expr(params[2].clone())?);
-                let high = Box::new(self.to_expr(params[3].clone())?);
-                Expr::Between {
-                    expr,
-                    negated,
-                    low,
-                    high,
-                }
-            }
-            LogicalPlanLanguage::CaseExpr(params) => {
-                let expr = match_expr_list_node!(self, params[0], CaseExprExpr);
-                let when_then_expr = match_expr_list_node!(self, params[1], CaseExprWhenThenExpr);
-                let else_expr = match_expr_list_node!(self, params[2], CaseExprElseExpr);
-                Expr::Case {
-                    expr: expr.into_iter().next().map(|e| Box::new(e)),
-                    when_then_expr: when_then_expr
-                        .into_iter()
-                        .chunks(2)
-                        .into_iter()
-                        .map(|mut chunk| {
-                            (
-                                Box::new(chunk.next().unwrap()),
-                                Box::new(chunk.next().unwrap()),
-                            )
-                        })
-                        .collect::<Vec<_>>(),
-                    else_expr: else_expr.into_iter().next().map(|e| Box::new(e)),
-                }
-            }
-            LogicalPlanLanguage::CastExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                let data_type = match_data_node!(self, params[1], CastExprDataType);
-                Expr::Cast { expr, data_type }
-            }
-            LogicalPlanLanguage::TryCastExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                let data_type = match_data_node!(self, params[1], TryCastExprDataType);
-                Expr::TryCast { expr, data_type }
-            }
-            LogicalPlanLanguage::SortExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                let asc = match_data_node!(self, params[1], SortExprAsc);
-                let nulls_first = match_data_node!(self, params[2], SortExprNullsFirst);
-                Expr::Sort {
-                    expr,
-                    asc,
-                    nulls_first,
-                }
-            }
-            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
-                let fun = match_data_node!(self, params[0], ScalarFunctionExprFun);
-                let args = match_expr_list_node!(self, params[1], ScalarFunctionExprArgs);
-                Expr::ScalarFunction { fun, args }
-            }
-            LogicalPlanLanguage::ScalarUDFExpr(params) => {
-                let fun_name = match_data_node!(self, params[0], ScalarUDFExprFun);
-                let args = match_expr_list_node!(self, params[1], ScalarUDFExprArgs);
-                let fun = self
-                    .cube_context
-                    .get_function_meta(&fun_name)
-                    .ok_or(CubeError::user(format!(
-                        "Scalar UDF '{}' is not found",
-                        fun_name
-                    )))?;
-                Expr::ScalarUDF { fun, args }
-            }
-            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
-                let fun = match_data_node!(self, params[0], AggregateFunctionExprFun);
-                let args = match_expr_list_node!(self, params[1], AggregateFunctionExprArgs);
-                let distinct = match_data_node!(self, params[2], AggregateFunctionExprDistinct);
-                Expr::AggregateFunction {
-                    fun,
-                    args,
-                    distinct,
-                }
-            }
-            LogicalPlanLanguage::WindowFunctionExpr(params) => {
-                let fun = match_data_node!(self, params[0], WindowFunctionExprFun);
-                let args = match_expr_list_node!(self, params[1], WindowFunctionExprArgs);
-                let partition_by =
-                    match_expr_list_node!(self, params[2], WindowFunctionExprPartitionBy);
-                let order_by = match_expr_list_node!(self, params[3], WindowFunctionExprOrderBy);
-                let window_frame = match_data_node!(self, params[4], WindowFunctionExprWindowFrame);
-                Expr::WindowFunction {
-                    fun,
-                    args,
-                    partition_by,
-                    order_by,
-                    window_frame,
-                }
-            }
-            LogicalPlanLanguage::AggregateUDFExpr(params) => {
-                let fun_name = match_data_node!(self, params[0], AggregateUDFExprFun);
-                let args = match_expr_list_node!(self, params[1], AggregateUDFExprArgs);
-                let fun =
-                    self.cube_context
-                        .get_aggregate_meta(&fun_name)
-                        .ok_or(CubeError::user(format!(
-                            "Aggregate UDF '{}' is not found",
-                            fun_name
-                        )))?;
-                Expr::AggregateUDF { fun, args }
-            }
-            LogicalPlanLanguage::InListExpr(params) => {
-                let expr = Box::new(self.to_expr(params[0].clone())?);
-                let list = match_expr_list_node!(self, params[1], InListExprList);
-                let negated = match_data_node!(self, params[2], InListExprNegated);
-                Expr::InList {
-                    expr,
-                    list,
-                    negated,
-                }
-            }
-            LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
-            x => panic!("Unexpected expression node: {:?}", x),
-        })
+        let to_expr = |id| self.to_expr(id);
+        node_to_expr(node, &self.cube_context, &to_expr, &self.best_expr)
     }
 
     pub fn to_logical_plan(&self, id: Id) -> Result<LogicalPlan, CubeError> {
-        let node = self.best_expr.index(id);
+        let node_by_id = &self.best_expr;
+        let node = node_by_id.index(id);
+        let to_expr = &|id| self.to_expr(id);
         Ok(match node {
             LogicalPlanLanguage::Projection(params) => {
-                let expr = match_expr_list_node!(self, params[0], ProjectionExpr);
+                let expr = match_expr_list_node!(node_by_id, to_expr, params[0], ProjectionExpr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
-                let alias = match_data_node!(self, params[2], ProjectionAlias);
+                let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
                 let input_schema = DFSchema::new(exprlist_to_fields(&expr, input.schema())?)?;
                 let schema = match alias {
                     Some(ref alias) => input_schema.replace_qualifier(alias.as_str()),
@@ -1266,7 +1712,8 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
             }
             LogicalPlanLanguage::Window(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
-                let window_expr = match_expr_list_node!(self, params[1], WindowWindowExpr);
+                let window_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[1], WindowWindowExpr);
                 let mut window_fields: Vec<DFField> =
                     exprlist_to_fields(window_expr.iter(), input.schema())?;
                 window_fields.extend_from_slice(input.schema().fields());
@@ -1278,8 +1725,10 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
             }
             LogicalPlanLanguage::Aggregate(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
-                let group_expr = match_expr_list_node!(self, params[1], AggregateGroupExpr);
-                let aggr_expr = match_expr_list_node!(self, params[2], AggregateAggrExpr);
+                let group_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[1], AggregateGroupExpr);
+                let aggr_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[2], AggregateAggrExpr);
                 let group_expr = normalize_cols(group_expr, &input)?;
                 let aggr_expr = normalize_cols(aggr_expr, &input)?;
                 let all_expr = group_expr.iter().chain(aggr_expr.iter());
@@ -1295,17 +1744,17 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                 }
             }
             LogicalPlanLanguage::Sort(params) => {
-                let expr = match_expr_list_node!(self, params[0], SortExp);
+                let expr = match_expr_list_node!(node_by_id, to_expr, params[0], SortExp);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
                 LogicalPlan::Sort { expr, input }
             }
             LogicalPlanLanguage::Join(params) => {
                 let left = Arc::new(self.to_logical_plan(params[0])?);
                 let right = Arc::new(self.to_logical_plan(params[1])?);
-                let left_on = match_data_node!(self, params[2], JoinLeftOn);
-                let right_on = match_data_node!(self, params[3], JoinRightOn);
-                let join_type = match_data_node!(self, params[4], JoinJoinType);
-                let join_constraint = match_data_node!(self, params[5], JoinJoinConstraint);
+                let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
+                let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
+                let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
+                let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
                 let schema = Arc::new(build_join_schema(
                     left.schema(),
                     right.schema(),
@@ -1342,11 +1791,13 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
             //     self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             // }
             LogicalPlanLanguage::TableScan(params) => {
-                let source_table_name = match_data_node!(self, params[0], TableScanSourceTableName);
-                let table_name = match_data_node!(self, params[1], TableScanTableName);
-                let projection = match_data_node!(self, params[2], TableScanProjection);
-                let filters = match_expr_list_node!(self, params[3], TableScanFilters);
-                let limit = match_data_node!(self, params[4], TableScanLimit);
+                let source_table_name =
+                    match_data_node!(node_by_id, params[0], TableScanSourceTableName);
+                let table_name = match_data_node!(node_by_id, params[1], TableScanTableName);
+                let projection = match_data_node!(node_by_id, params[2], TableScanProjection);
+                let filters =
+                    match_expr_list_node!(node_by_id, to_expr, params[3], TableScanFilters);
+                let limit = match_data_node!(node_by_id, params[4], TableScanLimit);
                 let table_parts = source_table_name.split(".").collect::<Vec<_>>();
                 let table_reference = if table_parts.len() == 2 {
                     TableReference::Partial {
@@ -1393,14 +1844,15 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                 }
             }
             LogicalPlanLanguage::EmptyRelation(params) => {
-                let produce_one_row = match_data_node!(self, params[0], EmptyRelationProduceOneRow);
+                let produce_one_row =
+                    match_data_node!(node_by_id, params[0], EmptyRelationProduceOneRow);
                 LogicalPlan::EmptyRelation {
                     produce_one_row,
                     schema: Arc::new(DFSchema::empty()),
                 } // TODO
             }
             LogicalPlanLanguage::Limit(params) => {
-                let n = match_data_node!(self, params[0], LimitN);
+                let n = match_data_node!(node_by_id, params[0], LimitN);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
                 LogicalPlan::Limit { n, input }
             }
@@ -1419,20 +1871,24 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
             LogicalPlanLanguage::Extension(params) => {
                 let node = match self.best_expr.index(params[0]) {
                     LogicalPlanLanguage::CubeScan(cube_scan_params) => {
-                        let cube =
-                            match_data_node!(self, cube_scan_params[0], TableScanSourceTableName);
+                        let cube = match_data_node!(
+                            node_by_id,
+                            cube_scan_params[0],
+                            TableScanSourceTableName
+                        );
                         let measures =
-                            match_list_node!(self, cube_scan_params[1], CubeScanMeasures);
+                            match_list_node!(node_by_id, cube_scan_params[1], CubeScanMeasures);
                         let dimensions =
-                            match_list_node!(self, cube_scan_params[2], CubeScanDimensions);
+                            match_list_node!(node_by_id, cube_scan_params[2], CubeScanDimensions);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
                         let mut fields = Vec::new();
                         let mut query_measures = Vec::new();
                         for m in measures {
-                            let measure_params = match_params!(self, m, Measure);
-                            let measure = match_data_node!(self, measure_params[0], MeasureName);
+                            let measure_params = match_params!(m, Measure);
+                            let measure =
+                                match_data_node!(node_by_id, measure_params[0], MeasureName);
                             let expr = self.to_expr(measure_params[1])?;
                             query_measures.push(measure);
                             fields.push(DFField::new(
@@ -1449,12 +1905,24 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                             match d {
                                 LogicalPlanLanguage::TimeDimension(params) => {
                                     let dimension =
-                                        match_data_node!(self, params[0], TimeDimensionName);
-                                    let granularity =
-                                        match_data_node!(self, params[1], TimeDimensionGranularity);
-                                    let date_range =
-                                        match_data_node!(self, params[2], TimeDimensionDateRange);
-                                    let expr = self.to_expr(params[3])?;
+                                        match_data_node!(node_by_id, params[0], TimeDimensionName);
+                                    let granularity = match_data_node!(
+                                        node_by_id,
+                                        params[1],
+                                        TimeDimensionGranularity
+                                    );
+                                    let date_range = match_data_node!(
+                                        node_by_id,
+                                        params[2],
+                                        TimeDimensionDateRange
+                                    );
+                                    let member_alias_params =
+                                        match_params!(node_by_id.index(params[3]), MemberAlias);
+                                    let expr_name = match_data_node!(
+                                        node_by_id,
+                                        member_alias_params[0],
+                                        MemberAliasName
+                                    );
                                     query_time_dimensions.push(V1LoadRequestQueryTimeDimension {
                                         dimension,
                                         granularity,
@@ -1470,7 +1938,7 @@ impl<'a> LanguageToLogicalPlanConverter<'a> {
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
-                                        &expr.name(&DFSchema::empty())?,
+                                        &expr_name,
                                         DataType::Timestamp(TimeUnit::Millisecond, None),
                                         true,
                                     ));

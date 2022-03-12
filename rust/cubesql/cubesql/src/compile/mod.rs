@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{backtrace::Backtrace, fmt};
+use std::{backtrace::Backtrace, env, fmt};
 
 use chrono::{prelude::*, Duration};
 
@@ -45,7 +45,11 @@ use self::engine::udf::{
     create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
-use crate::compile::engine::udf::create_date_udf;
+use crate::compile::engine::udf::{
+    create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+    create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
+    create_minute_udf, create_quarter_udf, create_second_udf, create_year_udf,
+};
 use crate::compile::rewrite::LogicalPlanToLanguageConverter;
 
 pub mod builder;
@@ -1360,6 +1364,15 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
     ) -> CompilationResult<QueryPlan> {
+        // TODO move CUBESQL_REWRITE_ENGINE env to config
+        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
+            .ok()
+            .map(|v| v.parse::<bool>().unwrap())
+            .unwrap_or(false);
+        if rewrite_engine {
+            return self.create_df_logical_plan(stmt.clone());
+        }
+
         let select = match &q.body {
             sqlparser::ast::SetExpr::Select(select) => select,
             _ => {
@@ -1368,9 +1381,6 @@ impl QueryPlanner {
                 ));
             }
         };
-
-        // TODO should use this route when rewriting is done
-        // return self.create_df_logical_plan(stmt.clone());
 
         let from_table = if select.from.len() == 1 {
             &select.from[0]
@@ -2017,6 +2027,17 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
         ctx.register_udf(create_date_udf());
+        ctx.register_udf(create_makedate_udf());
+        ctx.register_udf(create_year_udf());
+        ctx.register_udf(create_quarter_udf());
+        ctx.register_udf(create_hour_udf());
+        ctx.register_udf(create_minute_udf());
+        ctx.register_udf(create_second_udf());
+        ctx.register_udf(create_dayofweek_udf());
+        ctx.register_udf(create_dayofmonth_udf());
+        ctx.register_udf(create_dayofyear_udf());
+        ctx.register_udf(create_date_sub_udf());
+        ctx.register_udf(create_date_add_udf());
 
         ctx
     }
@@ -2024,9 +2045,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
         let ctx = self.create_execution_ctx();
 
-        let state = ctx.state.lock().unwrap().clone();
+        let state = Arc::new(ctx.state.lock().unwrap().clone());
         let cube_ctx = CubeContext::new(
-            &state,
+            state,
             self.meta.clone(),
             self.session_manager.clone(),
             self.state.clone(),

@@ -237,6 +237,8 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::ToTimestampMillis => "ToTimestampMillis",
                 BuiltinScalarFunction::ToTimestampMicros => "ToTimestampMicros",
                 BuiltinScalarFunction::ToTimestampSeconds => "ToTimestampSeconds",
+                BuiltinScalarFunction::ToMonthInterval => "ToMonthInterval",
+                BuiltinScalarFunction::ToDayInterval => "ToDayInterval",
                 BuiltinScalarFunction::Now => "Now",
                 BuiltinScalarFunction::UtcTimestamp => "UtcTimestamp",
                 BuiltinScalarFunction::Translate => "Translate",

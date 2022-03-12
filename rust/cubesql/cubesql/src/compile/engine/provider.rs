@@ -42,18 +42,18 @@ use datafusion::physical_plan::ExecutionPlan;
 use std::any::Any;
 
 #[derive(Clone)]
-pub struct CubeContext<'a> {
+pub struct CubeContext {
     /// Internal state for the context (default)
-    pub state: &'a ExecutionContextState,
+    pub state: Arc<ExecutionContextState>,
     /// References
     pub meta: Arc<MetaContext>,
     pub sessions: Arc<SessionManager>,
     pub session_state: Arc<SessionState>,
 }
 
-impl<'a> CubeContext<'a> {
+impl CubeContext {
     pub fn new(
-        state: &'a ExecutionContextState,
+        state: Arc<ExecutionContextState>,
         meta: Arc<MetaContext>,
         sessions: Arc<SessionManager>,
         session_state: Arc<SessionState>,
@@ -98,7 +98,7 @@ impl<'a> CubeContext<'a> {
     }
 }
 
-impl<'a> ContextProvider for CubeContext<'a> {
+impl ContextProvider for CubeContext {
     fn get_table_provider(
         &self,
         name: datafusion::catalog::TableReference,

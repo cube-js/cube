@@ -658,3 +658,186 @@ pub fn create_date_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_makedate_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+
+    ScalarUDF::new(
+        "makedate",
+        &Signature::exact(
+            vec![DataType::Int64, DataType::Int64],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_year_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "year",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_quarter_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "quarter",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofweek_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofweek",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofmonth_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofmonth",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofyear_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofyear",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_hour_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "hour",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_minute_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "minute",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_second_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "second",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_sub_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "date_sub",
+        &Signature::exact(
+            vec![
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                DataType::Interval(IntervalUnit::DayTime),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_add_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "date_add",
+        &Signature::exact(
+            vec![
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                DataType::Interval(IntervalUnit::DayTime),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
