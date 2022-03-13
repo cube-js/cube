@@ -89,6 +89,8 @@ impl CubeContext {
             t.table_name().to_string()
         } else if let Some(t) = any.downcast_ref::<MySqlPerfSchemaVariablesProvider>() {
             t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<InfoSchemaProcesslistProvider>() {
+            t.table_name().to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
