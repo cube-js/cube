@@ -13,22 +13,23 @@ const minDesktopWidth = getComputedStyle(document.documentElement)
 
 // TODO: move credentials to env
 const cubejsApi = cubejs(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NDY0ODI4NDl9.xxO5HFPrXMnTRFbF5vyNkpAgJGx04h-ZOJA-7O9uiIE',
-  { apiUrl: 'https://olive-tyrannosaurus.gcp-us-central1.cubecloudapp.dev/dev-mode/dev-carina-785663c4/cubejs-api/v1' }
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NDcyNzEzMzh9.ovHUQRSNDW3h1d9fCnNpr20sr3Gpj89F6aPZwkFEER0',
+  { apiUrl: 'https://relevant-badger.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1' }
 );
 
 const createQuery = () => ({
-  dimensions: ['ExamplesMenuList.name', 'ExamplesMenuList.url'],
+  dimensions: ['ExamplesMeta.name', 'ExamplesMeta.url'],
   timeDimensions: [],
   order: {
-    'ExamplesMenuList.name': 'asc',
+    'ExamplesMeta.name': 'asc',
   },
+  filters: [],
 });
 
 const mapDataFormat = (data) =>
   data.map((item) => ({
-    name: item['ExamplesMenuList.name'],
-    url: item['ExamplesMenuList.url'],
+    name: item['ExamplesMeta.name'],
+    url: item['ExamplesMeta.url'],
   }));
 
 function fetchData() {
