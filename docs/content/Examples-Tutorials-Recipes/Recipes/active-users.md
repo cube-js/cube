@@ -83,14 +83,14 @@ We should set a `timeDimensions` with the `dateRange`.
 curl cube:4000/cubejs-api/v1/load \
 'query={
   "measures": [
-    "Users.monthlyActiveUsers",
-    "Users.weeklyActiveUsers",
-    "Users.dailyActiveUsers",
-    "Users.wauToMau"
+    "ActiveUsers.monthlyActiveUsers",
+    "ActiveUsers.weeklyActiveUsers",
+    "ActiveUsers.dailyActiveUsers",
+    "ActiveUsers.wauToMau"
   ],
   "timeDimensions": [
     {
-      "dimension": "Users.createdAt",
+      "dimension": "ActiveUsers.createdAt",
       "dateRange": [
         "2020-01-01",
         "2020-12-31"
@@ -108,10 +108,10 @@ We got the data with our daily, weekly, and monthly active users.
 {
   "data": [
     {
-      "Users.monthlyActiveUsers": "22",
-      "Users.weeklyActiveUsers": "4",
-      "Users.dailyActiveUsers": "0",
-      "Users.wauToMau": "18.1818181818181818"
+      "ActiveUsers.monthlyActiveUsers": "22",
+      "ActiveUsers.weeklyActiveUsers": "4",
+      "ActiveUsers.dailyActiveUsers": "0",
+      "ActiveUsers.wauToMau": "18.1818181818181818"
     }
   ]
 }
