@@ -59,7 +59,7 @@ navOverlay.addEventListener('click', () => {
   }
 });
 
-window.addEventListener('resize', () => {
+window.addEventListener('resize', function () {
   if (this.innerWidth >= minDesktopWidth) {
     // hide nav on window resize properly
     header.classList.remove('open');
