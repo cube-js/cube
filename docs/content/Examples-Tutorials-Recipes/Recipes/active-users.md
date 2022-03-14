@@ -1,5 +1,5 @@
 ---
-title: Calculating Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
+title: Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
 permalink: /recipes/active-users
 category: Examples & Tutorials
 subCategory: Analytics
@@ -27,12 +27,12 @@ To calculate daily, weekly, or monthly active users we’re going to use the
 measure parameter.
 
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`ActiveUsers`, {
+  sql: `SELECT user_id, created_at FROM public.orders`,
 
   measures: {
     monthlyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `30 day`,
@@ -41,7 +41,7 @@ cube(`Users`, {
     },
 
     weeklyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `7 day`,
@@ -50,7 +50,7 @@ cube(`Users`, {
     },
 
     dailyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `1 day`,
