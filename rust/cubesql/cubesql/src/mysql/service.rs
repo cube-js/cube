@@ -21,6 +21,7 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::mysql::dataframe::batch_to_dataframe;
+use crate::mysql::session::DatabaseProtocol;
 use crate::CubeError;
 
 use super::dataframe;
@@ -431,9 +432,11 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
-            let session = self
-                .session_manager
-                .create_session("mysql".to_string(), socket.peer_addr().unwrap().to_string());
+            // TODO: Switch Protocol
+            let session = self.session_manager.create_session(
+                DatabaseProtocol::MySQL,
+                socket.peer_addr().unwrap().to_string(),
+            );
 
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
