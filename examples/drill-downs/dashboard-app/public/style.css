@@ -463,6 +463,7 @@ ul {
         position: relative;
         margin: 0;
         overflow-y: initial;
+        z-index: auto;
 
     }
 
