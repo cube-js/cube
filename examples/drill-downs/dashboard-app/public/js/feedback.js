@@ -2,11 +2,11 @@ const cubeTracking = require('cubedev-tracking');
 const { event: cubeTrackingEvent } = cubeTracking;
 
 // controls
-const feedbackLikeBtn = document.getElementById('feedback-like');
-const feedbackDislikeBtn = document.getElementById('feedback-dislike');
-const feedbackMessageField = document.getElementById('feedback-message');
-const feedbackMessageSendBtn = document.getElementById('feedback-message-send');
-const feedbackMessageCancelBtn = document.getElementById('feedback-message-cancel');
+const feedbackLikeBtn = document.querySelector('#feedback-like');
+const feedbackDislikeBtn = document.querySelector('#feedback-dislike');
+const feedbackMessageField = document.querySelector('#feedback-message');
+const feedbackMessageSendBtn = document.querySelector('#feedback-message-send');
+const feedbackMessageCancelBtn = document.querySelector('#feedback-message-cancel');
 
 // UI
 const feedbackBlock = document.querySelector('.feedback-block');

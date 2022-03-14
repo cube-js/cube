@@ -1,10 +1,9 @@
 const cubejs = require('@cubejs-client/core').default;
-require('dotenv').config();
 
 // DOM
-const menuList = document.getElementById('menu-list');
-const menuCurrent = document.getElementById('menu-current');
-const menuButton = document.getElementById('menu-button');
+const menuList = document.querySelector('#menu-list');
+const menuCurrent = document.querySelector('#menu-current');
+const menuButton = document.querySelector('#menu-button');
 
 // CSS
 const minDesktopWidth = getComputedStyle(document.documentElement)

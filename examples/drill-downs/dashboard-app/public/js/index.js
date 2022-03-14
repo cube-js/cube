@@ -3,7 +3,7 @@ const minDesktopWidth = getComputedStyle(document.documentElement)
   .getPropertyValue('--breakpoint-desktop-xs')
   .replace('px', '');
 
-const menuList = document.getElementById('menu-list');
+const menuList = document.querySelector('#menu-list');
 
 // dropdown menu functionality
 const dropdownMenuBtn = document.querySelector('.dropdown-button');
@@ -25,9 +25,9 @@ window.addEventListener('click', (e) => {
 });
 
 // mobile nav functionality
-const navToggle = document.getElementById('nav-toggle');
-const header = document.getElementById('header');
-const navOverlay = document.getElementById('nav-overlay');
+const navToggle = document.querySelector('#nav-toggle');
+const header = document.querySelector('#header');
+const navOverlay = document.querySelector('#nav-overlay');
 
 const hideNav = () => {
   header.classList.remove('open');
