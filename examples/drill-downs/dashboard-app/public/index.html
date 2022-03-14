@@ -1,43 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="%PUBLIC_URL%/assets/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Web site created using create-react-app" />
+  <link rel="apple-touch-icon" href="%PUBLIC_URL%/assets/logo192.png" />
+  <link rel="preload" href="https://static.cube.dev/fonts/CeraPro-Regular.woff2" as="font" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css">
+  <title>React App</title>
+</head>
+
+<body>
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+
+  <header class="header" id="header">
+    <div class="logo">
+      <img src="assets/logo.svg" alt="Cube Examples" class="logo-img">
+    </div>
+    <button class="nav-toggle" id="nav-toggle" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+    <nav class="nav" id="nav" aria-label="Cube examples navigation">
+      <ul class="user-actions">
+        <li class="user-actions-item">
+          <a href="https://slack.cube.dev/" class="button clear">Discuss on Slack</a>
+        </li>
+        <li class="user-actions-item">
+          <a href="https://cubecloud.dev/auth/signup" class="button primary">Get started with Cube</a>
+        </li>
+      </ul>
+      <div class="menu dropdown">
+        <button class="menu-button dropdown-button button outline load" id="menu-button" aria-expanded="false" tabindex="0">
+          <span id="menu-current"></span>
+          <svg width="10" height="7" viewBox="0 0 10 7" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L5 5L9 1" stroke="#141446" stroke-width="1.6" />
+          </svg>
+        </button>
+        <ul class="menu-list dropdown-content" id="menu-list" aria-label="Cube examples list"></ul>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="description">
+      <!-- Fill Your Title -->
+      <h2 class="title">Drill Downs</h2>
+      <!-- Fill Your Description -->
+      <p>This example app shows drill-downs chart built on Cube</p>
+      <!-- Fill your tutorial and source code link -->
+      <p>Would to learn more? Read the <a href="#" class="link">tutorial</a> or explore the <a href="#"
+          class="link">source code</a></p>
+    </section>
+    
+    <!-- Fill your root id -->
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
+  </main>
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
+  <footer class="footer">
+    <div class="feedback">
+      <p class="thanks d-none">Thank you for the feedback!</p>
+      <div class="feedback-block">
+        <p>Did you find this example useful?</p>
+        <div class="feedback-buttons">
+          <button class="feedback-button" id="feedback-like">
+            <svg width="14" height="14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12.842 7.339a2.01 2.01 0 0 0 .408-1.214c0-.702-.392-1.366-1.023-1.736a1.058 1.058 0 0 0-.536-.146H7.944l.093-1.92a1.673 1.673 0 0 0-.46-1.24A1.666 1.666 0 0 0 6.359.56c-.812 0-1.53.546-1.747 1.33L3.27 6.75H1.25a.5.5 0 0 0-.5.5v5.687a.5.5 0 0 0 .5.5h9.395c.144 0 .285-.028.414-.084a2.009 2.009 0 0 0 1.14-2.428 2.01 2.01 0 0 0 .323-1.793 2.01 2.01 0 0 0 .32-1.793ZM1.875 12.312V7.875h1.266v4.437H1.875Zm9.944-5.515-.342.296.217.397a.892.892 0 0 1-.198 1.098l-.343.298.217.396a.893.893 0 0 1-.198 1.098l-.342.298.217.397a.889.889 0 0 1-.417 1.236H4.14V7.825l1.555-5.633a.69.69 0 0 1 .66-.505.555.555 0 0 1 .558.581l-.15 3.1h4.912c.278.17.45.458.45.757a.895.895 0 0 1-.306.671Z"
+                fill="#59A36C" />
+            </svg>
+          </button>
+          <button class="feedback-button" id="feedback-dislike">
+            <svg width="14" height="14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12.842 6.664a2.008 2.008 0 0 0-.323-1.792 2.008 2.008 0 0 0-.324-1.792 2.009 2.009 0 0 0-1.14-2.428 1.033 1.033 0 0 0-.413-.085H1.25a.5.5 0 0 0-.5.5v5.688a.5.5 0 0 0 .5.5h2.02l1.34 4.856c.217.783.935 1.33 1.748 1.33.464 0 .897-.184 1.217-.522a1.66 1.66 0 0 0 .46-1.24l-.093-1.921h3.749c.189 0 .373-.05.536-.145.63-.367 1.023-1.033 1.023-1.735a2.01 2.01 0 0 0-.408-1.214ZM1.875 6.128V1.691h1.266v4.437H1.875Zm9.8 2.507H6.762l.15 3.1a.555.555 0 0 1-.557.58.692.692 0 0 1-.66-.504L4.141 6.178V1.691h6.49a.888.888 0 0 1 .417 1.236l-.217.397.342.297a.885.885 0 0 1 .307.671.88.88 0 0 1-.108.427l-.217.397.342.297a.886.886 0 0 1 .198 1.098l-.218.399.342.296a.886.886 0 0 1 .306.672.904.904 0 0 1-.45.757Z"
+                fill="#EF404A" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <form class="feedback-message-form form d-none">
+        <textarea id="feedback-message" class="form-textarea" placeholder=""></textarea>
+        <div class="feedback-message-buttons">
+          <button id="feedback-message-send" class="button secondary sm">Send</button>
+          <button id="feedback-message-cancel" class="button outline sm">Not now</button>
+        </div>
+      </form>
+    </div>
+  </footer>
+  
+  <script src="bundle.js"></script>
+</body>
 
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-  </body>
 </html>

@@ -3,3 +3,8 @@
   border-radius: 3px;
   background: #F3F3FB;
 }
+
+.app{
+  background-color: #F3F3FB !important;
+  height: 100%;
+}
