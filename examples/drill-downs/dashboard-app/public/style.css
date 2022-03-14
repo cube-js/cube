@@ -337,7 +337,6 @@ ul {
 .dropdown-button {
     height: 40px;
     text-overflow: ellipsis;
-    display: flex !important;
     align-items: center;
 }
 
@@ -485,7 +484,6 @@ ul {
 
     .dropdown-button {
         width: auto;
-        min-width: 150px;
     }
 
     .dropdown-button.load {
