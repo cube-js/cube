@@ -826,6 +826,7 @@ class ApiGateway {
           queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
             .length,
           queriesWithData: results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
         },
         context
       );
