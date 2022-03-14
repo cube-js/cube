@@ -10,7 +10,7 @@ use crate::CubeError;
 
 use super::{
     server_manager::ServerManager,
-    session::{Session, SessionProcessList, SessionProperties, SessionState},
+    session::{DatabaseProtocol, Session, SessionProcessList, SessionProperties, SessionState},
 };
 
 #[derive(Debug)]
@@ -33,7 +33,11 @@ impl SessionManager {
         }
     }
 
-    pub fn create_session(self: &Arc<Self>, protocol: String, host: String) -> Arc<Session> {
+    pub fn create_session(
+        self: &Arc<Self>,
+        protocol: DatabaseProtocol,
+        host: String,
+    ) -> Arc<Session> {
         let connection_id = self.last_id.fetch_add(1, Ordering::SeqCst);
 
         let sess = Session {

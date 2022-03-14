@@ -2,6 +2,12 @@ use std::sync::{Arc, RwLock as RwLockSync};
 
 use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContext};
 
+#[derive(Debug, Clone)]
+pub enum DatabaseProtocol {
+    MySQL,
+    PostgreSQL,
+}
+
 #[derive(Debug)]
 pub struct SessionProperties {
     user: Option<String>,
@@ -21,7 +27,7 @@ pub struct SessionState {
     // client address, immutable
     pub host: String,
     // client protocol, mysql/postgresql, immutable
-    pub protocol: String,
+    pub protocol: DatabaseProtocol,
     // Connection properties
     properties: RwLockSync<SessionProperties>,
     // @todo Remove RWLock after split of Connection & SQLWorker
@@ -33,7 +39,7 @@ impl SessionState {
     pub fn new(
         connection_id: u32,
         host: String,
-        protocol: String,
+        protocol: DatabaseProtocol,
         properties: SessionProperties,
         auth_context: Option<AuthContext>,
     ) -> Self {
