@@ -19,8 +19,10 @@ use cubeclient::models::{
 };
 
 use crate::sql::{
-    dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
+    dataframe, types::StatusFlags, ColumnFlags, ColumnType, DatabaseProtocol, Session,
+    SessionManager, SessionState,
 };
+
 pub use crate::transport::ctx::*;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
@@ -1527,13 +1529,13 @@ impl QueryPlanner {
     }
 
     pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        match stmt {
-            ast::Statement::Query(q) => self.select_to_plan(stmt, q),
-            ast::Statement::SetTransaction { .. } => Ok(QueryPlan::MetaTabular(
+        match (stmt, &self.state.protocol) {
+            (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
+            (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Arc::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
-            ast::Statement::SetNames { charset_name, .. } => {
+            (ast::Statement::SetNames { charset_name, .. }, DatabaseProtocol::MySQL) => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
                     || charset_name.eq_ignore_ascii_case("utf8mb4"))
                 {
@@ -1548,31 +1550,52 @@ impl QueryPlanner {
                     Arc::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
-            ast::Statement::Kill { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
-            ast::Statement::SetVariable { key_values } => self.set_variable_to_plan(&key_values),
-            ast::Statement::ShowVariable { variable } => self.show_variable_to_plan(variable),
-            ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter),
-            ast::Statement::ShowCreate { obj_name, obj_type } => {
+            (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => {
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
+            // TODO: enable for Postgres after variables are supported
+            (ast::Statement::SetVariable { key_values }, DatabaseProtocol::MySQL) => {
+                self.set_variable_to_plan(&key_values)
+            }
+            (ast::Statement::ShowVariable { variable }, DatabaseProtocol::MySQL) => {
+                self.show_variable_to_plan(variable)
+            }
+            (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
+                self.show_variables_to_plan(&filter)
+            }
+            (ast::Statement::ShowCreate { obj_name, obj_type }, DatabaseProtocol::MySQL) => {
                 self.show_create_to_plan(&obj_name, &obj_type)
             }
-            ast::Statement::ShowColumns {
-                extended,
-                full,
-                filter,
-                table_name,
-            } => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
-            ast::Statement::ShowTables {
-                extended,
-                full,
-                filter,
-                db_name,
-            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
-            ast::Statement::ShowCollation { filter } => self.show_collation_to_plan(&filter),
-            ast::Statement::ExplainTable { table_name, .. } => {
+            (
+                ast::Statement::ShowColumns {
+                    extended,
+                    full,
+                    filter,
+                    table_name,
+                },
+                DatabaseProtocol::MySQL,
+            ) => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
+            (
+                ast::Statement::ShowTables {
+                    extended,
+                    full,
+                    filter,
+                    db_name,
+                },
+                DatabaseProtocol::MySQL,
+            ) => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
+            (ast::Statement::ShowCollation { filter }, DatabaseProtocol::MySQL) => {
+                self.show_collation_to_plan(&filter)
+            }
+            (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            ast::Statement::Explain { statement, .. } => self.explain_to_plan(&statement),
-            ast::Statement::Use { db_name } => self.use_to_plan(&db_name),
+            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
+                self.explain_to_plan(&statement)
+            }
+            (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
+                self.use_to_plan(&db_name)
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
