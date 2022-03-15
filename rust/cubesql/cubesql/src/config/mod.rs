@@ -114,6 +114,8 @@ pub struct Config {
 pub trait ConfigObj: DIService {
     fn bind_address(&self) -> &Option<String>;
 
+    fn postgres_bind_address(&self) -> &Option<String>;
+
     fn query_timeout(&self) -> u64;
 
     fn nonce(&self) -> &Option<Vec<u8>>;
@@ -122,6 +124,7 @@ pub trait ConfigObj: DIService {
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
+    pub postgres_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
 }
@@ -132,6 +135,10 @@ crate::di_service!(MockConfigObj, [ConfigObj]);
 impl ConfigObj for ConfigObjImpl {
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn postgres_bind_address(&self) -> &Option<String> {
+        &self.postgres_bind_address
     }
 
     fn nonce(&self) -> &Option<Vec<u8>> {
@@ -163,6 +170,9 @@ impl Config {
                             .map(|v| v.parse::<u16>().unwrap())
                             .unwrap_or(3306u16)),
                 )),
+                postgres_bind_address: env::var("CUBESQL_PG_PORT")
+                    .ok()
+                    .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
                 nonce: None,
                 query_timeout,
             }),
@@ -175,6 +185,7 @@ impl Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 bind_address: None,
+                postgres_bind_address: None,
                 nonce: None,
                 query_timeout,
             }),
@@ -227,17 +238,30 @@ impl Config {
             })
             .await;
 
+        self.injector
+            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+                Arc::new(SqlAuthDefaultImpl)
+            })
+            .await;
+
         if self.config_obj.bind_address().is_some() {
-            self.injector
-                .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
-                    Arc::new(SqlAuthDefaultImpl)
-                })
-                .await;
             self.injector
                 .register_typed::<MySqlServer, _, _, _>(async move |i| {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     MySqlServer::new(
                         config.bind_address().as_ref().unwrap().to_string(),
+                        i.get_service_typed().await,
+                    )
+                })
+                .await;
+        }
+
+        if self.config_obj.postgres_bind_address().is_some() {
+            self.injector
+                .register_typed::<PostgresServer, _, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    PostgresServer::new(
+                        config.postgres_bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                     )
                 })

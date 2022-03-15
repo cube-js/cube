@@ -11,13 +11,14 @@ use super::protocol::{self, Deserialize, FrontendMessage, Serialize};
 pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     reader: &mut Reader,
 ) -> Result<FrontendMessage, Error> {
+    // https://www.postgresql.org/docs/14/protocol-message-formats.html
     Ok(match reader.read_u8().await? {
         b'Q' => FrontendMessage::Query(protocol::Query::read_from(reader).await?),
         b'X' => FrontendMessage::Terminate,
-        _ => {
+        identifier => {
             return Err(Error::new(
                 ErrorKind::InvalidData,
-                "Unknown message identifier",
+                format!("Unknown message identifier: {}", identifier),
             ))
         }
     })
