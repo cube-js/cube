@@ -279,28 +279,6 @@ export function RollupDesigner({
   }
 
   function rollupBody() {
-    // if (!canBeRolledUp) {
-    //   return (
-    //     <Paragraph>
-    //       <Link
-    //         href="https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries"
-    //         target="_blank"
-    //       >
-    //         Current query cannot be rolled up due to it is not additive
-    //       </Link>
-    //       . Please consider removing not additive measures like `countDistinct`
-    //       or `avg`. You can also try to use{' '}
-    //       <Link
-    //         href="https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-originalsql"
-    //         target="_blank"
-    //       >
-    //         originalSql
-    //       </Link>{' '}
-    //       rollup instead.
-    //     </Paragraph>
-    //   );
-    // }
-
     return (
       <>
         <CodeSnippet
