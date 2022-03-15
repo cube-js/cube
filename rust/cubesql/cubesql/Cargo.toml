@@ -51,6 +51,7 @@ pretty_assertions = "1.0.0"
 insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
+tokio-postgres = "0.7.5"
 
 [[test]]
 name = "e2e"
