@@ -93,14 +93,19 @@ function getSelectedKeys(references: PreAggregationReferences) {
 type RollupDesignerProps = {
   apiUrl: string;
   memberTypeCubeMap: AvailableMembers;
+  token?: string;
 };
 
 export function RollupDesigner({
   apiUrl,
   memberTypeCubeMap,
+  token: designerToken
 }: RollupDesignerProps) {
   const isMounted = useIsMounted();
-  const token = useToken();
+  const appToken = useToken();
+  
+  const token = appToken || designerToken;
+  
   const { isCloud, ...cloud } = useCloud();
   const { query, transformedQuery, isLoading, error } =
     useRollupDesignerContext();
@@ -111,10 +116,6 @@ export function RollupDesigner({
   const [firstOpenCubeName, setFirstOpenCubeName] = useState<string | null>(
     null
   );
-
-  // todo: avoid
-  const canBeRolledUp = true;
-  const hasNonAdditiveMeasures = Boolean(transformedQuery?.leafMeasureAdditive);
 
   const [matching, setMatching] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -182,7 +183,7 @@ export function RollupDesigner({
         setMatching(json.canUsePreAggregationForTransformedQuery);
       }
     }
-
+    
     if (token != null && transformedQuery) {
       load();
     }
@@ -278,27 +279,27 @@ export function RollupDesigner({
   }
 
   function rollupBody() {
-    if (!canBeRolledUp) {
-      return (
-        <Paragraph>
-          <Link
-            href="https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries"
-            target="_blank"
-          >
-            Current query cannot be rolled up due to it is not additive
-          </Link>
-          . Please consider removing not additive measures like `countDistinct`
-          or `avg`. You can also try to use{' '}
-          <Link
-            href="https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-originalsql"
-            target="_blank"
-          >
-            originalSql
-          </Link>{' '}
-          rollup instead.
-        </Paragraph>
-      );
-    }
+    // if (!canBeRolledUp) {
+    //   return (
+    //     <Paragraph>
+    //       <Link
+    //         href="https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries"
+    //         target="_blank"
+    //       >
+    //         Current query cannot be rolled up due to it is not additive
+    //       </Link>
+    //       . Please consider removing not additive measures like `countDistinct`
+    //       or `avg`. You can also try to use{' '}
+    //       <Link
+    //         href="https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-originalsql"
+    //         target="_blank"
+    //       >
+    //         originalSql
+    //       </Link>{' '}
+    //       rollup instead.
+    //     </Paragraph>
+    //   );
+    // }
 
     return (
       <>
@@ -340,7 +341,12 @@ export function RollupDesigner({
           <Skeleton />
         </Box>
 
-        <Box style={{ width: 420, minWidth: 420 }}>
+        <Box
+          style={{
+            width: 420,
+            minWidth: 420,
+          }}
+        >
           <Skeleton />
         </Box>
       </Flex>
@@ -488,28 +494,26 @@ export function RollupDesigner({
                   </Box>
                 )}
 
-              {canBeRolledUp ? (
-                <Box style={{ marginBottom: 16 }}>
-                  {!areReferencesEmpty(references) ? (
-                    <Paragraph>
-                      Add the following rollup pre-aggregation
-                      <br /> to the <b>{cubeName}</b> cube:
-                    </Paragraph>
-                  ) : (
-                    <Alert type="warning" message="Add some references" />
-                  )}
-
-                  <Paragraph style={{ margin: '24px 0 4px' }}>
-                    Rollup Name
+              <Box style={{ marginBottom: 16 }}>
+                {!areReferencesEmpty(references) ? (
+                  <Paragraph>
+                    Add the following rollup pre-aggregation
+                    <br /> to the <b>{cubeName}</b> cube:
                   </Paragraph>
+                ) : (
+                  <Alert type="warning" message="Add some references" />
+                )}
 
-                  <Input
-                    value={preAggName}
-                    suffix={<EditOutlined />}
-                    onChange={(event) => setPreAggName(event.target.value)}
-                  />
-                </Box>
-              ) : null}
+                <Paragraph style={{ margin: '24px 0 4px' }}>
+                  Rollup Name
+                </Paragraph>
+
+                <Input
+                  value={preAggName}
+                  suffix={<EditOutlined />}
+                  onChange={(event) => setPreAggName(event.target.value)}
+                />
+              </Box>
 
               <Box>{rollupBody()}</Box>
             </Flex>
@@ -518,7 +522,7 @@ export function RollupDesigner({
           {isQueryPresent(query) ? (
             <TabPane
               tab={
-                canBeRolledUp && matching ? (
+                matching ? (
                   <span data-testid="rd-query-tab">Query Compatibility</span>
                 ) : (
                   <Typography.Text data-testid="rd-query-tab">
@@ -531,7 +535,7 @@ export function RollupDesigner({
             >
               <Flex direction="column" justifyContent="flex-start">
                 <Box style={{ marginBottom: 32 }}>
-                  {canBeRolledUp && matching ? (
+                  {matching ? (
                     <Text>This rollup will match the following query:</Text>
                   ) : (
                     <Space direction="vertical">
