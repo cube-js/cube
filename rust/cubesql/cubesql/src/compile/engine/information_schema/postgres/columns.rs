@@ -16,7 +16,10 @@ use datafusion::{
 
 use crate::transport::{CubeColumn, V1CubeMetaExt};
 
-use super::utils::{new_string_array_with_placeholder, new_uint32_array_with_placeholder};
+use super::{
+    ext::CubeColumnPostgresExt,
+    utils::{new_string_array_with_placeholder, new_uint32_array_with_placeholder},
+};
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,
@@ -93,31 +96,52 @@ impl InformationSchemaColumnsBuilder {
             .append_value(ordinal_position)
             .unwrap();
         self.column_default.append_value("").unwrap();
-        self.is_nullable
-            .append_value(if column.sql_can_be_null() {
-                //TODO: rename mysql_can_be_null
-                "YES"
-            } else {
-                "NO"
-            })
-            .unwrap();
+        self.is_nullable.append_value(column.is_nullable()).unwrap();
 
         self.data_type.append_value(column.get_data_type()).unwrap();
 
         self.char_max_length.append_null().unwrap();
-        self.char_octet_length.append_null().unwrap();
-        self.numeric_precision.append_null().unwrap();
-        self.numeric_precision_radix.append_null().unwrap();
-        self.numeric_scale.append_null().unwrap();
-        self.datetime_precision.append_null().unwrap();
+
+        match column.char_octet_length() {
+            Some(value) => self.char_octet_length.append_value(value).unwrap(),
+            _ => self.char_octet_length.append_null().unwrap(),
+        }
+
+        match column.get_numeric_precision() {
+            Some(value) => self.numeric_precision.append_value(value).unwrap(),
+            _ => self.numeric_precision.append_null().unwrap(),
+        }
+
+        match column.numeric_precision_radix() {
+            Some(value) => self.numeric_precision_radix.append_value(value).unwrap(),
+            _ => self.numeric_precision_radix.append_null().unwrap(),
+        }
+
+        match column.numeric_scale() {
+            Some(value) => self.numeric_scale.append_value(value).unwrap(),
+            _ => self.numeric_scale.append_null().unwrap(),
+        }
+
+        match column.datetime_precision() {
+            Some(value) => self.datetime_precision.append_value(value).unwrap(),
+            _ => self.datetime_precision.append_null().unwrap(),
+        }
+
         self.domain_catalog.append_null().unwrap();
         self.domain_schema.append_null().unwrap();
         self.domain_name.append_null().unwrap();
-        self.udt_catalog.append_null().unwrap();
-        self.udt_schema.append_null().unwrap();
-        self.udt_name.append_null().unwrap();
-        self.dtd_identifier.append_null().unwrap();
-        self.is_updatable.append_null().unwrap();
+
+        self.udt_catalog
+            .append_value(catalog_name.as_ref())
+            .unwrap();
+        self.udt_schema.append_value(column.udt_schema()).unwrap();
+        self.udt_name.append_value(column.get_udt_name()).unwrap();
+
+        // unsupported
+        self.dtd_identifier.append_value("0").unwrap();
+
+        // always YES for basic tables
+        self.is_updatable.append_value("YES").unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -325,22 +349,17 @@ impl TableProvider for InfoSchemaColumnsProvider {
             Field::new("column_default", DataType::Utf8, true),
             Field::new("is_nullable", DataType::Utf8, false),
             Field::new("data_type", DataType::Utf8, false),
-            // TODO: to fill
-            // ----------------------------------- start
             Field::new("character_maximum_length", DataType::UInt32, true),
             Field::new("character_octet_length", DataType::UInt32, true),
             Field::new("numeric_precision", DataType::UInt32, true),
             Field::new("numeric_precision_radix", DataType::UInt32, true),
             Field::new("numeric_scale", DataType::UInt32, true),
             Field::new("datetime_precision", DataType::UInt32, true),
-            // ----------------------------------- end
             Field::new("interval_type", DataType::Utf8, false),
             Field::new("interval_precision", DataType::Utf8, true),
             Field::new("character_set_catalog", DataType::Utf8, true),
             Field::new("character_set_schema", DataType::Utf8, true),
             Field::new("character_set_name", DataType::Utf8, true),
-            // TODO: to fill
-            // ----------------------------------- start
             Field::new("collation_catalog", DataType::Utf8, true),
             Field::new("collation_schema", DataType::Utf8, true),
             Field::new("collation_name", DataType::Utf8, true),
@@ -350,32 +369,23 @@ impl TableProvider for InfoSchemaColumnsProvider {
             Field::new("udt_catalog", DataType::Utf8, true),
             Field::new("udt_schema", DataType::Utf8, true),
             Field::new("udt_name", DataType::Utf8, true),
-            // ----------------------------------- end
             Field::new("scope_catalog", DataType::Utf8, true),
             Field::new("scope_schema", DataType::Utf8, true),
             Field::new("scope_name", DataType::Utf8, true),
             Field::new("maximum_cardinality", DataType::UInt32, true),
-            // TODO: to fill
-            // ----------------------------------- start
             Field::new("dtd_identifier", DataType::Utf8, true),
-            // ----------------------------------- end
             Field::new("is_self_referencing", DataType::Utf8, true),
-            // TODO: to fill
-            // ----------------------------------- start
+            // TODO: is_identity is not supported yet
             Field::new("is_identity", DataType::Utf8, true),
             Field::new("identity_generation", DataType::Utf8, true),
             Field::new("identity_start", DataType::Utf8, true),
             Field::new("identity_increment", DataType::Utf8, true),
             Field::new("identity_maximum", DataType::Utf8, true),
             Field::new("identity_minimum", DataType::Utf8, true),
-            // ----------------------------------- end
             Field::new("identity_cycle", DataType::Utf8, true),
             Field::new("is_generated", DataType::Utf8, true),
             Field::new("generation_expression", DataType::Utf8, false),
-            // TODO: to fill
-            // ----------------------------------- start
             Field::new("is_updatable", DataType::Utf8, true),
-            // ----------------------------------- end
         ]))
     }
 

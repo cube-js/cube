@@ -36,6 +36,7 @@ use self::context::*;
 use self::engine::context::VariablesProvider;
 use self::engine::df::planner::CubeQueryPlanner;
 use self::engine::df::scan::CubeScanNode;
+use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
@@ -1734,7 +1735,7 @@ impl QueryPlanner {
                 fields.push(format!(
                     "`{}` {}{}",
                     column.get_name(),
-                    column.get_column_type(),
+                    column.get_mysql_column_type(),
                     if column.sql_can_be_null() { " NOT NULL" } else { "" }
                 ));
             }
@@ -2955,7 +2956,7 @@ mod tests {
                     DFSchema::new(vec![DFField::new(
                         None,
                         "Logs.agentCount",
-                        DataType::Float64,
+                        DataType::Int64,
                         false,
                     )])
                     .unwrap(),
@@ -2977,7 +2978,7 @@ mod tests {
                     DFSchema::new(vec![DFField::new(
                         None,
                         "Logs.agentCountApprox",
-                        DataType::Float64,
+                        DataType::Int64,
                         false,
                     )])
                     .unwrap(),
@@ -4084,39 +4085,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_show_create_table() -> Result<(), CubeError> {
-        let exepected =
-            "+---------------------------+-----------------------------------------------+\n\
-        | Table                     | Create Table                                  |\n\
-        +---------------------------+-----------------------------------------------+\n\
-        | KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` (\r    |\n\
-        |                           |   `count` int,\r                                |\n\
-        |                           |   `maxPrice` int,\r                             |\n\
-        |                           |   `minPrice` int,\r                             |\n\
-        |                           |   `avgPrice` int,\r                             |\n\
-        |                           |   `order_date` datetime NOT NULL,\r             |\n\
-        |                           |   `customer_gender` varchar(255) NOT NULL,\r    |\n\
-        |                           |   `taxful_total_price` varchar(255) NOT NULL,\r |\n\
-        |                           |   `is_male` boolean,\r                          |\n\
-        |                           |   `is_female` boolean\r                         |\n\
-        |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4       |\n\
-        +---------------------------+-----------------------------------------------+";
-
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_create_table",
             execute_query(
                 "show create table KibanaSampleDataEcommerce;".to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            exepected.clone()
+            .await?
         );
 
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_create_table",
             execute_query(
                 "show create table `db`.`KibanaSampleDataEcommerce`;".to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            exepected
+            .await?
         );
 
         Ok(())
