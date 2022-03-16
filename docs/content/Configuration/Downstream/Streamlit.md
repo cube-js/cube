@@ -23,7 +23,7 @@ Query Cube via SQL API from Streamlit.
 connection_string = 'mysql+pymysql://user:password@host/db'
 with streamlit.echo():
     conn = create_engine(connection_string)
-    df = pandas.read_sql_query('select count, status from Orders', conn)
+    df = pandas.read_sql_query('SELECT MEASURE(total_sum), status from orders GROUP BY status', conn)
     streamlit.dataframe(df)
 ```
 
