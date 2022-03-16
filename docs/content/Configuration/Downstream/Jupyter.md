@@ -3,7 +3,7 @@ title: Connecting to Jupyter
 permalink: /config/downstream/jupyter
 ---
 
-You can query Cube from Jupyter notebooks via SQL API.
+You can query Cube from Jupyter notebooks via [SQL API][ref-sql-api].
 
 ```python
 from sqlalchemy import create_engine
@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 conn = create_engine('mysql+pymysql://user:password@host/db')
 
-data_frame = pandas.read_sql('SELECT total_sum, status from Orders');
+data_frame = pandas.read_sql('SELECT MEASURE(total_sum), status from orders GROUP BY status');
 ```
 
 <img
@@ -22,3 +22,6 @@ data_frame = pandas.read_sql('SELECT total_sum, status from Orders');
   style="border: none"
   width="80%"
 />
+
+
+[ref-sql-api]: /backend/sql
