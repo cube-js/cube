@@ -2,8 +2,8 @@ name: 'Cloud Tests'
 on:
   push:
     paths:
-      - '.github/workflows/push.yml'
-      - '.github/workflows/master.yml'
+      - '.github/actions/integration/**'
+      - '.github/workflows/cloud.yml'
       - 'packages/**'
       - '.eslintrc.js'
       - '.prettierrc'
