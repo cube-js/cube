@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`bigquery Driver.query 1`] = `
+exports[`bigquery query: query 1`] = `
 Array [
   Object {
     "OrdersPA.amount": "600.6",
