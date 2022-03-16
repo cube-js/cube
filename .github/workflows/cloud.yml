@@ -1,4 +1,4 @@
-# CAUTION: This workflow exposes secrets. It is only supposed to run on "merge into master" condition.
+# CAUTION: This workflow exposes secrets. It is only supposed to be run on "merge into master" condition.
 name: 'Cloud Tests'
 on:
   push:
