@@ -129,7 +129,7 @@ mysql> DESCRIBE Orders;
 To get the count of orders grouped by status we can run the following query.
 
 ```
-mysql> SELECT count, status FROM Orders;
+mysql> SELECT MEASURE(count), status FROM Orders GROUP BY status;
 +-------+------------+
 | count | status     |
 +-------+------------+
@@ -139,14 +139,12 @@ mysql> SELECT count, status FROM Orders;
 +-------+------------+
 ```
 
-Cube will automatically apply the `GROUP BY` clause in case it is missing in the
-query. We can also provide the `GROUP BY` statement to control how results are
-grouped. In the following example we group orders by created month and also by
+In the following example we group orders by created month and also by
 status within every month.
 
 ```
 mysql> SELECT
-    ->   count,
+    ->   MEASURE(count),
     ->   status,
     ->   DATE(DATE_SUB(`created`, INTERVAL DAYOFMONTH(`created`) - 1 DAY)) date
     -> FROM Orders
@@ -187,11 +185,11 @@ mysql> SELECT status FROM Orders;
 
 Measures can similarly be queried through Cube SQL.
 
-Because measures are already aggregated in Cube there is no need to apply
+Measures are already aggregated in Cube there is no need to apply
 aggregate functions to them in SQL API.
 
 ```
-mysql> SELECT count FROM Orders;
+mysql> SELECT MEASURE(count) FROM Orders;
 +-------+
 | count |
 +-------+
