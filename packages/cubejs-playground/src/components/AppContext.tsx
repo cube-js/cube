@@ -54,7 +54,7 @@ export function AppContextProvider({
   const [context, setContextState] = useState<Partial<ContextProps> | null>(
     contextProps || null
   );
-
+  
   const setContext = useCallback<(context: Partial<ContextProps> | null) => any>((context) => {
     setContextState((currentContext) => ({
       ...currentContext,
