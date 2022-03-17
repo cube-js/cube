@@ -81,7 +81,7 @@ pub async fn read_format<Reader: AsyncReadExt + Unpin>(
         1 => protocol::Format::Binary,
         format_code => {
             return Err(Error::new(
-                std::io::ErrorKind::Other,
+                std::io::ErrorKind::Unsupported,
                 format!("Unknown format code: {}", format_code),
             ));
         }

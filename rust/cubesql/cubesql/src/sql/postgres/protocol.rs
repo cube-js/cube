@@ -266,7 +266,7 @@ impl Deserialize for PasswordMessage {
 /// This command is used for prepared statement creation on the server side
 #[derive(Debug, PartialEq)]
 pub struct Parse {
-    /// The name of the prepared statement. Empty string is used for
+    /// The name of the prepared statement. Empty string is used for unamed statements
     pub name: String,
     /// SQL query with placeholders ($1)
     pub query: String,
