@@ -57,7 +57,6 @@ use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
-use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -68,6 +67,7 @@ use crate::{
 };
 use data::create_array_builder;
 use std::mem::take;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -551,6 +551,103 @@ impl SqlService for SqlServiceImpl {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
+        match async_try_with_catch_unwind(self.exec_query_with_context_impl(context, query)).await {
+            Ok(result) => result,
+            Err(panic) => Err(CubeError::from(panic))
+        }
+    }
+
+    async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
+        let ast = {
+            let replaced_quote = q.replace("\\'", "''");
+            let mut parser = CubeStoreParser::new(&replaced_quote)?;
+            parser.parse_statement()?
+        };
+        match ast {
+            CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .await?;
+                match logical_plan {
+                    QueryPlan::Select(router_plan, _) => {
+                        // For tests, pretend we have all partitions on the same worker.
+                        let worker_plan = router_plan.with_partition_id_to_execute(
+                            router_plan
+                                .index_snapshots()
+                                .iter()
+                                .flat_map(|i| {
+                                    i.partitions
+                                        .iter()
+                                        .map(|p| (p.partition.get_id(), RowFilter::default()))
+                                })
+                                .collect(),
+                        );
+                        let mut mocked_names = HashMap::new();
+                        for (_, f, _) in worker_plan.files_to_download() {
+                            let name = self.remote_fs.local_file(&f).await?;
+                            mocked_names.insert(f, name);
+                        }
+                        let chunk_ids_to_batches = worker_plan
+                            .in_memory_chunks_to_load()
+                            .into_iter()
+                            .map(|c| (c.get_id(), Vec::new()))
+                            .collect();
+                        return Ok(QueryPlans {
+                            router: self
+                                .query_executor
+                                .router_plan(router_plan, self.cluster.clone())
+                                .await?
+                                .0,
+                            worker: self
+                                .query_executor
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
+                                .await?
+                                .0,
+                        });
+                    }
+                    QueryPlan::Meta(_) => {
+                        return Err(CubeError::internal(
+                            "plan_query only works for data selects".to_string(),
+                        ))
+                    }
+                };
+            }
+            _ => {
+                return Err(CubeError::internal(
+                    "plan_query only works for data selects".to_string(),
+                ))
+            }
+        }
+    }
+
+    async fn upload_temp_file(
+        &self,
+        _context: SqlQueryContext,
+        name: String,
+        file_path: &Path,
+    ) -> Result<(), CubeError> {
+        // TODO persist file size
+        self.remote_fs
+            .upload_file(
+                file_path.to_string_lossy().as_ref(),
+                &format!("temp-uploads/{}", name),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn temp_uploads_dir(&self, _context: SqlQueryContext) -> Result<String, CubeError> {
+        self.remote_fs.uploads_dir().await
+    }
+}
+
+impl SqlServiceImpl {
+    async fn exec_query_with_context_impl(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
@@ -613,8 +710,7 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                     if workers.len() == 0 {
                         let executor = self.query_executor.clone();
-                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
-                            .await?;
+                        executor.execute_router_plan(plan, cluster).await?;
                     } else {
                         let worker = &workers[0];
                         cluster.run_select(worker, plan).await?;
@@ -913,90 +1009,6 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
-    }
-
-    async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
-        let ast = {
-            let replaced_quote = q.replace("\\'", "''");
-            let mut parser = CubeStoreParser::new(&replaced_quote)?;
-            parser.parse_statement()?
-        };
-        match ast {
-            CubeStoreStatement::Statement(Statement::Query(q)) => {
-                let logical_plan = self
-                    .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
-                    .await?;
-                match logical_plan {
-                    QueryPlan::Select(router_plan, _) => {
-                        // For tests, pretend we have all partitions on the same worker.
-                        let worker_plan = router_plan.with_partition_id_to_execute(
-                            router_plan
-                                .index_snapshots()
-                                .iter()
-                                .flat_map(|i| {
-                                    i.partitions
-                                        .iter()
-                                        .map(|p| (p.partition.get_id(), RowFilter::default()))
-                                })
-                                .collect(),
-                        );
-                        let mut mocked_names = HashMap::new();
-                        for (_, f, _) in worker_plan.files_to_download() {
-                            let name = self.remote_fs.local_file(&f).await?;
-                            mocked_names.insert(f, name);
-                        }
-                        let chunk_ids_to_batches = worker_plan
-                            .in_memory_chunks_to_load()
-                            .into_iter()
-                            .map(|c| (c.get_id(), Vec::new()))
-                            .collect();
-                        return Ok(QueryPlans {
-                            router: self
-                                .query_executor
-                                .router_plan(router_plan, self.cluster.clone())
-                                .await?
-                                .0,
-                            worker: self
-                                .query_executor
-                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
-                                .await?
-                                .0,
-                        });
-                    }
-                    QueryPlan::Meta(_) => {
-                        return Err(CubeError::internal(
-                            "plan_query only works for data selects".to_string(),
-                        ))
-                    }
-                };
-            }
-            _ => {
-                return Err(CubeError::internal(
-                    "plan_query only works for data selects".to_string(),
-                ))
-            }
-        }
-    }
-
-    async fn upload_temp_file(
-        &self,
-        _context: SqlQueryContext,
-        name: String,
-        file_path: &Path,
-    ) -> Result<(), CubeError> {
-        // TODO persist file size
-        self.remote_fs
-            .upload_file(
-                file_path.to_string_lossy().as_ref(),
-                &format!("temp-uploads/{}", name),
-            )
-            .await?;
-        Ok(())
-    }
-
-    async fn temp_uploads_dir(&self, _context: SqlQueryContext) -> Result<String, CubeError> {
-        self.remote_fs.uploads_dir().await
     }
 }
 

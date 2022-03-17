@@ -36,6 +36,7 @@ use std::fmt::Display;
 use std::fmt::{Debug, Formatter};
 use std::num::ParseIntError;
 use std::sync::PoisonError;
+use datafusion::cube_ext::catch_unwind::PanicError;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::time::error::Elapsed;
@@ -230,7 +231,17 @@ impl From<Elapsed> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::from_error(v)
+        match v {
+            datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            v => CubeError::from_error(v)
+        }
+    }
+}
+
+impl From<PanicError> for CubeError {
+    fn from(v: PanicError) -> Self {
+        let PanicError { msg } = v;
+        CubeError::panic(msg)
     }
 }
 
