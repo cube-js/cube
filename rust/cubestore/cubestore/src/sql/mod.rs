@@ -66,8 +66,8 @@ use crate::{
     store::DataFrame,
 };
 use data::create_array_builder;
-use std::mem::take;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
+use std::mem::take;
 
 pub mod cache;
 pub(crate) mod parser;
@@ -553,7 +553,7 @@ impl SqlService for SqlServiceImpl {
     ) -> Result<Arc<DataFrame>, CubeError> {
         match async_try_with_catch_unwind(self.exec_query_with_context_impl(context, query)).await {
             Ok(result) => result,
-            Err(panic) => Err(CubeError::from(panic))
+            Err(panic) => Err(CubeError::from(panic)),
         }
     }
 
