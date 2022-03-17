@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
+
+
+### Bug Fixes
+
+* TypeError: Cannot create proxy with a non-object as target or handler /cubejs-api/v1/run-scheduled-refresh request without auth params ([a04f13f](https://github.com/cube-js/cube.js/commit/a04f13f91c3ce2b7168a1eff4067df068ea320ae))
+
+
+
+
+
 ## [0.29.32](https://github.com/cube-js/cube.js/compare/v0.29.31...v0.29.32) (2022-03-10)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
