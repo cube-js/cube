@@ -257,11 +257,11 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
       console.log('[Birdbox] Done with DB');
 
       console.log('CLI', cli.pid);
-      console.log('PS BEFORE', execInDir('.', 'ps'));
+      console.log('PS BEFORE KILL', execInDir('.', 'ps').stdout);
 
       cli.kill();
 
-      console.log('PS AFTER', execInDir('.', 'ps'));
+      console.log('PS AFTER KILL', execInDir('.', 'ps').stdout);
 
       console.log('[Birdbox] Closed');
     },
