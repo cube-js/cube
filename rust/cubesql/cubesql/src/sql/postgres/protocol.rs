@@ -246,6 +246,7 @@ impl Serialize for DataRow {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct PasswordMessage {
     pub password: String,
 }
@@ -262,6 +263,145 @@ impl Deserialize for PasswordMessage {
     }
 }
 
+/// This command is used for prepared statement creation on the server side
+#[derive(Debug, PartialEq)]
+pub struct Parse {
+    /// The name of the prepared statement. Empty string is used for
+    pub name: String,
+    /// SQL query with placeholders ($1)
+    pub query: String,
+    // Types for parameters
+    pub param_types: Vec<u32>,
+}
+
+#[async_trait]
+impl Deserialize for Parse {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let name = buffer::read_string(&mut buffer).await?;
+        let query = buffer::read_string(&mut buffer).await?;
+
+        let total = buffer.read_i16().await?;
+        let mut param_types = Vec::with_capacity(total as usize);
+
+        for _ in 0..total {
+            param_types.push(buffer.read_u32().await?);
+        }
+
+        Ok(Self {
+            name,
+            query,
+            param_types,
+        })
+    }
+}
+
+/// This command is used for prepared statement creation on the server side
+#[derive(Debug, PartialEq)]
+pub struct Bind {
+    /// The name of the destination portal (an empty string selects the unnamed portal).
+    pub portal: String,
+    /// The name of the source prepared statement (an empty string selects the unnamed prepared statement).
+    pub statement: String,
+    /// Format for parameters
+    pub parameter_formats: Vec<Format>,
+    /// Raw values for parameters
+    pub parameter_values: Vec<Option<Vec<u8>>>,
+    /// Format for results
+    pub result_formats: Vec<Format>,
+}
+
+#[async_trait]
+impl Deserialize for Bind {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let portal = buffer::read_string(&mut buffer).await?;
+        let statement = buffer::read_string(&mut buffer).await?;
+
+        let mut parameter_formats = Vec::new();
+        {
+            let total = buffer.read_i16().await?;
+            for _ in 0..total {
+                parameter_formats.push(buffer::read_format(&mut buffer).await?);
+            }
+        }
+
+        let mut parameter_values = Vec::new();
+        {
+            let total = buffer.read_i16().await?;
+            for _ in 0..total {
+                let len = buffer.read_i32().await?;
+                if len == -1 {
+                    parameter_values.push(None);
+                } else {
+                    let mut value = Vec::with_capacity(len as usize);
+                    for _ in 0..len {
+                        value.push(buffer.read_u8().await?);
+                    }
+
+                    parameter_values.push(Some(value));
+                }
+            }
+        }
+
+        let mut result_formats = Vec::new();
+        {
+            let total = buffer.read_i16().await?;
+
+            for _ in 0..total {
+                result_formats.push(buffer::read_format(&mut buffer).await?);
+            }
+        }
+
+        Ok(Self {
+            portal,
+            statement,
+            parameter_formats,
+            parameter_values,
+            result_formats: vec![],
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum DescribeType {
+    Statement,
+    Portal,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Describe {
+    pub typ: DescribeType,
+    pub name: String,
+}
+
+#[async_trait]
+impl Deserialize for Describe {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let typ = match buffer.read_u8().await? {
+            b'S' => DescribeType::Statement,
+            b'P' => DescribeType::Portal,
+            t => {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Unknown describe code: {}", t),
+                ));
+            }
+        };
+        let name = buffer::read_string(&mut buffer).await?;
+
+        Ok(Self { typ, name })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Query {
     pub query: String,
 }
@@ -278,6 +418,13 @@ impl Deserialize for Query {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Format {
+    Text,
+    Binary,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct ProtocolVersion {
     pub major: u16,
     pub minor: u16,
@@ -289,16 +436,22 @@ impl ProtocolVersion {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum FrontendMessage {
     PasswordMessage(PasswordMessage),
     Query(Query),
+    Parse(Parse),
+    Bind(Bind),
+    Describe(Describe),
+    /// Close connection
     Terminate,
+    /// Finish
+    Sync,
 }
 
+/// https://www.postgresql.org/docs/14/errcodes-appendix.html
 pub enum ErrorCode {
-    // https://www.postgresql.org/docs/14/errcodes-appendix.html
-
-    // 0A - Feature Not Supported
+    // 0A — Feature Not Supported
     FeatureNotSupported,
     // 28 - Invalid Authorization Specification
     InvalidAuthorizationSpecification,
@@ -410,5 +563,125 @@ pub trait Deserialize {
     {
         let cursor = buffer::read_contents(&mut reader).await?;
         Ok(Self::deserialize(cursor).await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{sql::postgres::buffer::read_message, CubeError};
+    use std::io::Cursor;
+
+    use super::*;
+
+    fn parse_hex_dump(input: String) -> Vec<u8> {
+        let mut result: Vec<Vec<u8>> = vec![];
+
+        for line in input.trim().split("\n") {
+            let splitted = line.trim().split("   ").collect::<Vec<&str>>();
+            let row = splitted.first().unwrap().to_string().replace(" ", "");
+
+            let tmp = hex::decode(row).unwrap();
+            result.push(tmp);
+        }
+
+        result.concat()
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_parse() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
+            0a 20 20 20 20 20 20 53 45 4c 45 43 54 20 6e 75   .      SELECT nu
+            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.   
+            20 20 20 46 52 4f 4d 20 74 65 73 74 64 61 74 61      FROM testdata
+            0a 20 20 20 20 20 20 57 48 45 52 45 20 6e 75 6d   .      WHERE num
+            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str = 
+            24 32 20 41 4e 44 20 62 6f 6f 6c 20 3d 20 24 33   $2 AND bool = $3
+            0a 20 20 20 20 00 00 00                           .    ...
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Parse(parse) => {
+                assert_eq!(
+                    parse,
+                    Parse {
+                        name: "named-stmt".to_string(),
+                        query: "\n      SELECT num, str, bool\n      FROM testdata\n      WHERE num = $1 AND str = $2 AND bool = $3\n    ".to_string(),
+                        param_types: vec![],
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Parse"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_bind() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
+            00 00 00 00 03 00 00 00 01 35 00 00 00 04 74 65   .........5....te
+            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....            
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Bind(bind) => {
+                assert_eq!(
+                    bind,
+                    Bind {
+                        portal: "".to_string(),
+                        statement: "named-stmt".to_string(),
+                        parameter_formats: vec![],
+                        parameter_values: vec![
+                            Some(vec![53]),
+                            Some(vec![116, 101, 115, 116]),
+                            Some(vec![116, 114, 117, 101]),
+                        ],
+                        result_formats: vec![]
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_describe() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            44 00 00 00 08 53 73 30 00                        D....Ss0.          
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Describe(desc) => {
+                assert_eq!(
+                    desc,
+                    Describe {
+                        typ: DescribeType::Statement,
+                        name: "s0".to_string(),
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Describe"),
+        }
+
+        Ok(())
     }
 }

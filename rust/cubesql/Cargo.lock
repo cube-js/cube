@@ -727,6 +727,7 @@ dependencies = [
  "cubeclient",
  "datafusion",
  "futures",
+ "hex",
  "insta",
  "itertools",
  "lazy_static",
