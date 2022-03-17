@@ -13,6 +13,8 @@ use super::buffer;
 
 const DEFAULT_CAPACITY: usize = 64;
 
+pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
+
 pub struct StartupMessage {
     pub protocol_version: ProtocolVersion,
     pub parameters: HashMap<String, String>,
@@ -25,13 +27,16 @@ impl StartupMessage {
         let protocol_version = ProtocolVersion::new(major_protocol_version, minor_protocol_version);
 
         let mut parameters = HashMap::new();
-        loop {
-            let name = buffer::read_string(&mut buffer).await?;
-            if name.is_empty() {
-                break;
+
+        if major_protocol_version != SSL_REQUEST_PROTOCOL {
+            loop {
+                let name = buffer::read_string(&mut buffer).await?;
+                if name.is_empty() {
+                    break;
+                }
+                let value = buffer::read_string(&mut buffer).await?;
+                parameters.insert(name, value);
             }
-            let value = buffer::read_string(&mut buffer).await?;
-            parameters.insert(name, value);
         }
 
         Ok(Self {
@@ -76,6 +81,22 @@ impl Serialize for ErrorResponse {
         buffer.push(0);
 
         Some(buffer)
+    }
+}
+
+pub struct SSLResponse {}
+
+impl SSLResponse {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for SSLResponse {
+    const CODE: u8 = b'N';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        None
     }
 }
 
