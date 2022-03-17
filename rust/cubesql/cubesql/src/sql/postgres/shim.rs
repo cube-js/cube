@@ -38,22 +38,43 @@ impl AsyncPostgresShim {
         };
         match shim.run().await {
             Err(e) => {
-                if e.kind() == ErrorKind::Unsupported {
-                    shim.socket.shutdown().await?;
+                if e.kind() == ErrorKind::UnexpectedEof
+                    && shim.session.state.auth_context().is_none()
+                {
                     return Ok(());
                 }
                 Err(e)
             }
-            _ => Ok(()),
+            _ => {
+                shim.socket.shutdown().await?;
+                return Ok(());
+            }
         }
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        self.process_startup_message().await?;
+        if !self.process_startup_message().await? {
+            return Ok(());
+        }
+        match buffer::read_message(&mut self.socket).await? {
+            FrontendMessage::PasswordMessage(password_message) => {
+                if !self.authenticate(password_message).await? {
+                    return Ok(());
+                }
+            }
+            _ => return Ok(()),
+        }
+        self.ready().await?;
         loop {
             match buffer::read_message(&mut self.socket).await? {
                 FrontendMessage::Query(query) => self.process_query(query).await?,
                 FrontendMessage::Terminate => return Ok(()),
+                _ => {
+                    return Err(Error::new(
+                        ErrorKind::Unsupported,
+                        "command is not supported in this context",
+                    ))
+                }
             }
         }
     }
@@ -65,7 +86,7 @@ impl AsyncPostgresShim {
         buffer::write_message(&mut self.socket, message).await
     }
 
-    pub async fn process_startup_message(&mut self) -> Result<(), Error> {
+    pub async fn process_startup_message(&mut self) -> Result<bool, Error> {
         let mut buffer = buffer::read_contents(&mut self.socket).await?;
 
         let startup_message = protocol::StartupMessage::from(&mut buffer).await?;
@@ -81,17 +102,79 @@ impl AsyncPostgresShim {
                 ),
             );
             buffer::write_message(&mut self.socket, error_response).await?;
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "unsupported frontend protocol version",
-            ));
+            return Ok(false);
         }
 
         self.parameters = startup_message.parameters;
-        // TODO: throw an error on lack of "user" and default "database" to that if no value is provided
-        // See StartupMessage: https://www.postgresql.org/docs/14/protocol-message-formats.html
-        self.write(protocol::AuthenticationOk::new()).await?;
+        if !self.parameters.contains_key("user") {
+            let error_response = protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Fatal,
+                protocol::ErrorCode::InvalidAuthorizationSpecification,
+                "no PostgreSQL user name specified in startup packet".to_string(),
+            );
+            buffer::write_message(&mut self.socket, error_response).await?;
+            return Ok(false);
+        }
+        if !self.parameters.contains_key("database") {
+            self.parameters.insert(
+                "database".to_string(),
+                self.parameters.get("user").unwrap().clone(),
+            );
+        }
 
+        self.write(protocol::Authentication::new(
+            protocol::AuthenticationRequest::CleartextPassword,
+        ))
+        .await?;
+
+        Ok(true)
+    }
+
+    pub async fn authenticate(
+        &mut self,
+        password_message: protocol::PasswordMessage,
+    ) -> Result<bool, Error> {
+        let user = self.parameters.get("user").unwrap().clone();
+        let authenticate_response = self
+            .session
+            .server
+            .auth
+            .authenticate(Some(user.clone()))
+            .await;
+        let mut auth_context: Option<AuthContext> = None;
+        let auth_success = match authenticate_response {
+            Ok(authenticate_response) => {
+                auth_context = Some(authenticate_response.context);
+                match authenticate_response.password {
+                    None => true,
+                    Some(password) => password == password_message.password,
+                }
+            }
+            _ => false,
+        };
+
+        if !auth_success {
+            let error_response = protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Fatal,
+                protocol::ErrorCode::InvalidPassword,
+                format!("password authentication failed for user \"{}\"", &user),
+            );
+            buffer::write_message(&mut self.socket, error_response).await?;
+            return Ok(false);
+        }
+
+        self.session.state.set_user(Some(user));
+        self.session.state.set_auth_context(auth_context);
+
+        self.write(protocol::Authentication::new(
+            protocol::AuthenticationRequest::Ok,
+        ))
+        .await?;
+
+        Ok(true)
+    }
+
+    pub async fn ready(&mut self) -> Result<(), Error> {
         self.write(protocol::ParameterStatus::new(
             "server_version".to_string(),
             "14.2 (Cube SQL)".to_string(),
@@ -102,6 +185,7 @@ impl AsyncPostgresShim {
             protocol::TransactionStatus::Idle,
         ))
         .await?;
+
         Ok(())
     }
 

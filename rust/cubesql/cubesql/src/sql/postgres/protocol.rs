@@ -79,19 +79,21 @@ impl Serialize for ErrorResponse {
     }
 }
 
-pub struct AuthenticationOk;
+pub struct Authentication {
+    response: AuthenticationRequest,
+}
 
-impl AuthenticationOk {
-    pub fn new() -> Self {
-        Self {}
+impl Authentication {
+    pub fn new(response: AuthenticationRequest) -> Self {
+        Self { response }
     }
 }
 
-impl Serialize for AuthenticationOk {
+impl Serialize for Authentication {
     const CODE: u8 = b'R';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        Some(0_u32.to_be_bytes().to_vec())
+        Some(self.response.to_bytes())
     }
 }
 
@@ -244,6 +246,22 @@ impl Serialize for DataRow {
     }
 }
 
+pub struct PasswordMessage {
+    pub password: String,
+}
+
+#[async_trait]
+impl Deserialize for PasswordMessage {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            password: buffer::read_string(&mut buffer).await?,
+        })
+    }
+}
+
 pub struct Query {
     pub query: String,
 }
@@ -272,6 +290,7 @@ impl ProtocolVersion {
 }
 
 pub enum FrontendMessage {
+    PasswordMessage(PasswordMessage),
     Query(Query),
     Terminate,
 }
@@ -279,8 +298,11 @@ pub enum FrontendMessage {
 pub enum ErrorCode {
     // https://www.postgresql.org/docs/14/errcodes-appendix.html
 
-    // 0A — Feature Not Supported
+    // 0A - Feature Not Supported
     FeatureNotSupported,
+    // 28 - Invalid Authorization Specification
+    InvalidAuthorizationSpecification,
+    InvalidPassword,
     // XX - Internal Error
     InternalError,
 }
@@ -289,6 +311,9 @@ impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
             Self::FeatureNotSupported => "0A000",
+
+            Self::InvalidAuthorizationSpecification => "28000",
+            Self::InvalidPassword => "28P01",
 
             Self::InternalError => "XX000",
         };
@@ -340,6 +365,24 @@ impl Display for CommandCompleteTag {
             Self::Select => "SELECT",
         };
         write!(f, "{}", string)
+    }
+}
+
+pub enum AuthenticationRequest {
+    Ok,
+    CleartextPassword,
+}
+
+impl AuthenticationRequest {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_code().to_be_bytes().to_vec()
+    }
+
+    pub fn to_code(&self) -> u32 {
+        match self {
+            Self::Ok => 0,
+            Self::CleartextPassword => 3,
+        }
     }
 }
 

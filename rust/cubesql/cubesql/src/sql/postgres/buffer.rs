@@ -15,6 +15,9 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     Ok(match reader.read_u8().await? {
         b'Q' => FrontendMessage::Query(protocol::Query::read_from(reader).await?),
         b'X' => FrontendMessage::Terminate,
+        b'p' => {
+            FrontendMessage::PasswordMessage(protocol::PasswordMessage::read_from(reader).await?)
+        }
         identifier => {
             return Err(Error::new(
                 ErrorKind::InvalidData,

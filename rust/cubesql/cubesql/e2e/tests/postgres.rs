@@ -5,7 +5,7 @@ use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use portpicker::pick_unused_port;
 use tokio::time::sleep;
-use tokio_postgres::{NoTls, Row, Socket};
+use tokio_postgres::{NoTls, Row};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
@@ -59,7 +59,11 @@ impl PostgresIntegrationTestSuite {
         sleep(Duration::from_millis(1 * 1000)).await;
 
         let (client, connection) = tokio_postgres::connect(
-            format!("host=127.0.0.1 port={} user=ovr", random_port).as_str(),
+            format!(
+                "host=127.0.0.1 port={} user=ovr password=skipped",
+                random_port
+            )
+            .as_str(),
             NoTls,
         )
         .await
@@ -93,7 +97,7 @@ impl PostgresIntegrationTestSuite {
         for (idx, row) in res.into_iter().enumerate() {
             let mut values = Vec::new();
 
-            for column in row.columns() {
+            for _column in row.columns() {
                 let value: String = row.get(idx);
                 values.push(value);
             }
