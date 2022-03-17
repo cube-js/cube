@@ -1,6 +1,6 @@
 import spawn from 'cross-spawn';
 import { Readable } from 'stream';
-import shell from "shelljs";
+import shell, {ShellString} from "shelljs";
 
 export function getRealType(value: any): string {
   if (value === null) {
@@ -38,12 +38,12 @@ export async function executeCommand(
 }
 
 // Executes `command` in `dir`, returns the error code. Preserves working directory.
-export function execInDir(dir: string, command: string): number {
+export function execInDir(dir: string, command: string): ShellString {
   const crtDir = process.cwd();
   try {
     process.chdir(dir);
     const result = shell.exec(command);
-    return result.code;
+    return result;
   } finally {
     process.chdir(crtDir);
   }

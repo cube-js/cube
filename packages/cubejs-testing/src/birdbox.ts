@@ -47,7 +47,7 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
     const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
-    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`) !== 0) {
+    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`).code !== 0) {
       throw new Error('[Birdbox] Docker build failed.');
     }
   }
