@@ -8,7 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -27,21 +26,13 @@ declare module '@cubejs-client/core' {
   };
 
   export interface ITransportResponse<R> {
-    subscribe: <CBResult>(
-      cb: (
-        result: R,
-        resubscribe: () => Promise<CBResult>
-      ) => CBResult
-    ) => Promise<CBResult>;
+    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
     // Optional, supported in WebSocketTransport
     unsubscribe?: () => Promise<void>;
   }
 
   export interface ITransport<R> {
-    request(
-      method: string,
-      params: Record<string, unknown>
-    ): ITransportResponse<R>;
+    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
   }
 
   /**
@@ -140,6 +131,11 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  type LeafMeasure = {
+    measure: string;
+    additive: boolean;
+  };
+
   export type TransformedQuery = {
     allFiltersWithinSelectedDimensions: boolean;
     granularityHierarchies: Record<string, string[]>;
@@ -151,6 +147,7 @@ declare module '@cubejs-client/core' {
     measures: string[];
     sortedDimensions: string[];
     sortedTimeDimensions: [[string, string]];
+    measureToLeafMeasures?: Record<string, LeafMeasure[]>;
   };
 
   export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
@@ -168,7 +165,7 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
-    requestId?: string,
+    requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
@@ -799,7 +796,7 @@ declare module '@cubejs-client/core' {
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
-    responseFormat?: 'compact' | 'default'
+    responseFormat?: 'compact' | 'default';
   }
 
   export class ProgressResult {
@@ -1003,7 +1000,12 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>, responseFormat?: string):  Promise<ResultSet>;
+    load(
+      query: Query | Query[],
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet>,
+      responseFormat?: string
+    ): Promise<ResultSet>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
