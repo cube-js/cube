@@ -12,7 +12,8 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
       - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
 
-      - CUBEJS_DEV_MODE=true
+      # - CUBEJS_DEV_MODE=true
+      - CUBEJS_ROLLUP_ONLY=true
 
       - CUBEJS_EXT_DB_TYPE=cubestore
       - CUBEJS_EXT_DB_HOST=cubestore
