@@ -72,7 +72,7 @@ cube(`Mobility`, {
       type: `rollup`,
       external: true,
       scheduledRefresh: true,
-      refreshKey: { every: '1 minute' },
+      refreshKey: { every: '1 hour' },
       measureReferences: [ grocery, park, residential, retail, transit, workplace ],
       dimensionReferences: [ country ],
       timeDimensionReference: date,

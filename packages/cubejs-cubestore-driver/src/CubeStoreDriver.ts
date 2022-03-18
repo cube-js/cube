@@ -157,9 +157,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const createTableSqlWithLocation = `${createTableSql} WITH (input_format = '${inputFormat}') ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
       return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
-        console.log('eee', e);
         throw e;
-      }
+      });
     }
 
     const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;

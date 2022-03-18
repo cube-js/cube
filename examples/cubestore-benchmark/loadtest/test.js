@@ -22,10 +22,10 @@ export let options = {
       Object.assign({}, defaultScenario),
       { exec: 'cubestore' },
     ),
-    // postgres: Object.assign(
-    //   Object.assign({}, defaultScenario),
-    //   { exec: 'postgres' },
-    // ),
+    postgres: Object.assign(
+      Object.assign({}, defaultScenario),
+      { exec: 'postgres' },
+    ),
   },
 };
 
@@ -43,14 +43,14 @@ export function cubestore() {
 }
 
 
-// let postgresLantency = new Trend('Latency (Cube.js with Postgres)', true);
-//
-// export function postgres() {
-//     let res = http.get(`${RELAY_URL}/postgres`);
-//
-//     postgresLantency.add(res.timings.duration);
-//
-//     check(res, {
-//       'is status 200': res => res.status === 200,
-//     });
-// }
+let postgresLantency = new Trend('Latency (Cube.js with Postgres)', true);
+
+export function postgres() {
+    let res = http.get(`${RELAY_URL}/postgres`);
+
+    postgresLantency.add(res.timings.duration);
+
+    check(res, {
+      'is status 200': res => res.status === 200,
+    });
+}
