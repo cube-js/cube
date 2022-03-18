@@ -7,13 +7,14 @@ services:
       - 4001:4000
       - 3001:3000
     environment:
+      - CUBEJS_REFRESH_WORKER=false
+      - CUBEJS_ROLLUP_ONLY=true
+      - CUBEJS_DEV_MODE=true
+
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
       - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
       - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
-
-      # - CUBEJS_DEV_MODE=true
-      - CUBEJS_ROLLUP_ONLY=true
 
       - CUBEJS_EXT_DB_TYPE=cubestore
       - CUBEJS_EXT_DB_HOST=cubestore
@@ -32,7 +33,7 @@ services:
   refresh_worker:
     image: cubejs/cube:latest
     environment:
-      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_REFRESH_WORKER=true
 
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
