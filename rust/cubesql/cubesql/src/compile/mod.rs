@@ -2060,9 +2060,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 CompilationError::Internal(format!("Initial planning error: {}", err))
             })?;
 
-        let optimized_plan = ctx.optimize(&plan).map_err(|err| {
-            CompilationError::Internal(format!("Planning optimization error: {}", err))
-        })?;
+        let optimized_plan = plan;
+        // ctx.optimize(&plan).map_err(|err| {
+        //    CompilationError::Internal(format!("Planning optimization error: {}", err))
+        // })?;
 
         let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx);
         let root = converter

@@ -27,6 +27,7 @@ use egg::{
 };
 use egg::{EGraph, Extractor, Id, RecExpr, Rewrite, Runner};
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Index;
 use std::str::FromStr;
@@ -111,8 +112,7 @@ crate::plan_to_language! {
 
         CubeScan {
             cube: Arc<LogicalPlan>,
-            measures: Vec<LogicalPlan>,
-            dimensions: Vec<LogicalPlan>,
+            members: Vec<LogicalPlan>,
             filters: Vec<LogicalPlan>,
         },
         Measure {
@@ -131,6 +131,14 @@ crate::plan_to_language! {
         },
         MemberAlias {
             name: String,
+        },
+        MemberReplacer {
+            members: Vec<LogicalPlan>,
+            cube: Arc<LogicalPlan>,
+        },
+        ColumnAliasReplacer {
+            members: Vec<LogicalPlan>,
+            aliases: Vec<(String, String)>,
         },
 
         AliasExpr {
@@ -654,123 +662,196 @@ impl LogicalPlanToLanguageConverter {
         vec![
             rewrite!("cube-scan";
                 "(TableScan ?source_table_name ?table_name ?projection ?filters ?limit)" =>
-                "(Extension (CubeScan ?source_table_name CubeScanMeasures CubeScanDimensions CubeScanFilters))"
+                "(Extension (CubeScan ?source_table_name CubeScanMembers CubeScanFilters))"
                 if self.is_cube_table("?source_table_name")
             ),
-            rewrite!("simple-count";
-                "(Aggregate \
-                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
-                    ?group_expr \
-                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal) AggregateFunctionExprArgs) ?distinct) ?tail_aggr_expr) \
-                 )" => {
-                    TransformingPattern::new(
-                        "(Aggregate \
-                            (Extension (CubeScan ?source_table_name \
-                                (CubeScanMeasures \
-                                    ?measures \
-                                    (Measure ?measure_name (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (LiteralExpr ?literal)) ?distinct))\
-                                ) \
-                                ?dimensions \
-                                ?filters\
-                            )) \
-                            ?group_expr \
-                            ?tail_aggr_expr \
-                         )",
-                         self.transform_measure("?source_table_name", None, "?distinct", "?aggr_fun")
-                    )
-                 }
+            rewrite(
+                "member-replacer-aggr-tail",
+                member_replacer(aggr_aggr_expr_empty_tail(), "?source_table_name"),
+                cube_scan_members_empty_tail(),
             ),
-            rewrite!("named-aggr";
-                "(Aggregate \
-                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
-                    ?group_expr \
-                    (AggregateAggrExpr (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column) AggregateFunctionExprArgs) ?distinct) ?tail_aggr_expr) \
-                 )" => {
-                    TransformingPattern::new(
-                        "(Aggregate \
-                            (Extension (CubeScan ?source_table_name \
-                                (CubeScanMeasures \
-                                    ?measures \
-                                    (Measure ?measure_name (AggregateFunctionExpr ?aggr_fun (AggregateFunctionExprArgs (ColumnExpr ?column)) ?distinct))\
-                                ) \
-                                ?dimensions \
-                                ?filters\
-                            )) \
-                            ?group_expr \
-                            ?tail_aggr_expr \
-                         )",
-                         self.transform_measure("?source_table_name", Some("?column"), "?distinct", "?aggr_fun")
-                    )
-                 }
+            rewrite(
+                "member-replacer-group-tail",
+                member_replacer(aggr_group_expr_empty_tail(), "?source_table_name"),
+                cube_scan_members_empty_tail(),
             ),
-            rewrite!("date-trunc";
-                "(Aggregate \
-                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
-                    (AggregateGroupExpr \
-                        (ScalarFunctionExpr \
-                            DateTrunc \
-                            (ScalarFunctionExprArgs \
-                                (LiteralExpr ?granularity) \
-                                (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
-                            ) \
-                        ) \
-                        ?tail_group_expr\
-                    ) \
-                    ?aggr_expr \
-                 )" => {
-                    TransformingPattern::new(
-                        "(Aggregate \
-                            (Extension (CubeScan ?source_table_name \
-                                ?measures
-                                (CubeScanDimensions \
-                                    ?dimensions \
-                                    (TimeDimension \
-                                        ?time_dimension_name \
-                                        ?time_dimension_granularity \
-                                        ?date_range \
-                                        (ScalarFunctionExpr \
-                                            DateTrunc \
-                                            (ScalarFunctionExprArgs \
-                                                (LiteralExpr ?granularity) \
-                                                (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
-                                            ) \
-                                        )\
-                                    )\
-                                ) \
-                                ?filters\
-                            )) \
-                            ?tail_group_expr \
-                            ?aggr_expr \
-                         )",
-                         self.transform_time_dimension("?source_table_name", "?column", "?time_dimension_name", "?granularity", "?time_dimension_granularity", "?date_range")
-                    )
-                 }
+            rewrite(
+                "dimension-replacer-tail-proj",
+                member_replacer(projection_expr_empty_tail(), "?source_table_name"),
+                cube_scan_members_empty_tail(),
             ),
-            rewrite!("time-dimension-alias";
-                "(TimeDimension \
-                    ?time_dimension_name \
-                    ?time_dimension_granularity \
-                    ?date_range \
-                    ?original_expr \
-                )" => {
-                    TransformingPattern::new(
-                        "(TimeDimension \
-                            ?time_dimension_name \
-                            ?time_dimension_granularity \
-                            ?date_range \
-                            ?alias \
-                        )",
-                         self.transform_original_expr_alias("?original_expr", "?alias")
-                    )
-                 }
+            transforming_rewrite(
+                "simple-count",
+                member_replacer(
+                    aggr_aggr_expr(
+                        agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
+                        "?tail_aggr_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    measure_expr(
+                        "?measure_name",
+                        agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
+                    ),
+                    member_replacer("?tail_aggr_expr", "?source_table_name"),
+                ),
+                self.transform_measure("?source_table_name", None, "?distinct", "?aggr_fun"),
             ),
-            rewrite!("remove-processed-aggregate";
-                "(Aggregate \
-                    (Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters)) \
-                    AggregateGroupExpr \
-                    AggregateAggrExpr \
-                 )" =>
-                "(Extension (CubeScan ?source_table_name ?measures ?dimensions ?filters))"
+            transforming_rewrite(
+                "named-aggr",
+                member_replacer(
+                    aggr_aggr_expr(
+                        agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
+                        "?tail_aggr_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    measure_expr(
+                        "?measure_name",
+                        agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
+                    ),
+                    member_replacer("?tail_aggr_expr", "?source_table_name"),
+                ),
+                self.transform_measure(
+                    "?source_table_name",
+                    Some("?column"),
+                    "?distinct",
+                    "?aggr_fun",
+                ),
+            ),
+            transforming_rewrite(
+                "projection-columns-with-alias",
+                member_replacer(
+                    projection_expr(
+                        alias_expr(column_expr("?column"), "?alias"),
+                        "?tail_group_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    "?member",
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_projection_member(
+                    "?source_table_name",
+                    "?column",
+                    Some("?alias"),
+                    "?member",
+                ),
+            ),
+            transforming_rewrite(
+                "projection-columns",
+                member_replacer(
+                    projection_expr(column_expr("?column"), "?tail_group_expr"),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    "?member",
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_projection_member("?source_table_name", "?column", None, "?member"),
+            ),
+            transforming_rewrite(
+                "date-trunc",
+                member_replacer(
+                    aggr_group_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?tail_group_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    time_dimension_expr(
+                        "?time_dimension_name",
+                        "?time_dimension_granularity",
+                        "?date_range",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                    ),
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
+            transforming_rewrite(
+                "time-dimension-alias",
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?original_expr",
+                ),
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?alias",
+                ),
+                self.transform_original_expr_alias("?original_expr", "?alias"),
+            ),
+            rewrite(
+                "push-down-aggregate",
+                aggregate(
+                    cube_scan(
+                        "?source_table_name",
+                        cube_scan_members_empty_tail(),
+                        "?filters",
+                    ),
+                    "?group_expr",
+                    "?aggr_expr",
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    cube_scan_members(
+                        member_replacer("?group_expr", "?source_table_name"),
+                        member_replacer("?aggr_expr", "?source_table_name"),
+                    ),
+                    "?filters",
+                ),
+            ),
+            rewrite(
+                "push-down-projection-to-empty-scan",
+                projection(
+                    "?expr",
+                    cube_scan(
+                        "?source_table_name",
+                        cube_scan_members_empty_tail(),
+                        "?filters",
+                    ),
+                    "?alias",
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    member_replacer("?expr", "?source_table_name"),
+                    "?filters",
+                ),
+            ),
+            transforming_rewrite(
+                "push-down-projection",
+                projection(
+                    "?expr",
+                    cube_scan("?source_table_name", "?members", "?filters"),
+                    "?alias",
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    column_alias_replacer("?members", "?aliases"),
+                    "?filters",
+                ),
+                self.push_down_projection("?expr", "?members", "?aliases"),
             ),
             rewrite!("date-to-date-trunc";
                 "(ScalarUDFExpr \
@@ -1023,7 +1104,7 @@ impl LogicalPlanToLanguageConverter {
                 .nodes
                 .iter()
                 .any(|node| match node {
-                    LogicalPlanLanguage::MemberAlias(_) => true,
+                    LogicalPlanLanguage::ColumnExpr(_) => true,
                     _ => false,
                 })
             {
@@ -1036,13 +1117,135 @@ impl LogicalPlanToLanguageConverter {
                 if let Ok(expr) = res {
                     // TODO unwrap
                     let name = expr.name(&DFSchema::empty()).unwrap();
-                    let alias =
-                        egraph.add(LogicalPlanLanguage::MemberAliasName(MemberAliasName(name)));
+                    let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                        ColumnExprColumn(Column::from_name(name)),
+                    ));
                     subst.insert(
                         alias_expr_var,
-                        egraph.add(LogicalPlanLanguage::MemberAlias([alias])),
+                        egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
                     );
                     return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn push_down_projection(
+        &self,
+        projection_expr_var: &'static str,
+        members_var: &'static str,
+        aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let projection_expr_var = projection_expr_var.parse().unwrap();
+        let members_var = members_var.parse().unwrap();
+        let aliases_var = aliases_var.parse().unwrap();
+        move |egraph, subst| {
+            if let Some(column_name_to_alias) = &egraph
+                .index(subst[projection_expr_var])
+                .data
+                .column_name_to_alias
+            {
+                let all_columns = egraph
+                    .index(subst[members_var])
+                    .data
+                    .column_name_to_expr
+                    .clone();
+                if column_name_to_alias
+                    .iter()
+                    .all(|(c, a)| all_columns.contains_key(c))
+                {
+                    let aliases = egraph.add(LogicalPlanLanguage::ColumnAliasReplacerAliases(
+                        ColumnAliasReplacerAliases(column_name_to_alias.clone()),
+                    ));
+                    subst.insert(aliases_var, aliases);
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_projection_member(
+        &self,
+        cube_var: &'static str,
+        column_var: &'static str,
+        alias_var: Option<&'static str>,
+        member_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = cube_var.parse().unwrap();
+        let column_var = column_var.parse().unwrap();
+        let alias_var = alias_var.map(|alias_var| alias_var.parse().unwrap());
+        let member_var = member_var.parse().unwrap();
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for member_name in
+                var_iter!(egraph[subst[column_var]], ColumnExprColumn).map(|c| c.name.to_string())
+            {
+                for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName) {
+                    if let Some(cube) = meta_context
+                        .cubes
+                        .iter()
+                        .find(|c| c.name.eq_ignore_ascii_case(cube_name))
+                    {
+                        let column_names = if let Some(alias_var) = &alias_var {
+                            var_iter!(egraph[subst[*alias_var]], AliasExprAlias)
+                                .map(|s| s.to_string())
+                                .collect::<Vec<_>>()
+                        } else {
+                            vec![member_name.to_string()]
+                        };
+                        for column_name in column_names {
+                            let member_name = format!("{}.{}", cube_name, member_name);
+                            if let Some(dimension) = cube
+                                .dimensions
+                                .iter()
+                                .find(|d| d.name.eq_ignore_ascii_case(&member_name))
+                            {
+                                let dimension_name =
+                                    egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
+                                        dimension.name.to_string(),
+                                    )));
+                                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(Column::from_name(column_name)),
+                                ));
+                                let alias_expr =
+                                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+
+                                subst.insert(
+                                    member_var,
+                                    egraph.add(LogicalPlanLanguage::Dimension([
+                                        dimension_name,
+                                        alias_expr,
+                                    ])),
+                                );
+                                return true;
+                            }
+
+                            if let Some(measure) = cube
+                                .measures
+                                .iter()
+                                .find(|d| d.name.eq_ignore_ascii_case(&member_name))
+                            {
+                                let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(
+                                    MeasureName(measure.name.to_string()),
+                                ));
+                                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(Column::from_name(column_name)),
+                                ));
+                                let alias_expr =
+                                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+                                subst.insert(
+                                    member_var,
+                                    egraph.add(LogicalPlanLanguage::Measure([
+                                        measure_name,
+                                        alias_expr,
+                                    ])),
+                                );
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
             false
@@ -1211,6 +1414,26 @@ fn rewrite(
     .unwrap()
 }
 
+fn transforming_rewrite<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        TransformingPattern::new(applier.as_str(), transform_fn),
+    )
+    .unwrap()
+}
+
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut current = list_type.to_string();
     for i in list.into_iter().rev() {
@@ -1235,6 +1458,43 @@ fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     )
 }
 
+fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
+    format!(
+        "(AggregateFunctionExpr {} {} {})",
+        fun_name,
+        list_expr("AggregateFunctionExprArgs", args),
+        distinct
+    )
+}
+
+fn aggregate(input: impl Display, group: impl Display, aggr: impl Display) -> String {
+    format!("(Aggregate {} {} {})", input, group, aggr)
+}
+
+fn aggr_aggr_expr(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateAggrExpr {} {})", left, right)
+}
+
+fn aggr_aggr_expr_empty_tail() -> String {
+    format!("AggregateAggrExpr")
+}
+
+fn aggr_group_expr(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateGroupExpr {} {})", left, right)
+}
+
+fn projection_expr(left: impl Display, right: impl Display) -> String {
+    format!("(ProjectionExpr {} {})", left, right)
+}
+
+fn aggr_group_expr_empty_tail() -> String {
+    format!("AggregateGroupExpr")
+}
+
+fn projection_expr_empty_tail() -> String {
+    format!("ProjectionExpr")
+}
+
 fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
     fun_expr("ToDayInterval", vec![period, unit])
 }
@@ -1251,13 +1511,71 @@ fn column_expr(column: impl Display) -> String {
     format!("(ColumnExpr {})", column)
 }
 
+fn alias_expr(column: impl Display, alias: impl Display) -> String {
+    format!("(AliasExpr {} {})", column, alias)
+}
+
 fn literal_string(literal_str: impl Display) -> String {
     format!("(LiteralExpr LiteralExprValue:{})", literal_str)
+}
+
+fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> String {
+    format!("(Projection {} {} {})", expr, input, alias)
+}
+
+fn column_alias_replacer(members: impl Display, aliases: impl Display) -> String {
+    format!("(ColumnAliasReplacer {} {})", members, aliases)
+}
+
+fn member_replacer(members: impl Display, aliases: impl Display) -> String {
+    format!("(MemberReplacer {} {})", members, aliases)
+}
+
+fn cube_scan_members(left: impl Display, right: impl Display) -> String {
+    format!("(CubeScanMembers {} {})", left, right)
+}
+
+fn cube_scan_members_empty_tail() -> String {
+    format!("CubeScanMembers")
+}
+
+fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
+    format!("(Measure {} {})", measure_name, expr)
+}
+
+fn dimension_expr(name: impl Display, expr: impl Display) -> String {
+    format!("(Dimension {} {})", name, expr)
+}
+
+fn time_dimension_expr(
+    name: impl Display,
+    granularity: impl Display,
+    date_range: impl Display,
+    expr: impl Display,
+) -> String {
+    format!(
+        "(TimeDimension {} {} {} {})",
+        name, granularity, date_range, expr
+    )
+}
+
+fn cube_scan(
+    source_table_name: impl Display,
+    members: impl Display,
+    filters: impl Display,
+) -> String {
+    format!(
+        "(Extension (CubeScan {} {} {}))",
+        source_table_name, members, filters,
+    )
 }
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     original_expr: Option<Expr>,
+    column_name_to_expr: HashMap<String, Id>,
+    column_name: Option<String>,
+    column_name_to_alias: Option<Vec<(String, String)>>,
 }
 
 #[derive(Clone)]
@@ -1282,10 +1600,11 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
     }
 }
 
-impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
-    type Data = LogicalPlanData;
-
-    fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
+impl LogicalPlanAnalysis {
+    fn make_original_expr(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Expr> {
         let id_to_expr = |id| {
             egraph[id]
                 .data
@@ -1309,18 +1628,155 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         } else {
             None
         };
-        LogicalPlanData { original_expr }
+        original_expr
     }
 
-    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        if a.original_expr.is_none() && b.original_expr.is_some() {
+    fn merge_original_expr(
+        &mut self,
+        a: &mut LogicalPlanData,
+        b: LogicalPlanData,
+    ) -> (DidMerge, LogicalPlanData) {
+        let res = if a.original_expr.is_none() && b.original_expr.is_some() {
             a.original_expr = b.original_expr.clone();
             DidMerge(true, false)
         } else if a.original_expr.is_some() {
             DidMerge(false, true)
         } else {
             DidMerge(false, false)
+        };
+        (res, b)
+    }
+
+    fn make_column_name_to_expr(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> HashMap<String, Id> {
+        let id_to_column_name_to_expr = |id| egraph.index(id).data.column_name_to_expr.clone();
+        let id_to_column_name = |id| egraph.index(id).data.column_name.clone();
+        let mut map = HashMap::new();
+        match enode {
+            LogicalPlanLanguage::Measure(params) | LogicalPlanLanguage::Dimension(params) => {
+                if let Some(column_name) = id_to_column_name(params[1]) {
+                    map.insert(column_name, params[1]);
+                }
+                map
+            }
+            LogicalPlanLanguage::TimeDimension(params) => {
+                if let Some(column_name) = id_to_column_name(params[3]) {
+                    map.insert(column_name, params[3]);
+                }
+                map
+            }
+            LogicalPlanLanguage::CubeScanMembers(params) => {
+                for id in params.iter() {
+                    map.extend(id_to_column_name_to_expr(*id).into_iter());
+                }
+                map
+            }
+            LogicalPlanLanguage::CubeScan(params) => {
+                map.extend(id_to_column_name_to_expr(params[1]).into_iter());
+                map.extend(id_to_column_name_to_expr(params[2]).into_iter());
+                map
+            }
+            _ => map,
         }
+    }
+
+    fn merge_column_name_to_expr(
+        &mut self,
+        a: &mut LogicalPlanData,
+        b: LogicalPlanData,
+    ) -> (DidMerge, LogicalPlanData) {
+        let x = a.column_name_to_expr != b.column_name_to_expr;
+        let res = DidMerge(
+            x && b.column_name_to_expr.len() > 0,
+            x && a.column_name_to_expr.len() > 0,
+        );
+        // TODO union or intersection on merge?
+        a.column_name_to_expr
+            .extend(b.column_name_to_expr.clone().into_iter());
+        (res, b)
+    }
+
+    fn make_column_name_to_alias(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<(String, String)>> {
+        let id_to_column_name = |id| egraph.index(id).data.column_name.clone();
+        let mut map = Vec::new();
+        match enode {
+            LogicalPlanLanguage::AliasExpr(params) => {
+                map.push((id_to_column_name(params[0])?, id_to_column_name(params[1])?));
+                Some(map)
+            }
+            _ => None,
+        }
+    }
+
+    fn merge_column_name_to_alias(
+        &mut self,
+        a: &mut LogicalPlanData,
+        b: LogicalPlanData,
+    ) -> (DidMerge, LogicalPlanData) {
+        let res = if a.column_name_to_alias.is_none() && b.column_name_to_alias.is_some() {
+            a.column_name_to_alias = b.column_name_to_alias.clone();
+            DidMerge(true, false)
+        } else if a.column_name_to_alias.is_some() {
+            DidMerge(false, true)
+        } else {
+            DidMerge(false, false)
+        };
+        (res, b)
+    }
+
+    fn make_column_name(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<String> {
+        let id_to_column_name = |id| egraph.index(id).data.column_name.clone();
+        match enode {
+            LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(c)) => Some(c.name.to_string()),
+            LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(a)) => Some(a.to_string()),
+            LogicalPlanLanguage::ColumnExpr(c) => id_to_column_name(c[0]),
+            _ => None,
+        }
+    }
+
+    fn merge_column_name(
+        &mut self,
+        a: &mut LogicalPlanData,
+        b: LogicalPlanData,
+    ) -> (DidMerge, LogicalPlanData) {
+        let res = if a.column_name.is_none() && b.column_name.is_some() {
+            a.column_name = b.column_name.clone();
+            DidMerge(true, false)
+        } else if a.column_name.is_some() {
+            DidMerge(false, true)
+        } else {
+            DidMerge(false, false)
+        };
+        (res, b)
+    }
+}
+
+impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
+    type Data = LogicalPlanData;
+
+    fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
+        LogicalPlanData {
+            original_expr: Self::make_original_expr(egraph, enode),
+            column_name_to_expr: Self::make_column_name_to_expr(egraph, enode),
+            column_name: Self::make_column_name(egraph, enode),
+            column_name_to_alias: Self::make_column_name_to_alias(egraph, enode),
+        }
+    }
+
+    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
+        let (original_expr, b) = self.merge_original_expr(a, b);
+        let (column_name_to_expr, b) = self.merge_column_name_to_expr(a, b);
+        let (column_name_to_alias, b) = self.merge_column_name_to_alias(a, b);
+        let (column_name, _) = self.merge_column_name(a, b);
+        original_expr | column_name_to_expr | column_name_to_alias | column_name
     }
 }
 
@@ -1876,33 +2332,35 @@ impl LanguageToLogicalPlanConverter {
                             cube_scan_params[0],
                             TableScanSourceTableName
                         );
-                        let measures =
-                            match_list_node!(node_by_id, cube_scan_params[1], CubeScanMeasures);
-                        let dimensions =
-                            match_list_node!(node_by_id, cube_scan_params[2], CubeScanDimensions);
+                        let members =
+                            match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
                         let mut fields = Vec::new();
                         let mut query_measures = Vec::new();
-                        for m in measures {
-                            let measure_params = match_params!(m, Measure);
-                            let measure =
-                                match_data_node!(node_by_id, measure_params[0], MeasureName);
-                            let expr = self.to_expr(measure_params[1])?;
-                            query_measures.push(measure);
-                            fields.push(DFField::new(
-                                None,
-                                // TODO empty schema
-                                &expr.name(&DFSchema::empty())?,
-                                DataType::Int64,
-                                true,
-                            ));
-                        }
-
                         let mut query_time_dimensions = Vec::new();
-                        for d in dimensions {
-                            match d {
+                        let mut query_dimensions = Vec::new();
+
+                        for m in members {
+                            match m {
+                                LogicalPlanLanguage::Measure(params) => {
+                                    let measure_params = match_params!(m, Measure);
+                                    let measure = match_data_node!(
+                                        node_by_id,
+                                        measure_params[0],
+                                        MeasureName
+                                    );
+                                    let expr = self.to_expr(measure_params[1])?;
+                                    query_measures.push(measure);
+                                    fields.push(DFField::new(
+                                        None,
+                                        // TODO empty schema
+                                        &expr.name(&DFSchema::empty())?,
+                                        DataType::Int64,
+                                        true,
+                                    ));
+                                }
                                 LogicalPlanLanguage::TimeDimension(params) => {
                                     let dimension =
                                         match_data_node!(node_by_id, params[0], TimeDimensionName);
@@ -1916,13 +2374,7 @@ impl LanguageToLogicalPlanConverter {
                                         params[2],
                                         TimeDimensionDateRange
                                     );
-                                    let member_alias_params =
-                                        match_params!(node_by_id.index(params[3]), MemberAlias);
-                                    let expr_name = match_data_node!(
-                                        node_by_id,
-                                        member_alias_params[0],
-                                        MemberAliasName
-                                    );
+                                    let expr = self.to_expr(params[3])?;
                                     query_time_dimensions.push(V1LoadRequestQueryTimeDimension {
                                         dimension,
                                         granularity,
@@ -1938,8 +2390,22 @@ impl LanguageToLogicalPlanConverter {
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
-                                        &expr_name,
+                                        &expr.name(&DFSchema::empty())?,
                                         DataType::Timestamp(TimeUnit::Millisecond, None),
+                                        true,
+                                    ));
+                                }
+                                LogicalPlanLanguage::Dimension(params) => {
+                                    let dimension =
+                                        match_data_node!(node_by_id, params[0], DimensionName);
+                                    let expr = self.to_expr(params[1])?;
+                                    query_dimensions.push(dimension);
+                                    fields.push(DFField::new(
+                                        None,
+                                        // TODO empty schema
+                                        &expr.name(&DFSchema::empty())?,
+                                        // TODO
+                                        DataType::Utf8,
                                         true,
                                     ));
                                 }
@@ -1948,7 +2414,7 @@ impl LanguageToLogicalPlanConverter {
                         }
 
                         query.measures = Some(query_measures);
-                        query.dimensions = Some(Vec::new());
+                        query.dimensions = Some(query_dimensions);
                         query.time_dimensions = if query_time_dimensions.len() > 0 {
                             Some(query_time_dimensions)
                         } else {
