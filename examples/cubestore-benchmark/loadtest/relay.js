@@ -24,7 +24,7 @@ express()
 
   .get('/:endpoint', (req, res) => {
     let query = prepareQuery('query');
-
+    
     const api = cubejs.default(
       process.env[`CUBEJS_${req.params.endpoint.toUpperCase()}_TOKEN`], 
       { apiUrl: process.env[`CUBEJS_${req.params.endpoint.toUpperCase()}_API_URL`] }

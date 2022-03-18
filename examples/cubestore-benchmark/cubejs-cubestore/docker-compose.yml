@@ -9,7 +9,7 @@ services:
     environment:
       - CUBEJS_REFRESH_WORKER=false
       - CUBEJS_ROLLUP_ONLY=true
-      - CUBEJS_DEV_MODE=true
+      # - CUBEJS_DEV_MODE=true
 
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
