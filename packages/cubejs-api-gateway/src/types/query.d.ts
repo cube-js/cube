@@ -12,6 +12,7 @@ import {
   QueryTimeDimensionGranularity,
   QueryOrderType,
 } from './strings';
+import { ResultType } from './enums';
 
 /**
  * Query base filter definition.
@@ -62,6 +63,7 @@ interface Query {
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
+  responseFormat?: ResultType;
 }
 
 /**
