@@ -29,7 +29,7 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
-import { QUERY_TYPE } from './query';
+import { QueryType, MemberType } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -235,7 +235,7 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => cube.config.name === cubeName);
   if (!cubeConfig) return undefined;
 
-  return ['measure', 'dimension'].find((memberType) => (cubeConfig.config[`${memberType}s`]
+  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}`) !== -1
   ));
 }
@@ -530,9 +530,9 @@ export function makeSchema(metaConfig: any) {
               const memberType = getMemberType(metaConfig, cubeName, memberName);
               const key = `${cubeName}.${memberName}`;
 
-              if (memberType === 'measure') {
+              if (memberType === MemberType.MEASURES) {
                 measures.push(key);
-              } else if (memberType === 'dimension') {
+              } else if (memberType === MemberType.DIMENSIONS) {
                 const granularityNodes = getFieldNodeChildren(memberNode, infos);
                 if (granularityNodes.length > 0) {
                   granularityNodes.forEach(granularityNode => {
@@ -573,7 +573,7 @@ export function makeSchema(metaConfig: any) {
             try {
               await apiGateway.load({
                 query,
-                queryType: QUERY_TYPE.REGULAR_QUERY,
+                queryType: QueryType.REGULAR_QUERY,
                 context: req.context,
                 res: (message) => {
                   if (message.error) {

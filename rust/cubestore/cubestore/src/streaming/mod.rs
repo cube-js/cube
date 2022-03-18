@@ -137,10 +137,13 @@ impl StreamingService for StreamingServiceImpl {
                 )
                 .await?;
 
-            let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
+            let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
                 .await
                 .into_iter()
-                .map(|c| Ok(c??.get_id()))
+                .map(|c| {
+                    let (c, file_size) = c??;
+                    Ok((c.get_id(), file_size))
+                })
                 .collect();
             self.meta_store
                 .activate_chunks(table.get_id(), new_chunk_ids?)

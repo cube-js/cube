@@ -70,6 +70,9 @@ jobs:
           command: install
           args: cargo-tarpaulin --version 0.19.1
       - name: Unit tests
+        env:
+          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
+          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
         run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
       - name: Upload code coverage
         uses: codecov/codecov-action@v2

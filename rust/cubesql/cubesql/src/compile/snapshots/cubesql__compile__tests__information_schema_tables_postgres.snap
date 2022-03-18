@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+
+| table_catalog | table_schema       | table_name                | table_type | self_referencing_column_name | reference_generation | user_defined_type_catalog | user_defined_type_schema | user_defined_type_name | is_insertable_into | is_typed | commit_action |
++---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+
+| def           | information_schema | tables                    | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| def           | information_schema | columns                   | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| def           | information_schema | pg_tables                 | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| def           | db                 | KibanaSampleDataEcommerce | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| def           | db                 | Logs                      | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
++---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+

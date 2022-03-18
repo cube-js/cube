@@ -136,7 +136,7 @@ impl RemoteFs for S3RemoteFs {
         &self,
         temp_upload_path: &str,
         remote_path: &str,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let path = self.s3_path(remote_path);
@@ -157,7 +157,7 @@ impl RemoteFs for S3RemoteFs {
                         e
                     ))
                 })?;
-            fs::rename(&temp_upload_path, local_path).await?;
+            fs::rename(&temp_upload_path, local_path.clone()).await?;
         }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         if status_code != 200 {
@@ -166,10 +166,14 @@ impl RemoteFs for S3RemoteFs {
                 status_code
             )));
         }
-        Ok(())
+        Ok(fs::metadata(local_path).await?.len())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        _expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError> {
         let local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
@@ -255,6 +259,7 @@ impl RemoteFs for S3RemoteFs {
                             remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
                             updated: DateTime::parse_from_rfc3339(&o.last_modified)?
                                 .with_timezone(&Utc),
+                            file_size: o.size,
                         })
                     })
             })

@@ -1,0 +1,19 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4455
+expression: "execute_query(\"explain select count, avgPrice from KibanaSampleDataEcommerce;\".to_string()).await?"
+
+---
++--------------------------------------------------------------------------------------------------------+
+| Execution Plan                                                                                         |
++--------------------------------------------------------------------------------------------------------+
+| Projection: #KibanaSampleDataEcommerce.count AS count, #KibanaSampleDataEcommerce.avgPrice AS avgPrice |
+|   CubeScan: request={                                                                                  |
+|   "measures": [                                                                                        |
+|     "KibanaSampleDataEcommerce.count",                                                                 |
+|     "KibanaSampleDataEcommerce.avgPrice"                                                               |
+|   ],                                                                                                   |
+|   "dimensions": [],                                                                                    |
+|   "segments": []                                                                                       |
+| }                                                                                                      |
++--------------------------------------------------------------------------------------------------------+

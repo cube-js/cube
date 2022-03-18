@@ -8,7 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -80,6 +79,7 @@ declare module '@cubejs-client/core' {
     pollInterval?: number;
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
+    resType?: 'default' | 'compact';
   };
 
   export type LoadMethodOptions = {
@@ -131,6 +131,11 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  type LeafMeasure = {
+    measure: string;
+    additive: boolean;
+  };
+
   export type TransformedQuery = {
     allFiltersWithinSelectedDimensions: boolean;
     granularityHierarchies: Record<string, string[]>;
@@ -142,6 +147,7 @@ declare module '@cubejs-client/core' {
     measures: string[];
     sortedDimensions: string[];
     sortedTimeDimensions: [[string, string]];
+    measureToLeafMeasures?: Record<string, LeafMeasure[]>;
   };
 
   export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
@@ -159,7 +165,7 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
-    requestId?: string,
+    requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
   };
@@ -790,6 +796,7 @@ declare module '@cubejs-client/core' {
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
+    responseFormat?: 'compact' | 'default';
   }
 
   export class ProgressResult {
@@ -993,6 +1000,12 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load(
+      query: Query | Query[],
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet>,
+      responseFormat?: string
+    ): Promise<ResultSet>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)

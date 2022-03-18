@@ -24,6 +24,7 @@ use tokio::sync::{Mutex, RwLock};
 pub struct RemoteFile {
     remote_path: String,
     updated: DateTime<Utc>,
+    file_size: u64,
 }
 
 impl RemoteFile {
@@ -61,10 +62,17 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
 
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
-    async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)
-        -> Result<(), CubeError>;
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<u64, CubeError>;
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError>;
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError>;
 
@@ -117,7 +125,7 @@ impl RemoteFs for LocalDirRemoteFs {
         &self,
         temp_upload_path: &str,
         remote_path: &str,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
             debug!("Uploading {}", remote_path);
             let dest = remote_dir.as_path().join(remote_path);
@@ -163,10 +171,14 @@ impl RemoteFs for LocalDirRemoteFs {
                     ))
                 })?;
         }
-        Ok(())
+        Ok(fs::metadata(local_path).await?.len())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        _expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError> {
         let mut local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
@@ -318,6 +330,7 @@ impl LocalDirRemoteFs {
                         result.push(RemoteFile {
                             remote_path: relative_name.to_string(),
                             updated: DateTime::from(metadata.modified()?),
+                            file_size: metadata.len(),
                         });
                     }
                 }

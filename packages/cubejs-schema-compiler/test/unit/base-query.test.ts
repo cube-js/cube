@@ -8,7 +8,7 @@ import { createCubeSchema } from './utils';
 
 describe('SQL Generation', () => {
   describe('Common', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -20,9 +20,9 @@ describe('SQL Generation', () => {
     );
 
     it('Test time series with different granularity', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
@@ -100,10 +100,10 @@ describe('SQL Generation', () => {
     });
 
     it('Test for everyRefreshKeySql', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
       const timezone = 'America/Los_Angeles';
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
@@ -156,7 +156,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey from schema', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -207,9 +207,9 @@ describe('SQL Generation', () => {
     );
 
     it('cacheKeyQueries for cube with refreshKey.every (source)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.sum'
         ],
@@ -234,10 +234,10 @@ describe('SQL Generation', () => {
     });
 
     it('cacheKeyQueries for cube with refreshKey.every (external)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
       // Query should not match any pre-aggregation!
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.sum'
         ],
@@ -267,9 +267,9 @@ describe('SQL Generation', () => {
      * external database
      */
     it('preAggregationsDescription for query - refreshKey every (external)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
@@ -298,9 +298,9 @@ describe('SQL Generation', () => {
      * Testing: preAggregation which has refresh.sql, should be executed in source db
      */
     it('preAggregationsDescription for query - refreshKey manually (external)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.max'
         ],
@@ -325,9 +325,9 @@ describe('SQL Generation', () => {
     });
 
     it('preAggregationsDescription for query - refreshKey incremental (timeDimensions range)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.min'
         ],
@@ -362,7 +362,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (immutable)', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -386,7 +386,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (every)', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -409,9 +409,9 @@ describe('SQL Generation', () => {
     );
 
     it('refreshKey from cube (source)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
@@ -439,9 +439,9 @@ describe('SQL Generation', () => {
     });
 
     it('refreshKey from cube (external)', async () => {
-      await compiler.compile();
+      await compilers.compiler.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
@@ -471,7 +471,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in cube', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -493,9 +493,9 @@ describe('SQL Generation', () => {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compiler.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery(compilers, {
       measures: [
         'cards.count'
       ],
@@ -520,7 +520,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in preAggregation', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: '',
@@ -541,9 +541,9 @@ describe('SQL Generation', () => {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compiler.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = new PostgresQuery(compilers, {
       measures: [
         'cards.count'
       ],
@@ -566,5 +566,104 @@ describe('SQL Generation', () => {
         }
       ]
     ]);
+  });
+});
+
+describe('Class unit tests', () => {
+  describe('BaseQuery aliases', () => {
+    it('Test BaseQuery with unaliased cube', async () => {
+      const set = /** @type Compilers */ prepareCompiler(`
+        cube('CamelCaseCube', {
+          sql: 'SELECT * FROM TABLE_NAME',
+          measures: {
+            grant_total: {
+              format: 'currency',
+              sql: 'grant_field',
+              type: 'sum'
+            },
+          },
+          dimensions: {
+            id: {
+              format: 'id',
+              primaryKey: true,
+              shown: true,
+              sql: 'id',
+              type: 'number'
+            },
+            description: {
+              sql: 'description_field',
+              type: 'string'
+            },
+          }
+        })
+      `);
+      await set.compiler.compile();
+      const baseQuery = new BaseQuery(set, {});
+      // aliasName
+      expect(baseQuery.aliasName('CamelCaseCube', false)).toEqual('camel_case_cube');
+      expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
+      expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('camel_case_cube__description');
+      expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('camel_case_cube__grant_total');
+      
+      // aliasName for pre-agg
+      expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('camel_case_cube');
+      expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('camel_case_cube_id');
+      expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('camel_case_cube_description');
+      expect(baseQuery.aliasName('CamelCaseCube.grant_total', true)).toEqual('camel_case_cube_grant_total');
+      
+      // cubeAlias
+      expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"camel_case_cube"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"camel_case_cube__id"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
+    });
+    it('Test BaseQuery with aliased cube', async () => {
+      const set = /** @type Compilers */ prepareCompiler(`
+        cube('CamelCaseCube', {
+          sql: 'SELECT * FROM TABLE_NAME',
+          sqlAlias: 'T1',
+          measures: {
+            grant_total: {
+              format: 'currency',
+              sql: 'grant_field',
+              type: 'sum'
+            },
+          },
+          dimensions: {
+            id: {
+              format: 'id',
+              primaryKey: true,
+              shown: true,
+              sql: 'id',
+              type: 'number'
+            },
+            description: {
+              sql: 'description_field',
+              type: 'string'
+            },
+          }
+        })
+      `);
+      await set.compiler.compile();
+      const baseQuery = new BaseQuery(set, {});
+
+      // aliasName
+      expect(baseQuery.aliasName('CamelCaseCube', false)).toEqual('t1');
+      expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('t1__id');
+      expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('t1__description');
+      expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('t1__grant_total');
+      
+      // aliasName for pre-agg
+      expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('t1');
+      expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('t1_id');
+      expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('t1_description');
+      expect(baseQuery.aliasName('CamelCaseCube.grant_total', true)).toEqual('t1_grant_total');
+
+      // cubeAlias
+      expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"t1"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"t1__id"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
+      expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
+    });
   });
 });

@@ -1,10 +1,10 @@
 use super::{
     BaseRocksSecondaryIndex, IndexId, Partition, RocksSecondaryIndex, RocksTable, TableId,
 };
-use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -33,6 +33,7 @@ impl Partition {
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
         }
     }
 
@@ -52,6 +53,7 @@ impl Partition {
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
         }
     }
     pub fn get_min_val(&self) -> &Option<Row> {
@@ -102,6 +104,21 @@ impl Partition {
         p.max_value = max_value;
         p.main_table_row_count = main_table_row_count;
         p
+    }
+
+    pub fn file_size(&self) -> Option<u64> {
+        self.file_size
+    }
+
+    pub fn set_file_size(&self, file_size: u64) -> Result<Self, CubeError> {
+        let mut p = self.clone();
+        if file_size == 0 {
+            return Err(CubeError::internal(format!(
+                "Received zero file size for partition"
+            )));
+        }
+        p.file_size = Some(file_size);
+        Ok(p)
     }
 
     pub fn get_index_id(&self) -> u64 {

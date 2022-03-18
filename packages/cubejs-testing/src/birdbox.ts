@@ -2,16 +2,15 @@ import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
-import { DockerComposeEnvironment } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
+import { execInDir, pausePromise } from '@cubejs-backend/shared';
+import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
-
-import { PostgresDBRunner } from './db/postgres';
-import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
   loadScript?: string;
+  env?: Record<string, string>;
 }
 
 export interface BirdBox {
@@ -41,18 +40,40 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     };
   }
 
+  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
+    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
+  }
+
+  if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
+    process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
+    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
+    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`) !== 0) {
+      throw new Error('[Birdbox] Docker build failed.');
+    }
+  }
+
+  if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
+    process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
+  }
+
   const composeFile = `${options.name}.yml`;
-  const dc = new DockerComposeEnvironment(
+  let dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
     composeFile
   );
+
+  if (options.env) {
+    for (const k of Object.keys(options.env)) {
+      dc = dc.withEnv(k, options.env[k]);
+    }
+  }
 
   console.log(`[Birdbox] Using ${composeFile} compose file`);
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
+    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION)
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION)
     .up();
 
   const host = '127.0.0.1';
@@ -77,8 +98,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     });
   }
 
-  {
-    const loadScript = options.loadScript || 'load.sh';
+  if (options.loadScript) {
+    const { loadScript } = options;
     console.log(`[Birdbox] Executing ${loadScript} script`);
 
     const { output, exitCode } = await env.getContainer('birdbox-db').exec([`/scripts/${loadScript}`]);
@@ -121,32 +142,31 @@ export interface StartCliWithEnvOptions {
   useCubejsServerBinary?: boolean;
   loadScript?: string;
   cubejsConfig?: string;
+  env?: Record<string, string>;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
-  if (options.dbType !== 'postgresql') {
-    throw new Error('Unsupported');
-  }
+  let db: StartedTestContainer;
 
-  const db = await PostgresDBRunner.startContainer({
-    volumes: [
-      {
-        source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
-        target: '/data',
-        bindMode: 'ro',
-      },
-      {
-        source: path.join(__dirname, '..', '..', 'birdbox-fixtures', options.dbType, 'scripts'),
-        target: '/scripts',
-        bindMode: 'ro',
-      },
-    ],
-  });
+  if (options.loadScript) {
+    db = await PostgresDBRunner.startContainer({
+      volumes: [
+        {
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
+          target: '/data',
+          bindMode: 'ro',
+        },
+        {
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
+          target: '/scripts',
+          bindMode: 'ro',
+        },
+      ],
+    });
 
-  {
-    console.log('[Birdbox] Executing load.sh script');
+    console.log('[Birdbox] Executing load script');
 
-    const loadScript = `/scripts/${options.loadScript || 'load.sh'}`;
+    const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
     if (exitCode === 0) {
@@ -174,13 +194,13 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
   }
 
   fsExtra.copySync(
-    path.join(process.cwd(), 'birdbox-fixtures', options.dbType),
+    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql'),
     path.join(testDir)
   );
 
   if (options.cubejsConfig) {
     fsExtra.copySync(
-      path.join(process.cwd(), 'birdbox-fixtures', options.dbType, options.cubejsConfig),
+      path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', options.cubejsConfig),
       path.join(testDir, 'cube.js')
     );
   }
@@ -195,16 +215,20 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        CUBEJS_DB_TYPE: 'postgres',
-        CUBEJS_DB_HOST: db.getHost(),
-        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
-        CUBEJS_DB_NAME: 'test',
-        CUBEJS_DB_USER: 'test',
-        CUBEJS_DB_PASS: 'test',
+        CUBEJS_DB_TYPE: options.dbType === 'postgresql' ? 'postgres' : options.dbType,
         CUBEJS_DEV_MODE: 'true',
-        CUBEJS_WEB_SOCKETS: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
+        CUBEJS_WEB_SOCKETS: 'true',
         CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+        ...options.env
+          ? options.env
+          : {
+            CUBEJS_DB_HOST: db!.getHost(),
+            CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
+            CUBEJS_DB_NAME: 'test',
+            CUBEJS_DB_USER: 'test',
+            CUBEJS_DB_PASS: 'test',
+          }
       },
     }
   );
@@ -226,7 +250,9 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     stop: async () => {
       console.log('[Birdbox] Closing');
 
-      await db.stop();
+      if (db) {
+        await db.stop();
+      }
 
       console.log('[Birdbox] Done with DB');
 

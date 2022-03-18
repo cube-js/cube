@@ -14,6 +14,7 @@ use test::TestFn::DynTestFn;
 use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
 use tests::sql_tests;
 
+mod files;
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
 #[allow(unused_parens, non_snake_case)]

@@ -299,7 +299,7 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
+        <Helmet title={`${frontmatter.title} | Cube Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
             <h1 name="top">{frontmatter.title}</h1>

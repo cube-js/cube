@@ -70,7 +70,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public getPrefixTablesQuery(schemaName, tablePrefixes) {
-    const prefixWhere = tablePrefixes.map(p => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
+    const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
@@ -151,16 +151,11 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
+    const inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
 
     if (files.length > 0) {
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-      console.log('ttt', createTableSqlWithLocation, files);
-      try {
-        const result = await this.query(createTableSqlWithLocation, files, queryTracingObj);
-        console.log('ggg', result);
-        return result;
-      } catch (e) {
+      const createTableSqlWithLocation = `${createTableSql} WITH (input_format = '${inputFormat}') ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
+      return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         console.log('eee', e);
         throw e;
@@ -226,7 +221,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       let rowCount = 0;
 
       const endStream = (chunk, encoding, callback) => {
-        const { stream, tempFile } = getFileStream();
+        const { stream } = getFileStream();
         currentFileStream = null;
         rowCount = 0;
         if (chunk) {
@@ -262,8 +257,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       await Promise.all(pipelinePromises);
 
       const files = await Promise.all(filePromises);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const sqlWithLocation = files.length ? `${createTableSqlWithoutLocation} LOCATION ${files.map(f => '?').join(', ')}` : createTableSqlWithoutLocation;
+      const sqlWithLocation = files.length ? `${createTableSqlWithoutLocation} LOCATION ${files.map(_ => '?').join(', ')}` : createTableSqlWithoutLocation;
       await this.query(
         sqlWithLocation,
         files.map(fileName => `temp://${fileName}`), queryTracingObj

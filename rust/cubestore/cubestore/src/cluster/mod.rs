@@ -18,7 +18,10 @@ use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::table::Table;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
+use crate::metastore::{
+    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
+    TableId,
+};
 use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
@@ -34,7 +37,6 @@ use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
-use chrono::Utc;
 use core::mem;
 use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
@@ -49,16 +51,12 @@ use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
 use std::sync::Weak;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
-use tokio::fs;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
@@ -100,7 +98,12 @@ pub trait Cluster: DIService + Send + Sync {
 
     fn server_name(&self) -> &str;
 
-    async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError>;
+    async fn warmup_download(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+    ) -> Result<(), CubeError>;
 
     async fn warmup_partition(
         &self,
@@ -120,6 +123,11 @@ pub trait Cluster: DIService + Send + Sync {
     fn job_result_listener(&self) -> JobResultListener;
 
     fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String;
+
+    async fn node_name_for_chunk_repartition(
+        &self,
+        chunk: &IdRow<Chunk>,
+    ) -> Result<String, CubeError>;
 
     async fn node_name_for_import(
         &self,
@@ -200,7 +208,8 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
             WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
-                debug!("Running select in worker started: {:?}", plan_node);
+                let time = SystemTime::now();
+                debug!("Running select in worker started");
                 let plan_node_to_send = plan_node.clone();
                 let result = chunk_id_to_record_batches
                     .into_iter()
@@ -218,7 +227,10 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                     .query_executor
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
-                debug!("Running select in worker completed: {:?}", plan_node);
+                debug!(
+                    "Running select in worker completed ({:?})",
+                    time.elapsed().unwrap()
+                );
                 let (schema, records) = res?;
                 let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
                 Ok((schema, records))
@@ -318,10 +330,18 @@ impl Cluster for ClusterImpl {
         self.server_name.as_str()
     }
 
-    async fn warmup_download(&self, node_name: &str, remote_path: String) -> Result<(), CubeError> {
+    async fn warmup_download(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+    ) -> Result<(), CubeError> {
         // We only wait for the result is to ensure our request is delivered.
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::WarmupDownload(remote_path))
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::WarmupDownload(remote_path, expected_file_size),
+            )
             .await?;
         match response {
             NetworkMessage::WarmupDownloadResult(r) => r,
@@ -375,6 +395,22 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn node_name_for_chunk_repartition(
+        &self,
+        chunk: &IdRow<Chunk>,
+    ) -> Result<String, CubeError> {
+        if chunk.get_row().in_memory() {
+            Ok(self.node_name_by_partition(
+                &self
+                    .meta_store
+                    .get_partition(chunk.get_row().get_partition_id())
+                    .await?,
+            ))
+        } else {
+            Ok(pick_worker_by_ids(self.config_obj.as_ref(), [chunk.get_id()]).to_string())
+        }
+    }
+
     async fn node_name_for_import(
         &self,
         table_id: u64,
@@ -398,16 +434,20 @@ impl Cluster for ClusterImpl {
         let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
-            futures.push(self.warmup_download(&node_name, name));
+            futures.push(self.warmup_download(&node_name, name, partition.get_row().file_size()));
         }
         for chunk in chunks.iter() {
             let name = chunk.get_row().get_full_name(chunk.get_id());
-            futures.push(self.warmup_download(&node_name, name));
+            futures.push(self.warmup_download(&node_name, name, chunk.get_row().file_size()));
         }
-        join_all(futures)
+        let res = join_all(futures)
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>();
+
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, &partition).await;
+
+        res?;
         Ok(())
     }
 
@@ -429,8 +469,11 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::WarmupDownload(remote_path) => {
-                let res = self.remote_fs.download_file(&remote_path).await;
+            NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
+                let res = self
+                    .remote_fs
+                    .download_file(&remote_path, expected_file_size)
+                    .await;
                 NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
             }
             NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
@@ -497,17 +540,25 @@ impl Cluster for ClusterImpl {
     }
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
-        let node = self.node_name_by_partition(p);
-        let job = self
+        let chunks = self
             .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, p.get_id()),
-                JobType::Repartition,
-                node.to_string(),
-            ))
+            .get_chunks_by_partition(p.get_id(), false)
             .await?;
-        if job.is_some() {
-            self.notify_job_runner(node).await?;
+
+        for chunk in chunks {
+            let node = self.node_name_for_chunk_repartition(&chunk).await?;
+
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Chunks, chunk.get_id()),
+                    JobType::RepartitionChunk,
+                    node.to_string(),
+                ))
+                .await?;
+            if job.is_some() {
+                self.notify_job_runner(node).await?;
+            }
         }
         Ok(())
     }
@@ -610,6 +661,8 @@ impl JobRunner {
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
+            // In case of job queue is in place jump to the next job immediately
+            self.notify.notify_one();
         }
         Ok(())
     }
@@ -804,6 +857,17 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::RepartitionChunk => {
+                if let RowKey::Table(TableId::Chunks, chunk_id) = job.row_reference() {
+                    let chunk_store = self.chunk_store.clone();
+                    let chunk_id = *chunk_id;
+                    Ok(cube_ext::spawn(async move {
+                        chunk_store.repartition_chunk(chunk_id).await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
         }
     }
 
@@ -870,7 +934,10 @@ impl ClusterImpl {
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
         let mut futures = Vec::new();
         #[cfg(not(target_os = "windows"))]
-        if self.config_obj.select_worker_pool_size() > 0 {
+        if (self.config_obj.select_workers().is_empty()
+            || self.config_obj.worker_bind_address().is_some())
+            && self.config_obj.select_worker_pool_size() > 0
+        {
             let mut pool = self.select_process_pool.write().await;
             let arc = Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
@@ -1085,11 +1152,21 @@ impl ClusterImpl {
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         let start = SystemTime::now();
-        debug!("Running select: {:?}", plan_node);
+        debug!("Running select");
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
-            .map(|remote| self.remote_fs.download_file(remote))
+            .map(|(partition, remote, file_size)| {
+                let meta_store = self.meta_store.clone();
+                async move {
+                    let res = self
+                        .remote_fs
+                        .download_file(remote, file_size.clone())
+                        .await;
+                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
+                    res
+                }
+            })
             .collect::<Vec<_>>();
         let remote_to_local_names = to_download
             .clone()
@@ -1102,6 +1179,7 @@ impl ClusterImpl {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter(),
             )
+            .map(|((_, remote_path, _), path)| (remote_path, path))
             .collect::<HashMap<_, _>>();
         let warmup = start.elapsed()?;
         if warmup.as_millis() > 200 {
@@ -1195,70 +1273,6 @@ impl ClusterImpl {
         let _ = join_all(streams).await;
         // TODO
         Ok(())
-    }
-
-    pub async fn elect_leader(&self) -> Result<String, CubeError> {
-        let heart_beats_dir =
-            Path::new(self.remote_fs.local_path().await.as_str()).join("node-heart-beats");
-
-        fs::create_dir_all(heart_beats_dir.clone()).await?;
-
-        let heart_beat_path = heart_beats_dir.join(&self.server_name);
-
-        {
-            let mut heart_beat_file = File::create(heart_beat_path.clone()).await?;
-
-            heart_beat_file
-                .write_u64(
-                    SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)?
-                        .as_secs(),
-                )
-                .await?;
-            heart_beat_file.flush().await?;
-        }
-
-        let to_upload = heart_beat_path
-            .to_str()
-            .unwrap()
-            .to_string()
-            .replace(&self.remote_fs.local_path().await, "")
-            .trim_start_matches("/")
-            .to_string();
-
-        self.remote_fs
-            .upload_file(heart_beat_path.to_str().unwrap(), &to_upload)
-            .await?;
-
-        let heart_beats = self
-            .remote_fs
-            .list_with_metadata("node-heart-beats/")
-            .await?;
-        let leader_paths = heart_beats
-            .iter()
-            .filter(|f| {
-                f.updated().clone() + chrono::Duration::from_std(self.connect_timeout).unwrap() * 4
-                    >= Utc::now()
-            })
-            .flat_map(|f| {
-                HEART_BEAT_NODE_REGEX
-                    .captures(f.remote_path())
-                    .and_then(|v| v.name("node"))
-                    .map(|v| v.as_str().to_string())
-            })
-            .collect::<HashSet<_>>();
-
-        if let Some(leader) = self
-            .server_addresses
-            .iter()
-            .find(|a| leader_paths.contains(*a))
-        {
-            return Ok(leader.to_string());
-        }
-
-        Err(CubeError::internal(
-            "No leader has been elected".to_string(),
-        ))
     }
 
     #[instrument(level = "trace", skip(self, m))]
@@ -1463,18 +1477,26 @@ impl ClusterImpl {
                 }
                 // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
                 //       so they are not errors most of the time.
-                ack_error!(self.remote_fs.download_file(&file).await);
+                ack_error!(
+                    self.remote_fs
+                        .download_file(&file, p.get_row().file_size())
+                        .await
+                );
             }
             for c in chunks {
                 if self.stop_token.is_cancelled() {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
-                ack_error!(
-                    self.remote_fs
-                        .download_file(&chunk_file_name(c.get_id(), c.get_row().suffix()))
-                        .await
-                );
+                let result = self
+                    .remote_fs
+                    .download_file(
+                        &chunk_file_name(c.get_id(), c.get_row().suffix()),
+                        c.get_row().file_size(),
+                    )
+                    .await;
+                deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &p).await;
+                ack_error!(result);
             }
         }
         log::debug!("Startup warmup finished");

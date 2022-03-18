@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 3856
+expression: "execute_query(\"SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'\".to_string()).await?"
+
+---
++--------------------+----------------+
+| VARIABLE_NAME      | VARIABLE_VALUE |
++--------------------+----------------+
+| max_allowed_packet | 67108864       |
++--------------------+----------------+

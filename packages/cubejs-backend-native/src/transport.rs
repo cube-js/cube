@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     di_service,
-    mysql::AuthContext,
+    sql::AuthContext,
     transport::{MetaContext, TransportService},
     CubeError,
 };
@@ -47,7 +47,7 @@ struct MetaRequest {
 
 #[async_trait]
 impl TransportService for NodeBridgeTransport {
-    async fn meta(&self, ctx: &AuthContext) -> Result<MetaContext, CubeError> {
+    async fn meta(&self, ctx: Arc<AuthContext>) -> Result<MetaContext, CubeError> {
         trace!("[transport] Meta ->");
 
         let request_id = Uuid::new_v4().to_string();
@@ -73,7 +73,7 @@ impl TransportService for NodeBridgeTransport {
     async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: &AuthContext,
+        ctx: Arc<AuthContext>,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 

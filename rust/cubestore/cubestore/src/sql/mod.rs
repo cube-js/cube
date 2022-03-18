@@ -47,15 +47,17 @@ use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     MetaStoreTable, RowKey, Schema, TableId,
 };
+use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
-use crate::queryplanner::serialized_plan::RowFilter;
-use crate::queryplanner::{QueryPlan, QueryPlanner};
+use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
+use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
+use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -178,6 +180,7 @@ impl SqlServiceImpl {
         columns: &Vec<ColumnDef>,
         external: bool,
         locations: Option<Vec<String>>,
+        import_format: Option<ImportFormat>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         partitioned_index: Option<PartitionedIndexRef>,
@@ -293,7 +296,7 @@ impl SqlServiceImpl {
                 table_name,
                 columns_to_set,
                 locations,
-                Some(ImportFormat::CSV),
+                import_format,
                 indexes_to_create,
                 false,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
@@ -373,8 +376,10 @@ impl SqlServiceImpl {
                 indexes.iter().map(|i| i.get_id()).collect(),
             )
             .await?;
-        for (partition, chunks) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, chunks));
+        // Omit warming up chunks as those shouldn't affect select times much however will affect
+        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
+        for (partition, _) in partitions.into_iter().flatten() {
+            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
         }
         join_all(futures)
             .await
@@ -481,8 +486,8 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for f in p.all_required_files() {
-                    let f = self.remote_fs.download_file(&f).await?;
+                for (_, f, size) in p.all_required_files() {
+                    let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
                     })?;
@@ -595,6 +600,27 @@ impl SqlService for SqlServiceImpl {
                     self.cluster.schedule_repartition(&partition).await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
                 }
+                SystemCommand::PanicWorker => {
+                    let cluster = self.cluster.clone();
+                    let workers = self.config_obj.select_workers();
+                    let plan = SerializedPlan::try_new(
+                        PanicWorkerNode {}.into_plan(),
+                        PlanningMeta {
+                            indices: Vec::new(),
+                            multi_part_subtree: HashMap::new(),
+                        },
+                    )
+                    .await?;
+                    if workers.len() == 0 {
+                        let executor = self.query_executor.clone();
+                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
+                            .await?;
+                    } else {
+                        let worker = &workers[0];
+                        cluster.run_select(worker, plan).await?;
+                    }
+                    panic!("worker did not panic")
+                }
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -613,6 +639,7 @@ impl SqlService for SqlServiceImpl {
                         name,
                         columns,
                         external,
+                        with_options,
                         ..
                     },
                 indexes,
@@ -629,6 +656,27 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
+                let import_format = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "input_format")
+                    .map_or(Result::Ok(ImportFormat::CSV), |option| {
+                        match &option.value {
+                            Value::SingleQuotedString(input_format) => {
+                                match input_format.as_str() {
+                                    "csv" => Result::Ok(ImportFormat::CSV),
+                                    "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                    _ => Err(CubeError::user(format!(
+                                        "Bad input format {}",
+                                        option.value
+                                    ))),
+                                }
+                            }
+                            _ => Err(CubeError::user(format!(
+                                "Bad input format {}",
+                                option.value
+                            ))),
+                        }
+                    })?;
 
                 let res = self
                     .create_table(
@@ -637,6 +685,7 @@ impl SqlService for SqlServiceImpl {
                         &columns,
                         external,
                         locations,
+                        Some(import_format),
                         indexes,
                         unique_key,
                         partitioned_index,
@@ -893,7 +942,7 @@ impl SqlService for SqlServiceImpl {
                                 .collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for f in worker_plan.files_to_download() {
+                        for (_, f, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -936,6 +985,7 @@ impl SqlService for SqlServiceImpl {
         name: String,
         file_path: &Path,
     ) -> Result<(), CubeError> {
+        // TODO persist file size
         self.remote_fs
             .upload_file(
                 file_path.to_string_lossy().as_ref(),
@@ -1420,8 +1470,10 @@ mod tests {
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use regex::Regex;
 
     #[tokio::test]
     async fn create_schema_test() {
@@ -1729,10 +1781,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_size_consistency() {
+        Config::test("file_size_consistency")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                let _ = service
+                    .exec_query("CREATE TABLE foo.ints (value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query("INSERT INTO foo.ints (value) VALUES (42)")
+                    .await
+                    .unwrap();
+
+                let chunk = services.meta_store.get_chunk(1).await.unwrap();
+
+                let path = {
+                    let dir = env::temp_dir();
+
+                    let path = dir.clone().join("1.chunk.parquet");
+                    let mut file = File::create(path.clone()).unwrap();
+                    file.write_all("Malformed parquet".as_bytes()).unwrap();
+                    path
+                };
+
+                services
+                    .remote_fs
+                    .upload_file(
+                        path.to_str().unwrap(),
+                        &chunk.get_row().get_full_name(chunk.get_id()),
+                    )
+                    .await
+                    .unwrap();
+
+                let result = service.exec_query("SELECT count(*) from foo.ints").await;
+                println!("Result: {:?}", result);
+                assert!(result.is_err(), "Expected error but {:?} found", result);
+
+                let result = service.exec_query("SELECT count(*) from foo.ints").await;
+                println!("Result: {:?}", result);
+                assert!(
+                    result
+                        .clone()
+                        .err()
+                        .unwrap()
+                        .to_string()
+                        .contains("not found"),
+                    "Expected table not found error but got {:?}",
+                    result
+                );
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn high_frequency_inserts() {
         Config::test("high_frequency_inserts")
             .update_config(|mut c| {
-                c.partition_split_threshold = 1000000;
+                c.partition_split_threshold = 100;
                 c.compaction_chunks_count_threshold = 100;
                 c
             })
@@ -1764,6 +1874,72 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(44850)]));
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn decimal_partition_pruning() {
+        Config::test("decimal_partition_pruning")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num decimal)")
+                    .await
+                    .unwrap();
+
+                for i in 0..100 {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await
+                        .unwrap();
+                }
+
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await
+                    .unwrap();
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(100)]));
+
+                let result = service
+                    .exec_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows()[0],
+                    Row::new(vec![TableValue::Decimal(Decimal::new(5000000))])
+                );
+
+                let partitions = service
+                    .exec_query("SELECT id, min_value, max_value FROM system.partitions")
+                    .await
+                    .unwrap();
+
+                println!("All partitions: {:#?}", partitions);
+
+                let plans = service
+                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+
+                let worker_plan = pp_phys_plan(plans.worker.as_ref());
+                println!("Worker Plan: {}", worker_plan);
+                let parquet_regex = Regex::new(r"\d+-[a-z0-9]+.parquet").unwrap();
+                let matches = parquet_regex.captures_iter(&worker_plan).count();
+                assert!(
+                    // TODO 2 because partition pruning doesn't respect half open intervals yet
+                    matches < 3 && matches > 0,
+                    "{}\nshould have 2 and less partition scan nodes",
+                    worker_plan
+                );
             })
             .await;
     }
@@ -2032,6 +2208,8 @@ mod tests {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
+                c.meta_store_log_upload_interval = 1;
+                c.gc_loop_interval = 1;
                 c
             })
             .start_test(async move |services| {
@@ -2081,6 +2259,9 @@ mod tests {
                     .await
                     .unwrap();
                 let last_active_partition = active_partitions.iter().next().unwrap();
+
+                // Wait for GC tasks to drop files
+                Delay::new(Duration::from_millis(3000)).await;
 
                 let files = services
                     .remote_fs

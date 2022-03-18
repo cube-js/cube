@@ -1,5 +1,6 @@
 pub mod hll;
 mod optimizations;
+pub mod panic;
 mod partition_filter;
 mod planning;
 pub use planning::PlanningMeta;

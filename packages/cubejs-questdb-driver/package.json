@@ -1,0 +1,51 @@
+{
+  "name": "@cubejs-backend/questdb-driver",
+  "description": "Cube.js QuestDB database driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.29.33",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-questdb-driver"
+  },
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "integration": "npm run integration:questdb",
+    "integration:questdb": "jest --verbose dist/test",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
+    "@cubejs-backend/schema-compiler": "^0.29.33",
+    "@cubejs-backend/shared": "^0.29.33",
+    "@types/pg": "^8.6.0",
+    "moment": "^2.24.0",
+    "pg": "^8.7.0",
+    "ramda": "^0.27.1"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-backend/testing-shared": "^0.29.33",
+    "testcontainers": "^8.4.0",
+    "typescript": "~4.1.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}
