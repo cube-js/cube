@@ -8,8 +8,8 @@
 
 ## Running
 
-* Go to `cubejs-cubestore` and run `docker-compose -p cubejs-cubestore up`
-* Go to `cubejs-postgres` and run `docker-compose -p cubejs-postgres up`
-* Go to `loadtest` and run `npm install`
-* Then, start the relay server using `npm start`
-* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s npm test` (e.g., `RPS=10 DURATION=10s npm test`)
+* Run `docker-compose -p cubejs-cubestore -f cubejs-cubestore/docker-compose.yml up`
+* Run `docker-compose -p cubejs-postgres -f cubejs-postgres/docker-compose.yml up`
+* Go to `loadtest` and run `yarn install`
+* Then, start the relay server using `yarn start`
+* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s npm test` (e.g., `RPS=1 DURATION=10s npm test`)
