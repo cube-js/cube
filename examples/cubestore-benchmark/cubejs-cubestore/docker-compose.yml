@@ -2,13 +2,12 @@ version: '2.2'
 
 services:
   cube:
-    image: cubejs/cube:cristipp
+    image: cubejs/cube:latest
     ports:
       - 4001:4000
       - 3001:3000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      # Via external .env file
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
       - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
       - CUBEJS_DB_BQ_EXPORT_BUCKET=${CUBEJS_DB_BQ_EXPORT_BUCKET}
@@ -32,10 +31,9 @@ services:
       - redis
 
   refresh_worker:
-    image: cubejs/cube:cristipp
+    image: cubejs/cube:latest
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      # Via external .env file
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
       - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
       - CUBEJS_DB_BQ_EXPORT_BUCKET=${CUBEJS_DB_BQ_EXPORT_BUCKET}
