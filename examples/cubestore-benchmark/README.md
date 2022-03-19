@@ -12,4 +12,4 @@
 * Run `docker-compose -p cubejs-postgres -f cubejs-postgres/docker-compose.yml up`
 * Go to `loadtest` and run `yarn install`
 * Then, start the relay server using `yarn start`
-* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s npm test` (e.g., `RPS=5 DURATION=10s npm test`)
+* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s yarn test` (e.g., `RPS=5 DURATION=10s yarn test`)
