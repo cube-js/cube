@@ -2886,7 +2886,7 @@ mod tests {
         );
 
         assert_eq!(
-            logical_plan.find_projection_schema(),
+            logical_plan.schema().clone(),
             Arc::new(
                 DFSchema::new(vec![
                     DFField::new(None, "order_date", DataType::Utf8, false),

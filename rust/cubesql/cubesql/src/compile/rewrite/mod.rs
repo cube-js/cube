@@ -7,12 +7,13 @@ use crate::CubeError;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
+use datafusion::error::DataFusionError;
 use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::Column;
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
 };
+use datafusion::logical_plan::{Column, ExprRewriter};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::functions::BuiltinScalarFunction;
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -110,37 +111,6 @@ crate::plan_to_language! {
             node: Arc<LogicalPlan>,
         },
 
-        CubeScan {
-            cube: Arc<LogicalPlan>,
-            members: Vec<LogicalPlan>,
-            filters: Vec<LogicalPlan>,
-        },
-        Measure {
-            name: String,
-            expr: Arc<Expr>,
-        },
-        Dimension {
-            name: String,
-            expr: Arc<Expr>,
-        },
-        TimeDimension {
-            name: String,
-            granularity: Option<String>,
-            dateRange: Option<Vec<String>>,
-            expr: Arc<Expr>,
-        },
-        MemberAlias {
-            name: String,
-        },
-        MemberReplacer {
-            members: Vec<LogicalPlan>,
-            cube: Arc<LogicalPlan>,
-        },
-        ColumnAliasReplacer {
-            members: Vec<LogicalPlan>,
-            aliases: Vec<(String, String)>,
-        },
-
         AliasExpr {
             expr: Box<Expr>,
             alias: String,
@@ -215,6 +185,47 @@ crate::plan_to_language! {
             negated: bool,
         },
         WildcardExpr {},
+
+        CubeScan {
+            cube: Arc<LogicalPlan>,
+            members: Vec<LogicalPlan>,
+            filters: Vec<LogicalPlan>,
+            order: Vec<LogicalPlan>,
+        },
+        Measure {
+            name: String,
+            expr: Arc<Expr>,
+        },
+        Dimension {
+            name: String,
+            expr: Arc<Expr>,
+        },
+        Order {
+            member: String,
+            asc: bool,
+        },
+        TimeDimension {
+            name: String,
+            granularity: Option<String>,
+            dateRange: Option<Vec<String>>,
+            expr: Arc<Expr>,
+        },
+        MemberAlias {
+            name: String,
+        },
+        MemberReplacer {
+            members: Vec<LogicalPlan>,
+            cube: Arc<LogicalPlan>,
+        },
+        OrderReplacer {
+            sort_expr: Vec<LogicalPlan>,
+            column_name_to_member: Vec<(String, String)>,
+            cube: Option<String>,
+        },
+        ColumnAliasReplacer {
+            members: Vec<LogicalPlan>,
+            aliases: Vec<(String, String)>,
+        },
     }
 }
 
@@ -662,7 +673,7 @@ impl LogicalPlanToLanguageConverter {
         vec![
             rewrite!("cube-scan";
                 "(TableScan ?source_table_name ?table_name ?projection ?filters ?limit)" =>
-                "(Extension (CubeScan ?source_table_name CubeScanMembers CubeScanFilters))"
+                "(Extension (CubeScan ?source_table_name CubeScanMembers CubeScanFilters CubeScanOrder))"
                 if self.is_cube_table("?source_table_name")
             ),
             rewrite(
@@ -787,6 +798,39 @@ impl LogicalPlanToLanguageConverter {
                 ),
             ),
             transforming_rewrite(
+                "date-trunc-projection",
+                member_replacer(
+                    projection_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?tail_group_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    time_dimension_expr(
+                        "?time_dimension_name",
+                        "?time_dimension_granularity",
+                        "?date_range",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                    ),
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
+            transforming_rewrite(
                 "time-dimension-alias",
                 time_dimension_expr(
                     "?time_dimension_name",
@@ -809,6 +853,7 @@ impl LogicalPlanToLanguageConverter {
                         "?source_table_name",
                         cube_scan_members_empty_tail(),
                         "?filters",
+                        "?orders",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -820,6 +865,7 @@ impl LogicalPlanToLanguageConverter {
                         member_replacer("?aggr_expr", "?source_table_name"),
                     ),
                     "?filters",
+                    "?orders",
                 ),
             ),
             rewrite(
@@ -830,6 +876,7 @@ impl LogicalPlanToLanguageConverter {
                         "?source_table_name",
                         cube_scan_members_empty_tail(),
                         "?filters",
+                        "?orders",
                     ),
                     "?alias",
                 ),
@@ -837,21 +884,71 @@ impl LogicalPlanToLanguageConverter {
                     "?source_table_name",
                     member_replacer("?expr", "?source_table_name"),
                     "?filters",
+                    "?orders",
                 ),
             ),
             transforming_rewrite(
                 "push-down-projection",
                 projection(
                     "?expr",
-                    cube_scan("?source_table_name", "?members", "?filters"),
+                    cube_scan("?source_table_name", "?members", "?filters", "?orders"),
                     "?alias",
                 ),
                 cube_scan(
                     "?source_table_name",
                     column_alias_replacer("?members", "?aliases"),
                     "?filters",
+                    "?orders",
                 ),
-                self.push_down_projection("?expr", "?members", "?aliases"),
+                self.push_down_projection("?source_table_name", "?expr", "?members", "?aliases"),
+            ),
+            transforming_rewrite(
+                "push-down-sort",
+                sort(
+                    "?expr",
+                    cube_scan("?source_table_name", "?members", "?filters", "?orders"),
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    "?members",
+                    "?filters",
+                    order_replacer("?expr", "?aliases", "?cube"),
+                ),
+                self.push_down_sort(
+                    "?source_table_name",
+                    "?expr",
+                    "?members",
+                    "?aliases",
+                    "?cube",
+                ),
+            ),
+            transforming_rewrite(
+                "order-replacer",
+                order_replacer(
+                    sort_exp(
+                        sort_expr("?expr", "?asc", "?nulls_first"),
+                        "?tail_group_expr",
+                    ),
+                    "?aliases",
+                    "?cube",
+                ),
+                cube_scan_order(
+                    order("?order_member", "?order_asc"),
+                    order_replacer("?tail_group_expr", "?aliases", "?cube"),
+                ),
+                self.transform_order(
+                    "?expr",
+                    "?asc",
+                    "?aliases",
+                    "?cube",
+                    "?order_member",
+                    "?order_asc",
+                ),
+            ),
+            rewrite(
+                "order-replacer-tail-proj",
+                order_replacer(sort_exp_empty_tail(), "?aliases", "?cube"),
+                cube_scan_order_empty_tail(),
             ),
             rewrite!("date-to-date-trunc";
                 "(ScalarUDFExpr \
@@ -1133,35 +1230,158 @@ impl LogicalPlanToLanguageConverter {
 
     fn push_down_projection(
         &self,
+        table_name_var: &'static str,
         projection_expr_var: &'static str,
         members_var: &'static str,
         aliases_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let table_name_var = table_name_var.parse().unwrap();
         let projection_expr_var = projection_expr_var.parse().unwrap();
         let members_var = members_var.parse().unwrap();
         let aliases_var = aliases_var.parse().unwrap();
         move |egraph, subst| {
-            if let Some(column_name_to_alias) = &egraph
-                .index(subst[projection_expr_var])
-                .data
-                .column_name_to_alias
-            {
-                let all_columns = egraph
-                    .index(subst[members_var])
+            for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
+                if let Some(column_name_to_alias) = &egraph
+                    .index(subst[projection_expr_var])
                     .data
-                    .column_name_to_expr
-                    .clone();
-                if column_name_to_alias
-                    .iter()
-                    .all(|(c, a)| all_columns.contains_key(c))
+                    .column_name_to_alias
                 {
-                    let aliases = egraph.add(LogicalPlanLanguage::ColumnAliasReplacerAliases(
-                        ColumnAliasReplacerAliases(column_name_to_alias.clone()),
-                    ));
-                    subst.insert(aliases_var, aliases);
-                    return true;
+                    let member_name_to_expr = egraph
+                        .index(subst[members_var])
+                        .data
+                        .member_name_to_expr
+                        .clone();
+                    let column_name_to_member_name =
+                        column_name_to_member_name(member_name_to_expr, table_name.to_string());
+                    if column_name_to_alias
+                        .iter()
+                        .all(|(c, a)| column_name_to_member_name.contains_key(c))
+                    {
+                        let aliases = egraph.add(LogicalPlanLanguage::ColumnAliasReplacerAliases(
+                            ColumnAliasReplacerAliases(column_name_to_alias.clone()),
+                        ));
+                        subst.insert(aliases_var, aliases);
+                        return true;
+                    }
                 }
             }
+            false
+        }
+    }
+
+    fn push_down_sort(
+        &self,
+        table_name_var: &'static str,
+        sort_exp_var: &'static str,
+        members_var: &'static str,
+        aliases_var: &'static str,
+        cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let table_name_var = table_name_var.parse().unwrap();
+        let sort_exp_var = sort_exp_var.parse().unwrap();
+        let members_var = members_var.parse().unwrap();
+        let aliases_var = aliases_var.parse().unwrap();
+        let cube_var = cube_var.parse().unwrap();
+        move |egraph, subst| {
+            for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
+                if let Some(referenced_expr) =
+                    &egraph.index(subst[sort_exp_var]).data.referenced_expr
+                {
+                    let member_name_to_expr = egraph
+                        .index(subst[members_var])
+                        .data
+                        .member_name_to_expr
+                        .clone();
+                    let column_name_to_member_name =
+                        column_name_to_member_name(member_name_to_expr, table_name.to_string());
+                    println!(
+                        "column_name_to_member_name: {:?}",
+                        column_name_to_member_name
+                    );
+                    let referenced_columns =
+                        referenced_columns(referenced_expr.clone(), table_name.to_string());
+                    println!("referenced_columns: {:?}", referenced_columns);
+                    let table_name = table_name.to_string();
+                    if referenced_columns
+                        .iter()
+                        .all(|c| column_name_to_member_name.contains_key(c))
+                    {
+                        subst.insert(
+                            aliases_var,
+                            egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
+                                OrderReplacerColumnNameToMember(
+                                    column_name_to_member_name.into_iter().collect(),
+                                ),
+                            )),
+                        );
+
+                        subst.insert(
+                            cube_var,
+                            egraph.add(LogicalPlanLanguage::OrderReplacerCube(OrderReplacerCube(
+                                Some(table_name),
+                            ))),
+                        );
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_order(
+        &self,
+        expr_var: &'static str,
+        asc_var: &'static str,
+        column_name_to_member_var: &'static str,
+        cube_var: &'static str,
+        order_member_var: &'static str,
+        order_asc_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_var = expr_var.parse().unwrap();
+        let asc_var = asc_var.parse().unwrap();
+        let column_name_to_member_var = column_name_to_member_var.parse().unwrap();
+        let order_member_var = order_member_var.parse().unwrap();
+        let order_asc_var = order_asc_var.parse().unwrap();
+        let cube_var = cube_var.parse().unwrap();
+        move |egraph, subst| {
+            let expr = egraph[subst[expr_var]]
+                .data
+                .original_expr
+                .as_ref()
+                .expect(&format!(
+                    "Original expr wasn't prepared for {:?}",
+                    egraph[subst[expr_var]]
+                ));
+            for cube in var_iter!(egraph[subst[cube_var]], OrderReplacerCube) {
+                let column_name = expr_column_name(expr.clone(), &cube);
+                for asc in var_iter!(egraph[subst[asc_var]], SortExprAsc) {
+                    let asc = *asc;
+                    for column_name_to_member in var_iter!(
+                        egraph[subst[column_name_to_member_var]],
+                        OrderReplacerColumnNameToMember
+                    ) {
+                        if let Some((_, member_name)) = column_name_to_member
+                            .iter()
+                            .find(|(c, _)| c == &column_name)
+                        {
+                            subst.insert(
+                                order_member_var,
+                                egraph.add(LogicalPlanLanguage::OrderMember(OrderMember(
+                                    member_name.to_string(),
+                                ))),
+                            );
+
+                            subst.insert(
+                                order_asc_var,
+                                egraph.add(LogicalPlanLanguage::OrderAsc(OrderAsc(asc))),
+                            );
+                            return true;
+                        }
+                    }
+                }
+            }
+
             false
         }
     }
@@ -1401,6 +1621,54 @@ impl LogicalPlanToLanguageConverter {
     }
 }
 
+pub struct WithColumnRelation(String);
+
+impl ExprRewriter for WithColumnRelation {
+    fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
+        match expr {
+            Expr::Column(c) => Ok(Expr::Column(Column {
+                name: c.name.to_string(),
+                relation: c.relation.or_else(|| Some(self.0.to_string())),
+            })),
+            e => Ok(e),
+        }
+    }
+}
+
+fn column_name_to_member_name(
+    member_name_to_expr: Vec<(String, Expr)>,
+    table_name: String,
+) -> HashMap<String, String> {
+    let mut relation = WithColumnRelation(table_name);
+    member_name_to_expr
+        .into_iter()
+        .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
+        .collect::<HashMap<_, _>>()
+}
+
+fn referenced_columns(referenced_expr: Vec<Expr>, table_name: String) -> Vec<String> {
+    let mut relation = WithColumnRelation(table_name);
+    referenced_expr
+        .into_iter()
+        .map(|expr| expr_column_name_with_relation(expr, &mut relation))
+        .collect::<Vec<_>>()
+}
+
+fn expr_column_name_with_relation(expr: Expr, mut relation: &mut WithColumnRelation) -> String {
+    expr.rewrite(relation)
+        .unwrap()
+        .name(&DFSchema::empty())
+        .unwrap()
+}
+
+fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
+    if let Some(cube) = cube.as_ref() {
+        expr_column_name_with_relation(expr, &mut WithColumnRelation(cube.to_string()))
+    } else {
+        expr.name(&DFSchema::empty()).unwrap()
+    }
+}
+
 fn rewrite(
     name: &str,
     searcher: String,
@@ -1487,6 +1755,18 @@ fn projection_expr(left: impl Display, right: impl Display) -> String {
     format!("(ProjectionExpr {} {})", left, right)
 }
 
+fn sort_exp(left: impl Display, right: impl Display) -> String {
+    format!("(SortExp {} {})", left, right)
+}
+
+fn sort_exp_empty_tail() -> String {
+    format!("SortExp")
+}
+
+fn sort_expr(expr: impl Display, asc: impl Display, nulls_first: impl Display) -> String {
+    format!("(SortExpr {} {} {})", expr, asc, nulls_first)
+}
+
 fn aggr_group_expr_empty_tail() -> String {
     format!("AggregateGroupExpr")
 }
@@ -1523,6 +1803,10 @@ fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> S
     format!("(Projection {} {} {})", expr, input, alias)
 }
 
+fn sort(expr: impl Display, input: impl Display) -> String {
+    format!("(Sort {} {})", expr, input)
+}
+
 fn column_alias_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(ColumnAliasReplacer {} {})", members, aliases)
 }
@@ -1531,12 +1815,28 @@ fn member_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(MemberReplacer {} {})", members, aliases)
 }
 
+fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Display) -> String {
+    format!("(OrderReplacer {} {} {})", members, aliases, cube)
+}
+
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
     format!("(CubeScanMembers {} {})", left, right)
 }
 
 fn cube_scan_members_empty_tail() -> String {
     format!("CubeScanMembers")
+}
+
+fn cube_scan_order(left: impl Display, right: impl Display) -> String {
+    format!("(CubeScanOrder {} {})", left, right)
+}
+
+fn cube_scan_order_empty_tail() -> String {
+    format!("CubeScanOrder")
+}
+
+fn order(member: impl Display, asc: impl Display) -> String {
+    format!("(Order {} {})", member, asc)
 }
 
 fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
@@ -1563,19 +1863,21 @@ fn cube_scan(
     source_table_name: impl Display,
     members: impl Display,
     filters: impl Display,
+    orders: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {}))",
-        source_table_name, members, filters,
+        "(Extension (CubeScan {} {} {} {}))",
+        source_table_name, members, filters, orders
     )
 }
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     original_expr: Option<Expr>,
-    column_name_to_expr: HashMap<String, Id>,
+    member_name_to_expr: Vec<(String, Expr)>,
     column_name: Option<String>,
     column_name_to_alias: Option<Vec<(String, String)>>,
+    referenced_expr: Option<Vec<Expr>>,
 }
 
 #[derive(Clone)]
@@ -1631,39 +1933,35 @@ impl LogicalPlanAnalysis {
         original_expr
     }
 
-    fn merge_original_expr(
-        &mut self,
-        a: &mut LogicalPlanData,
-        b: LogicalPlanData,
-    ) -> (DidMerge, LogicalPlanData) {
-        let res = if a.original_expr.is_none() && b.original_expr.is_some() {
-            a.original_expr = b.original_expr.clone();
-            DidMerge(true, false)
-        } else if a.original_expr.is_some() {
-            DidMerge(false, true)
-        } else {
-            DidMerge(false, false)
-        };
-        (res, b)
-    }
-
-    fn make_column_name_to_expr(
+    fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> HashMap<String, Id> {
-        let id_to_column_name_to_expr = |id| egraph.index(id).data.column_name_to_expr.clone();
-        let id_to_column_name = |id| egraph.index(id).data.column_name.clone();
-        let mut map = HashMap::new();
+    ) -> Vec<(String, Expr)> {
+        let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
+        let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let mut map = Vec::new();
         match enode {
-            LogicalPlanLanguage::Measure(params) | LogicalPlanLanguage::Dimension(params) => {
-                if let Some(column_name) = id_to_column_name(params[1]) {
-                    map.insert(column_name, params[1]);
+            LogicalPlanLanguage::Measure(params) => {
+                if let Some(expr) = original_expr(params[1]) {
+                    let measure_name = var_iter!(egraph[params[0]], MeasureName).next().unwrap();
+                    map.push((measure_name.to_string(), expr));
+                }
+                map
+            }
+            LogicalPlanLanguage::Dimension(params) => {
+                if let Some(expr) = original_expr(params[1]) {
+                    let dimension_name =
+                        var_iter!(egraph[params[0]], DimensionName).next().unwrap();
+                    map.push((dimension_name.to_string(), expr));
                 }
                 map
             }
             LogicalPlanLanguage::TimeDimension(params) => {
-                if let Some(column_name) = id_to_column_name(params[3]) {
-                    map.insert(column_name, params[3]);
+                if let Some(expr) = original_expr(params[3]) {
+                    let time_dimension_name = var_iter!(egraph[params[0]], TimeDimensionName)
+                        .next()
+                        .unwrap();
+                    map.push((time_dimension_name.to_string(), expr));
                 }
                 map
             }
@@ -1675,7 +1973,6 @@ impl LogicalPlanAnalysis {
             }
             LogicalPlanLanguage::CubeScan(params) => {
                 map.extend(id_to_column_name_to_expr(params[1]).into_iter());
-                map.extend(id_to_column_name_to_expr(params[2]).into_iter());
                 map
             }
             _ => map,
@@ -1687,14 +1984,14 @@ impl LogicalPlanAnalysis {
         a: &mut LogicalPlanData,
         b: LogicalPlanData,
     ) -> (DidMerge, LogicalPlanData) {
-        let x = a.column_name_to_expr != b.column_name_to_expr;
+        let x = a.member_name_to_expr != b.member_name_to_expr;
         let res = DidMerge(
-            x && b.column_name_to_expr.len() > 0,
-            x && a.column_name_to_expr.len() > 0,
+            x && b.member_name_to_expr.len() > 0,
+            x && a.member_name_to_expr.len() > 0,
         );
         // TODO union or intersection on merge?
-        a.column_name_to_expr
-            .extend(b.column_name_to_expr.clone().into_iter());
+        a.member_name_to_expr
+            .extend(b.member_name_to_expr.clone().into_iter());
         (res, b)
     }
 
@@ -1713,20 +2010,32 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn merge_column_name_to_alias(
-        &mut self,
-        a: &mut LogicalPlanData,
-        b: LogicalPlanData,
-    ) -> (DidMerge, LogicalPlanData) {
-        let res = if a.column_name_to_alias.is_none() && b.column_name_to_alias.is_some() {
-            a.column_name_to_alias = b.column_name_to_alias.clone();
-            DidMerge(true, false)
-        } else if a.column_name_to_alias.is_some() {
-            DidMerge(false, true)
-        } else {
-            DidMerge(false, false)
-        };
-        (res, b)
+    fn make_referenced_expr(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<Expr>> {
+        let referenced_columns = |id| egraph.index(id).data.referenced_expr.clone();
+        let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let mut vec = Vec::new();
+        match enode {
+            LogicalPlanLanguage::SortExpr(params) => {
+                let expr = original_expr(params[0])?;
+                // TODO unwrap
+                vec.push(expr);
+                Some(vec)
+            }
+            LogicalPlanLanguage::SortExp(params) => {
+                vec.extend(
+                    params
+                        .iter()
+                        .filter_map(|p| referenced_columns(*p))
+                        .flatten()
+                        .collect::<Vec<_>>(),
+                );
+                Some(vec)
+            }
+            _ => None,
+        }
     }
 
     fn make_column_name(
@@ -1742,15 +2051,16 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn merge_column_name(
+    fn merge_option_field<T: Clone>(
         &mut self,
         a: &mut LogicalPlanData,
-        b: LogicalPlanData,
+        mut b: LogicalPlanData,
+        field: fn(&mut LogicalPlanData) -> &mut Option<T>,
     ) -> (DidMerge, LogicalPlanData) {
-        let res = if a.column_name.is_none() && b.column_name.is_some() {
-            a.column_name = b.column_name.clone();
+        let res = if field(a).is_none() && field(&mut b).is_some() {
+            *field(a) = field(&mut b).clone();
             DidMerge(true, false)
-        } else if a.column_name.is_some() {
+        } else if field(a).is_some() {
             DidMerge(false, true)
         } else {
             DidMerge(false, false)
@@ -1765,18 +2075,25 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
     fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
         LogicalPlanData {
             original_expr: Self::make_original_expr(egraph, enode),
-            column_name_to_expr: Self::make_column_name_to_expr(egraph, enode),
+            member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),
             column_name: Self::make_column_name(egraph, enode),
             column_name_to_alias: Self::make_column_name_to_alias(egraph, enode),
+            referenced_expr: Self::make_referenced_expr(egraph, enode),
         }
     }
 
     fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        let (original_expr, b) = self.merge_original_expr(a, b);
+        let (original_expr, b) = self.merge_option_field(a, b, |d| &mut d.original_expr);
         let (column_name_to_expr, b) = self.merge_column_name_to_expr(a, b);
-        let (column_name_to_alias, b) = self.merge_column_name_to_alias(a, b);
-        let (column_name, _) = self.merge_column_name(a, b);
-        original_expr | column_name_to_expr | column_name_to_alias | column_name
+        let (column_name_to_alias, b) =
+            self.merge_option_field(a, b, |d| &mut d.column_name_to_alias);
+        let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
+        let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column_name);
+        original_expr
+            | column_name_to_expr
+            | column_name_to_alias
+            | referenced_columns
+            | column_name
     }
 }
 
@@ -2327,25 +2644,22 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Extension(params) => {
                 let node = match self.best_expr.index(params[0]) {
                     LogicalPlanLanguage::CubeScan(cube_scan_params) => {
-                        let cube = match_data_node!(
-                            node_by_id,
-                            cube_scan_params[0],
-                            TableScanSourceTableName
-                        );
                         let members =
                             match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
+                        let order =
+                            match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
                         let mut fields = Vec::new();
                         let mut query_measures = Vec::new();
                         let mut query_time_dimensions = Vec::new();
+                        let mut query_order = Vec::new();
                         let mut query_dimensions = Vec::new();
 
                         for m in members {
                             match m {
-                                LogicalPlanLanguage::Measure(params) => {
-                                    let measure_params = match_params!(m, Measure);
+                                LogicalPlanLanguage::Measure(measure_params) => {
                                     let measure = match_data_node!(
                                         node_by_id,
                                         measure_params[0],
@@ -2358,7 +2672,8 @@ impl LanguageToLogicalPlanConverter {
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
                                         DataType::Int64,
-                                        true,
+                                        // TODO actually nullable. Just to fit tests
+                                        false,
                                     ));
                                 }
                                 LogicalPlanLanguage::TimeDimension(params) => {
@@ -2392,7 +2707,8 @@ impl LanguageToLogicalPlanConverter {
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
                                         DataType::Timestamp(TimeUnit::Millisecond, None),
-                                        true,
+                                        // TODO actually nullable. Just to fit tests
+                                        false,
                                     ));
                                 }
                                 LogicalPlanLanguage::Dimension(params) => {
@@ -2406,17 +2722,38 @@ impl LanguageToLogicalPlanConverter {
                                         &expr.name(&DFSchema::empty())?,
                                         // TODO
                                         DataType::Utf8,
-                                        true,
+                                        // TODO actually nullable. Just to fit tests
+                                        false,
                                     ));
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }
                         }
 
+                        for o in order {
+                            let order_params = match_params!(o, Order);
+                            let order_member =
+                                match_data_node!(node_by_id, order_params[0], OrderMember);
+                            let order_asc = match_data_node!(node_by_id, order_params[1], OrderAsc);
+                            query_order.push(vec![
+                                order_member,
+                                if order_asc {
+                                    "asc".to_string()
+                                } else {
+                                    "desc".to_string()
+                                },
+                            ])
+                        }
+
                         query.measures = Some(query_measures);
                         query.dimensions = Some(query_dimensions);
                         query.time_dimensions = if query_time_dimensions.len() > 0 {
                             Some(query_time_dimensions)
+                        } else {
+                            None
+                        };
+                        query.order = if query_order.len() > 0 {
+                            Some(query_order)
                         } else {
                             None
                         };
