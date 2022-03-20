@@ -65,14 +65,15 @@ impl AsyncPostgresShim {
             _ => return Ok(()),
         }
         self.ready().await?;
+
         loop {
             match buffer::read_message(&mut self.socket).await? {
                 FrontendMessage::Query(query) => self.process_query(query).await?,
                 FrontendMessage::Terminate => return Ok(()),
-                _ => {
+                command_id => {
                     return Err(Error::new(
                         ErrorKind::Unsupported,
-                        "command is not supported in this context",
+                        format!("Unsupported operation: {:?}", command_id),
                     ))
                 }
             }
