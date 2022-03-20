@@ -656,6 +656,7 @@ impl LogicalPlanToLanguageConverter {
         let runner = self.rewrite_runner();
         let rules = self.rewrite_rules();
         let runner = runner.run(rules.iter());
+        println!("Iterations: {:?}", runner.iterations);
         let extractor = Extractor::new(&runner.egraph, BestCubePlan);
         let (_, best) = extractor.find_best(root);
         let new_root = Id::from(best.as_ref().len() - 1);
@@ -708,7 +709,12 @@ impl LogicalPlanToLanguageConverter {
                     ),
                     member_replacer("?tail_aggr_expr", "?source_table_name"),
                 ),
-                self.transform_measure("?source_table_name", None, "?distinct", "?aggr_fun"),
+                self.transform_measure(
+                    "?source_table_name",
+                    None,
+                    Some("?distinct"),
+                    Some("?aggr_fun"),
+                ),
             ),
             transforming_rewrite(
                 "named-aggr",
@@ -729,9 +735,27 @@ impl LogicalPlanToLanguageConverter {
                 self.transform_measure(
                     "?source_table_name",
                     Some("?column"),
-                    "?distinct",
-                    "?aggr_fun",
+                    Some("?distinct"),
+                    Some("?aggr_fun"),
                 ),
+            ),
+            transforming_rewrite(
+                "measure-fun-aggr",
+                member_replacer(
+                    aggr_aggr_expr(
+                        udaf_expr("?aggr_fun", vec![column_expr("?column")]),
+                        "?tail_aggr_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    measure_expr(
+                        "?measure_name",
+                        udaf_expr("?aggr_fun", vec![column_expr("?column")]),
+                    ),
+                    member_replacer("?tail_aggr_expr", "?source_table_name"),
+                ),
+                self.transform_measure("?source_table_name", Some("?column"), None, None),
             ),
             transforming_rewrite(
                 "projection-columns-with-alias",
@@ -924,17 +948,66 @@ impl LogicalPlanToLanguageConverter {
             rewrite(
                 "alias-replacer-split",
                 column_alias_replacer(
-                    cube_scan_members("?members_left", "?members_right"),
+                    cube_scan_members(
+                        cube_scan_members("?members_left", "?tail_left"),
+                        cube_scan_members("?members_right", "?tail_right"),
+                    ),
                     "?aliases",
                     "?cube",
                 ),
                 cube_scan_members(
-                    column_alias_replacer("?members_left", "?aliases", "?cube"),
-                    column_alias_replacer("?members_right", "?aliases", "?cube"),
+                    column_alias_replacer(
+                        cube_scan_members("?members_left", "?tail_left"),
+                        "?aliases",
+                        "?cube",
+                    ),
+                    column_alias_replacer(
+                        cube_scan_members("?members_right", "?tail_right"),
+                        "?aliases",
+                        "?cube",
+                    ),
+                ),
+            ),
+            rewrite(
+                "alias-replacer-split-left-empty",
+                column_alias_replacer(
+                    cube_scan_members(
+                        cube_scan_members_empty_tail(),
+                        cube_scan_members("?members_right", "?tail_right"),
+                    ),
+                    "?aliases",
+                    "?cube",
+                ),
+                cube_scan_members(
+                    cube_scan_members_empty_tail(),
+                    column_alias_replacer(
+                        cube_scan_members("?members_right", "?tail_right"),
+                        "?aliases",
+                        "?cube",
+                    ),
+                ),
+            ),
+            rewrite(
+                "alias-replacer-split-right-empty",
+                column_alias_replacer(
+                    cube_scan_members(
+                        cube_scan_members("?members_left", "?tail_left"),
+                        cube_scan_members_empty_tail(),
+                    ),
+                    "?aliases",
+                    "?cube",
+                ),
+                cube_scan_members(
+                    column_alias_replacer(
+                        cube_scan_members("?members_left", "?tail_left"),
+                        "?aliases",
+                        "?cube",
+                    ),
+                    cube_scan_members_empty_tail(),
                 ),
             ),
             transforming_rewrite(
-                "alias-replacer",
+                "alias-replacer-measure",
                 column_alias_replacer(
                     cube_scan_members(measure_expr("?measure", "?expr"), "?tail_group_expr"),
                     "?aliases",
@@ -942,6 +1015,32 @@ impl LogicalPlanToLanguageConverter {
                 ),
                 cube_scan_members(
                     measure_expr("?measure", "?replaced_alias_expr"),
+                    column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
+                ),
+                self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
+            ),
+            transforming_rewrite(
+                "alias-replacer-time-dimension",
+                column_alias_replacer(
+                    cube_scan_members(
+                        time_dimension_expr(
+                            "?time_dimension_name",
+                            "?time_dimension_granularity",
+                            "?date_range",
+                            "?expr",
+                        ),
+                        "?tail_group_expr",
+                    ),
+                    "?aliases",
+                    "?cube",
+                ),
+                cube_scan_members(
+                    time_dimension_expr(
+                        "?time_dimension_name",
+                        "?time_dimension_granularity",
+                        "?date_range",
+                        "?replaced_alias_expr",
+                    ),
                     column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
                 ),
                 self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
@@ -1484,8 +1583,13 @@ impl LogicalPlanToLanguageConverter {
                     "Original expr wasn't prepared for {:?}",
                     egraph[subst[expr_var]]
                 ));
+            println!("replace_projection_alias pre expr: {:?}", expr);
             for cube in var_iter!(egraph[subst[cube_var]], ColumnAliasReplacerCube) {
                 let column_name = expr_column_name(expr.clone(), &cube);
+                println!(
+                    "replace_projection_alias expr: {:?}, {:?}",
+                    expr, column_name
+                );
                 for column_name_to_alias in var_iter!(
                     egraph[subst[column_name_to_alias]],
                     ColumnAliasReplacerAliases
@@ -1672,12 +1776,12 @@ impl LogicalPlanToLanguageConverter {
         &self,
         cube_var: &'static str,
         measure_var: Option<&'static str>,
-        distinct_var: &'static str,
-        fun_var: &'static str,
+        distinct_var: Option<&'static str>,
+        fun_var: Option<&'static str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let var = cube_var.parse().unwrap();
-        let distinct_var = distinct_var.parse().unwrap();
-        let fun_var = fun_var.parse().unwrap();
+        let distinct_var = distinct_var.map(|var| var.parse().unwrap());
+        let fun_var = fun_var.map(|var| var.parse().unwrap());
         let measure_var = measure_var.map(|var| var.parse().unwrap());
         let measure_name_var = "?measure_name".parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
@@ -1696,30 +1800,46 @@ impl LogicalPlanToLanguageConverter {
                         .iter()
                         .find(|c| c.name.eq_ignore_ascii_case(cube_name))
                     {
-                        for distinct in
-                            var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                        for distinct in distinct_var
+                            .map(|distinct_var| {
+                                var_iter!(
+                                    egraph[subst[distinct_var]],
+                                    AggregateFunctionExprDistinct
+                                )
+                                .map(|d| *d)
+                                .collect()
+                            })
+                            .unwrap_or(vec![false])
                         {
-                            for fun in var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun) {
+                            for fun in fun_var
+                                .map(|fun_var| {
+                                    var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                                        .map(|fun| Some(fun))
+                                        .collect()
+                                })
+                                .unwrap_or(vec![None])
+                            {
                                 let measure_name = format!("{}.{}", cube_name, measure_name);
                                 if let Some(measure) = cube.measures.iter().find(|m| {
                                     measure_name.eq_ignore_ascii_case(&m.name) && {
                                         if let Some(agg_type) = &m.agg_type {
                                             match fun {
-                                                AggregateFunction::Count => {
-                                                    if *distinct {
+                                                Some(AggregateFunction::Count) => {
+                                                    if distinct {
                                                         agg_type == "countDistinct"
                                                             || agg_type == "countDistinctApprox"
                                                     } else {
                                                         agg_type == "count"
                                                     }
                                                 }
-                                                AggregateFunction::Sum => agg_type == "sum",
-                                                AggregateFunction::Min => agg_type == "min",
-                                                AggregateFunction::Max => agg_type == "max",
-                                                AggregateFunction::Avg => agg_type == "avg",
-                                                AggregateFunction::ApproxDistinct => {
+                                                Some(AggregateFunction::Sum) => agg_type == "sum",
+                                                Some(AggregateFunction::Min) => agg_type == "min",
+                                                Some(AggregateFunction::Max) => agg_type == "max",
+                                                Some(AggregateFunction::Avg) => agg_type == "avg",
+                                                Some(AggregateFunction::ApproxDistinct) => {
                                                     agg_type == "countDistinctApprox"
                                                 }
+                                                None => true,
                                             }
                                         } else {
                                             false
@@ -1855,6 +1975,14 @@ fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl 
         fun_name,
         list_expr("AggregateFunctionExprArgs", args),
         distinct
+    )
+}
+
+fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+    format!(
+        "(AggregateUDFExpr {} {})",
+        fun_name,
+        list_expr("AggregateUDFExprArgs", args),
     )
 }
 
@@ -2073,8 +2201,13 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let measure_name = var_iter!(egraph[params[0]], MeasureName).next().unwrap();
-                    map.push((measure_name.to_string(), expr));
-                    println!("Measure: {:?}", map);
+                    map.push((measure_name.to_string(), expr.clone()));
+                    println!(
+                        "Measure: {:?}, {:?}, {:?}",
+                        map,
+                        expr,
+                        column_name(params[1])
+                    );
                     Some(map)
                 } else {
                     None
@@ -2131,13 +2264,25 @@ impl LogicalPlanAnalysis {
         let mut map = Vec::new();
         match enode {
             LogicalPlanLanguage::AliasExpr(params) => {
-                map.push((original_expr(params[0])?, id_to_column_name(params[1])?));
+                map.push((
+                    original_expr(params[0])?,
+                    var_iter!(egraph[params[1]], AliasExprAlias)
+                        .next()
+                        .unwrap()
+                        .to_string(),
+                ));
+                println!("make_expr_to_alias AliasExpr: {:?}", map);
                 Some(map)
             }
             LogicalPlanLanguage::ProjectionExpr(params) => {
                 for id in params.iter() {
-                    map.extend(column_name_to_alias(*id)?.into_iter());
+                    if let Some(col_name) = id_to_column_name(*id) {
+                        map.push((original_expr(*id)?, col_name));
+                    } else {
+                        map.extend(column_name_to_alias(*id)?.into_iter());
+                    }
                 }
+                println!("make_expr_to_alias ProjectionExpr: {:?}", map);
                 Some(map)
             }
             _ => None,
@@ -2180,7 +2325,6 @@ impl LogicalPlanAnalysis {
         let id_to_column_name = |id| egraph.index(id).data.column_name.clone();
         match enode {
             LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(c)) => Some(c.name.to_string()),
-            LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(a)) => Some(a.to_string()),
             LogicalPlanLanguage::ColumnExpr(c) => id_to_column_name(c[0]),
             _ => None,
         }

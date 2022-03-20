@@ -28,7 +28,9 @@ use crate::{
     },
     sql::SessionState,
 };
+use datafusion::logical_plan::create_udaf;
 use datafusion::physical_plan::datetime_expressions::date_trunc;
+use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::ColumnarValue;
 use datafusion::scalar::ScalarValue;
 
@@ -839,5 +841,16 @@ pub fn create_date_add_udf() -> ScalarUDF {
         ),
         &return_type,
         &fun,
+    )
+}
+
+pub fn create_measure_udaf() -> AggregateUDF {
+    create_udaf(
+        "measure",
+        DataType::Float64,
+        Arc::new(DataType::Float64),
+        Volatility::Immutable,
+        Arc::new(|| todo!("Not implemented")),
+        Arc::new(vec![DataType::Float64]),
     )
 }
