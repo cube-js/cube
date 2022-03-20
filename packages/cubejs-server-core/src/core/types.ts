@@ -141,6 +141,7 @@ export interface CreateOptions {
   livePreview?: boolean;
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
+  allowNodeRequire?: boolean;
 }
 
 export type SystemOptions = {
