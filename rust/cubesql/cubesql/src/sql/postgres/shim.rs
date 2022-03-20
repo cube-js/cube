@@ -19,7 +19,7 @@ use crate::{
 
 use super::{
     buffer,
-    protocol::{self, FrontendMessage},
+    protocol::{self, FrontendMessage, SSL_REQUEST_PROTOCOL},
 };
 
 pub struct AsyncPostgresShim {
@@ -27,6 +27,13 @@ pub struct AsyncPostgresShim {
     #[allow(unused)]
     parameters: HashMap<String, String>,
     session: Arc<Session>,
+}
+
+#[derive(PartialEq, Eq)]
+pub enum StartupState {
+    Success,
+    SslRequested,
+    Denied,
 }
 
 impl AsyncPostgresShim {
@@ -53,9 +60,16 @@ impl AsyncPostgresShim {
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        if !self.process_startup_message().await? {
-            return Ok(());
+        match self.process_startup_message().await? {
+            StartupState::Success => {}
+            StartupState::SslRequested => {
+                if self.process_startup_message().await? != StartupState::Success {
+                    return Ok(());
+                }
+            }
+            StartupState::Denied => return Ok(()),
         }
+
         match buffer::read_message(&mut self.socket).await? {
             FrontendMessage::PasswordMessage(password_message) => {
                 if !self.authenticate(password_message).await? {
@@ -87,10 +101,16 @@ impl AsyncPostgresShim {
         buffer::write_message(&mut self.socket, message).await
     }
 
-    pub async fn process_startup_message(&mut self) -> Result<bool, Error> {
+    pub async fn process_startup_message(&mut self) -> Result<StartupState, Error> {
         let mut buffer = buffer::read_contents(&mut self.socket).await?;
 
         let startup_message = protocol::StartupMessage::from(&mut buffer).await?;
+
+        if startup_message.protocol_version.major == SSL_REQUEST_PROTOCOL {
+            self.write(protocol::SSLResponse::new()).await?;
+            return Ok(StartupState::SslRequested);
+        }
+
         if startup_message.protocol_version.major != 3
             || startup_message.protocol_version.minor != 0
         {
@@ -103,7 +123,7 @@ impl AsyncPostgresShim {
                 ),
             );
             buffer::write_message(&mut self.socket, error_response).await?;
-            return Ok(false);
+            return Ok(StartupState::Denied);
         }
 
         self.parameters = startup_message.parameters;
@@ -114,7 +134,7 @@ impl AsyncPostgresShim {
                 "no PostgreSQL user name specified in startup packet".to_string(),
             );
             buffer::write_message(&mut self.socket, error_response).await?;
-            return Ok(false);
+            return Ok(StartupState::Denied);
         }
         if !self.parameters.contains_key("database") {
             self.parameters.insert(
@@ -128,7 +148,7 @@ impl AsyncPostgresShim {
         ))
         .await?;
 
-        Ok(true)
+        return Ok(StartupState::Success);
     }
 
     pub async fn authenticate(
