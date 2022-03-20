@@ -126,6 +126,8 @@ impl CubeColumn {
 
 pub trait V1CubeMetaExt {
     fn get_columns(&self) -> Vec<CubeColumn>;
+
+    fn contains_member(&self, member_name: &str) -> bool;
 }
 
 impl V1CubeMetaExt for V1CubeMeta {
@@ -157,5 +159,15 @@ impl V1CubeMetaExt for V1CubeMeta {
         }
 
         columns
+    }
+
+    fn contains_member(&self, member_name: &str) -> bool {
+        self.measures
+            .iter()
+            .any(|m| m.name.eq_ignore_ascii_case(member_name))
+            || self
+                .dimensions
+                .iter()
+                .any(|m| m.name.eq_ignore_ascii_case(member_name))
     }
 }

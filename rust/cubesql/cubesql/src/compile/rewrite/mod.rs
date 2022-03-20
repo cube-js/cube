@@ -3,8 +3,11 @@ pub mod language;
 use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
 use crate::sql::auth_service::AuthContext;
+use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+};
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
 use datafusion::error::DataFusionError;
@@ -204,6 +207,15 @@ crate::plan_to_language! {
             member: String,
             asc: bool,
         },
+        FilterMember {
+            member: String,
+            op: String,
+            values: Vec<String>,
+        },
+        FilterOp {
+            filters: Vec<LogicalPlan>,
+            op: String,
+        },
         TimeDimension {
             name: String,
             granularity: Option<String>,
@@ -216,6 +228,10 @@ crate::plan_to_language! {
         MemberReplacer {
             members: Vec<LogicalPlan>,
             cube: Arc<LogicalPlan>,
+        },
+        FilterReplacer {
+            filters: Vec<LogicalPlan>,
+            cube: Option<String>,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
@@ -1054,7 +1070,12 @@ impl LogicalPlanToLanguageConverter {
                 "push-down-sort",
                 sort(
                     "?expr",
-                    cube_scan("?source_table_name", "?members", "?filters", "?orders"),
+                    cube_scan(
+                        "?source_table_name",
+                        "?members",
+                        "?filters",
+                        "CubeScanOrder",
+                    ),
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -1099,23 +1120,107 @@ impl LogicalPlanToLanguageConverter {
                 cube_scan_order_empty_tail(),
             ),
             transforming_rewrite(
+                "push-down-filter",
+                filter(
+                    "?expr",
+                    cube_scan("?source_table_name", "?members", "?filters", "?order"),
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    "?members",
+                    cube_scan_filters("?filters", filter_replacer("?expr", "?cube")),
+                    "?order",
+                ),
+                self.push_down_filter("?source_table_name", "?expr", "?cube"),
+            ),
+            transforming_rewrite(
+                "filter-replacer",
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
+                    "?cube",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter(
+                    "?column",
+                    "?op",
+                    "?literal",
+                    "?cube",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            rewrite(
+                "filter-replacer-and",
+                filter_replacer(binary_expr("?left", "AND", "?right"), "?cube"),
+                filter_op(
+                    filter_op_filters(
+                        filter_replacer("?left", "?cube"),
+                        filter_replacer("?right", "?cube"),
+                    ),
+                    "and",
+                ),
+            ),
+            rewrite(
+                "filter-replacer-or",
+                filter_replacer(binary_expr("?left", "OR", "?right"), "?cube"),
+                filter_op(
+                    filter_op_filters(
+                        filter_replacer("?left", "?cube"),
+                        filter_replacer("?right", "?cube"),
+                    ),
+                    "or",
+                ),
+            ),
+            rewrite(
+                "filter-flatten-upper-and-left",
+                cube_scan_filters(
+                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                    "?tail",
+                ),
+                cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
+            ),
+            rewrite(
+                "filter-flatten-upper-and-right",
+                cube_scan_filters(
+                    "?tail",
+                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                ),
+                cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
+            ),
+            rewrite(
+                "filter-flatten-upper-and-left-reduce",
+                cube_scan_filters(filter_op_filters("?left", "?right"), "?tail"),
+                cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
+            ),
+            rewrite(
+                "filter-flatten-upper-and-right",
+                cube_scan_filters("?tail", filter_op_filters("?left", "?right")),
+                cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
+            ),
+            filter_flatter_rewrite_left("or"),
+            filter_flatter_rewrite_right("or"),
+            filter_flatter_rewrite_left("and"),
+            filter_flatter_rewrite_right("and"),
+            // TODO changes filter ordering which fail tests
+            // rewrite(
+            //     "filter-commute",
+            //     cube_scan_filters("?left", "?right"),
+            //     cube_scan_filters("?right", "?left"),
+            // ),
+            transforming_rewrite(
                 "sort-expr-column-name",
                 sort_expr("?expr", "?asc", "?nulls_first"),
                 sort_expr("?alias", "?asc", "?nulls_first"),
                 self.transform_original_expr_alias("?expr", "?alias"),
             ),
-            rewrite!("date-to-date-trunc";
-                "(ScalarUDFExpr \
-                    ScalarUDFExprFun:date\
-                    (ScalarUDFExprArgs (ColumnExpr ?column) ScalarUDFExprArgs)
-                )" =>
-                "(ScalarFunctionExpr \
-                    DateTrunc \
-                    (ScalarFunctionExprArgs \
-                        (LiteralExpr LiteralExprValue:day) \
-                        (ScalarFunctionExprArgs (ColumnExpr ?column) ScalarFunctionExprArgs) \
-                    ) \
-                )"
+            rewrite(
+                "date-to-date-trunc",
+                udf_expr("date", vec![column_expr("?column")]),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("day"), column_expr("?column")],
+                ),
             ),
             rewrite(
                 "binary-expr-addition-assoc",
@@ -1563,6 +1668,116 @@ impl LogicalPlanToLanguageConverter {
         }
     }
 
+    fn push_down_filter(
+        &self,
+        table_name_var: &'static str,
+        exp_var: &'static str,
+        cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let table_name_var = table_name_var.parse().unwrap();
+        let exp_var = exp_var.parse().unwrap();
+        let cube_var = cube_var.parse().unwrap();
+        move |egraph, subst| {
+            for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
+                if let Some(referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
+                    println!("push_down_filter");
+                    // TODO check referenced_expr
+                    subst.insert(
+                        cube_var,
+                        egraph.add(LogicalPlanLanguage::FilterReplacerCube(FilterReplacerCube(
+                            Some(table_name.to_string()),
+                        ))),
+                    );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_filter(
+        &self,
+        column_var: &'static str,
+        op_var: &'static str,
+        literal_var: &'static str,
+        cube_var: &'static str,
+        filter_member_var: &'static str,
+        filter_op_var: &'static str,
+        filter_values_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = column_var.parse().unwrap();
+        let op_var = op_var.parse().unwrap();
+        let literal_var = literal_var.parse().unwrap();
+        let cube_var = cube_var.parse().unwrap();
+        let filter_member_var = filter_member_var.parse().unwrap();
+        let filter_op_var = filter_op_var.parse().unwrap();
+        let filter_values_var = filter_values_var.parse().unwrap();
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for cube in var_iter!(egraph[subst[cube_var]], FilterReplacerCube) {
+                for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                    let op = match op {
+                        Operator::Eq => "equals",
+                        Operator::NotEq => "notEquals",
+                        Operator::Lt => "lt",
+                        Operator::LtEq => "lte",
+                        Operator::Gt => "gt",
+                        Operator::GtEq => "gte",
+                        Operator::Like => "contains",
+                        Operator::NotLike => "notContains",
+                        _ => {
+                            continue;
+                        }
+                    };
+                    for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                        if let Some(cube) = cube
+                            .as_ref()
+                            .and_then(|cube| meta_context.find_cube_with_name(cube.to_string()))
+                        {
+                            let value = match literal {
+                                ScalarValue::Utf8(Some(value)) => value.to_string(),
+                                ScalarValue::Int64(Some(value)) => value.to_string(),
+                                ScalarValue::Boolean(Some(value)) => value.to_string(),
+                                ScalarValue::Float64(Some(value)) => value.to_string(),
+                                x => panic!("Unsupported filter scalar: {:?}", x),
+                            };
+
+                            for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                                let member_name = format!("{}.{}", cube.name, column.name);
+                                if cube.contains_member(&member_name) {
+                                    subst.insert(
+                                        filter_member_var,
+                                        egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                            FilterMemberMember(member_name.to_string()),
+                                        )),
+                                    );
+
+                                    subst.insert(
+                                        filter_op_var,
+                                        egraph.add(LogicalPlanLanguage::FilterMemberOp(
+                                            FilterMemberOp(op.to_string()),
+                                        )),
+                                    );
+
+                                    subst.insert(
+                                        filter_values_var,
+                                        egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                            FilterMemberValues(vec![value.to_string()]),
+                                        )),
+                                    );
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
     fn replace_projection_alias(
         &self,
         expr_var: &'static str,
@@ -1945,6 +2160,38 @@ where
     .unwrap()
 }
 
+fn filter_flatter_rewrite_left(
+    op: impl Display + Copy,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    rewrite(
+        &format!("filter-flatten-{}-left", op),
+        filter_op(
+            filter_op_filters(filter_op(filter_op_filters("?left", "?right"), op), "?tail"),
+            op,
+        ),
+        filter_op(
+            filter_op_filters(filter_op_filters("?left", "?right"), "?tail"),
+            op,
+        ),
+    )
+}
+
+fn filter_flatter_rewrite_right(
+    op: impl Display + Copy,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    rewrite(
+        &format!("filter-flatten-{}-right", op),
+        filter_op(
+            filter_op_filters("?tail", filter_op(filter_op_filters("?left", "?right"), op)),
+            op,
+        ),
+        filter_op(
+            filter_op_filters("?tail", filter_op_filters("?left", "?right")),
+            op,
+        ),
+    )
+}
+
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut current = list_type.to_string();
     for i in list.into_iter().rev() {
@@ -2058,6 +2305,10 @@ fn sort(expr: impl Display, input: impl Display) -> String {
     format!("(Sort {} {})", expr, input)
 }
 
+fn filter(expr: impl Display, input: impl Display) -> String {
+    format!("(Filter {} {})", expr, input)
+}
+
 fn column_alias_replacer(
     members: impl Display,
     aliases: impl Display,
@@ -2074,12 +2325,24 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
     format!("(OrderReplacer {} {} {})", members, aliases, cube)
 }
 
+fn filter_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(FilterReplacer {} {})", members, cube)
+}
+
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
     format!("(CubeScanMembers {} {})", left, right)
 }
 
 fn cube_scan_members_empty_tail() -> String {
     format!("CubeScanMembers")
+}
+
+fn cube_scan_filters(left: impl Display, right: impl Display) -> String {
+    format!("(CubeScanFilters {} {})", left, right)
+}
+
+fn cube_scan_filters_empty_tail() -> String {
+    format!("CubeScanFilters")
 }
 
 fn cube_scan_order(left: impl Display, right: impl Display) -> String {
@@ -2092,6 +2355,18 @@ fn cube_scan_order_empty_tail() -> String {
 
 fn order(member: impl Display, asc: impl Display) -> String {
     format!("(Order {} {})", member, asc)
+}
+
+fn filter_op(filters: impl Display, op: impl Display) -> String {
+    format!("(FilterOp {} FilterOpOp:{})", filters, op)
+}
+
+fn filter_op_filters(left: impl Display, right: impl Display) -> String {
+    format!("(FilterOpFilters {} {})", left, right)
+}
+
+fn filter_member(member: impl Display, op: impl Display, values: impl Display) -> String {
+    format!("(FilterMember {} {} {})", member, op, values)
 }
 
 fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
@@ -2298,6 +2573,23 @@ impl LogicalPlanAnalysis {
         let column_name = |id| egraph.index(id).data.column_name.clone();
         let mut vec = Vec::new();
         match enode {
+            LogicalPlanLanguage::BinaryExpr(params) => {
+                if column_name(params[0]).is_some() {
+                    let expr = original_expr(params[0])?;
+                    vec.push(expr);
+                } else {
+                    vec.extend(referenced_columns(params[0])?.into_iter());
+                }
+
+                if column_name(params[2]).is_some() {
+                    let expr = original_expr(params[2])?;
+                    vec.push(expr);
+                } else {
+                    vec.extend(referenced_columns(params[2])?.into_iter());
+                }
+                Some(vec)
+            }
+            LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
             LogicalPlanLanguage::SortExpr(params) => {
                 if column_name(params[0]).is_some() {
                     let expr = original_expr(params[0])?;
@@ -2421,7 +2713,11 @@ where
 pub struct BestCubePlan;
 
 impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
-    type Cost = (/* Cube nodes */ i64, /* AST size */ usize);
+    type Cost = (
+        /* Cube nodes */ i64,
+        /* Structure points */ i64,
+        /* AST size */ usize,
+    );
     fn cost<C>(&mut self, enode: &LogicalPlanLanguage, mut costs: C) -> Self::Cost
     where
         C: FnMut(Id) -> Self::Cost,
@@ -2433,13 +2729,23 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::TimeDimension(_) => -1,
             _ => 0,
         };
-        enode
-            .children()
-            .iter()
-            .fold((this_cube_nodes, 1), |(cube_nodes, nodes), id| {
-                let (child_cube_nodes, child_nodes) = costs(*id);
-                (cube_nodes + child_cube_nodes, nodes + child_nodes)
-            })
+
+        let this_cube_structure = match enode {
+            // TODO needed to get rid of FilterOpFilters on upper level
+            LogicalPlanLanguage::CubeScanFilters(_) => -1,
+            _ => 0,
+        };
+        enode.children().iter().fold(
+            (this_cube_nodes, this_cube_structure, 1),
+            |(cube_nodes, structure, nodes), id| {
+                let (child_cube_nodes, child_structure, child_nodes) = costs(*id);
+                (
+                    cube_nodes + child_cube_nodes,
+                    structure + child_structure,
+                    nodes + child_nodes,
+                )
+            },
+        )
     }
 }
 
@@ -3008,6 +3314,93 @@ impl LanguageToLogicalPlanConverter {
                                 x => panic!("Expected dimension but found {:?}", x),
                             }
                         }
+
+                        let filters =
+                            match_list_node!(node_by_id, cube_scan_params[2], CubeScanFilters);
+
+                        fn to_filter(
+                            filters: Vec<LogicalPlanLanguage>,
+                            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+                        ) -> Result<Vec<V1LoadRequestQueryFilterItem>, CubeError>
+                        {
+                            let mut result = Vec::new();
+                            for f in filters {
+                                match f {
+                                    LogicalPlanLanguage::FilterOp(params) => {
+                                        let filters = match_list_node!(
+                                            node_by_id,
+                                            params[0],
+                                            FilterOpFilters
+                                        );
+                                        let op =
+                                            match_data_node!(node_by_id, params[1], FilterOpOp);
+                                        let filters = to_filter(filters, node_by_id)?;
+                                        match op.as_str() {
+                                            "and" => {
+                                                result.push(V1LoadRequestQueryFilterItem {
+                                                    member: None,
+                                                    operator: None,
+                                                    values: None,
+                                                    or: None,
+                                                    and: Some(
+                                                        filters
+                                                            .into_iter()
+                                                            .map(|f| serde_json::json!(f))
+                                                            .collect(),
+                                                    ),
+                                                });
+                                            }
+                                            "or" => {
+                                                result.push(V1LoadRequestQueryFilterItem {
+                                                    member: None,
+                                                    operator: None,
+                                                    values: None,
+                                                    or: Some(
+                                                        filters
+                                                            .into_iter()
+                                                            .map(|f| serde_json::json!(f))
+                                                            .collect(),
+                                                    ),
+                                                    and: None,
+                                                });
+                                            }
+                                            x => panic!("Unsupported filter operator: {}", x),
+                                        }
+                                    }
+                                    LogicalPlanLanguage::FilterMember(params) => {
+                                        let member = match_data_node!(
+                                            node_by_id,
+                                            params[0],
+                                            FilterMemberMember
+                                        );
+                                        let op =
+                                            match_data_node!(node_by_id, params[1], FilterMemberOp);
+                                        let values = match_data_node!(
+                                            node_by_id,
+                                            params[2],
+                                            FilterMemberValues
+                                        );
+                                        result.push(V1LoadRequestQueryFilterItem {
+                                            member: Some(member),
+                                            operator: Some(op),
+                                            values: Some(values),
+                                            or: None,
+                                            and: None,
+                                        });
+                                    }
+                                    x => panic!("Expected filter but found {:?}", x),
+                                }
+                            }
+                            Ok(result)
+                        }
+
+                        let filters = to_filter(filters, node_by_id)?;
+
+                        query.filters = if filters.len() > 0 {
+                            Some(filters)
+                        } else {
+                            None
+                        };
 
                         for o in order {
                             let order_params = match_params!(o, Order);

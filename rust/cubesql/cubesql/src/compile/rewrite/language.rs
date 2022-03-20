@@ -1,12 +1,3 @@
-use crate::compile::engine::df::scan::CubeScanNode;
-use crate::compile::engine::provider::CubeContext;
-use crate::mysql::AuthContext;
-use crate::CubeError;
-use cubeclient::models::V1LoadRequestQuery;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::catalog::TableReference;
-use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::Column;
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
