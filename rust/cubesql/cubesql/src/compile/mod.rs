@@ -2895,27 +2895,6 @@ mod tests {
                 .unwrap()
             ),
         );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.order_date",
-                        DataType::Utf8,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.customer_gender",
-                        DataType::Utf8,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
