@@ -1596,6 +1596,14 @@ impl QueryPlanner {
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
+            (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
+            (ast::Statement::Commit { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
