@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/shared",
-  "version": "0.29.28",
+  "version": "0.29.33",
   "description": "Shared code for Cube.js backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -29,6 +29,7 @@
     "@types/jest": "^26.0.16",
     "@types/node": "^12",
     "@types/node-fetch": "^2.5.8",
+    "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",
     "jest": "^26.6.3",
     "typescript": "~4.1.5"
@@ -45,6 +46,7 @@
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.33",
     "node-fetch": "^2.6.1",
+    "shelljs": "^0.8.5",
     "throttle-debounce": "^3.0.1"
   },
   "publishConfig": {

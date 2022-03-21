@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/athena-driver",
   "description": "Cube.js Athena database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.28",
+  "version": "0.29.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -16,7 +16,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
-    "integration": "jest --verbose dist/test",
+    "integration": "npm run integration:athena",
+    "integration:athena": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -30,13 +31,13 @@
     "@aws-sdk/client-athena": "^3.22.0",
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
-    "@cubejs-backend/query-orchestrator": "^0.29.28",
-    "@cubejs-backend/shared": "^0.29.28",
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
+    "@cubejs-backend/shared": "^0.29.33",
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-backend/testing": "^0.29.28",
+    "@cubejs-backend/testing-shared": "^0.29.33",
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"
   },

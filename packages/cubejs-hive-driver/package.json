@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/hive-driver",
   "description": "Cube.js Hive database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.28",
+  "version": "0.29.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/HiveDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.29.28",
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
     "generic-pool": "^3.6.0",
     "jshs2": "^0.4.4",
     "sasl-plain": "^0.1.0",

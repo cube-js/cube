@@ -1,0 +1,13 @@
+---
+source: cubesql/e2e/tests/mysql.rs
+assertion_line: 129
+expression: self.print_query_result(&mut response).await
+
+---
++-------+------------+
+| count | status     |
++-------+------------+
+| 3354  | processing |
+| 3346  | completed  |
+| 3300  | shipped    |
++-------+------------+

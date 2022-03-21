@@ -1,5 +1,6 @@
 import spawn from 'cross-spawn';
 import { Readable } from 'stream';
+import shell from "shelljs";
 
 export function getRealType(value: any): string {
   if (value === null) {
@@ -34,6 +35,18 @@ export async function executeCommand(
       resolve();
     });
   });
+}
+
+// Executes `command` in `dir`, returns the error code. Preserves working directory.
+export function execInDir(dir: string, command: string): number {
+  const crtDir = process.cwd();
+  try {
+    process.chdir(dir);
+    const result = shell.exec(command);
+    return result.code;
+  } finally {
+    process.chdir(crtDir);
+  }
 }
 
 export function assertNonNullable<T>(name: string, x: T): asserts x is NonNullable<T> {

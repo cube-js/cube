@@ -6,17 +6,24 @@ services:
     image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
     environment:
       CUBEJS_DB_TYPE: bigquery
+
+      # from env
       CUBEJS_DB_BQ_PROJECT_ID: ${CUBEJS_DB_BQ_PROJECT_ID}
       CUBEJS_DB_BQ_CREDENTIALS: ${CUBEJS_DB_BQ_CREDENTIALS}
-      CUBEJS_DB_BQ_EXPORT_BUCKET: ${CUBEJS_DB_BQ_EXPORT_BUCKET}
+      CUBEJS_DB_EXPORT_BUCKET: ${CUBEJS_DB_EXPORT_BUCKET}
 
+      # from test
+      CUBEJS_SCHEDULED_REFRESH_DEFAULT: ${CUBEJS_SCHEDULED_REFRESH_DEFAULT}
+      CUBEJS_REFRESH_WORKER: ${CUBEJS_REFRESH_WORKER}
+      CUBEJS_EXTERNAL_DEFAULT: ${CUBEJS_EXTERNAL_DEFAULT}
+      CUBEJS_ROLLUP_ONLY: ${CUBEJS_ROLLUP_ONLY}
+
+      # defaults
       CUBEJS_DEV_MODE: "true"
       CUBEJS_API_SECRET: mysupersecret
-      CUBEJS_SCHEDULED_REFRESH_DEFAULT: "false"
-      CUBEJS_REFRESH_WORKER: "false"
     volumes:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
-      - ./postgresql/schema:/cube/conf/schema
+      - ./postgresql/schema/OrdersPA.js:/cube/conf/schema/OrdersPA.js
     ports:
       - "4000:4000"
     restart: always

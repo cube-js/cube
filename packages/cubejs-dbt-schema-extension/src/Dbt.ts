@@ -19,7 +19,10 @@ type MetricDefinition = {
 
 type NodeDefinition = {
   // eslint-disable-next-line camelcase
-  relation_name: string;
+  relation_name?: string;
+  database?: string;
+  schema?: string;
+  name?: string;
 };
 
 type DbtManifest = {
@@ -106,6 +109,26 @@ query LoadModels($jobId: Int!) {
 }
 `;
 
+// For reference:
+// - dbt Metrics types: https://docs.getdbt.com/docs/building-a-dbt-project/metrics, https://github.com/dbt-labs/dbt-core/issues/4071#issue-102758091
+// - Cube measure types: https://cube.dev/docs/schema/reference/types-and-formats#measures-types
+const dbtToCubeMetricTypeMap: Record<string, string> = {
+  count: 'count',
+  count_distinct: 'countDistinct',
+  sum: 'sum',
+  average: 'avg',
+  min: 'min',
+  max: 'max',
+};
+
+function mapMetricType(dbtMetricType: string): string {
+  if (!dbtToCubeMetricTypeMap[dbtMetricType]) {
+    throw new UserError(`Unsupported dbt metric type '${dbtMetricType}'`);
+  }
+
+  return dbtToCubeMetricTypeMap[dbtMetricType];
+}
+
 export class Dbt extends AbstractExtension {
   public async loadMetricCubesFromDbtProject(projectPath: string, options: DbtLoadOptions): Promise<{ [cubeName: string]: any }> {
     const dbtProjectPath = path.join(projectPath, 'dbt_project.yml');
@@ -162,7 +185,9 @@ export class Dbt extends AbstractExtension {
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       nodes: res.data.models.map(modelDef => ({
         [modelDef.uniqueId]: {
-          relation_name: `${modelDef.database}.${modelDef.schema}.${modelDef.name}`
+          database: modelDef.database,
+          schema: modelDef.schema,
+          name: modelDef.name,
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
     };
@@ -206,13 +231,13 @@ export class Dbt extends AbstractExtension {
         throw new UserError(`Model '${model}' is not found`);
       }
       const cubeDef = {
-        sql: () => `SELECT * FROM ${modelDef.relation_name}`,
+        sql: () => `SELECT * FROM ${modelDef.relation_name ? modelDef.relation_name : `${this.compiler.contextQuery().escapeColumnName(modelDef.database)}.${this.compiler.contextQuery().escapeColumnName(modelDef.schema)}.${this.compiler.contextQuery().escapeColumnName(modelDef.name)}`}`,
         fileName: manifestPath,
 
         measures: cubeDefs[model].metrics.map(metric => ({
           [camelize(metric.name, true)]: {
             sql: () => metric.sql,
-            type: metric.type,
+            type: mapMetricType(metric.type),
           },
         })).reduce((a, b) => ({ ...a, ...b }), {}),
 

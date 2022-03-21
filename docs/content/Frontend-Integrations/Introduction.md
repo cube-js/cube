@@ -5,11 +5,12 @@ permalink: /frontend-introduction
 category: Frontend Integrations
 ---
 
-Cube.js is an open-source analytical API platform, and it enables you to build internal business intelligence tools or add customer‑facing analytics to existing applications. Cube.js is visualization-agnostic, so you can build any user interface for your application.
+Cube.js is headless business intelligence for building data applications. Cube.js is visualization-agnostic, so you can build any user interface for your application.
 
-You can directly query Cube.js Backend using JSON [Query Format](https://cube.dev/docs/query-format) via [HTTP API](https://cube.dev/docs/rest-api) or [WebSockets](https://cube.dev/docs/real-time-data-fetch#web-sockets) and visualize analytical data with tools of your choice. However, it's much easier to use Cube.js JavaScript Client and bindings for popular frameworks such as React, Angular, and Vue.
+You can directly query Cube.js Backend using JSON [Query Format](https://cube.dev/docs/query-format) via [HTTP API](https://cube.dev/docs/rest-api) or [WebSockets](https://cube.dev/docs/real-time-data-fetch#web-sockets) and visualize analytical data with tools of your choice. However, it's much easier to use the Cube.js JavaScript client and bindings for popular frameworks such as React, Angular, and Vue.
 
-The client has methods to communicate with Cube.js API Gateway, retrieve, and process data. It is designed to work with existing charting libraries such as Chart.js, D3.js, and more.
+The client has methods to communicate with Cube.js API Gateway and retrieve and process data. It is designed to work with existing charting libraries including Chart.js, D3.js, and more.
+
 
 ## Cube.js JavaScript Client
 

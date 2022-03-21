@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 3866
+assertion_line: 4111
 expression: "execute_query(\"SELECT * FROM information_schema.collations\".to_string()).await?"
 
 ---

@@ -200,6 +200,14 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+    
+    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      await this.sql({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
@@ -818,6 +826,7 @@ class ApiGateway {
           queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
             .length,
           queriesWithData: results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
         },
         context
       );

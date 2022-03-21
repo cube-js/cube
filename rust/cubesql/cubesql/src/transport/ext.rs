@@ -1,12 +1,16 @@
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
-use msql_srv::ColumnType;
+use msql_srv::ColumnType as MySqlColumnType;
+
+use crate::sql::ColumnType;
 
 pub trait V1CubeMetaMeasureExt {
     fn get_real_name(&self) -> String;
 
     fn is_same_agg_type(&self, expect_agg_type: &String) -> bool;
 
-    fn get_mysql_type(&self) -> ColumnType;
+    fn get_mysql_type(&self) -> MySqlColumnType;
+
+    fn get_sql_type(&self) -> ColumnType;
 
     /// varchar(128)
     fn get_column_type(&self) -> String;
@@ -37,16 +41,32 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
         }
     }
 
-    fn get_mysql_type(&self) -> ColumnType {
+    fn get_mysql_type(&self) -> MySqlColumnType {
         let from_type = match &self._type.to_lowercase().as_str() {
-            &"number" => ColumnType::MYSQL_TYPE_DOUBLE,
-            &"boolean" => ColumnType::MYSQL_TYPE_TINY,
-            _ => ColumnType::MYSQL_TYPE_STRING,
+            &"number" => MySqlColumnType::MYSQL_TYPE_DOUBLE,
+            &"boolean" => MySqlColumnType::MYSQL_TYPE_TINY,
+            _ => MySqlColumnType::MYSQL_TYPE_STRING,
         };
 
         match &self.agg_type {
             Some(agg_type) => match agg_type.as_str() {
-                "count" => ColumnType::MYSQL_TYPE_LONGLONG,
+                "count" => MySqlColumnType::MYSQL_TYPE_LONGLONG,
+                _ => from_type,
+            },
+            _ => from_type,
+        }
+    }
+
+    fn get_sql_type(&self) -> ColumnType {
+        let from_type = match &self._type.to_lowercase().as_str() {
+            &"number" => ColumnType::Double,
+            &"boolean" => ColumnType::Int8,
+            _ => ColumnType::String,
+        };
+
+        match &self.agg_type {
+            Some(agg_type) => match agg_type.as_str() {
+                "count" => ColumnType::Int64,
                 _ => from_type,
             },
             _ => from_type,
@@ -144,7 +164,7 @@ impl CubeColumn {
         &self.column_type
     }
 
-    pub fn mysql_can_be_null(&self) -> bool {
+    pub fn sql_can_be_null(&self) -> bool {
         self.can_be_null
     }
 }

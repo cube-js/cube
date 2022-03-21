@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless",
   "description": "Cube.js Serverless",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.28",
+  "version": "0.29.34",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/server-core": "^0.29.28",
+    "@cubejs-backend/server-core": "^0.29.34",
     "cors": "^2.8.5",
     "serverless-express": "^2.0.11"
   },

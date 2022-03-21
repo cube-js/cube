@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.28",
+  "version": "0.29.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -29,10 +29,10 @@
     "integration:cubestore": "jest"
   },
   "dependencies": {
-    "@cubejs-backend/cubestore": "^0.29.28",
-    "@cubejs-backend/query-orchestrator": "^0.29.28",
-    "@cubejs-backend/schema-compiler": "^0.29.28",
-    "@cubejs-backend/shared": "^0.29.28",
+    "@cubejs-backend/cubestore": "^0.29.33",
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
+    "@cubejs-backend/schema-compiler": "^0.29.33",
+    "@cubejs-backend/shared": "^0.29.33",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "^1.12.0",
     "fs-extra": "^9.1.0",
@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-backend/testing": "^0.29.28",
+    "@cubejs-backend/testing-shared": "^0.29.33",
     "@types/flatbuffers": "^1.10.0",
     "@types/generic-pool": "^3.1.9",
     "@types/mysql": "^2.15.17",

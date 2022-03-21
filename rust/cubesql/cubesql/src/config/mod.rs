@@ -3,7 +3,9 @@ pub mod processing_loop;
 
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
-use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
+use crate::sql::{
+    MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+};
 use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
 use crate::transport::{HttpTransport, TransportService};
 use crate::CubeError;
@@ -49,8 +51,20 @@ impl CubeServices {
 
     pub async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
+
         if self.injector.has_service_typed::<MySqlServer>().await {
             let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
+            futures.push(tokio::spawn(async move {
+                if let Err(e) = mysql_server.processing_loop().await {
+                    error!("{}", e.to_string());
+                };
+
+                Ok(())
+            }));
+        }
+
+        if self.injector.has_service_typed::<PostgresServer>().await {
+            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
                 if let Err(e) = mysql_server.processing_loop().await {
                     error!("{}", e.to_string());
@@ -76,6 +90,15 @@ impl CubeServices {
                 .stop_processing()
                 .await?;
         }
+
+        if self.injector.has_service_typed::<PostgresServer>().await {
+            self.injector
+                .get_service_typed::<PostgresServer>()
+                .await
+                .stop_processing()
+                .await?;
+        }
+
         stop_track_event_loop().await;
         Ok(())
     }
@@ -91,6 +114,8 @@ pub struct Config {
 pub trait ConfigObj: DIService {
     fn bind_address(&self) -> &Option<String>;
 
+    fn postgres_bind_address(&self) -> &Option<String>;
+
     fn query_timeout(&self) -> u64;
 
     fn nonce(&self) -> &Option<Vec<u8>>;
@@ -99,6 +124,7 @@ pub trait ConfigObj: DIService {
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub bind_address: Option<String>,
+    pub postgres_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
 }
@@ -109,6 +135,10 @@ crate::di_service!(MockConfigObj, [ConfigObj]);
 impl ConfigObj for ConfigObjImpl {
     fn bind_address(&self) -> &Option<String> {
         &self.bind_address
+    }
+
+    fn postgres_bind_address(&self) -> &Option<String> {
+        &self.postgres_bind_address
     }
 
     fn nonce(&self) -> &Option<Vec<u8>> {
@@ -140,6 +170,9 @@ impl Config {
                             .map(|v| v.parse::<u16>().unwrap())
                             .unwrap_or(3306u16)),
                 )),
+                postgres_bind_address: env::var("CUBESQL_PG_PORT")
+                    .ok()
+                    .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
                 nonce: None,
                 query_timeout,
             }),
@@ -152,6 +185,7 @@ impl Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 bind_address: None,
+                postgres_bind_address: None,
                 nonce: None,
                 query_timeout,
             }),
@@ -187,20 +221,48 @@ impl Config {
             .register_typed::<dyn TransportService, _, _, _>(async move |_| Arc::new(HttpTransport))
             .await;
 
+        self.injector
+            .register_typed::<ServerManager, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    config.nonce().clone(),
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<SessionManager, _, _, _>(async move |i| {
+                Arc::new(SessionManager::new(i.get_service_typed().await))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+                Arc::new(SqlAuthDefaultImpl)
+            })
+            .await;
+
         if self.config_obj.bind_address().is_some() {
-            self.injector
-                .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
-                    Arc::new(SqlAuthDefaultImpl)
-                })
-                .await;
             self.injector
                 .register_typed::<MySqlServer, _, _, _>(async move |i| {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     MySqlServer::new(
                         config.bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
+                    )
+                })
+                .await;
+        }
+
+        if self.config_obj.postgres_bind_address().is_some() {
+            self.injector
+                .register_typed::<PostgresServer, _, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    PostgresServer::new(
+                        config.postgres_bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
-                        config.nonce().clone(),
                     )
                 })
                 .await;

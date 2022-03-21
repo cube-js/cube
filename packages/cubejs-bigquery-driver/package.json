@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.28",
+  "version": "0.29.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -16,7 +16,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
-    "integration": "jest --verbose dist/test",
+    "integration": "npm run integration:bigquery",
+    "integration:bigquery": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -28,14 +29,14 @@
   "types": "dist/src/index.d.ts",
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/query-orchestrator": "^0.29.28",
-    "@cubejs-backend/shared": "^0.29.28",
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
+    "@cubejs-backend/shared": "^0.29.33",
     "@google-cloud/bigquery": "^5.6.0",
     "@google-cloud/storage": "^5.7.2",
     "ramda": "^0.27.1"
   },
   "devDependencies": {
-    "@cubejs-backend/testing": "^0.29.28",
+    "@cubejs-backend/testing-shared": "^0.29.33",
     "@types/dedent": "^0.7.0",
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"

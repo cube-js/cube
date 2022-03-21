@@ -1,0 +1,55 @@
+{
+  "name": "@cubejs-backend/testing-shared",
+  "version": "0.29.33",
+  "description": "Cube.js Testing Helpers",
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "files": [
+    "dist/src/*"
+  ],
+  "dependencies": {
+    "@cubejs-backend/dotenv": "^9.0.2",
+    "@cubejs-backend/query-orchestrator": "^0.29.33",
+    "@cubejs-backend/schema-compiler": "^0.29.33",
+    "@cubejs-backend/shared": "^0.29.33",
+    "dedent": "^0.7.0",
+    "testcontainers": "^7.5.0"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.29.23",
+    "@jest/globals": "^26.6.2",
+    "@types/dedent": "^0.7.0",
+    "@types/jest": "^26.0.22",
+    "@types/node": "^10.17.55",
+    "jest": "^26.6.3",
+    "typescript": "~4.1.5"
+  },
+  "jest": {
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ],
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}
