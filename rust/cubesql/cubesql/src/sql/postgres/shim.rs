@@ -196,11 +196,17 @@ impl AsyncPostgresShim {
     }
 
     pub async fn ready(&mut self) -> Result<(), Error> {
-        self.write(protocol::ParameterStatus::new(
-            "server_version".to_string(),
-            "14.2 (Cube SQL)".to_string(),
-        ))
-        .await?;
+        let params = [
+            ("server_version".to_string(), "14.2 (Cube SQL)".to_string()),
+            ("server_encoding".to_string(), "UTF8".to_string()),
+            ("client_encoding".to_string(), "UTF8".to_string()),
+            ("DateStyle".to_string(), "ISO".to_string()),
+        ];
+
+        for (key, value) in params {
+            self.write(protocol::ParameterStatus::new(key, value))
+                .await?;
+        }
 
         self.write(protocol::ReadyForQuery::new(
             protocol::TransactionStatus::Idle,
