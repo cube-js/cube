@@ -372,7 +372,10 @@ impl CubeTable {
                     partition_projection_in_memory.push(column.get_index());
                 }
                 for index in p {
-                    if !partition_projection_in_memory.iter().any(|s| *s == index.clone()) {
+                    if !partition_projection_in_memory
+                        .iter()
+                        .any(|s| *s == index.clone())
+                    {
                         partition_projection_in_memory.push(index.clone());
                     }
                 }
@@ -383,13 +386,14 @@ impl CubeTable {
             }
         });
 
-        let partition_projected_in_memory_schema = if let Some(p) = partition_projection_in_memory.as_ref() {
-            Arc::new(Schema::new(
-                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
-            ))
-        } else {
-            self.schema.clone()
-        };
+        let partition_projected_in_memory_schema =
+            if let Some(p) = partition_projection_in_memory.as_ref() {
+                Arc::new(Schema::new(
+                    p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+                ))
+            } else {
+                self.schema.clone()
+            };
 
         let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {

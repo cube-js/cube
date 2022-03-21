@@ -469,6 +469,7 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
+                // TODO: Restart stream job after delete without 2 min timeouts
                 JobType::Repartition => match job.get_row().row_reference() {
                     RowKey::Table(TableId::Partitions, p) => {
                         let p = self.meta_store.get_partition(*p).await?;
