@@ -1,6 +1,18 @@
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock as RwLockSync},
+};
 
-use crate::{sql::SqlAuthService, transport::TransportService, CubeError};
+use crate::{
+    sql::{
+        database_variables::{mysql_default_global_variables, DatabaseVariable},
+        SqlAuthService,
+    },
+    transport::TransportService,
+    CubeError,
+};
+
+use super::session::DatabaseProtocol;
 
 #[derive(Debug)]
 pub struct ServerConfiguration {
@@ -14,6 +26,13 @@ impl Default for ServerConfiguration {
             connection_max_prepared_statements: 50,
         }
     }
+}
+
+lazy_static! {
+    static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
+        Arc::new(RwLockSync::new(HashMap::new()));
+    static ref MYSQL_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
+        Arc::new(RwLockSync::new(mysql_default_global_variables()));
 }
 
 #[derive(Debug)]
@@ -39,6 +58,19 @@ impl ServerManager {
             transport,
             nonce,
             configuration: ServerConfiguration::default(),
+        }
+    }
+
+    pub fn all_variables(&self, protocol: DatabaseProtocol) -> HashMap<String, DatabaseVariable> {
+        match protocol {
+            DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES
+                .read()
+                .expect("failed to unlock properties")
+                .clone(),
+            DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES
+                .read()
+                .expect("failed to unlock properties")
+                .clone(),
         }
     }
 }

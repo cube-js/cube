@@ -9,7 +9,7 @@ use tokio::{
 
 use crate::{
     config::processing_loop::ProcessingLoop,
-    sql::{DatabaseProtocol, SessionManager},
+    sql::{session::DatabaseProtocol, SessionManager},
     CubeError,
 };
 

@@ -1,11 +1,20 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4067
-expression: "execute_query(\"show variables like '%_mode';\".to_string()).await?"
-
+expression: "execute_query(\"show variables like '%_mode';\".to_string(),\n              DatabaseProtocol::MySQL).await?"
 ---
-+---------------+-----------------------------------------------------------------------------------------------------------------------+
-| Variable_name | Value                                                                                                                 |
-+---------------+-----------------------------------------------------------------------------------------------------------------------+
-| sql_mode      | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |
-+---------------+-----------------------------------------------------------------------------------------------------------------------+
++--------------------------+-----------------------------------------------------------------------------------------------------------------------+
+| Variable_name            | Value                                                                                                                 |
++--------------------------+-----------------------------------------------------------------------------------------------------------------------+
+| ssl_fips_mode            | OFF                                                                                                                   |
+| sql_mode                 | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |
+| slave_exec_mode          | STRICT                                                                                                                |
+| replica_exec_mode        | STRICT                                                                                                                |
+| rbr_exec_mode            | STRICT                                                                                                                |
+| pseudo_slave_mode        | OFF                                                                                                                   |
+| pseudo_replica_mode      | OFF                                                                                                                   |
+| offline_mode             | OFF                                                                                                                   |
+| innodb_strict_mode       | ON                                                                                                                    |
+| innodb_autoinc_lock_mode | 2                                                                                                                     |
+| gtid_mode                | OFF                                                                                                                   |
+| block_encryption_mode    | aes-128-ecb                                                                                                           |
++--------------------------+-----------------------------------------------------------------------------------------------------------------------+

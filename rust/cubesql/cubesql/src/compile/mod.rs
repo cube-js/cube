@@ -18,9 +18,9 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
+use crate::sql::session::DatabaseProtocol;
 use crate::sql::{
-    dataframe, types::StatusFlags, ColumnFlags, ColumnType, DatabaseProtocol, Session,
-    SessionManager, SessionState,
+    dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
 };
 
 pub use crate::transport::ctx::*;
@@ -33,7 +33,7 @@ use crate::{
 
 use self::builder::*;
 use self::context::*;
-use self::engine::context::SystemVar;
+use self::engine::context::VariablesProvider;
 use self::engine::df::planner::CubeQueryPlanner;
 use self::engine::df::scan::CubeScanNode;
 use self::engine::provider::CubeContext;
@@ -1989,8 +1989,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 .with_information_schema(false),
         );
 
-        let variable_provider = SystemVar::new();
-        ctx.register_variable(VarType::System, Arc::new(variable_provider));
+        if self.state.protocol == DatabaseProtocol::MySQL {
+            let variable_provider =
+                VariablesProvider::new(self.state.all_variables(), VarType::System);
+            ctx.register_variable(VarType::System, Arc::new(variable_provider));
+        }
 
         ctx.register_udf(create_version_udf());
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
@@ -2192,7 +2195,7 @@ mod tests {
     use crate::{
         sql::{
             dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
-            AuthContext, AuthenticateResponse, DatabaseProtocol, ServerManager, SqlAuthService,
+            AuthContext, AuthenticateResponse, ServerManager, SqlAuthService,
         },
         transport::TransportService,
     };

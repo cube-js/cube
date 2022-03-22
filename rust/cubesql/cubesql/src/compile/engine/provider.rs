@@ -9,7 +9,7 @@ use datafusion::{
 
 use crate::{
     compile::MetaContext,
-    sql::{DatabaseProtocol, SessionManager, SessionState},
+    sql::{session::DatabaseProtocol, SessionManager, SessionState},
 };
 
 use super::information_schema::mysql::{
@@ -142,11 +142,18 @@ impl DatabaseProtocol {
         }
 
         if tp.eq_ignore_ascii_case("performance_schema.global_variables") {
-            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new()));
+            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
+                context
+                    .sessions
+                    .server
+                    .all_variables(context.session_state.protocol.clone()),
+            )));
         }
 
         if tp.eq_ignore_ascii_case("performance_schema.session_variables") {
-            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new()));
+            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
+                context.session_state.all_variables(),
+            )));
         }
 
         None
