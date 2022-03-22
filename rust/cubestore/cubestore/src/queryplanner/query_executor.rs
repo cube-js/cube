@@ -35,7 +35,7 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
     collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
@@ -53,6 +53,7 @@ use std::mem::take;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
+use crate::table::parquet::CubestoreParquetMetadataCache;
 
 #[automock]
 #[async_trait]
@@ -75,6 +76,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
+
     async fn worker_plan(
         &self,
         plan: SerializedPlan,
@@ -85,7 +87,9 @@ pub trait QueryExecutor: DIService + Send + Sync {
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
-pub struct QueryExecutorImpl;
+pub struct QueryExecutorImpl {
+    parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
+}
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
@@ -212,7 +216,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new())?;
+        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new(), NoopParquetMetadataCache::new())?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -227,7 +231,7 @@ impl QueryExecutor for QueryExecutorImpl {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches)?;
+        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches, self.parquet_metadata_cache.cache().clone())?;
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -239,6 +243,10 @@ impl QueryExecutor for QueryExecutorImpl {
 }
 
 impl QueryExecutorImpl {
+    pub fn new(parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>) -> Arc<Self> {
+        Arc::new(QueryExecutorImpl { parquet_metadata_cache })
+    }
+
     fn router_context(
         &self,
         cluster: Arc<dyn Cluster>,
@@ -276,6 +284,8 @@ pub struct CubeTable {
     #[serde(skip, default)]
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     schema: SchemaRef,
+    #[serde(skip, default = "NoopParquetMetadataCache::new")]
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
 impl Debug for CubeTable {
@@ -293,6 +303,7 @@ impl CubeTable {
         index_snapshot: IndexSnapshot,
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             // Tables are always exposed only using table columns order instead of index one because
@@ -313,6 +324,7 @@ impl CubeTable {
             remote_to_local_names,
             worker_partition_ids,
             chunk_id_to_record_batches: HashMap::new(),
+            parquet_metadata_cache,
         })
     }
 
@@ -322,12 +334,14 @@ impl CubeTable {
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     ) -> CubeTable {
         debug_assert!(worker_partition_ids.iter().is_sorted_by_key(|(id, _)| id));
         let mut t = self.clone();
         t.remote_to_local_names = remote_to_local_names;
         t.worker_partition_ids = worker_partition_ids;
         t.chunk_id_to_record_batches = chunk_id_to_record_batches;
+        t.parquet_metadata_cache = parquet_metadata_cache;
         t
     }
 
@@ -457,6 +471,7 @@ impl CubeTable {
                     batch_size,
                     1,
                     None, // TODO: propagate limit
+                    self.parquet_metadata_cache.clone(),
                 )?);
                 let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
                 partition_execs.push(arc);
@@ -499,6 +514,7 @@ impl CubeTable {
                         batch_size,
                         1,
                         None, // TODO: propagate limit
+                        self.parquet_metadata_cache.clone(),
                     )?)
                 };
 

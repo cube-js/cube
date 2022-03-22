@@ -50,6 +50,7 @@ use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Seri
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::iter::FromIterator;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 
 #[cfg(test)]
 pub async fn choose_index(
@@ -397,6 +398,7 @@ impl ChooseIndex<'_> {
                     // Filled by workers
                     HashMap::new(),
                     Vec::new(),
+                    NoopParquetMetadataCache::new(),
                 )?);
 
                 let index_schema = source.schema();

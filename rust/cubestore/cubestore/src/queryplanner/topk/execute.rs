@@ -783,6 +783,7 @@ mod tests {
 
     use std::iter::FromIterator;
     use std::sync::Arc;
+    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 
     #[tokio::test]
     async fn topk_simple() {
@@ -1140,6 +1141,7 @@ mod tests {
             aggregate_functions: Default::default(),
             config: ExecutionConfig::new(),
             execution_props: ExecutionProps::new(),
+            parquet_metadata_cache: NoopParquetMetadataCache::new(),
         };
         let agg_exprs = aggs
             .iter()

@@ -25,7 +25,6 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
-use crate::table::parquet::{ParquetMetadataCache, ParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
@@ -43,9 +42,11 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
+use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, LruParquetMetadataCache};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
+use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -664,7 +665,7 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
-                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 10_000),
+                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 0),
             }),
         }
     }
@@ -713,7 +714,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
-                max_cached_metadata: 10_000,
+                max_cached_metadata: 0,
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
@@ -984,7 +985,6 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    i.get_service_typed().await,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -993,19 +993,20 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn ParquetMetadataCache, _, _, _>(async move |i| {
-                ParquetMetadataCacheImpl::new(
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .max_cached_metadata(),
-                )
+            .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
+                CubestoreParquetMetadataCacheImpl::new(
+                    match i.get_service_typed::<dyn ConfigObj>()
+                    .await
+                    .max_cached_metadata() {
+                        0 => NoopParquetMetadataCache::new(),
+                        max_cached_metadata => LruParquetMetadataCache::new(max_cached_metadata),
+                })
             })
             .await;
 
         self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
                 CompactionServiceImpl::new(
-                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -1054,8 +1055,8 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn QueryExecutor, _, _, _>(async move |_| {
-                Arc::new(QueryExecutorImpl)
+            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                QueryExecutorImpl::new(i.get_service_typed().await)
             })
             .await;
 
@@ -1177,7 +1178,7 @@ impl Config {
     pub fn configure_worker_services() {
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
-            query_executor: Arc::new(QueryExecutorImpl),
+            query_executor: QueryExecutorImpl::new(CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new())),
         })
     }
 

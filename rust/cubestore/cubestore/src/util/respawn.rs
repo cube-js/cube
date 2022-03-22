@@ -43,6 +43,8 @@ pub fn respawn<Args: Serialize + DeserializeOwned>(
     cmd.env(PARENT_PID_ENV, std::process::id().to_string());
     cmd.env(IPC_ENV, ipc_name);
 
+    // println!("QQQ Spawning {:?} {:?} {:?}", handler, ipc_name, cmd);
+
     let c = cmd.spawn()?;
     let (_, tx) = server.accept()?;
     tx.send(args)?;
