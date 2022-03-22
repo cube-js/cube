@@ -567,6 +567,91 @@ describe('SQL Generation', () => {
       ]
     ]);
   });
+
+  describe('FILTER_PARAMS', () => {
+    /** @type {Compilers} */
+    const compilers = prepareCompiler(`cube('Order', {
+        sql: \`select * from order where \${FILTER_PARAMS.Order.type.filter('type')}\`,
+        measures: {
+          count: {
+            sql: 'id',
+            type: 'count',
+          },
+        },
+        dimensions: {
+          type: {
+            sql: 'type',
+            type: 'string',
+          },
+        },
+      })`);
+
+    it('inserts filter params into query', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            member: 'Order.type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/where type = \$\d\$\)/);
+    });
+
+    it('inserts "or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: ['online'],
+              },
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: ['in-store'],
+              },
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)/);
+    });
+
+    it('inserts "and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: ['online'],
+              },
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: ['in-store'],
+              },
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)/);
+    });
+  });
 });
 
 describe('Class unit tests', () => {
