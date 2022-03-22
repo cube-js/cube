@@ -52,9 +52,9 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut names = StringBuilder::new(100);
         let mut values = StringBuilder::new(100);
 
-        for (key, value) in self.variables.iter() {
+        for (key, variable) in self.variables.iter() {
             names.append_value(key.clone()).unwrap();
-            values.append_value(value.value.clone()).unwrap();
+            values.append_value(variable.value.clone()).unwrap();
         }
 
         let mut data: Vec<Arc<dyn Array>> = vec![];
