@@ -1,22 +1,3 @@
-use datafusion::logical_plan::{
-    build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
-    JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
-};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::functions::BuiltinScalarFunction;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::window_functions::WindowFunction;
-use datafusion::scalar::ScalarValue;
-use datafusion::sql::parser::FileType;
-use datafusion::sql::planner::ContextProvider;
-use egg::{rewrite, Applier, CostFunction, Language, Pattern, PatternAst, Subst, Symbol, Var};
-use egg::{EGraph, Extractor, Id, RecExpr, Rewrite, Runner};
-use itertools::Itertools;
-use std::ops::Index;
-use std::str::FromStr;
-use std::sync::Arc;
-
 #[macro_export]
 macro_rules! plan_to_language {
     ($(#[$meta:meta])* $vis:vis enum $name:ident $variants:tt) => {

@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder, UInt32Builder},
