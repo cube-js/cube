@@ -28,9 +28,10 @@ impl SessionProperties {
 }
 
 lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> = Arc::new(RwLockSync::new(HashMap::new()));
+    static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
+        Arc::new(RwLockSync::new(HashMap::new()));
     static ref MYSQL_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
-    Arc::new(RwLockSync::new(mysql_default_session_variables()));
+        Arc::new(RwLockSync::new(mysql_default_session_variables()));
 }
 
 #[derive(Debug)]

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc, RwLock};
 
 use datafusion::error::Result;
 use datafusion::variable::VarType;
@@ -14,8 +14,14 @@ pub struct VariablesProvider {
 }
 
 impl VariablesProvider {
-    pub fn new(variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>, var_type: VarType) -> Self {
-        Self { variables, var_type }
+    pub fn new(
+        variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
+        var_type: VarType,
+    ) -> Self {
+        Self {
+            variables,
+            var_type,
+        }
     }
 }
 
@@ -34,12 +40,17 @@ impl VarProvider for VariablesProvider {
             identifier.concat()[2..].to_string()
         };
 
-        if let Some(var) = self.variables.read().expect("failed to unlock properties").get(&key) {
+        if let Some(var) = self
+            .variables
+            .read()
+            .expect("failed to unlock properties")
+            .get(&key)
+        {
             if var.var_type == self.var_type {
                 return Ok(var.value.clone());
             }
         }
-        
+
         warn!("Unknown system variable: {}", key);
 
         Ok(ScalarValue::Utf8(None))

@@ -1,4 +1,8 @@
-use std::{any::Any, collections::HashMap, sync::{Arc, RwLock}};
+use std::{
+    any::Any,
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use async_trait::async_trait;
 use datafusion::{
@@ -52,7 +56,12 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut names = StringBuilder::new(100);
         let mut values = StringBuilder::new(100);
 
-        for (key, variable) in self.variables.read().expect("failed to unlock properties").iter() {
+        for (key, variable) in self
+            .variables
+            .read()
+            .expect("failed to unlock properties")
+            .iter()
+        {
             names.append_value(key.clone()).unwrap();
             values.append_value(variable.value.to_string()).unwrap();
         }
