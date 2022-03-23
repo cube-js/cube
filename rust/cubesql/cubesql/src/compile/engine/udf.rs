@@ -642,7 +642,7 @@ pub fn create_date_udf() -> ScalarUDF {
                             NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
                                 .map_err(|e| DataFusionError::Execution(e.to_string()))?
                                 .timestamp_nanos(),
-                        );
+                        )?;
                     }
                     Ok(ColumnarValue::Array(Arc::new(builder.finish())))
                 } else {

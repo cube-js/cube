@@ -1236,12 +1236,60 @@ impl LogicalPlanToLanguageConverter {
             ),
             transforming_rewrite(
                 "in-date-range-to-time-dimension",
+                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters_empty_tail(),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                self.filter_to_time_dimension_range(
+                    "?member",
+                    "?date_range",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-pull-up-left",
+                cube_scan_filters(
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                    "?right",
+                ),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters("?filters", "?right"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-pull-up-right",
+                cube_scan_filters(
+                    "?left",
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                ),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters("?left", "?filters"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-swap-to-members",
                 cube_scan(
                     "?source_table_name",
                     "?members",
-                    cube_scan_filters(
-                        "?tail",
-                        filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
                     ),
                     "?order",
                 ),
@@ -1252,14 +1300,8 @@ impl LogicalPlanToLanguageConverter {
                         "?time_dimension_member",
                         "?time_dimension_date_range",
                     ),
-                    "?tail",
+                    "?filters",
                     "?order",
-                ),
-                self.filter_to_time_dimension_range(
-                    "?member",
-                    "?date_range",
-                    "?time_dimension_member",
-                    "?time_dimension_date_range",
                 ),
             ),
             transforming_rewrite(
@@ -1295,6 +1337,27 @@ impl LogicalPlanToLanguageConverter {
                     ),
                 ),
                 self.push_down_time_dimension_replacer("?right", "?time_dimension_member"),
+            ),
+            transforming_rewrite(
+                "time-dimension-date-range-replacer-push-down-new-time-dimension",
+                time_dimension_date_range_replacer(
+                    "?members",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    time_dimension_expr("?member", "?granularity", "?date_range", "?expr"),
+                    "?members",
+                ),
+                self.push_down_time_dimension_replacer_new_time_dimension(
+                    "?members",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                    "?member",
+                    "?granularity",
+                    "?date_range",
+                    "?expr",
+                ),
             ),
             rewrite(
                 "time-dimension-date-range-replacer-skip-measure",
@@ -2005,6 +2068,80 @@ impl LogicalPlanToLanguageConverter {
                     );
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn push_down_time_dimension_replacer_new_time_dimension(
+        &self,
+        members_var: &'static str,
+        time_dimension_member_var: &'static str,
+        time_dimension_date_range_var: &'static str,
+        member_var: &'static str,
+        granularity_var: &'static str,
+        date_range_var: &'static str,
+        expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let time_dimension_member_var = var!(time_dimension_member_var);
+        let time_dimension_date_range_var = var!(time_dimension_date_range_var);
+        let member_var = var!(member_var);
+        let granularity_var = var!(granularity_var);
+        let date_range_var = var!(date_range_var);
+        let expr_var = var!(expr_var);
+        move |egraph, subst| {
+            for member in var_iter!(
+                egraph[subst[time_dimension_member_var]],
+                TimeDimensionDateRangeReplacerMember
+            ) {
+                let member = member.to_string();
+                if let Some(member_name_to_expr) =
+                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                {
+                    if member_name_to_expr.iter().all(|(m, _)| m != &member) {
+                        let date_range = var_iter!(
+                            egraph[subst[time_dimension_date_range_var]],
+                            TimeDimensionDateRangeReplacerDateRange
+                        )
+                        .next()
+                        .unwrap()
+                        .clone();
+
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionName(TimeDimensionName(
+                                member.to_string(),
+                            ))),
+                        );
+
+                        subst.insert(
+                            granularity_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionGranularity(
+                                TimeDimensionGranularity(None),
+                            )),
+                        );
+
+                        subst.insert(
+                            date_range_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
+                                TimeDimensionDateRange(Some(date_range)),
+                            )),
+                        );
+
+                        let column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                            ColumnExprColumn(Column::from_name(member.to_string())),
+                        ));
+
+                        subst.insert(
+                            expr_var,
+                            egraph.add(LogicalPlanLanguage::ColumnExpr([column])),
+                        );
+
+                        return true;
+                    }
                 }
             }
 
