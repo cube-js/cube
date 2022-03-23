@@ -723,28 +723,25 @@ class ApiGateway {
    */
   private async getSqlQueriesInternal(
     context: RequestContext,
-    normalizedQueries: (NormalizedQuery | null)[],
+    normalizedQueries: (NormalizedQuery)[],
   ): Promise<Array<any>> {
     const sqlQueries = await Promise.all(
       normalizedQueries.map(
         async (normalizedQuery, index) => {
-          if (normalizedQuery) {
-            const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(
+          const loadRequestSQLStarted = new Date();
+          const sqlQuery = await this.getCompilerApi(context)
+            .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
-    
-            this.log({
-              type: 'Load Request SQL',
-              duration: this.duration(loadRequestSQLStarted),
-              query: normalizedQueries[index],
-              sqlQuery
-            }, context);
-    
-            return sqlQuery;
-          } else {
-            return null;
-          }
+  
+          this.log({
+            type: 'Load Request SQL',
+            duration: this.duration(loadRequestSQLStarted),
+            query: normalizedQueries[index],
+            sqlQuery
+          }, context);
+  
+          return sqlQuery;
         }
       )
     );
@@ -759,8 +756,6 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-    totalMap: Map<NormalizedQuery, NormalizedQuery | null>,
-    totalQuery: any,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -772,8 +767,14 @@ class ApiGateway {
       context
     }];
     if (normalizedQuery.total) {
-      const normalizedTotal =
-        totalMap.get(normalizedQuery) as NormalizedQuery;
+      const normalizedTotal = structuredClone(normalizedQuery);
+      normalizedTotal.totalQuery = true;
+      normalizedTotal.limit = null;
+      normalizedTotal.rowLimit = null;
+      const [totalQuery] = await this.getSqlQueriesInternal(
+        context,
+        [normalizedTotal],
+      );
       queries.push({
         ...totalQuery,
         query: totalQuery.sql[0],
@@ -839,12 +840,17 @@ class ApiGateway {
         responseType,
       ),
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
-      ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
-        refreshKeyValues: response.refreshKeyValues,
-        usedPreAggregations: response.usedPreAggregations,
-        transformedQuery: sqlQuery.canUseTransformedQuery,
-        requestId: context.requestId,
-      } : null),
+      ...(
+        getEnv('devMode') ||
+        context.signedWithPlaygroundAuthSecret
+          ? {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
+          }
+          : null
+      ),
       annotation,
       dataSource: response.dataSource,
       dbType: response.dbType,
@@ -885,21 +891,6 @@ class ApiGateway {
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
-
-      const totalMap: Map<NormalizedQuery, NormalizedQuery | null> =
-        new Map();
-
-      normalizedQueries.forEach(nq => {
-        if (nq.total) {
-          const tq = structuredClone(nq);
-          tq.totalQuery = true;
-          tq.limit = null;
-          tq.rowLimit = null;
-          totalMap.set(nq, tq);
-        } else {
-          totalMap.set(nq, null);
-        }
-      });
       
       const metaConfigResult = await this
         .getCompilerApi(context).metaConfig({
@@ -908,12 +899,6 @@ class ApiGateway {
 
       const sqlQueries = await this
         .getSqlQueriesInternal(context, normalizedQueries);
-
-      const totalQueries = await this
-        .getSqlQueriesInternal(
-          context,
-          Array.from(totalMap.values()),
-        );
 
       let slowQuery = false;
 
@@ -930,8 +915,6 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
-            totalMap,
-            totalQueries[index],
           );
           
           return this.getResultInternal(
@@ -952,17 +935,32 @@ class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
-          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
-          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
-            .length,
-          queriesWithData: results.filter((r: any) => r.data?.length).length,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queriesWithPreAggregations:
+            results.filter(
+              (r: any) => Object.keys(
+                r.usedPreAggregations || {}
+              ).length
+            ).length,
+          queriesWithData:
+            results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.dbType),
         },
-        context
+        context,
       );
 
-      if (queryType !== QueryTypeEnum.REGULAR_QUERY && props.queryType == null) {
-        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${
+            queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
       }
 
       if (props.queryType === 'multi') {
