@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::panic;
+use std::backtrace::Backtrace;
 use std::process::Child;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,9 +21,11 @@ use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
 use crate::util::catch_unwind::async_try_with_catch_unwind;
-use crate::util::respawn::respawn;
+use crate::util::respawn::{IPC_ENV, respawn};
 use crate::CubeError;
 use datafusion::cube_ext;
+
+use pretty_trace::*;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -271,6 +274,8 @@ where
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R>,
 {
+    println!("QQQ {:?} {:?} {:?}", std::process::id(), std::env::var(IPC_ENV), PrettyTrace::new());
+
     let (rx, tx) = (a.args, a.results);
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();

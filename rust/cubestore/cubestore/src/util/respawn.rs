@@ -72,6 +72,8 @@ pub fn init() {
         Ok(h) => h,
         Err(_) => return, // we're the main process.
     };
+    println!("III {}", std::process::id());
+
     let handlers = HANDLERS.read().unwrap();
     let handler = match handlers.get(handler_name.as_str()) {
         Some(f) => f,
@@ -90,9 +92,9 @@ pub fn init() {
     exit(handler(ipc_server))
 }
 
-const HANDLER_ENV: &'static str = "__CUBESTORE_RESPAWN_PROC";
-const PARENT_PID_ENV: &'static str = "__CUBESTORE_RESPAWN_PPID";
-const IPC_ENV: &'static str = "__CUBESTORE_IPC_NAME";
+pub const HANDLER_ENV: &'static str = "__CUBESTORE_RESPAWN_PROC";
+pub const PARENT_PID_ENV: &'static str = "__CUBESTORE_RESPAWN_PPID";
+pub const IPC_ENV: &'static str = "__CUBESTORE_IPC_NAME";
 
 static USE_TEST_CMD_ARGS: AtomicBool = AtomicBool::new(false);
 pub fn replace_cmd_args_in_tests() {

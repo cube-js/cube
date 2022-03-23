@@ -1176,6 +1176,7 @@ impl Config {
     }
 
     pub fn configure_worker_services() {
+        println!("WWW {}", std::process::id());
         let mut services = WORKER_SERVICES.write().unwrap();
         *services = Some(WorkerServices {
             query_executor: QueryExecutorImpl::new(CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new())),
@@ -1183,6 +1184,7 @@ impl Config {
     }
 
     pub fn current_worker_services() -> WorkerServices {
+        println!("RRR {}", std::process::id());
         WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
 }
