@@ -4,7 +4,11 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
-import { getEnv, getRealType } from '@cubejs-backend/shared';
+import {
+  getEnv,
+  getRealType,
+  QueryAlias,
+} from '@cubejs-backend/shared';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -718,7 +722,8 @@ class ApiGateway {
   }
 
   /**
-   * Returns an array of sqlQuery objects.
+   * Returns an array of sqlQuery objects for specified normalized
+   * queries.
    * @internal
    */
   private async getSqlQueriesInternal(
@@ -749,7 +754,7 @@ class ApiGateway {
   }
 
   /**
-   * Execute query and return adapter result.
+   * Execute query and return adapter's result.
    * @internal
    */
   private async getSqlResponseInternal(
@@ -794,13 +799,14 @@ class ApiGateway {
       })
     );
     response.total = normalizedQuery.total
-      ? total.data[0].total_count
+      ? total.data[0][QueryAlias.TOTAL_COUNT]
       : undefined;
     return response;
   }
 
   /**
-   * Prepare result object.
+   * Convert adapter's result and other request paramters to a final
+   * result object.
    * @internal
    */
   private getResultInternal(
