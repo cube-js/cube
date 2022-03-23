@@ -8,7 +8,7 @@ The first thing we need to have in place is a database. We’ll use Postgres for
 If you don’t have any data for the dashboard, you can load our sample e-commerce Postgres dataset.
 
 ```bash
-$ curl http://cube.dev/downloads/ecom-dump-d3-example.sql > ecom-dump.sql
+$ curl https://cube.dev/downloads/ecom-dump-d3-example.sql > ecom-dump.sql
 $ createdb ecom
 $ psql --dbname ecom -f ecom-dump.sql
 ```
