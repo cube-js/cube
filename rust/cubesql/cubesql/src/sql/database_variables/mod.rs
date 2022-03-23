@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use datafusion::{scalar::ScalarValue, variable::VarType};
 
-use super::session::DatabaseProtocol;
-
 pub mod mysql;
+
+pub type DatabaseVariables = HashMap<String, DatabaseVariable>;
 
 #[derive(Debug, Clone)]
 pub struct DatabaseVariable {
@@ -12,34 +12,30 @@ pub struct DatabaseVariable {
     pub value: ScalarValue,
     pub var_type: VarType,
     pub readonly: bool,
-    pub db_params: HashMap<String, ScalarValue>,
+    // Postgres schema includes a range of additional parameters
+    pub additional_params: Option<HashMap<String, ScalarValue>>,
 }
 
 impl DatabaseVariable {
-    pub fn new(params: HashMap<String, ScalarValue>, protocol: DatabaseProtocol) -> Self {
-        match protocol {
-            DatabaseProtocol::PostgreSQL => Self {
-                name: "".to_string(),
-                value: ScalarValue::Utf8(Some("".to_string())),
-                var_type: VarType::System,
-                readonly: false,
-                db_params: params,
-            },
-            DatabaseProtocol::MySQL => Self {
-                name: params["VARIABLE_NAME"].to_string(),
-                value: params["VARIABLE_VALUE"].clone(),
-                var_type: VarType::System,
-                readonly: true,
-                db_params: params,
-            },
+    pub fn new(
+        name: String,
+        value: ScalarValue,
+        additional_params: Option<HashMap<String, ScalarValue>>,
+    ) -> Self {
+        Self {
+            name: name,
+            value: value,
+            var_type: VarType::System,
+            readonly: true,
+            additional_params,
         }
     }
 }
 
-pub fn mysql_default_session_variables() -> HashMap<String, DatabaseVariable> {
+pub fn mysql_default_session_variables() -> DatabaseVariables {
     mysql::session_vars::defaults()
 }
 
-pub fn mysql_default_global_variables() -> HashMap<String, DatabaseVariable> {
+pub fn mysql_default_global_variables() -> DatabaseVariables {
     mysql::global_vars::defaults()
 }

@@ -1,18 +1,12 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    sql::{
-        database_variables::{mysql_default_global_variables, DatabaseVariable},
-        SqlAuthService,
-    },
+    sql::{database_variables::mysql_default_global_variables, SqlAuthService},
     transport::TransportService,
     CubeError,
 };
 
-use super::session::DatabaseProtocol;
+use super::{database_variables::DatabaseVariables, session::DatabaseProtocol};
 
 #[derive(Debug)]
 pub struct ServerConfiguration {
@@ -29,10 +23,8 @@ impl Default for ServerConfiguration {
 }
 
 lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
-        Arc::new(RwLockSync::new(HashMap::new()));
-    static ref MYSQL_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
-        Arc::new(RwLockSync::new(mysql_default_global_variables()));
+    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = HashMap::new();
+    static ref MYSQL_DEFAULT_VARIABLES: DatabaseVariables = mysql_default_global_variables();
 }
 
 #[derive(Debug)]
@@ -61,10 +53,7 @@ impl ServerManager {
         }
     }
 
-    pub fn all_variables(
-        &self,
-        protocol: DatabaseProtocol,
-    ) -> Arc<RwLockSync<HashMap<String, DatabaseVariable>>> {
+    pub fn all_variables(&self, protocol: DatabaseProtocol) -> DatabaseVariables {
         match protocol {
             DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
             DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),

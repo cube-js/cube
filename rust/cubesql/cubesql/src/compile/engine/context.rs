@@ -1,27 +1,20 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use datafusion::error::Result;
 use datafusion::variable::VarType;
 use datafusion::{scalar::ScalarValue, variable::VarProvider};
 use log::warn;
 
-use crate::sql::database_variables::DatabaseVariable;
+use crate::sql::SessionState;
 
 pub struct VariablesProvider {
-    variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
+    session: Arc<SessionState>,
     var_type: VarType,
 }
 
 impl VariablesProvider {
-    pub fn new(
-        variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
-        var_type: VarType,
-    ) -> Self {
-        Self {
-            variables,
-            var_type,
-        }
+    pub fn new(session: Arc<SessionState>, var_type: VarType) -> Self {
+        Self { session, var_type }
     }
 }
 
@@ -40,12 +33,7 @@ impl VarProvider for VariablesProvider {
             identifier.concat()[2..].to_string()
         };
 
-        if let Some(var) = self
-            .variables
-            .read()
-            .expect("failed to unlock properties")
-            .get(&key)
-        {
+        if let Some(var) = self.session.all_variables().get(&key) {
             if var.var_type == self.var_type {
                 return Ok(var.value.clone());
             }

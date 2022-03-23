@@ -1,8 +1,4 @@
-use std::{
-    any::Any,
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 use datafusion::{
@@ -17,14 +13,14 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::sql::database_variables::DatabaseVariable;
+use crate::sql::database_variables::DatabaseVariables;
 
 pub struct PerfSchemaVariablesProvider {
-    variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
+    variables: DatabaseVariables,
 }
 
 impl PerfSchemaVariablesProvider {
-    pub fn new(vars: Arc<RwLock<HashMap<String, DatabaseVariable>>>) -> Self {
+    pub fn new(vars: DatabaseVariables) -> Self {
         Self { variables: vars }
     }
 }
@@ -56,12 +52,7 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut names = StringBuilder::new(100);
         let mut values = StringBuilder::new(100);
 
-        for (key, variable) in self
-            .variables
-            .read()
-            .expect("failed to unlock properties")
-            .iter()
-        {
+        for (key, variable) in self.variables.iter() {
             names.append_value(key.clone()).unwrap();
             values.append_value(variable.value.to_string()).unwrap();
         }

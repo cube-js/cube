@@ -2,146 +2,211 @@ use std::collections::HashMap;
 
 use datafusion::scalar::ScalarValue;
 
-use crate::sql::{database_variables::DatabaseVariable, session::DatabaseProtocol};
+use crate::sql::database_variables::{DatabaseVariable, DatabaseVariables};
 
-fn append_to_hashmap(hm: &mut HashMap<String, DatabaseVariable>, key: &str, value: ScalarValue) {
-    let mut row: HashMap<String, ScalarValue> = HashMap::new();
-    row.insert(
-        "VARIABLE_NAME".to_string(),
-        ScalarValue::Utf8(Some(key.to_string())),
-    );
-    row.insert("VARIABLE_VALUE".to_string(), value);
+pub fn defaults() -> DatabaseVariables {
+    let mut variables: DatabaseVariables = HashMap::new();
 
-    hm.insert(
-        key.to_string(),
-        DatabaseVariable::new(row, DatabaseProtocol::MySQL),
+    variables.insert(
+        "max_allowed_packet".to_string(),
+        DatabaseVariable::new(
+            "max_allowed_packet".to_string(),
+            ScalarValue::UInt32(Some(67108864)),
+            None,
+        ),
     );
-}
+    variables.insert(
+        "auto_increment_increment".to_string(),
+        DatabaseVariable::new(
+            "auto_increment_increment".to_string(),
+            ScalarValue::UInt32(Some(1)),
+            None,
+        ),
+    );
+    variables.insert(
+        "version_comment".to_string(),
+        DatabaseVariable::new(
+            "version_comment".to_string(),
+            ScalarValue::Utf8(Some("mysql".to_string())),
+            None,
+        ),
+    );
+    variables.insert(
+        "system_time_zone".to_string(),
+        DatabaseVariable::new(
+            "system_time_zone".to_string(),
+            ScalarValue::Utf8(Some("UTC".to_string())),
+            None,
+        ),
+    );
+    variables.insert(
+        "time_zone".to_string(),
+        DatabaseVariable::new(
+            "time_zone".to_string(),
+            ScalarValue::Utf8(Some("SYSTEM".to_string())),
+            None,
+        ),
+    );
 
-pub fn defaults() -> HashMap<String, DatabaseVariable> {
-    let mut variables: HashMap<String, DatabaseVariable> = HashMap::new();
-
-    append_to_hashmap(
-        &mut variables,
-        "max_allowed_packet",
-        ScalarValue::UInt32(Some(67108864)),
+    variables.insert(
+        "tx_isolation".to_string(),
+        DatabaseVariable::new(
+            "tx_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "auto_increment_increment",
-        ScalarValue::UInt32(Some(1)),
+    variables.insert(
+        "tx_read_only".to_string(),
+        DatabaseVariable::new(
+            "tx_read_only".to_string(),
+            ScalarValue::Boolean(Some(false)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "version_comment",
-        ScalarValue::Utf8(Some("mysql".to_string())),
+    variables.insert(
+        "transaction_isolation".to_string(),
+        DatabaseVariable::new(
+            "transaction_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "system_time_zone",
-        ScalarValue::Utf8(Some("UTC".to_string())),
+    variables.insert(
+        "transaction_read_only".to_string(),
+        DatabaseVariable::new(
+            "transaction_read_only".to_string(),
+            ScalarValue::Boolean(Some(false)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "time_zone",
-        ScalarValue::Utf8(Some("SYSTEM".to_string())),
+    variables.insert(
+        "sessiontransaction_isolation".to_string(),
+        DatabaseVariable::new(
+            "sessiontransaction_isolation".to_string(),
+            ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "tx_isolation",
-        ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+    variables.insert(
+        "transaction_read_only".to_string(),
+        DatabaseVariable::new(
+            "transaction_read_only".to_string(),
+            ScalarValue::Int64(Some(1)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "tx_read_only",
-        ScalarValue::Boolean(Some(false)),
+    variables.insert(
+        "character_set_client".to_string(),
+        DatabaseVariable::new(
+            "character_set_client".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "transaction_isolation",
-        ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+    variables.insert(
+        "character_set_connection".to_string(),
+        DatabaseVariable::new(
+            "character_set_connection".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "transaction_read_only",
-        ScalarValue::Boolean(Some(false)),
+    variables.insert(
+        "character_set_results".to_string(),
+        DatabaseVariable::new(
+            "character_set_results".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "sessiontransaction_isolation",
-        ScalarValue::Utf8(Some("REPEATABLE-READ".to_string())),
+    variables.insert(
+        "character_set_server".to_string(),
+        DatabaseVariable::new(
+            "character_set_server".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "transaction_read_only",
-        ScalarValue::Int64(Some(1)),
+    variables.insert(
+        "collation_connection".to_string(),
+        DatabaseVariable::new(
+            "collation_connection".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "character_set_client",
-        ScalarValue::Utf8(Some("utf8mb4".to_string())),
+    variables.insert(
+        "collation_server".to_string(),
+        DatabaseVariable::new(
+            "collation_server".to_string(),
+            ScalarValue::Utf8(Some("utf8mb4_0900_ai_ci".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "character_set_connection",
-        ScalarValue::Utf8(Some("utf8mb4".to_string())),
+    variables.insert(
+        "init_connect".to_string(),
+        DatabaseVariable::new(
+            "init_connect".to_string(),
+            ScalarValue::Utf8(Some("".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "character_set_results",
-        ScalarValue::Utf8(Some("utf8mb4".to_string())),
+    variables.insert(
+        "interactive_timeout".to_string(),
+        DatabaseVariable::new(
+            "interactive_timeout".to_string(),
+            ScalarValue::Int32(Some(28800)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "character_set_server",
-        ScalarValue::Utf8(Some("utf8mb4".to_string())),
+    variables.insert(
+        "license".to_string(),
+        DatabaseVariable::new(
+            "license".to_string(),
+            ScalarValue::Utf8(Some("Apache 2".to_string())),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "collation_connection",
-        ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
+    variables.insert(
+        "lower_case_table_names".to_string(),
+        DatabaseVariable::new(
+            "lower_case_table_names".to_string(),
+            ScalarValue::Int32(Some(0)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "collation_server",
-        ScalarValue::Utf8(Some("utf8mb4_0900_ai_ci".to_string())),
+    variables.insert(
+        "net_buffer_length".to_string(),
+        DatabaseVariable::new(
+            "net_buffer_length".to_string(),
+            ScalarValue::Int32(Some(16384)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "init_connect",
-        ScalarValue::Utf8(Some("".to_string())),
+    variables.insert(
+        "net_write_timeout".to_string(),
+        DatabaseVariable::new(
+            "net_write_timeout".to_string(),
+            ScalarValue::Int32(Some(600)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "interactive_timeout",
-        ScalarValue::Int32(Some(28800)),
+    variables.insert(
+        "wait_timeout".to_string(),
+        DatabaseVariable::new(
+            "wait_timeout".to_string(),
+            ScalarValue::Int32(Some(28800)),
+            None,
+        ),
     );
-    append_to_hashmap(
-        &mut variables,
-        "license",
-        ScalarValue::Utf8(Some("Apache 2".to_string())),
-    );
-    append_to_hashmap(
-        &mut variables,
-        "lower_case_table_names",
-        ScalarValue::Int32(Some(0)),
-    );
-    append_to_hashmap(
-        &mut variables,
-        "net_buffer_length",
-        ScalarValue::Int32(Some(16384)),
-    );
-    append_to_hashmap(
-        &mut variables,
-        "net_write_timeout",
-        ScalarValue::Int32(Some(600)),
-    );
-    append_to_hashmap(
-        &mut variables,
-        "wait_timeout",
-        ScalarValue::Int32(Some(28800)),
-    );
-    append_to_hashmap(&mut variables, "sql_mode", ScalarValue::Utf8(Some("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string())));
-
+    variables.insert(
+  "sql_mode".to_string(),
+  DatabaseVariable::new(
+      "sql_mode".to_string(),
+      ScalarValue::Utf8(Some("ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string())),
+      None,
+  ),
+);
     variables
 }

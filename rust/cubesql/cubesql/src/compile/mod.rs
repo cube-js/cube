@@ -1990,8 +1990,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         );
 
         if self.state.protocol == DatabaseProtocol::MySQL {
-            let variable_provider =
-                VariablesProvider::new(self.state.all_variables(), VarType::System);
+            let variable_provider = VariablesProvider::new(self.state.clone(), VarType::System);
             ctx.register_variable(VarType::System, Arc::new(variable_provider));
         }
 
