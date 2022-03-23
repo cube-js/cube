@@ -33,6 +33,7 @@
   "dependencies": {
     "@cubejs-backend/shared": "^0.29.33",
     "generic-pool": "^3.7.1",
+    "es5-ext": "0.10.53",
     "ioredis": "^4.27.8",
     "lru-cache": "^6.0.0",
     "moment-range": "^4.0.2",
@@ -65,5 +66,8 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ]
+  },
+  "resolutions": {
+    "es5-ext": "0.10.53"
   }
 }
