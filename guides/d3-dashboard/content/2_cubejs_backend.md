@@ -29,6 +29,8 @@ CUBEJS_WEB_SOCKETS=true
 CUBEJS_DEV_MODE=true
 ```
 
+Note: Have a look at the full list of [DB environment variables](https://cube.dev/docs/config/databases/postgres#environment-variables) if the database is running in a container or different system.
+
 Now let’s start the server and open the Developer Playground at [http://localhost:4000](http://localhost:4000).
 
 ```bash
