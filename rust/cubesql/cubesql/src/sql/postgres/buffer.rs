@@ -12,13 +12,16 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     reader: &mut Reader,
 ) -> Result<FrontendMessage, Error> {
     // https://www.postgresql.org/docs/14/protocol-message-formats.html
-    Ok(match reader.read_u8().await? {
-        b'Q' => FrontendMessage::Query(protocol::Query::read_from(reader).await?),
-        b'P' => FrontendMessage::Parse(protocol::Parse::read_from(reader).await?),
-        b'B' => FrontendMessage::Bind(protocol::Bind::read_from(reader).await?),
-        b'D' => FrontendMessage::Describe(protocol::Describe::read_from(reader).await?),
+    let message_tag = reader.read_u8().await?;
+    let cursor = read_contents(reader).await?;
+
+    Ok(match message_tag {
+        b'Q' => FrontendMessage::Query(protocol::Query::deserialize(cursor).await?),
+        b'P' => FrontendMessage::Parse(protocol::Parse::deserialize(cursor).await?),
+        b'B' => FrontendMessage::Bind(protocol::Bind::deserialize(cursor).await?),
+        b'D' => FrontendMessage::Describe(protocol::Describe::deserialize(cursor).await?),
         b'p' => {
-            FrontendMessage::PasswordMessage(protocol::PasswordMessage::read_from(reader).await?)
+            FrontendMessage::PasswordMessage(protocol::PasswordMessage::deserialize(cursor).await?)
         }
         b'X' => FrontendMessage::Terminate,
         b'S' => FrontendMessage::Sync,
@@ -34,6 +37,7 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
 pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
 ) -> Result<Cursor<Vec<u8>>, Error> {
+    // protocol defines length for all types of messages
     let length = reader.read_u32().await?;
     if length < 4 {
         return Err(Error::new(
