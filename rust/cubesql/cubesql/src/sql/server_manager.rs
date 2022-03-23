@@ -30,9 +30,9 @@ impl Default for ServerConfiguration {
 
 lazy_static! {
     static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
-        Arc::new(RwLockSync::new(HashMap::new()));
+    Arc::new(RwLockSync::new(HashMap::new()));
     static ref MYSQL_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
-        Arc::new(RwLockSync::new(mysql_default_global_variables()));
+    Arc::new(RwLockSync::new(mysql_default_global_variables()));
 }
 
 #[derive(Debug)]
@@ -61,16 +61,10 @@ impl ServerManager {
         }
     }
 
-    pub fn all_variables(&self, protocol: DatabaseProtocol) -> HashMap<String, DatabaseVariable> {
+    pub fn all_variables(&self, protocol: DatabaseProtocol) -> Arc<RwLockSync<HashMap<String, DatabaseVariable>>> {
         match protocol {
-            DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES
-                .read()
-                .expect("failed to unlock properties")
-                .clone(),
-            DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES
-                .read()
-                .expect("failed to unlock properties")
-                .clone(),
+            DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
+            DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),
         }
     }
 }

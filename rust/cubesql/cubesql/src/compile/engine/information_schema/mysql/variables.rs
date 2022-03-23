@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::{any::Any, collections::HashMap, sync::{Arc, RwLock}};
 
 use async_trait::async_trait;
 use datafusion::{
@@ -16,11 +16,11 @@ use datafusion::{
 use crate::sql::database_variables::DatabaseVariable;
 
 pub struct PerfSchemaVariablesProvider {
-    variables: HashMap<String, DatabaseVariable>,
+    variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
 }
 
 impl PerfSchemaVariablesProvider {
-    pub fn new(vars: HashMap<String, DatabaseVariable>) -> Self {
+    pub fn new(vars: Arc<RwLock<HashMap<String, DatabaseVariable>>>) -> Self {
         Self { variables: vars }
     }
 }
@@ -52,9 +52,9 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut names = StringBuilder::new(100);
         let mut values = StringBuilder::new(100);
 
-        for (key, variable) in self.variables.iter() {
+        for (key, variable) in self.variables.read().expect("failed to unlock properties").iter() {
             names.append_value(key.clone()).unwrap();
-            values.append_value(variable.value.clone()).unwrap();
+            values.append_value(variable.value.to_string()).unwrap();
         }
 
         let mut data: Vec<Arc<dyn Array>> = vec![];

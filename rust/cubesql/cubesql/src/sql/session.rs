@@ -28,9 +28,9 @@ impl SessionProperties {
 }
 
 lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: HashMap<String, DatabaseVariable> = HashMap::new();
-    static ref MYSQL_DEFAULT_VARIABLES: HashMap<String, DatabaseVariable> =
-        mysql_default_session_variables();
+    static ref POSTGRES_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> = Arc::new(RwLockSync::new(HashMap::new()));
+    static ref MYSQL_DEFAULT_VARIABLES: Arc<RwLockSync<HashMap<String, DatabaseVariable>>> =
+    Arc::new(RwLockSync::new(mysql_default_session_variables()));
 }
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ pub struct SessionState {
     pub protocol: DatabaseProtocol,
 
     // session db variables
-    variables: RwLockSync<HashMap<String, DatabaseVariable>>,
+    variables: Option<Arc<RwLockSync<HashMap<String, DatabaseVariable>>>>,
 
     // TODO: remove after user defined vars are implemented
     properties: RwLockSync<SessionProperties>,
@@ -60,16 +60,11 @@ impl SessionState {
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContext>,
     ) -> Self {
-        let vars = match protocol {
-            DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
-            DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),
-        };
-
         Self {
             connection_id,
             host,
             protocol,
-            variables: RwLockSync::new(vars),
+            variables: None,
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new(auth_context),
         }
@@ -123,9 +118,14 @@ impl SessionState {
         *guard = auth_context;
     }
 
-    pub fn all_variables(&self) -> HashMap<String, DatabaseVariable> {
-        let guard = self.variables.read().expect("failed to unlock properties");
-        guard.clone()
+    pub fn all_variables(&self) -> Arc<RwLockSync<HashMap<String, DatabaseVariable>>> {
+        match &self.variables {
+            Some(vars) => vars.clone(),
+            _ => match self.protocol {
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),
+            },
+        }
     }
 }
 

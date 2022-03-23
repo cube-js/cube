@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{RwLock, Arc};
 
 use datafusion::error::Result;
 use datafusion::variable::VarType;
@@ -8,19 +9,13 @@ use log::warn;
 use crate::sql::database_variables::DatabaseVariable;
 
 pub struct VariablesProvider {
-    variables: HashMap<String, ScalarValue>,
+    variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>,
+    var_type: VarType,
 }
 
 impl VariablesProvider {
-    pub fn new(variables: HashMap<String, DatabaseVariable>, var_type: VarType) -> Self {
-        let mut vars: HashMap<String, ScalarValue> = HashMap::new();
-        for (k, v) in variables.into_iter() {
-            if var_type == v.var_type {
-                vars.insert(format!("{}{}", "@@", k), ScalarValue::Utf8(Some(v.value)));
-            }
-        }
-
-        Self { variables: vars }
+    pub fn new(variables: Arc<RwLock<HashMap<String, DatabaseVariable>>>, var_type: VarType) -> Self {
+        Self { variables, var_type }
     }
 }
 
@@ -31,20 +26,22 @@ impl VarProvider for VariablesProvider {
             let ignore_first = identifier[0].to_ascii_lowercase() == "@@global".to_owned();
 
             if ignore_first {
-                "@@".to_string() + &identifier[1..].concat()
+                identifier[1..].concat()
             } else {
-                identifier.concat()
+                identifier.concat()[2..].to_string()
             }
         } else {
-            identifier.concat()
+            identifier.concat()[2..].to_string()
         };
 
-        if let Some(value) = self.variables.get(&key) {
-            Ok(value.clone())
-        } else {
-            warn!("Unknown system variable: {}", key);
-
-            Ok(ScalarValue::Utf8(None))
+        if let Some(var) = self.variables.read().expect("failed to unlock properties").get(&key) {
+            if var.var_type == self.var_type {
+                return Ok(var.value.clone());
+            }
         }
+        
+        warn!("Unknown system variable: {}", key);
+
+        Ok(ScalarValue::Utf8(None))
     }
 }
