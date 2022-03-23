@@ -89,9 +89,9 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
     variables.insert(
-        "transaction_read_only".to_string(),
+        "sessionauto_increment_increment".to_string(),
         DatabaseVariable::new(
-            "transaction_read_only".to_string(),
+            "sessionauto_increment_increment".to_string(),
             ScalarValue::Int64(Some(1)),
             None,
         ),

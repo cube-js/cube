@@ -89,9 +89,9 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
     variables.insert(
-        "transaction_read_only".to_string(),
+        "sessionauto_increment_increment".to_string(),
         DatabaseVariable::new(
-            "transaction_read_only".to_string(),
+            "sessionauto_increment_increment".to_string(),
             ScalarValue::Int64(Some(1)),
             None,
         ),
@@ -140,7 +140,7 @@ pub fn defaults() -> DatabaseVariables {
         "collation_server".to_string(),
         DatabaseVariable::new(
             "collation_server".to_string(),
-            ScalarValue::Utf8(Some("utf8mb4_general_ci".to_string())),
+            ScalarValue::Utf8(Some("utf8mb4_0900_ai_ci".to_string())),
             None,
         ),
     );
