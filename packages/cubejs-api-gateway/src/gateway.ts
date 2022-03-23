@@ -723,24 +723,28 @@ class ApiGateway {
    */
   private async getSqlQueriesInternal(
     context: RequestContext,
-    normalizedQueries: NormalizedQuery[],
+    normalizedQueries: (NormalizedQuery | null)[],
   ): Promise<Array<any>> {
     const sqlQueries = await Promise.all(
       normalizedQueries.map(
         async (normalizedQuery, index) => {
-          const loadRequestSQLStarted = new Date();
-          const sqlQuery = await this.getCompilerApi(context).getSql(
-            this.coerceForSqlQuery(normalizedQuery, context)
-          );
-  
-          this.log({
-            type: 'Load Request SQL',
-            duration: this.duration(loadRequestSQLStarted),
-            query: normalizedQueries[index],
-            sqlQuery
-          }, context);
-  
-          return sqlQuery;
+          if (normalizedQuery) {
+            const loadRequestSQLStarted = new Date();
+            const sqlQuery = await this.getCompilerApi(context).getSql(
+              this.coerceForSqlQuery(normalizedQuery, context)
+            );
+    
+            this.log({
+              type: 'Load Request SQL',
+              duration: this.duration(loadRequestSQLStarted),
+              query: normalizedQueries[index],
+              sqlQuery
+            }, context);
+    
+            return sqlQuery;
+          } else {
+            return null;
+          }
         }
       )
     );
@@ -755,7 +759,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-    totalMap: Map<NormalizedQuery, NormalizedQuery>,
+    totalMap: Map<NormalizedQuery, NormalizedQuery | null>,
     totalQuery: any,
   ) {
     const queries = [{
@@ -882,7 +886,7 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
-      const totalMap: Map<NormalizedQuery, NormalizedQuery> =
+      const totalMap: Map<NormalizedQuery, NormalizedQuery | null> =
         new Map();
 
       normalizedQueries.forEach(nq => {
@@ -892,6 +896,8 @@ class ApiGateway {
           tq.limit = null;
           tq.rowLimit = null;
           totalMap.set(nq, tq);
+        } else {
+          totalMap.set(nq, null);
         }
       });
       
@@ -905,7 +911,8 @@ class ApiGateway {
 
       const totalQueries = await this
         .getSqlQueriesInternal(
-          context, Array.from(totalMap.values()),
+          context,
+          Array.from(totalMap.values()),
         );
 
       let slowQuery = false;
