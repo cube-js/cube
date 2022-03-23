@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone } from '@cubejs-backend/shared';
+import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -430,6 +430,9 @@ class BaseQuery {
     return new PreAggregations(this, this.options.historyQueries || [], this.options.cubeLatticeCache);
   }
 
+  /**
+   * Wrap cpecified column with the double quote.
+   */
   escapeColumnName(name) {
     return `"${name}"`;
   }
@@ -479,9 +482,13 @@ class BaseQuery {
    * @returns {string}
    */
   countAllQuery(sql) {
-    return `SELECT count(*) TOTAL_COUNT FROM (\n${
+    return `select count(*) ${
+      this.escapeColumnName(QueryAlias.TOTAL_COUNT)
+    } from (\n${
       sql
-    }\n) ORIGINAL_SQL_QUERY`;
+    }\n) ${
+      this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
+    }`;
   }
 
   regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
