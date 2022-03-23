@@ -18,15 +18,18 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
-use crate::mysql::{dataframe, ConnectionState};
+use crate::sql::{
+    dataframe, types::StatusFlags, ColumnFlags, ColumnType, DatabaseProtocol, Session,
+    SessionManager, SessionState,
+};
+
 pub use crate::transport::ctx::*;
-use crate::transport::{TransportService, V1CubeMetaExt};
+use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use crate::{
     compile::builder::QueryBuilder,
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use msql_srv::{ColumnFlags, ColumnType, StatusFlags};
 
 use self::builder::*;
 use self::context::*;
@@ -120,7 +123,7 @@ fn compile_select_expr(
                 CompiledQueryFieldMeta {
                     column_from: dimension.name.clone(),
                     column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                    column_type: ColumnType::MYSQL_TYPE_STRING,
+                    column_type: ColumnType::String,
                 },
             );
         }
@@ -134,7 +137,7 @@ fn compile_select_expr(
                 CompiledQueryFieldMeta {
                     column_from: measure.name.clone(),
                     column_to: mb_alias.unwrap_or(measure.get_real_name()),
-                    column_type: measure.get_mysql_type(),
+                    column_type: measure.get_sql_type(),
                 },
             );
         }
@@ -149,8 +152,8 @@ fn compile_select_expr(
                     column_from: dimension.name.clone(),
                     column_to: mb_alias.unwrap_or(dimension.get_real_name()),
                     column_type: match dimension._type.as_str() {
-                        "number" => ColumnType::MYSQL_TYPE_DOUBLE,
-                        _ => ColumnType::MYSQL_TYPE_STRING,
+                        "number" => ColumnType::Double,
+                        _ => ColumnType::String,
                     },
                 },
             );
@@ -1300,8 +1303,8 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                                 column_from: dimension.name.clone(),
                                 column_to: dimension.get_real_name(),
                                 column_type: match dimension._type.as_str() {
-                                    "number" => ColumnType::MYSQL_TYPE_DOUBLE,
-                                    _ => ColumnType::MYSQL_TYPE_STRING,
+                                    "number" => ColumnType::Double,
+                                    _ => ColumnType::String,
                                 },
                             },
                         )
@@ -1327,21 +1330,21 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
 }
 
 struct QueryPlanner {
-    state: Arc<ConnectionState>,
+    state: Arc<SessionState>,
     meta: Arc<MetaContext>,
-    transport: Arc<dyn TransportService>,
+    session_manager: Arc<SessionManager>,
 }
 
 impl QueryPlanner {
     pub fn new(
-        state: Arc<ConnectionState>,
+        state: Arc<SessionState>,
         meta: Arc<MetaContext>,
-        transport: Arc<dyn TransportService>,
+        session_manager: Arc<SessionManager>,
     ) -> Self {
         Self {
             state,
-            transport,
             meta,
+            session_manager,
         }
     }
 
@@ -1394,6 +1397,7 @@ impl QueryPlanner {
 
         if schema_name.to_lowercase() == "information_schema"
             || schema_name.to_lowercase() == "performance_schema"
+            || schema_name.to_lowercase() == "pg_catalog"
         {
             return self.create_df_logical_plan(stmt.clone());
         }
@@ -1448,7 +1452,7 @@ impl QueryPlanner {
                 Arc::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "_".to_string(),
-                        ColumnType::MYSQL_TYPE_TINY,
+                        ColumnType::Int8,
                         ColumnFlags::empty(),
                     )],
                     vec![],
@@ -1525,13 +1529,13 @@ impl QueryPlanner {
     }
 
     pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        match stmt {
-            ast::Statement::Query(q) => self.select_to_plan(stmt, q),
-            ast::Statement::SetTransaction { .. } => Ok(QueryPlan::MetaTabular(
+        match (stmt, &self.state.protocol) {
+            (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
+            (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Arc::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
-            ast::Statement::SetNames { charset_name, .. } => {
+            (ast::Statement::SetNames { charset_name, .. }, DatabaseProtocol::MySQL) => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
                     || charset_name.eq_ignore_ascii_case("utf8mb4"))
                 {
@@ -1546,31 +1550,60 @@ impl QueryPlanner {
                     Arc::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
-            ast::Statement::Kill { .. } => Ok(QueryPlan::MetaOk(StatusFlags::empty())),
-            ast::Statement::SetVariable { key_values } => self.set_variable_to_plan(&key_values),
-            ast::Statement::ShowVariable { variable } => self.show_variable_to_plan(variable),
-            ast::Statement::ShowVariables { filter } => self.show_variables_to_plan(&filter),
-            ast::Statement::ShowCreate { obj_name, obj_type } => {
+            (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => {
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
+            // TODO: enable for Postgres after variables are supported
+            (ast::Statement::SetVariable { key_values }, DatabaseProtocol::MySQL) => {
+                self.set_variable_to_plan(&key_values)
+            }
+            (ast::Statement::ShowVariable { variable }, DatabaseProtocol::MySQL) => {
+                self.show_variable_to_plan(variable)
+            }
+            (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
+                self.show_variables_to_plan(&filter)
+            }
+            (ast::Statement::ShowCreate { obj_name, obj_type }, DatabaseProtocol::MySQL) => {
                 self.show_create_to_plan(&obj_name, &obj_type)
             }
-            ast::Statement::ShowColumns {
-                extended,
-                full,
-                filter,
-                table_name,
-            } => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
-            ast::Statement::ShowTables {
-                extended,
-                full,
-                filter,
-                db_name,
-            } => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
-            ast::Statement::ShowCollation { filter } => self.show_collation_to_plan(&filter),
-            ast::Statement::ExplainTable { table_name, .. } => {
+            (
+                ast::Statement::ShowColumns {
+                    extended,
+                    full,
+                    filter,
+                    table_name,
+                },
+                DatabaseProtocol::MySQL,
+            ) => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
+            (
+                ast::Statement::ShowTables {
+                    extended,
+                    full,
+                    filter,
+                    db_name,
+                },
+                DatabaseProtocol::MySQL,
+            ) => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
+            (ast::Statement::ShowCollation { filter }, DatabaseProtocol::MySQL) => {
+                self.show_collation_to_plan(&filter)
+            }
+            (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            ast::Statement::Explain { statement, .. } => self.explain_to_plan(&statement),
-            ast::Statement::Use { db_name } => self.use_to_plan(&db_name),
+            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
+                self.explain_to_plan(&statement)
+            }
+            (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
+                self.use_to_plan(&db_name)
+            }
+            (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
+            (ast::Statement::Commit { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1586,7 +1619,7 @@ impl QueryPlanner {
                 Arc::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "Database".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     )],
                     vec![
@@ -1604,6 +1637,13 @@ impl QueryPlanner {
                     ],
                 )),
             ))
+        } else if name.eq_ignore_ascii_case("processlist") {
+            let stmt = parse_sql_to_statement(
+                &"SELECT * FROM information_schema.processlist".to_string(),
+                self.state.protocol.clone(),
+            )?;
+
+            self.create_df_logical_plan(stmt)
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1611,18 +1651,18 @@ impl QueryPlanner {
                     vec![
                         dataframe::Column::new(
                             "Level".to_string(),
-                            ColumnType::MYSQL_TYPE_VAR_STRING,
-                            ColumnFlags::NOT_NULL_FLAG,
+                            ColumnType::VarStr,
+                            ColumnFlags::NOT_NULL,
                         ),
                         dataframe::Column::new(
                             "Code".to_string(),
-                            ColumnType::MYSQL_TYPE_LONG,
-                            ColumnFlags::NOT_NULL_FLAG | ColumnFlags::UNSIGNED_FLAG,
+                            ColumnType::Int32,
+                            ColumnFlags::NOT_NULL | ColumnFlags::UNSIGNED,
                         ),
                         dataframe::Column::new(
                             "Message".to_string(),
-                            ColumnType::MYSQL_TYPE_VAR_STRING,
-                            ColumnFlags::NOT_NULL_FLAG,
+                            ColumnType::VarStr,
+                            ColumnFlags::NOT_NULL,
                         ),
                     ],
                     vec![],
@@ -1659,7 +1699,8 @@ impl QueryPlanner {
         };
 
         let stmt = parse_sql_to_statement(
-            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter)
+            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter),
+            self.state.protocol.clone(),
         )?;
 
         self.create_df_logical_plan(stmt)
@@ -1694,7 +1735,7 @@ impl QueryPlanner {
                     "`{}` {}{}",
                     column.get_name(),
                     column.get_column_type(),
-                    if column.mysql_can_be_null() { " NOT NULL" } else { "" }
+                    if column.sql_can_be_null() { " NOT NULL" } else { "" }
                 ));
             }
 
@@ -1702,12 +1743,12 @@ impl QueryPlanner {
                 vec![
                     dataframe::Column::new(
                         "Table".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     ),
                     dataframe::Column::new(
                         "Create Table".to_string(),
-                        ColumnType::MYSQL_TYPE_STRING,
+                        ColumnType::String,
                         ColumnFlags::empty(),
                     )
                 ],
@@ -1784,10 +1825,13 @@ impl QueryPlanner {
         };
 
         let information_schema_sql = format!("SELECT `COLUMN_NAME` AS `Field`, 1 AS `Order`, `COLUMN_TYPE` AS `Type`, IF(`DATA_TYPE` = 'varchar', 'utf8mb4_0900_ai_ci', NULL) AS `Collation`, `IS_NULLABLE` AS `Null`, `COLUMN_KEY` AS `Key`, NULL AS `Default`, `EXTRA` AS `Extra`, 'select' AS `Privileges`, `COLUMN_COMMENT` AS `Comment` FROM `information_schema`.`COLUMNS` WHERE `TABLE_NAME` = '{}' AND `TABLE_SCHEMA` = '{}' {}", table_name, db_name, extended);
-        let stmt = parse_sql_to_statement(&format!(
-            "SELECT {} FROM ({}) AS `COLUMNS` {}",
-            columns, information_schema_sql, filter
-        ))?;
+        let stmt = parse_sql_to_statement(
+            &format!(
+                "SELECT {} FROM ({}) AS `COLUMNS` {}",
+                columns, information_schema_sql, filter
+            ),
+            self.state.protocol.clone(),
+        )?;
 
         self.create_df_logical_plan(stmt)
     }
@@ -1838,10 +1882,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
             column_name,
             escape_single_quote_string(&db_name.value),
         );
-        let stmt = parse_sql_to_statement(&format!(
-            "SELECT {} FROM ({}) AS `TABLES` {}",
-            columns, information_schema_sql, filter
-        ))?;
+        let stmt = parse_sql_to_statement(
+            &format!(
+                "SELECT {} FROM ({}) AS `TABLES` {}",
+                columns, information_schema_sql, filter
+            ),
+            self.state.protocol.clone(),
+        )?;
 
         self.create_df_logical_plan(stmt)
     }
@@ -1867,10 +1914,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
         };
 
         let information_schema_sql = "SELECT `COLLATION_NAME` AS `Collation`, `CHARACTER_SET_NAME` AS `Charset`, `ID` AS `Id`, `IS_DEFAULT` AS `Default`, `IS_COMPILED` AS `Compiled`, `SORTLEN` AS `Sortlen`, `PAD_ATTRIBUTE` AS `Pad_attribute` FROM `information_schema`.`COLLATIONS` ORDER BY `Collation`";
-        let stmt = parse_sql_to_statement(&format!(
-            "SELECT * FROM ({}) AS `COLLATIONS` {}",
-            information_schema_sql, filter
-        ))?;
+        let stmt = parse_sql_to_statement(
+            &format!(
+                "SELECT * FROM ({}) AS `COLLATIONS` {}",
+                information_schema_sql, filter
+            ),
+            self.state.protocol.clone(),
+        )?;
 
         self.create_df_logical_plan(stmt)
     }
@@ -1887,19 +1937,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
         &self,
         statement: &Box<ast::Statement>,
     ) -> Result<QueryPlan, CompilationError> {
-        let plan = convert_statement_to_cube_query(
-            &statement,
-            self.meta.clone(),
-            self.state.clone(),
-            self.transport.clone(),
-        )?;
+        let plan = self.plan(&statement)?;
 
         return Ok(QueryPlan::MetaTabular(
             StatusFlags::empty(),
             Arc::new(dataframe::DataFrame::new(
                 vec![dataframe::Column::new(
                     "Execution Plan".to_string(),
-                    ColumnType::MYSQL_TYPE_STRING,
+                    ColumnType::String,
                     ColumnFlags::empty(),
                 )],
                 vec![dataframe::Row::new(vec![dataframe::TableValue::String(
@@ -1920,13 +1965,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
-        let mut flags = StatusFlags::SERVER_SESSION_STATE_CHANGED;
+        let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
         if key_values
             .iter()
             .any(|set| set.key.value.to_lowercase() == "autocommit".to_string())
         {
-            flags |= StatusFlags::SERVER_STATUS_AUTOCOMMIT;
+            flags |= StatusFlags::AUTOCOMMIT;
         }
 
         Ok(QueryPlan::MetaTabular(
@@ -1938,7 +1983,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_execution_ctx(&self) -> ExecutionContext {
         let mut ctx = ExecutionContext::with_config(
             ExecutionConfig::new()
-                .with_query_planner(Arc::new(CubeQueryPlanner::new(self.transport.clone())))
+                .with_query_planner(Arc::new(CubeQueryPlanner::new(
+                    self.session_manager.server.transport.clone(),
+                )))
                 .with_information_schema(false),
         );
 
@@ -1968,7 +2015,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let ctx = self.create_execution_ctx();
 
         let state = ctx.state.lock().unwrap().clone();
-        let cube_ctx = CubeContext::new(&state, &self.meta.cubes);
+        let cube_ctx = CubeContext::new(
+            &state,
+            self.meta.clone(),
+            self.session_manager.clone(),
+            self.state.clone(),
+        );
         let df_query_planner = SqlToRel::new(&cube_ctx);
 
         let plan = df_query_planner
@@ -1992,10 +2044,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
-    state: Arc<ConnectionState>,
-    transport: Arc<dyn TransportService>,
+    session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
-    let planner = QueryPlanner::new(state, meta, transport);
+    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(stmt)
 }
 
@@ -2030,12 +2081,10 @@ impl CompiledQuery {
                 None,
                 meta_field.column_to.as_str(),
                 match meta_field.column_type {
-                    ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
-                        DataType::Int64
-                    }
-                    ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
-                    ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
-                    ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                    ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+                    ColumnType::String => DataType::Utf8,
+                    ColumnType::Double => DataType::Float64,
+                    ColumnType::Int8 => DataType::Boolean,
                     _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
                 },
                 false,
@@ -2057,12 +2106,10 @@ impl CompiledQuery {
                     None,
                     meta_field.column_from.as_str(),
                     match meta_field.column_type {
-                        ColumnType::MYSQL_TYPE_LONG | ColumnType::MYSQL_TYPE_LONGLONG => {
-                            DataType::Int64
-                        }
-                        ColumnType::MYSQL_TYPE_STRING => DataType::Utf8,
-                        ColumnType::MYSQL_TYPE_DOUBLE => DataType::Float64,
-                        ColumnType::MYSQL_TYPE_TINY => DataType::Boolean,
+                        ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+                        ColumnType::String => DataType::Utf8,
+                        ColumnType::Double => DataType::Float64,
+                        ColumnType::Int8 => DataType::Boolean,
                         _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
                     },
                     false,
@@ -2113,8 +2160,7 @@ impl QueryPlan {
 pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
-    state: Arc<ConnectionState>,
-    transport: Arc<dyn TransportService>,
+    session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     // @todo Support without workarounds
     // metabase
@@ -2128,8 +2174,8 @@ pub fn convert_sql_to_cube_query(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    let stmt = parse_sql_to_statement(&query)?;
-    convert_statement_to_cube_query(&stmt, meta, state, transport)
+    let stmt = parse_sql_to_statement(&query, session.state.protocol.clone())?;
+    convert_statement_to_cube_query(&stmt, meta, session)
 }
 
 #[cfg(test)]
@@ -2138,12 +2184,18 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
-
-    use crate::mysql::{dataframe::batch_to_dataframe, AuthContext, ConnectionProperties};
     use datafusion::execution::dataframe_impl::DataFrameImpl;
+    use pretty_assertions::assert_eq;
 
     use super::*;
-    use pretty_assertions::assert_eq;
+
+    use crate::{
+        sql::{
+            dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
+            AuthContext, AuthenticateResponse, DatabaseProtocol, ServerManager, SqlAuthService,
+        },
+        transport::TransportService,
+    };
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -2232,15 +2284,49 @@ mod tests {
         })
     }
 
-    fn get_test_connection_state() -> Arc<ConnectionState> {
-        Arc::new(ConnectionState::new(
-            8,
-            ConnectionProperties::new(Some("ovr".to_string()), Some("db".to_string())),
-            Some(AuthContext {
-                access_token: "access_token".to_string(),
-                base_path: "base_path".to_string(),
-            }),
-        ))
+    fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
+        let server = Arc::new(ServerManager {
+            auth: get_test_auth(),
+            transport: get_test_transport(),
+            configuration: ServerConfiguration::default(),
+            nonce: None,
+        });
+
+        let session_manager = Arc::new(SessionManager::new(server.clone()));
+        let session = session_manager.create_session(protocol, "127.0.0.1".to_string());
+
+        // Populate like shims
+        session.state.set_database(Some("db".to_string()));
+        session.state.set_user(Some("ovr".to_string()));
+        session.state.set_auth_context(Some(AuthContext {
+            access_token: "access_token".to_string(),
+            base_path: "base_path".to_string(),
+        }));
+
+        session
+    }
+
+    fn get_test_auth() -> Arc<dyn SqlAuthService> {
+        #[derive(Debug)]
+        struct TestSqlAuth {}
+
+        #[async_trait]
+        impl SqlAuthService for TestSqlAuth {
+            async fn authenticate(
+                &self,
+                _user: Option<String>,
+            ) -> Result<AuthenticateResponse, CubeError> {
+                Ok(AuthenticateResponse {
+                    context: AuthContext {
+                        access_token: "fake".to_string(),
+                        base_path: "fake".to_string(),
+                    },
+                    password: None,
+                })
+            }
+        }
+
+        Arc::new(TestSqlAuth {})
     }
 
     fn get_test_transport() -> Arc<dyn TransportService> {
@@ -2267,13 +2353,8 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    fn convert_select_to_query_plan(query: String) -> QueryPlan {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_connection_state(),
-            get_test_transport(),
-        );
+    fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
 
         query.unwrap()
     }
@@ -2315,7 +2396,7 @@ mod tests {
     fn test_select_measure_via_function() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(maxPrice), MEASURE(minPrice), MEASURE(avgPrice) FROM KibanaSampleDataEcommerce".to_string(),
-        );
+        DatabaseProtocol::MySQL);
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -2379,7 +2460,7 @@ mod tests {
     #[test]
     fn test_select_compound_identifiers() {
         let query_plan = convert_select_to_query_plan(
-            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(),
+            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
         );
 
         let logical_plan = query_plan.as_logical_plan();
@@ -2427,6 +2508,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2452,6 +2534,7 @@ mod tests {
     fn test_order_alias_for_measure_default() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce ORDER BY cnt".to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2611,7 +2694,7 @@ mod tests {
         ];
 
         for (sql, expected_request) in supported_orders.iter() {
-            let query_plan = convert_select_to_query_plan(sql.to_string());
+            let query_plan = convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::MySQL);
 
             assert_eq!(
                 &query_plan.as_logical_plan().find_cube_scan().request,
@@ -2625,6 +2708,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
                 .to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2653,6 +2737,7 @@ mod tests {
     fn test_select_all_fields_by_asterisk_limit_100() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2678,6 +2763,7 @@ mod tests {
     fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100 OFFSET 50".to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2703,6 +2789,7 @@ mod tests {
     fn test_select_two_fields() {
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
+            DatabaseProtocol::MySQL,
         );
 
         assert_eq!(
@@ -2727,7 +2814,7 @@ mod tests {
     fn test_select_fields_alias() {
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
-                .to_string(),
+                .to_string(), DatabaseProtocol::MySQL
         );
 
         let logical_plan = query_plan.as_logical_plan();
@@ -2919,7 +3006,9 @@ mod tests {
         ];
 
         for (input_query, expected_request, expected_scan_schema) in variants.iter() {
-            let logical_plan = convert_select_to_query_plan(input_query.clone()).as_logical_plan();
+            let logical_plan =
+                convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
+                    .as_logical_plan();
 
             assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
             assert_eq!(&logical_plan.find_cube_scan().schema, expected_scan_schema);
@@ -2986,8 +3075,7 @@ mod tests {
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_connection_state(),
-                get_test_transport(),
+                get_test_session(DatabaseProtocol::MySQL),
             );
 
             match &query {
@@ -3038,7 +3126,7 @@ mod tests {
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
-                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery)
+                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
             ).as_logical_plan();
 
             assert_eq!(
@@ -3089,7 +3177,7 @@ mod tests {
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
-                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery)
+                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
             ).as_logical_plan();
 
             assert_eq!(
@@ -3184,14 +3272,17 @@ mod tests {
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
-            let logical_plan = convert_select_to_query_plan(format!(
-                "SELECT
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
-                sql_projection, sql_filter
-            ))
+                    sql_projection, sql_filter
+                ),
+                DatabaseProtocol::MySQL,
+            )
             .as_logical_plan();
 
             assert_eq!(
@@ -3209,7 +3300,7 @@ mod tests {
                 FROM KibanaSampleDataEcommerce
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
                 GROUP BY __timestamp"
-            .to_string()
+            .to_string(), DatabaseProtocol::MySQL
         );
 
         assert_eq!(
@@ -3512,14 +3603,17 @@ mod tests {
         ];
 
         for (sql, expected_fitler, expected_time_dimensions) in to_check.iter() {
-            let logical_plan = convert_select_to_query_plan(format!(
-                "SELECT
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
-                sql
-            ))
+                    sql
+                ),
+                DatabaseProtocol::MySQL,
+            )
             .as_logical_plan();
 
             assert_eq!(
@@ -3587,8 +3681,7 @@ mod tests {
                     sql
                 ),
                 get_test_tenant_ctx(),
-                get_test_connection_state(),
-                get_test_transport(),
+                get_test_session(DatabaseProtocol::MySQL),
             );
 
             match &query {
@@ -3793,14 +3886,17 @@ mod tests {
         ];
 
         for (sql, expected_fitler) in to_check.iter() {
-            let logical_plan = convert_select_to_query_plan(format!(
-                "SELECT
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 GROUP BY __timestamp",
-                sql
-            ))
+                    sql
+                ),
+                DatabaseProtocol::MySQL,
+            )
             .as_logical_plan();
 
             assert_eq!(
@@ -3810,8 +3906,8 @@ mod tests {
         }
     }
 
-    fn parse_expr_from_projection(query: &String) -> ast::Expr {
-        let stmt = parse_sql_to_statement(&query).unwrap();
+    fn parse_expr_from_projection(query: &String, db: DatabaseProtocol) -> ast::Expr {
+        let stmt = parse_sql_to_statement(&query, db).unwrap();
         match stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) => {
@@ -3841,6 +3937,7 @@ mod tests {
             &parse_expr_from_projection(
                 &"SELECT STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')"
                     .to_string(),
+                DatabaseProtocol::MySQL,
             ),
             &QueryContext::new(&get_test_meta()[0]),
         )
@@ -3857,7 +3954,7 @@ mod tests {
     #[test]
     fn test_now_expr() {
         let compiled = compile_expression(
-            &parse_expr_from_projection(&"SELECT NOW()".to_string()),
+            &parse_expr_from_projection(&"SELECT NOW()".to_string(), DatabaseProtocol::MySQL),
             &QueryContext::new(&get_test_meta()[0]),
         )
         .unwrap();
@@ -3907,7 +4004,7 @@ mod tests {
 
         for (sql, expected_date) in to_check.iter() {
             let compiled = compile_expression(
-                &parse_expr_from_projection(&format!("SELECT {}", sql)),
+                &parse_expr_from_projection(&format!("SELECT {}", sql), DatabaseProtocol::MySQL),
                 &QueryContext::new(&get_test_meta()[0]),
             )
             .unwrap();
@@ -3957,17 +4054,15 @@ mod tests {
         );
     }
 
-    async fn execute_query(query: String) -> Result<String, CubeError> {
-        Ok(execute_query_with_flags(query).await?.0)
+    async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
+        Ok(execute_query_with_flags(query, db).await?.0)
     }
 
-    async fn execute_query_with_flags(query: String) -> Result<(String, StatusFlags), CubeError> {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_connection_state(),
-            get_test_transport(),
-        );
+    async fn execute_query_with_flags(
+        query: String,
+        db: DatabaseProtocol,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DataFrameImpl::new(ctx.state, &plan);
@@ -4005,13 +4100,20 @@ mod tests {
         +---------------------------+-----------------------------------------------+";
 
         assert_eq!(
-            execute_query("show create table KibanaSampleDataEcommerce;".to_string()).await?,
+            execute_query(
+                "show create table KibanaSampleDataEcommerce;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?,
             exepected.clone()
         );
 
         assert_eq!(
-            execute_query("show create table `db`.`KibanaSampleDataEcommerce`;".to_string())
-                .await?,
+            execute_query(
+                "show create table `db`.`KibanaSampleDataEcommerce`;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?,
             exepected
         );
 
@@ -4019,21 +4121,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_information_schema_tables() -> Result<(), CubeError> {
+    async fn test_information_schema_tables_mysql() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "information_schema_tables",
-            execute_query("SELECT * FROM information_schema.tables".to_string()).await?
+            "information_schema_tables_mysql",
+            execute_query(
+                "SELECT * FROM information_schema.tables".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_information_schema_columns() -> Result<(), CubeError> {
+    async fn test_information_schema_columns_mysql() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "information_schema_columns",
+            "information_schema_columns_mysql",
             execute_query(
-                "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string()
+                "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4045,7 +4152,11 @@ mod tests {
     async fn test_information_schema_schemata() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_schemata",
-            execute_query("SELECT * FROM information_schema.schemata".to_string()).await?
+            execute_query(
+                "SELECT * FROM information_schema.schemata".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
@@ -4060,7 +4171,7 @@ mod tests {
                 A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
             FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
             WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
-            ORDER BY A.COLUMN_NAME".to_string()).await?,
+            ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?,
             "++\n++\n++"
         );
 
@@ -4071,12 +4182,32 @@ mod tests {
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "performance_schema_session_variables",
-            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?
+            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         insta::assert_snapshot!(
             "performance_schema_global_variables",
-            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string()).await?
+            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_processlist() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "show_processlist",
+            execute_query("SHOW processlist".to_string(), DatabaseProtocol::MySQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_show_warnings() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "show_warnings",
+            execute_query("SHOW warnings".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -4086,7 +4217,25 @@ mod tests {
     async fn test_information_schema_collations() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_collations",
-            execute_query("SELECT * FROM information_schema.collations".to_string()).await?
+            execute_query(
+                "SELECT * FROM information_schema.collations".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_processlist() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_processlist",
+            execute_query(
+                "SELECT * FROM information_schema.processlist".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
@@ -4104,7 +4253,8 @@ mod tests {
                 if(false, CAST(1 as int), CAST(2 as bigint)) as c2,
                 if(true, CAST(1 as bigint), CAST(2 as int)) as c3
             "#
-                .to_string()
+                .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "+-------+-------+------+----+----+----+\n\
@@ -4127,7 +4277,8 @@ mod tests {
                 least(null, 1) as r3, \
                 least(1, null) as r4
             "
-                .to_string()
+                .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "+----+----+------+------+\n\
@@ -4147,7 +4298,8 @@ mod tests {
                 "select \
                 ucase('super stroka') as r1
             "
-                .to_string()
+                .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "+--------------+\n\
@@ -4164,7 +4316,7 @@ mod tests {
     async fn test_convert_tz() -> Result<(), CubeError> {
         assert_eq!(
             execute_query(
-                "select convert_tz('2021-12-08T15:50:14.337Z'::timestamp, @@GLOBAL.time_zone, '+00:00') as r1;".to_string()
+                "select convert_tz('2021-12-08T15:50:14.337Z'::timestamp, @@GLOBAL.time_zone, '+00:00') as r1;".to_string(), DatabaseProtocol::MySQL
             )
             .await?,
             "+--------------------------+\n\
@@ -4183,7 +4335,7 @@ mod tests {
             execute_query(
                 "select \
                     timediff('1994-11-26T13:25:00.000Z'::timestamp, '1994-11-26T13:25:00.000Z'::timestamp) as r1
-                ".to_string()
+                ".to_string(), DatabaseProtocol::MySQL
             )
             .await?,
             "+------------------------------------------------+\n\
@@ -4205,7 +4357,8 @@ mod tests {
                     instr('rust is killing me', 'e') as r2,
                     instr('Rust is killing me', 'unknown') as r3;
                 "
-                .to_string()
+                .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "+----+----+----+\n\
@@ -4227,7 +4380,8 @@ mod tests {
                     locate('e', 'rust is killing me') as r2,
                     locate('unknown', 'Rust is killing me') as r3
                 "
-                .to_string()
+                .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "+----+----+----+\n\
@@ -4268,7 +4422,7 @@ mod tests {
                     @@transaction_isolation AS transaction_isolation, \
                     @@wait_timeout AS wait_timeout
                 "
-                .to_string()
+                .to_string(), DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4281,25 +4435,37 @@ mod tests {
         // LIKE
         insta::assert_snapshot!(
             "show_variables_like_sql_mode",
-            execute_query("show variables like 'sql_mode';".to_string()).await?
+            execute_query(
+                "show variables like 'sql_mode';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // LIKE pattern
         insta::assert_snapshot!(
             "show_variables_like",
-            execute_query("show variables like '%_mode';".to_string()).await?
+            execute_query(
+                "show variables like '%_mode';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // Negative test, we dont define this variable
         assert_eq!(
-            execute_query("show variables like 'aurora_version';".to_string()).await?,
+            execute_query(
+                "show variables like 'aurora_version';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?,
             "++\n++\n++"
         );
 
         // All variables
         insta::assert_snapshot!(
             "show_variables",
-            execute_query("show variables;".to_string()).await?
+            execute_query("show variables;".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -4310,27 +4476,39 @@ mod tests {
         // Simplest syntax
         insta::assert_snapshot!(
             "show_columns",
-            execute_query("show columns from KibanaSampleDataEcommerce;".to_string()).await?
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // FULL
         insta::assert_snapshot!(
             "show_columns_full",
-            execute_query("show full columns from KibanaSampleDataEcommerce;".to_string()).await?
+            execute_query(
+                "show full columns from KibanaSampleDataEcommerce;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // LIKE
         insta::assert_snapshot!(
             "show_columns_like",
-            execute_query("show columns from KibanaSampleDataEcommerce like '%ice%';".to_string())
-                .await?
+            execute_query(
+                "show columns from KibanaSampleDataEcommerce like '%ice%';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // WHERE
         insta::assert_snapshot!(
             "show_columns_where",
             execute_query(
-                "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string()
+                "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4339,7 +4517,8 @@ mod tests {
         insta::assert_snapshot!(
             "show_columns_from_db",
             execute_query(
-                "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string()
+                "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4348,7 +4527,8 @@ mod tests {
         insta::assert_snapshot!(
             "show_columns_everything",
             execute_query(
-                "show full columns from KibanaSampleDataEcommerce from db like '%';".to_string()
+                "show full columns from KibanaSampleDataEcommerce from db like '%';".to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4361,37 +4541,49 @@ mod tests {
         // Simplest syntax
         insta::assert_snapshot!(
             "show_tables_simple",
-            execute_query("show tables;".to_string()).await?
+            execute_query("show tables;".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         // FULL
         insta::assert_snapshot!(
             "show_tables_full",
-            execute_query("show full tables;".to_string()).await?
+            execute_query("show full tables;".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         // LIKE
         insta::assert_snapshot!(
             "show_tables_like",
-            execute_query("show tables like '%ban%';".to_string()).await?
+            execute_query(
+                "show tables like '%ban%';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // WHERE
         insta::assert_snapshot!(
             "show_tables_where",
-            execute_query("show tables where Tables_in_db = 'Logs';".to_string()).await?
+            execute_query(
+                "show tables where Tables_in_db = 'Logs';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // FROM db
         insta::assert_snapshot!(
             "show_tables_from_db",
-            execute_query("show tables from db;".to_string()).await?
+            execute_query("show tables from db;".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         // Everything
         insta::assert_snapshot!(
             "show_tables_everything",
-            execute_query("show full tables from db like '%';".to_string()).await?
+            execute_query(
+                "show full tables from db like '%';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
@@ -4404,7 +4596,8 @@ mod tests {
                 "SELECT `table_name`, `column_name`
                 FROM `information_schema`.`columns`
                 WHERE `data_type`='enum' AND `table_schema`='db'"
-                    .to_string()
+                    .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             "++\n++\n++"
@@ -4416,7 +4609,11 @@ mod tests {
     #[tokio::test]
     async fn test_explain_table() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            execute_query("explain KibanaSampleDataEcommerce;".to_string()).await?
+            execute_query(
+                "explain KibanaSampleDataEcommerce;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
@@ -4424,7 +4621,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_use_db() -> Result<(), CubeError> {
-        assert_eq!(execute_query("use db;".to_string()).await?, "".to_string());
+        assert_eq!(
+            execute_query("use db;".to_string(), DatabaseProtocol::MySQL).await?,
+            "".to_string()
+        );
 
         Ok(())
     }
@@ -4432,30 +4632,33 @@ mod tests {
     #[tokio::test]
     async fn test_set_variable() -> Result<(), CubeError> {
         assert_eq!(
-            execute_query_with_flags("set autocommit=1;".to_string()).await?,
+            execute_query_with_flags("set autocommit=1;".to_string(), DatabaseProtocol::MySQL)
+                .await?,
             (
                 "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
-            )
-        );
-
-        assert_eq!(
-            execute_query_with_flags("set character_set_results = utf8;".to_string()).await?,
-            (
-                "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED
+                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
         );
 
         assert_eq!(
             execute_query_with_flags(
+                "set character_set_results = utf8;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?,
+            ("++\n++\n++".to_string(), StatusFlags::SERVER_STATE_CHANGED)
+        );
+
+        assert_eq!(
+            execute_query_with_flags(
                 "set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables');"
-                    .to_string()
+                    .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?,
             (
                 "++\n++\n++".to_string(),
-                StatusFlags::SERVER_SESSION_STATE_CHANGED | StatusFlags::SERVER_STATUS_AUTOCOMMIT
+                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
         );
 
@@ -4467,19 +4670,27 @@ mod tests {
         // Simplest syntax
         insta::assert_snapshot!(
             "show_collation",
-            execute_query("show collation;".to_string()).await?
+            execute_query("show collation;".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         // LIKE
         insta::assert_snapshot!(
             "show_collation_like",
-            execute_query("show collation like '%unicode%';".to_string()).await?
+            execute_query(
+                "show collation like '%unicode%';".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // WHERE
         insta::assert_snapshot!(
             "show_collation_where",
-            execute_query("show collation where Id between 255 and 260;".to_string()).await?
+            execute_query(
+                "show collation where Id between 255 and 260;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         // Superset query
@@ -4487,7 +4698,8 @@ mod tests {
             "show_collation_superset",
             execute_query(
                 "show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';"
-                    .to_string()
+                    .to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4498,12 +4710,15 @@ mod tests {
     #[tokio::test]
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
-        insta::assert_snapshot!(execute_query("explain select 1+1;".to_string()).await?);
+        insta::assert_snapshot!(
+            execute_query("explain select 1+1;".to_string(), DatabaseProtocol::MySQL).await?
+        );
 
         // SELECT with table and specific columns
         insta::assert_snapshot!(
             execute_query(
-                "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string()
+                "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string(),
+                DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4518,7 +4733,7 @@ mod tests {
                 "SELECT \
                     @@GLOBAL.time_zone AS global_tz, \
                     @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'
-                ".to_string()
+                ".to_string(), DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4545,7 +4760,7 @@ mod tests {
                 IF(EXTRA = 'auto_increment','YES','NO') IS_AUTOINCREMENT, \
                 IF(EXTRA in ('VIRTUAL', 'PERSISTENT', 'VIRTUAL GENERATED', 'STORED GENERATED') ,'YES','NO') IS_GENERATEDCOLUMN \
                 FROM INFORMATION_SCHEMA.COLUMNS  WHERE (ISNULL(database()) OR (TABLE_SCHEMA = database())) AND TABLE_NAME = 'KibanaSampleDataEcommerce' \
-                ORDER BY TABLE_CAT, TABLE_SCHEM, TABLE_NAME, ORDINAL_POSITION;".to_string()
+                ORDER BY TABLE_CAT, TABLE_SCHEM, TABLE_NAME, ORDINAL_POSITION;".to_string(), DatabaseProtocol::MySQL
             )
             .await?
         );
@@ -4570,7 +4785,49 @@ mod tests {
                 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
                 INNER JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS RC ON KCU.CONSTRAINT_SCHEMA = RC.CONSTRAINT_SCHEMA AND KCU.CONSTRAINT_NAME = RC.CONSTRAINT_NAME
                 WHERE (ISNULL(database()) OR (KCU.TABLE_SCHEMA = database())) AND  KCU.TABLE_NAME = 'SlackMessages' ORDER BY PKTABLE_CAT, PKTABLE_SCHEM, PKTABLE_NAME, KEY_SEQ
-                ".to_string()
+                ".to_string(), DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_tables_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_tables_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.tables".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_columns_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_columns_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.columns".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgtables_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgtables_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_tables".to_string(),
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );

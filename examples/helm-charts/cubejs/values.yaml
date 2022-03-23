@@ -37,6 +37,17 @@ config:
   ##
   sqlPort:
 
+  ## The username to access the SQL api
+  ##
+  sqlUser:
+
+  ## The password to access the SQL api
+  ##
+  sqlPassword:
+  # apiPasswordFromSecret:
+  #   name:
+  #   key:
+
   ## If true, enables development mode.
   ##
   devMode: false
@@ -287,7 +298,7 @@ database:
 
     ## The S3 path to store query results made by the Cube.js deployment
     ##
-    outputLocation:
+    s3outputLocation:
 
     ## The AWS Secret Access Key to use for database connections
     ##
@@ -530,51 +541,6 @@ workers:
   ## Custom readinessProbe that overrides the default one
   ##
   customReadinessProbe: {}
-
-service:
-  ## Set to true to enable service generation
-  ##
-  enabled: true
-
-  ## Master service type
-  ##
-  type: ClusterIP
-
-  ## Master service port
-  ##
-  port: 4000
-
-  ## Node port for master
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-  ## NOTE: choose port between <30000-32767>
-  ##
-  nodePort:
-
-  ## Master service external traffic policy
-  ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-  ##
-  externalTrafficPolicy: Cluster
-
-  ## Master service Cluster IP
-  ##
-  clusterIP:
-
-  ## Master service Load Balancer IP
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
-  ##
-  loadBalancerIP:
-
-  ## Master service Load Balancer sources
-  ## https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
-  ## e.g.
-  ## loadBalancerSourceRanges:
-  ##   - 10.10.10.0/24
-  ##
-  loadBalancerSourceRanges: []
-
-  ## Additional custom annotations for master service
-  ##
-  annotations: {}
 
 ## Configure the ingress resource that allows you to access the
 ## Cubejs installation. Set up the URL

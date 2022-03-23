@@ -645,4 +645,30 @@ describe('Refresh Scheduler', () => {
       }
     }
   });
+
+  test('Empty security context', async () => {
+    const { refreshScheduler } = setupScheduler({
+      repository: repositoryWithoutPreAggregations,
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await refreshScheduler.runScheduledRefresh({
+        securityContext: undefined,
+        authInfo: null,
+        requestId: 'Empty security context'
+      }, {
+        concurrency: 1,
+        workerIndices: [0],
+      });
+    }
+    await refreshScheduler.runScheduledRefresh({
+      securityContext: undefined,
+      authInfo: null,
+      requestId: 'Empty security context'
+    }, {
+      concurrency: 1,
+      workerIndices: [0],
+      throwErrors: true
+    });
+  });
 });

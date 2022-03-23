@@ -11,7 +11,7 @@ import {
 import { useToggle } from '../../hooks';
 import { RollupDesignerModal } from './components/RollupDesignerModal';
 
-type RollupDesignerContextProps = {
+type RollupDesignerContextValue = {
   error: Error | null;
   isLoading: boolean;
   isModalOpen: boolean;
@@ -23,14 +23,15 @@ type RollupDesignerContextProps = {
   setTransformedQuery: (transformedQuery: TransformedQuery | null) => void;
 };
 
-export const Context = createContext<RollupDesignerContextProps>(
-  {} as RollupDesignerContextProps
+export const Context = createContext<RollupDesignerContextValue>(
+  {} as RollupDesignerContextValue
 );
 
 type ContextProps = {
   apiUrl: string;
   children: ReactNode;
   cubejsApi?: CubejsApi;
+  token?: string;
 };
 
 export function RollupDesignerContext({
@@ -104,7 +105,7 @@ export function RollupDesignerContext({
     >
       {children}
 
-      <RollupDesignerModal apiUrl={props.apiUrl} onAfterClose={reset} />
+      <RollupDesignerModal apiUrl={props.apiUrl} token={props.token} onAfterClose={reset} />
     </Context.Provider>
   );
 }

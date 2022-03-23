@@ -1,0 +1,74 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`questdb Events.count with Events.type order by Events.count DESC: Events.count with Events.type order by Events.count DESC 1`] = `
+Array [
+  Object {
+    "Events.count": "513",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "120",
+    "Events.type": "CreateEvent",
+  },
+  Object {
+    "Events.count": "104",
+    "Events.type": "IssueCommentEvent",
+  },
+  Object {
+    "Events.count": "92",
+    "Events.type": "WatchEvent",
+  },
+  Object {
+    "Events.count": "57",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "32",
+    "Events.type": "PullRequestEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "ForkEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "GollumEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "PullRequestReviewCommentEvent",
+  },
+  Object {
+    "Events.count": "14",
+    "Events.type": "DeleteEvent",
+  },
+  Object {
+    "Events.count": "2",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "1",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "1",
+    "Events.type": "CommitCommentEvent",
+  },
+]
+`;
+
+exports[`questdb Events.count: Events.count 1`] = `
+Array [
+  Object {
+    "Events.count": "999",
+  },
+]
+`;
+
+exports[`questdb Orders.totalAmount: Orders.totalAmount 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "114",
+  },
+]
+`;

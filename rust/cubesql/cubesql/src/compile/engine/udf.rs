@@ -26,7 +26,7 @@ use crate::{
         coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
-    mysql::ConnectionState,
+    sql::SessionState,
 };
 
 pub fn create_version_udf() -> ScalarUDF {
@@ -46,7 +46,7 @@ pub fn create_version_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_db_udf(name: String, state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     let db_state = state.database().unwrap_or("db".to_string());
 
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -65,7 +65,7 @@ pub fn create_db_udf(name: String, state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -86,7 +86,7 @@ pub fn create_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -107,7 +107,7 @@ pub fn create_current_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_connection_id_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
         builder.append_value(state.connection_id).unwrap();

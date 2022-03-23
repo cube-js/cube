@@ -3,17 +3,14 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
 import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { execInDir, pausePromise } from '@cubejs-backend/shared';
+import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import fsExtra from 'fs-extra';
-import dotenv from '@cubejs-backend/dotenv';
-
-import { PostgresDBRunner } from './db/postgres';
-import { getLocalHostnameByOs } from './utils';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
   loadScript?: string;
-  envFile?: string;
+  env?: Record<string, string>;
 }
 
 export interface BirdBox {
@@ -43,16 +40,31 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
     };
   }
 
+  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
+    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
+  }
+
+  if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
+    process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
+    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
+    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`) !== 0) {
+      throw new Error('[Birdbox] Docker build failed.');
+    }
+  }
+
+  if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
+    process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
+  }
+
   const composeFile = `${options.name}.yml`;
   let dc = new DockerComposeEnvironment(
     path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
     composeFile
   );
 
-  if (options.envFile) {
-    const env = dotenv.parse(fs.readFileSync(options.envFile));
-    for (const k of Object.keys(env)) {
-      dc = dc.withEnv(k, env[k]);
+  if (options.env) {
+    for (const k of Object.keys(options.env)) {
+      dc = dc.withEnv(k, options.env[k]);
     }
   }
 
@@ -60,8 +72,8 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION || 'latest')
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION || 'latest')
+    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION)
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION)
     .up();
 
   const host = '127.0.0.1';
@@ -130,8 +142,7 @@ export interface StartCliWithEnvOptions {
   useCubejsServerBinary?: boolean;
   loadScript?: string;
   cubejsConfig?: string;
-  extraEnv?: Record<string, string>;
-  envFile?: string;
+  env?: Record<string, string>;
 }
 
 export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
@@ -207,14 +218,10 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
         CUBEJS_DB_TYPE: options.dbType === 'postgresql' ? 'postgres' : options.dbType,
         CUBEJS_DEV_MODE: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
-        ...options.extraEnv
-          ? options.extraEnv
-          : {
-            CUBEJS_WEB_SOCKETS: 'true',
-            CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-          },
-        ...options.envFile
-          ? dotenv.parse(fs.readFileSync(options.envFile))
+        CUBEJS_WEB_SOCKETS: 'true',
+        CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+        ...options.env
+          ? options.env
           : {
             CUBEJS_DB_HOST: db!.getHost(),
             CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,

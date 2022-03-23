@@ -8,6 +8,12 @@ redirect_from:
 
 **Cube is the headless business intelligence platform.** It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
+<img
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-scheme.png"
+  style="border: none"
+  width="100%"
+/>
+
 Cube was designed to work with all SQL-enabled data sources, including cloud data warehouses like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has a built-in caching engine to provide sub-second latency and high concurrency for API requests.
 
 With Cube, you can build a data model, manage access control and caching, and expose your data to every application via REST, GraphQL, and SQL APIs. 
@@ -17,7 +23,7 @@ Cube is headless, API-first, and decoupled from visualizations. You can use any 
 
 If you are building a data application—such as a business intelligence tool or a customer-facing analytics feature—you’ll probably face the following problems:
 
-1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modelling framework.
+1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modeling framework.
 2. __Performance.__ Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
 3. __Access Control.__ It is important to secure and govern access to data for all downstream data consuming applications.
 
