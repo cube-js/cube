@@ -54,7 +54,7 @@ cube(`Order`, {
 
 
     /**
-     * Step 3.
+     * Step 3
      * Using dedicated pre-aggregations for large and complex queries
      */
     /** This is going to take ages to build...  */
@@ -86,7 +86,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
 
     /** 
@@ -247,7 +252,7 @@ cube(`Order`, {
 
   joins: {
     /**
-     * Step 3.
+     * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     Customer: {
@@ -308,14 +313,14 @@ cube(`Order`, {
      * Step 3 & Step 4 & Step 5
      * Using dedicated pre-aggregations for large and complex queries
      */
-    // totalPriceAvg: {
-    //   sql: `${CUBE.totalPriceSum} / ${CUBE.count}`,
-    //   type: `number`,
-    // },
-    // totalPriceSum: {
-    //   sql: `${CUBE}.O_TOTALPRICE`,
-    //   type: `sum`,
-    // },
+    totalPriceAvg: {
+      sql: `${CUBE.totalPriceSum} / ${CUBE.count}`,
+      type: `number`,
+    },
+    totalPriceSum: {
+      sql: `${CUBE}.O_TOTALPRICE`,
+      type: `sum`,
+    },
 
     /**
      * Step 8
@@ -349,7 +354,7 @@ cube(`Order`, {
 
   dimensions: {
     /**
-     * Step 3.
+     * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     oCustkey: {
