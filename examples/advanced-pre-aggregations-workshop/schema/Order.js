@@ -224,13 +224,11 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
-    //   indexes: {
-    //     customerIndex: {
-    //       columns: [
-    //         Order.oCustkey,
-    //       ],
-    //     },
-    //   },
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     /** Join Orders Rollup with Customers Rollup */
     // ordersCustomersRollupJoin: {
@@ -240,6 +238,11 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   },
     //   rollups: [
     //     Customer.customersRollup,
     //     Order.ordersRollup,
@@ -274,7 +277,13 @@ cube(`Order`, {
     //     Region.rRegionkey
     //   ],
     //   timeDimension: Order.oOrderdate,
-    //   granularity: `month`
+    //   granularity: `month`,
+    //   partitionGranularity: `month`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `1 month`,
+    //   },
     // }
   },
 
