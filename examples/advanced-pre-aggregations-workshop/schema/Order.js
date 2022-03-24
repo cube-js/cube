@@ -292,10 +292,10 @@ cube(`Order`, {
      * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
-    Customer: {
-      relationship: `belongsTo`,
-      sql: `${CUBE.oCustkey} = ${Customer.cCustkey}`,
-    },
+    // Customer: {
+    //   relationship: `belongsTo`,
+    //   sql: `${CUBE.oCustkey} = ${Customer.cCustkey}`,
+    // },
   },
 
   measures: {
@@ -350,14 +350,14 @@ cube(`Order`, {
      * Step 3 & Step 4 & Step 5
      * Using dedicated pre-aggregations for large and complex queries
      */
-    totalPriceAvg: {
-      sql: `${CUBE.totalPriceSum} / ${CUBE.count}`,
-      type: `number`,
-    },
-    totalPriceSum: {
-      sql: `${CUBE}.O_TOTALPRICE`,
-      type: `sum`,
-    },
+    // totalPriceAvg: {
+    //   sql: `${CUBE.totalPriceSum} / ${CUBE.count}`,
+    //   type: `number`,
+    // },
+    // totalPriceSum: {
+    //   sql: `${CUBE}.O_TOTALPRICE`,
+    //   type: `sum`,
+    // },
 
     /**
      * Step 8
