@@ -20,7 +20,6 @@ use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
 use crate::config::{Config, WorkerServices};
-use crate::queryplanner::query_executor::QueryExecutor;
 use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::respawn::respawn;
 use crate::CubeError;
@@ -53,7 +52,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(query_executor: Arc<dyn QueryExecutor>, args: T) -> Result<R, CubeError>;
+    async fn process(services: &WorkerServices, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -285,14 +284,13 @@ where
         let config = Config::default();
         config.configure_injector().await;
         let services = config.worker_services().await;
-        let WorkerServices { query_executor } = services;
 
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
                     let result =
-                        async_try_with_catch_unwind(P::process(query_executor.clone(), args)).await;
+                        async_try_with_catch_unwind(P::process(&services.clone(), args)).await;
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
@@ -321,11 +319,11 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
-    use crate::queryplanner::query_executor::QueryExecutor;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
+    use crate::config::WorkerServices;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -349,7 +347,7 @@ mod tests {
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
         async fn process(
-            _query_executor: Arc<dyn QueryExecutor>,
+            _services: &WorkerServices,
             args: Message,
         ) -> Result<Response, CubeError> {
             match args {

@@ -11,7 +11,7 @@ use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
-use crate::config::is_router;
+use crate::config::{is_router, WorkerServices};
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
@@ -204,7 +204,7 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     for WorkerProcessor
 {
     async fn process(
-        query_executor: Arc<dyn QueryExecutor>,
+        services: &WorkerServices,
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
@@ -224,7 +224,9 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                         ))
                     })
                     .collect::<Result<HashMap<_, _>, _>>()?;
-                let res = query_executor
+                let res = services
+                    .query_executor
+                    .clone()
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
                 debug!(
