@@ -168,19 +168,23 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
-    //   refreshKey: {
+    //   refreshKey: {    
     //     /**
     //      * Option 1 
     //      * Interval refresh key.
-    //      * Defaul value is 1 hour.
+    //      * Default value is 1 hour.
     //      * Refreshes pre-aggregations based on a time interval.
     //      */
     //     // every: `1 minute`, // This will refresh every minute
+    //     // incremental: true,
+    //     // updateWindow: `7 day`,
     //     /**
     //      * Option 2
     //      * Refreshes pre-aggregations based on a CRON string.
     //      */
     //     // every: `* * * * *`, // This will refresh every minute
+    //     // incremental: true,
+    //     // updateWindow: `7 day`,
     //     /**
     //      * Option 3
     //      * Custom refresh check SQL
@@ -191,8 +195,17 @@ cube(`Order`, {
     //      * => every: '2 minute' for BigQuery, Athena, Snowflake, and Presto
     //      * => every: '10 second' for all other databases
     //      */
-    //     sql: `SELECT MAX(O_UPDATEDAT) FROM tpc_h.order;`,
-    //     every: `1 minute`
+    //     // sql: `
+    //     //   SELECT 
+    //     //     MAX(O_UPDATEDAT) FROM tpc_h.order
+    //     //   WHERE 
+    //     //     O_UPDATEDAT
+    //     //   BETWEEN 
+    //     //     TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+    //     //   AND 
+    //     //     CURRENT_TIMESTAMP();
+    //     // `,
+    //     // every: `1 minute`
     //   },
     // },
 
