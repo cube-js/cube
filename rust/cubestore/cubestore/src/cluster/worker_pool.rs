@@ -23,6 +23,8 @@ use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
+use crate::config::{Config, WorkerServices};
+use crate::queryplanner::query_executor::QueryExecutor;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -51,7 +53,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(args: T) -> Result<R, CubeError>;
+    async fn process(query_executor: Arc<dyn QueryExecutor>, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -280,11 +282,16 @@ where
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        let config = Config::default();
+        config.configure_injector().await;
+        let services = config.worker_services().await;
+        let WorkerServices { query_executor } = services;
+
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let result = async_try_with_catch_unwind(P::process(args)).await;
+                    let result = async_try_with_catch_unwind(P::process(query_executor.clone(), args)).await;
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
@@ -317,6 +324,7 @@ mod tests {
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
+    use crate::queryplanner::query_executor::QueryExecutor;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -339,7 +347,7 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(args: Message) -> Result<Response, CubeError> {
+        async fn process(_query_executor: Arc<dyn QueryExecutor> , args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;

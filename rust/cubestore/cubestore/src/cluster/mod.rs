@@ -204,6 +204,7 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     for WorkerProcessor
 {
     async fn process(
+        query_executor: Arc<dyn QueryExecutor>,
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
@@ -223,8 +224,7 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                         ))
                     })
                     .collect::<Result<HashMap<_, _>, _>>()?;
-                let res = Config::current_worker_services()
-                    .query_executor
+                let res = query_executor
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
                 debug!(
