@@ -20,10 +20,10 @@ use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
 use crate::config::{Config, WorkerServices};
-use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -290,7 +290,10 @@ where
             match res {
                 Ok(args) => {
                     let result =
-                        async_try_with_catch_unwind(P::process(&services.clone(), args)).await;
+                        match async_try_with_catch_unwind(P::process(&services, args)).await {
+                            Ok(result) => result,
+                            Err(panic) => Err(CubeError::from(panic)),
+                        };
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
