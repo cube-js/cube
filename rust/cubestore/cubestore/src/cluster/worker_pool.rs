@@ -319,11 +319,11 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::config::WorkerServices;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
-    use crate::config::WorkerServices;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -346,10 +346,7 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(
-            _services: &WorkerServices,
-            args: Message,
-        ) -> Result<Response, CubeError> {
+        async fn process(_services: &WorkerServices, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;
