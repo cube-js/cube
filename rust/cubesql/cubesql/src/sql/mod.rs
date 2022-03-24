@@ -1,4 +1,5 @@
 pub(crate) mod auth_service;
+pub(crate) mod database_variables;
 pub(crate) mod dataframe;
 pub(crate) mod mysql;
 pub(crate) mod postgres;
@@ -13,6 +14,6 @@ pub use mysql::MySqlServer;
 pub use postgres::PostgresServer;
 pub use server_manager::ServerManager;
 pub use service::*;
-pub use session::{DatabaseProtocol, Session, SessionProcessList, SessionProperties, SessionState};
+pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
 pub use types::{ColumnFlags, ColumnType, StatusFlags};

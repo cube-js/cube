@@ -57,7 +57,6 @@ use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
-use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -67,6 +66,7 @@ use crate::{
     store::DataFrame,
 };
 use data::create_array_builder;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use std::mem::take;
 
 pub mod cache;
@@ -613,8 +613,14 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                     if workers.len() == 0 {
                         let executor = self.query_executor.clone();
-                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
-                            .await?;
+                        match async_try_with_catch_unwind(
+                            executor.execute_router_plan(plan, cluster),
+                        )
+                        .await
+                        {
+                            Ok(result) => result,
+                            Err(panic) => Err(CubeError::from(panic)),
+                        }?;
                     } else {
                         let worker = &workers[0];
                         cluster.run_select(worker, plan).await?;

@@ -11,22 +11,22 @@
   /* ----------------------------------------------------- */
 
   // Apply a tenant-aware filter to all queries
-  queryRewrite: (query, { securityContext }) => {
-    // Ensure that the security context has the `rRegionkey` property
-    if (!securityContext.rRegionkey) {
-      throw new Error('No Region Key found in Security Context!');
-    }
+  // queryRewrite: (query, { securityContext }) => {
+  //   // Ensure that the security context has the `rRegionkey` property
+  //   if (!securityContext.rRegionkey) {
+  //     throw new Error('No Region Key found in Security Context!');
+  //   }
 
-    // Apply a filter to all queries.  Cube will make sure to join
-    // the `Region` cube to other cubes in a query to apply the filter
-    query.filters.push({
-      member: "Region.rRegionkey",
-      operator: "equals",
-      values: [ securityContext.rRegionkey ]
-    });
+  //   // Apply a filter to all queries.  Cube will make sure to join
+  //   // the `Region` cube to other cubes in a query to apply the filter
+  //   query.filters.push({
+  //     member: "Region.rRegionkey",
+  //     operator: "equals",
+  //     values: [ securityContext.rRegionkey ]
+  //   });
 
-    return query;
-  },
+  //   return query;
+  // },
 
   /**
    * Part 2
@@ -37,29 +37,29 @@
   // Provide tenant-aware access to data sources
   // Now configure Cube to treat every tenant independently, by appId.
   // This is required for different database connections
-  contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.rRegionkey}`,
+  // contextToAppId: ({ securityContext }) => `CUBEJS_APP_${securityContext.rRegionkey}`,
 
   // We also must configure preAggregationsSchema to prevent preAggregation conflicts on the same table
-  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.rRegionkey}`,
+  // preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.rRegionkey}`,
 
   
   /* ---------------------------------------- */
 
   // Fetch info on all available tenants from the database.
   // Provide it to Cube so it's able to refresh pre-aggregations
-  scheduledRefreshContexts: async () => {
-    // Option 1.
-    // const rRegionkeys = await fetchRegionKeys();
-    // Option 2.
-    const rRegionkeys = await fetchRegionKeysGCPFun();
+  // scheduledRefreshContexts: async () => {
+  //   // Option 1.
+  //   // const rRegionkeys = await fetchRegionKeys();
+  //   // Option 2.
+  //   const rRegionkeys = await fetchRegionKeysGCPFun();
 
-    function mapSecurityContext() {
-      return rRegionkeys.map(rRegionkey => {
-        return { securityContext: { rRegionkey } }
-      })
-    }
-    return mapSecurityContext();
-  }
+  //   function mapSecurityContext() {
+  //     return rRegionkeys.map(rRegionkey => {
+  //       return { securityContext: { rRegionkey } }
+  //     })
+  //   }
+  //   return mapSecurityContext();
+  // }
 };
 
 /** 
