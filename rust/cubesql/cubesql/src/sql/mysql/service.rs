@@ -25,7 +25,7 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
 
-use crate::sql::DatabaseProtocol;
+use crate::sql::session::DatabaseProtocol;
 use crate::sql::Session;
 use crate::sql::SessionManager;
 use crate::sql::{
