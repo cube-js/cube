@@ -111,7 +111,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     /** ==>  */
     // dailyOrderCountPerCustomer: {
@@ -123,7 +128,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     // dailyOrderPriceAvgPerCustomer: {
     //   measures: [
@@ -134,7 +144,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
 
     /**
