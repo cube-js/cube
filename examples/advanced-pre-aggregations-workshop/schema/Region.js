@@ -40,6 +40,10 @@ cube(`Region`, {
   },
   
   dimensions: {
+    /**
+     * Step 9.
+     * Multi-tenancy
+     */
     rRegionkey: {
       sql: `${CUBE}.\`R_REGIONKEY\``,
       type: `number`,

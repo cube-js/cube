@@ -54,7 +54,7 @@ cube(`Order`, {
 
 
     /**
-     * Step 3.
+     * Step 3
      * Using dedicated pre-aggregations for large and complex queries
      */
     /** This is going to take ages to build...  */
@@ -86,7 +86,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
 
     /** 
@@ -106,7 +111,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     /** ==>  */
     // dailyOrderCountPerCustomer: {
@@ -118,7 +128,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     // dailyOrderPriceAvgPerCustomer: {
     //   measures: [
@@ -129,7 +144,12 @@ cube(`Order`, {
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
-    //   partitionGranularity: `day`
+    //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
 
     /**
@@ -148,19 +168,23 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
-    //   refreshKey: {
+    //   refreshKey: {    
     //     /**
     //      * Option 1 
     //      * Interval refresh key.
-    //      * Defaul value is 1 hour.
+    //      * Default value is 1 hour.
     //      * Refreshes pre-aggregations based on a time interval.
     //      */
     //     // every: `1 minute`, // This will refresh every minute
+    //     // incremental: true,
+    //     // updateWindow: `7 day`,
     //     /**
     //      * Option 2
     //      * Refreshes pre-aggregations based on a CRON string.
     //      */
     //     // every: `* * * * *`, // This will refresh every minute
+    //     // incremental: true,
+    //     // updateWindow: `7 day`,
     //     /**
     //      * Option 3
     //      * Custom refresh check SQL
@@ -171,8 +195,17 @@ cube(`Order`, {
     //      * => every: '2 minute' for BigQuery, Athena, Snowflake, and Presto
     //      * => every: '10 second' for all other databases
     //      */
-    //     sql: `SELECT MAX(O_UPDATEDAT) FROM tpc_h.order;`,
-    //     every: `1 minute`
+    //     // sql: `
+    //     //   SELECT 
+    //     //     MAX(O_UPDATEDAT) FROM tpc_h.order
+    //     //   WHERE 
+    //     //     O_UPDATEDAT
+    //     //   BETWEEN 
+    //     //     TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+    //     //   AND 
+    //     //     CURRENT_TIMESTAMP();
+    //     // `,
+    //     // every: `1 minute`
     //   },
     // },
 
@@ -191,13 +224,11 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
-    //   indexes: {
-    //     customerIndex: {
-    //       columns: [
-    //         Order.oCustkey,
-    //       ],
-    //     },
-    //   },
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   }
     // },
     /** Join Orders Rollup with Customers Rollup */
     // ordersCustomersRollupJoin: {
@@ -207,6 +238,11 @@ cube(`Order`, {
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `7 day`,
+    //   },
     //   rollups: [
     //     Customer.customersRollup,
     //     Order.ordersRollup,
@@ -241,19 +277,25 @@ cube(`Order`, {
     //     Region.rRegionkey
     //   ],
     //   timeDimension: Order.oOrderdate,
-    //   granularity: `month`
+    //   granularity: `month`,
+    //   partitionGranularity: `month`,
+    //   refreshKey: {
+    //     every: `1 minute`,
+    //     incremental: true,
+    //     updateWindow: `1 month`,
+    //   },
     // }
   },
 
   joins: {
     /**
-     * Step 3.
+     * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
-    Customer: {
-      relationship: `belongsTo`,
-      sql: `${CUBE.oCustkey} = ${Customer.cCustkey}`,
-    },
+    // Customer: {
+    //   relationship: `belongsTo`,
+    //   sql: `${CUBE.oCustkey} = ${Customer.cCustkey}`,
+    // },
   },
 
   measures: {
@@ -349,7 +391,7 @@ cube(`Order`, {
 
   dimensions: {
     /**
-     * Step 3.
+     * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     oCustkey: {
