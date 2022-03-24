@@ -2,8 +2,6 @@ import { DriverTests } from '@cubejs-backend/testing-shared';
 
 import { BigQueryDriver } from '../src';
 
-DriverTests.config();
-
 describe('BigQueryDriver', () => {
   let tests: DriverTests;
 

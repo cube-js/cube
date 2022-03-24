@@ -2,8 +2,6 @@ import { DriverTests } from '@cubejs-backend/testing-shared';
 
 import { AthenaDriver } from '../src';
 
-DriverTests.config();
-
 describe('AthenaDriver', () => {
   let tests: DriverTests;
 

@@ -19,6 +19,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
+use crate::config::{Config, WorkerServices};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -51,7 +52,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(args: T) -> Result<R, CubeError>;
+    async fn process(services: &WorkerServices, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -280,6 +281,10 @@ where
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        let config = Config::default();
+        config.configure_injector().await;
+        let services = config.worker_services().await;
+
         loop {
             let res = rx.recv();
             match res {
@@ -316,6 +321,7 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::config::WorkerServices;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
@@ -342,7 +348,7 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(args: Message) -> Result<Response, CubeError> {
+        async fn process(_services: &WorkerServices, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;

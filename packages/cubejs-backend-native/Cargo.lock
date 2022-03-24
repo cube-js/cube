@@ -460,6 +460,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bincode",
+ "bitflags",
  "byteorder",
  "bytes 0.5.6",
  "chrono",
@@ -492,7 +493,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=a3abf5bf90c8c93d22141e395571541e347a2bf6#a3abf5bf90c8c93d22141e395571541e347a2bf6"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=55a1d4a0f35cc932f5b4ceda037a302c5e1a3311#55a1d4a0f35cc932f5b4ceda037a302c5e1a3311"
 dependencies = [
  "ahash",
  "arrow",
@@ -2243,7 +2244,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.11.1-alpha.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=a9d45cc6d2e7458effee27939edfe787ef8e1b6d#a9d45cc6d2e7458effee27939edfe787ef8e1b6d"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=d6250ba4ca315d73d8b52fb67d1a54ca11351348#d6250ba4ca315d73d8b52fb67d1a54ca11351348"
 dependencies = [
  "log",
 ]

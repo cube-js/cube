@@ -1,10 +1,3 @@
-pub mod collations;
-pub mod columns;
-pub mod key_column_usage;
-pub mod processlist;
-pub mod referential_constraints;
-pub mod schemata;
-pub mod statistics;
-pub mod tables;
+pub mod mysql;
+pub mod postgres;
 pub mod utils;
-pub mod variables;

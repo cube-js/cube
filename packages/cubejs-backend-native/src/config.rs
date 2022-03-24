@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use cubesql::{
     config::{Config, CubeServices},
-    mysql::SqlAuthService,
+    sql::SqlAuthService,
     transport::TransportService,
 };
 

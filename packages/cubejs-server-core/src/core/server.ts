@@ -607,7 +607,8 @@ export class CubejsServerCore {
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context,
-          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema
+          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
+          allowNodeRequire: this.options.allowNodeRequire,
         }
       );
 
@@ -757,7 +758,8 @@ export class CubejsServerCore {
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
-      standalone: this.standalone
+      standalone: this.standalone,
+      allowNodeRequire: options.allowNodeRequire,
     });
   }
 

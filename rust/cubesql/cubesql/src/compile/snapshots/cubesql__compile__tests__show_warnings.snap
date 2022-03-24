@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4126
+expression: "execute_query(\"SHOW warnings\".to_string()).await?"
+
+---
++-------+------+---------+
+| Level | Code | Message |
++-------+------+---------+
++-------+------+---------+

@@ -2,8 +2,9 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use itertools::Itertools;
-use msql_srv::ColumnType;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
+
+use crate::sql::ColumnType;
 
 use super::CompiledQuery;
 
