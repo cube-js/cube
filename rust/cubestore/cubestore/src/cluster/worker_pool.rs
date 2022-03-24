@@ -25,8 +25,6 @@ use crate::util::respawn::{IPC_ENV, respawn};
 use crate::CubeError;
 use datafusion::cube_ext;
 
-use pretty_trace::*;
-
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -274,7 +272,7 @@ where
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R>,
 {
-    println!("QQQ {:?} {:?} {:?}", std::process::id(), std::env::var(IPC_ENV), PrettyTrace::new());
+    println!("QQQ {:?} {:?}", std::process::id(), std::env::var(IPC_ENV));
 
     let (rx, tx) = (a.args, a.results);
     let mut tokio_builder = Builder::new_multi_thread();
@@ -285,10 +283,16 @@ where
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        let config = Config::default();
+        config.configure_worker().await?;
+        // injector is lazy
+        // pull the query executor from injector
+
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
+                    println!("PPPX{} {:?}", std::process::id(), args);
                     let result = async_try_with_catch_unwind(P::process(args)).await;
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {

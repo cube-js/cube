@@ -1019,6 +1019,8 @@ impl ClusterImpl {
                     }
                 };
 
+                println!("PPPW{} {:?}", std::process::id(), m);
+
                 if !m.is_streaming_request() {
                     let response = c.process_message_on_worker(m).await;
                     if let Err(e) = response.send(&mut socket).await {

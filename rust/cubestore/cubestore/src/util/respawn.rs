@@ -8,6 +8,7 @@ use mysql_common::serde::Serialize;
 use crate::sys::process::{avoid_child_zombies, die_with_parent};
 use crate::CubeError;
 use std::any::type_name;
+use std::backtrace::Backtrace;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
@@ -41,9 +42,9 @@ pub fn respawn<Args: Serialize + DeserializeOwned>(
     cmd.envs(envs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     cmd.env(HANDLER_ENV, handler);
     cmd.env(PARENT_PID_ENV, std::process::id().to_string());
-    cmd.env(IPC_ENV, ipc_name);
+    cmd.env(IPC_ENV, ipc_name.clone());
 
-    // println!("QQQ Spawning {:?} {:?} {:?}", handler, ipc_name, cmd);
+    println!("RRR Spawn {} {:?} {:?} {:?}", std::process::id(), handler, ipc_name, cmd);
 
     let c = cmd.spawn()?;
     let (_, tx) = server.accept()?;
@@ -56,6 +57,7 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
     // We use type_name to simplify usage, although they are not guaranteed to be unique.
     // Hope this does not happen in practice.
     let key = type_name::<Args>();
+    println!("RRR REGISTER {} {}", std::process::id(), key);
     let had_duplicate = handlers
         .insert(
             key,
@@ -65,20 +67,20 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
     assert!(!had_duplicate, "duplicate handler registered for {}", key);
 }
 
-pub fn init() {
+pub fn init(worker_services: ...) {
     avoid_child_zombies();
 
     let handler_name = match std::env::var(HANDLER_ENV) {
         Ok(h) => h,
         Err(_) => return, // we're the main process.
     };
-    println!("III {}", std::process::id());
+    println!("RRR INIT {} {}", std::process::id(), Backtrace::capture());
 
-    let handlers = HANDLERS.read().unwrap();
-    let handler = match handlers.get(handler_name.as_str()) {
-        Some(f) => f,
-        None => panic!("no respawn handler for '{}'", handler_name),
-    };
+    // let handlers = HANDLERS.read().unwrap();
+    // let handler = match handlers.get(handler_name.as_str()) {
+    //     Some(f) => f,
+    //     None => panic!("no respawn handler for '{}'", handler_name),
+    // };
 
     let ppid = match std::env::var(PARENT_PID_ENV) {
         Ok(id) => id
@@ -89,6 +91,9 @@ pub fn init() {
     die_with_parent(ppid);
 
     let ipc_server = std::env::var(IPC_ENV).expect("could not get IPC channel name");
+
+    println!("RRR HANDLE {} {}", std::process::id(), ipc_server.clone());
+
     exit(handler(ipc_server))
 }
 

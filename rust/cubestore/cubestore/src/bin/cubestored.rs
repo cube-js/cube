@@ -11,10 +11,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
+use cubestore::cluster::worker_pool::worker_main;
 
 const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");
 
 fn main() {
+    println!("DDD main {}", std::process::id());
+
     let package_json: Value = serde_json::from_str(PACKAGE_JSON).unwrap();
     let version = package_json
         .get("version")
@@ -37,7 +40,7 @@ fn main() {
     log::info!("Cube Store version {} {}", version, std::process::id());
 
     let config = Config::default();
-    Config::configure_worker_services();
+    let worker_services = Config::configure_worker_services();
 
     let trim_every = config.config_obj().malloc_trim_every_secs();
     if trim_every != 0 {
@@ -49,6 +52,7 @@ fn main() {
 
     #[cfg(not(target_os = "windows"))]
     cubestore::util::respawn::init();
+    println!("DDD init {}", std::process::id());
 
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
@@ -68,6 +72,7 @@ fn main() {
 
         let services = config.cube_services().await;
 
+        println!("DDD config {}", std::process::id());
         track_event("Cube Store Start".to_string(), HashMap::new()).await;
 
         stop_on_ctrl_c(&services).await;
