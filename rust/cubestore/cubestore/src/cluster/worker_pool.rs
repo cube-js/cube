@@ -289,7 +289,7 @@ where
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let result = match async_try_with_catch_unwind(P::process(args)).await {
+                    let result = match async_try_with_catch_unwind(P::process(&services, args)).await {
                         Ok(result) => result,
                         Err(panic) => Err(CubeError::from(panic)),
                     };
