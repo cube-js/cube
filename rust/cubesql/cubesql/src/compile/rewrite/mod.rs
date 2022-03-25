@@ -3741,6 +3741,7 @@ impl LanguageToLogicalPlanConverter {
                         let mut query_time_dimensions = Vec::new();
                         let mut query_order = Vec::new();
                         let mut query_dimensions = Vec::new();
+                        let mut member_fields = Vec::new();
 
                         for m in members {
                             match m {
@@ -3751,7 +3752,7 @@ impl LanguageToLogicalPlanConverter {
                                         MeasureName
                                     );
                                     let expr = self.to_expr(measure_params[1])?;
-                                    query_measures.push(measure);
+                                    query_measures.push(measure.to_string());
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
@@ -3760,6 +3761,7 @@ impl LanguageToLogicalPlanConverter {
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
+                                    member_fields.push(measure.to_string());
                                 }
                                 LogicalPlanLanguage::TimeDimension(params) => {
                                     let dimension =
@@ -3776,8 +3778,8 @@ impl LanguageToLogicalPlanConverter {
                                     );
                                     let expr = self.to_expr(params[3])?;
                                     query_time_dimensions.push(V1LoadRequestQueryTimeDimension {
-                                        dimension,
-                                        granularity,
+                                        dimension: dimension.to_string(),
+                                        granularity: granularity.clone(),
                                         date_range: date_range.map(|date_range| {
                                             serde_json::Value::Array(
                                                 date_range
@@ -3787,20 +3789,24 @@ impl LanguageToLogicalPlanConverter {
                                             )
                                         }),
                                     });
-                                    fields.push(DFField::new(
-                                        None,
-                                        // TODO empty schema
-                                        &expr.name(&DFSchema::empty())?,
-                                        DataType::Timestamp(TimeUnit::Nanosecond, None),
-                                        // TODO actually nullable. Just to fit tests
-                                        false,
-                                    ));
+                                    if let Some(granularity) = &granularity {
+                                        fields.push(DFField::new(
+                                            None,
+                                            // TODO empty schema
+                                            &expr.name(&DFSchema::empty())?,
+                                            DataType::Timestamp(TimeUnit::Nanosecond, None),
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ));
+                                        member_fields
+                                            .push(format!("{}.{}", dimension, granularity));
+                                    }
                                 }
                                 LogicalPlanLanguage::Dimension(params) => {
                                     let dimension =
                                         match_data_node!(node_by_id, params[0], DimensionName);
                                     let expr = self.to_expr(params[1])?;
-                                    query_dimensions.push(dimension);
+                                    query_dimensions.push(dimension.to_string());
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
@@ -3810,6 +3816,7 @@ impl LanguageToLogicalPlanConverter {
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
+                                    member_fields.push(dimension);
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }
@@ -3939,6 +3946,7 @@ impl LanguageToLogicalPlanConverter {
                                 .map(|n| n as i32);
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new(fields)?),
+                            member_fields,
                             query,
                             self.auth_context.clone(),
                         ))

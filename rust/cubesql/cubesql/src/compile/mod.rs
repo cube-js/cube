@@ -1519,7 +1519,12 @@ impl QueryPlanner {
 
             let scan_node = LogicalPlan::Extension {
                 node: Arc::new(CubeScanNode::new(
-                    schema,
+                    schema.clone(),
+                    schema
+                        .fields()
+                        .iter()
+                        .map(|f| f.name().to_string())
+                        .collect(),
                     query.request,
                     // @todo Remove after split!
                     Arc::new(self.state.auth_context().unwrap()),

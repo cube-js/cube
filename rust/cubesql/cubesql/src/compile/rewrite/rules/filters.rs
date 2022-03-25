@@ -214,6 +214,7 @@ impl FilterRules {
         move |egraph, subst| {
             for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
                 if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
+                    let table_name = table_name.to_string();
                     println!("push_down_filter");
                     // TODO check referenced_expr
                     subst.insert(
