@@ -128,6 +128,17 @@ pub trait V1CubeMetaExt {
     fn get_columns(&self) -> Vec<CubeColumn>;
 
     fn contains_member(&self, member_name: &str) -> bool;
+
+    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn member_type(&self, member_name: &str) -> Option<MemberType>;
+}
+
+pub enum MemberType {
+    String,
+    Number,
+    Time,
+    Boolean,
 }
 
 impl V1CubeMetaExt for V1CubeMeta {
@@ -169,5 +180,44 @@ impl V1CubeMetaExt for V1CubeMeta {
                 .dimensions
                 .iter()
                 .any(|m| m.name.eq_ignore_ascii_case(member_name))
+    }
+
+    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+        self.dimensions
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+    }
+
+    fn member_type(&self, member_name: &str) -> Option<MemberType> {
+        if let Some(measure) = self
+            .measures
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(MemberType::Number);
+        }
+
+        if let Some(dimension) = self
+            .dimensions
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(match dimension._type.as_str() {
+                "number" => MemberType::Number,
+                "boolean" => MemberType::Boolean,
+                "string" => MemberType::String,
+                "time" => MemberType::Time,
+                x => panic!("Unexpected dimension type: {}", x),
+            });
+        }
+
+        if let Some(segment) = self
+            .segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(MemberType::Boolean);
+        }
+        None
     }
 }

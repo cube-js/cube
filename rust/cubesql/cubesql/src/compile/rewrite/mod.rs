@@ -1,11 +1,12 @@
 pub mod language;
+mod rules;
 
 use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
+use crate::compile::rewrite::rules::filters::FilterRules;
 use crate::sql::auth_service::AuthContext;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
-use chrono::{SecondsFormat, TimeZone, Utc};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
@@ -300,6 +301,7 @@ macro_rules! add_plan_list_node {
     }};
 }
 
+#[macro_export]
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
@@ -309,6 +311,7 @@ macro_rules! var_iter {
     }};
 }
 
+#[macro_export]
 macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
@@ -317,11 +320,11 @@ macro_rules! var {
 
 pub struct LogicalPlanToLanguageConverter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    cube_context: CubeContext,
+    cube_context: Arc<CubeContext>,
 }
 
 impl LogicalPlanToLanguageConverter {
-    pub fn new(cube_context: CubeContext) -> Self {
+    pub fn new(cube_context: Arc<CubeContext>) -> Self {
         Self {
             graph: EGraph::<LogicalPlanLanguage, LogicalPlanAnalysis>::new(LogicalPlanAnalysis {
                 cube_context: cube_context.clone(),
@@ -702,7 +705,8 @@ impl LogicalPlanToLanguageConverter {
     }
 
     pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let rules = vec![FilterRules::new(self.cube_context.clone())];
+        let mut rewrites = vec![
             rewrite!("cube-scan";
                 "(TableScan ?source_table_name ?table_name ?projection ?filters ?limit)" =>
                 "(Extension (CubeScan ?source_table_name CubeScanMembers CubeScanFilters CubeScanOrder))"
@@ -1134,95 +1138,6 @@ impl LogicalPlanToLanguageConverter {
                 cube_scan_order_empty_tail(),
             ),
             transforming_rewrite(
-                "push-down-filter",
-                filter(
-                    "?expr",
-                    cube_scan("?source_table_name", "?members", "?filters", "?order"),
-                ),
-                cube_scan(
-                    "?source_table_name",
-                    "?members",
-                    cube_scan_filters("?filters", filter_replacer("?expr", "?cube")),
-                    "?order",
-                ),
-                self.push_down_filter("?source_table_name", "?expr", "?cube"),
-            ),
-            transforming_rewrite(
-                "filter-replacer",
-                filter_replacer(
-                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
-                    "?cube",
-                ),
-                filter_member("?filter_member", "?filter_op", "?filter_values"),
-                self.transform_filter(
-                    "?column",
-                    "?op",
-                    "?literal",
-                    "?cube",
-                    "?filter_member",
-                    "?filter_op",
-                    "?filter_values",
-                ),
-            ),
-            rewrite(
-                "filter-replacer-and",
-                filter_replacer(binary_expr("?left", "AND", "?right"), "?cube"),
-                filter_op(
-                    filter_op_filters(
-                        filter_replacer("?left", "?cube"),
-                        filter_replacer("?right", "?cube"),
-                    ),
-                    "and",
-                ),
-            ),
-            rewrite(
-                "filter-replacer-or",
-                filter_replacer(binary_expr("?left", "OR", "?right"), "?cube"),
-                filter_op(
-                    filter_op_filters(
-                        filter_replacer("?left", "?cube"),
-                        filter_replacer("?right", "?cube"),
-                    ),
-                    "or",
-                ),
-            ),
-            rewrite(
-                "filter-flatten-upper-and-left",
-                cube_scan_filters(
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
-                    "?tail",
-                ),
-                cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
-            ),
-            rewrite(
-                "filter-flatten-upper-and-right",
-                cube_scan_filters(
-                    "?tail",
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
-                ),
-                cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
-            ),
-            rewrite(
-                "filter-flatten-upper-and-left-reduce",
-                cube_scan_filters(filter_op_filters("?left", "?right"), "?tail"),
-                cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
-            ),
-            rewrite(
-                "filter-flatten-upper-and-right-reduce",
-                cube_scan_filters("?tail", filter_op_filters("?left", "?right")),
-                cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
-            ),
-            filter_flatten_rewrite_left("or"),
-            filter_flatten_rewrite_right("or"),
-            filter_flatten_rewrite_left("and"),
-            filter_flatten_rewrite_right("and"),
-            // TODO changes filter ordering which fail tests
-            // rewrite(
-            //     "filter-commute",
-            //     cube_scan_filters("?left", "?right"),
-            //     cube_scan_filters("?right", "?left"),
-            // ),
-            transforming_rewrite(
                 "filter-replacer-in-date-range",
                 filter_op(
                     filter_op_filters(
@@ -1629,7 +1544,11 @@ impl LogicalPlanToLanguageConverter {
                     vec![literal_string("second"), column_expr("?column")],
                 ),
             ),
-        ]
+        ];
+        for r in rules {
+            rewrites.extend(r.rewrite_rules());
+        }
+        rewrites
     }
 
     fn is_cube_table(
@@ -1865,134 +1784,6 @@ impl LogicalPlanToLanguageConverter {
                                 egraph.add(LogicalPlanLanguage::OrderAsc(OrderAsc(asc))),
                             );
                             return true;
-                        }
-                    }
-                }
-            }
-
-            false
-        }
-    }
-
-    fn push_down_filter(
-        &self,
-        table_name_var: &'static str,
-        exp_var: &'static str,
-        cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let table_name_var = table_name_var.parse().unwrap();
-        let exp_var = exp_var.parse().unwrap();
-        let cube_var = cube_var.parse().unwrap();
-        move |egraph, subst| {
-            for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
-                if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
-                    println!("push_down_filter");
-                    // TODO check referenced_expr
-                    subst.insert(
-                        cube_var,
-                        egraph.add(LogicalPlanLanguage::FilterReplacerCube(FilterReplacerCube(
-                            Some(table_name.to_string()),
-                        ))),
-                    );
-                    return true;
-                }
-            }
-            false
-        }
-    }
-
-    fn transform_filter(
-        &self,
-        column_var: &'static str,
-        op_var: &'static str,
-        literal_var: &'static str,
-        cube_var: &'static str,
-        filter_member_var: &'static str,
-        filter_op_var: &'static str,
-        filter_values_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let column_var = column_var.parse().unwrap();
-        let op_var = op_var.parse().unwrap();
-        let literal_var = literal_var.parse().unwrap();
-        let cube_var = cube_var.parse().unwrap();
-        let filter_member_var = filter_member_var.parse().unwrap();
-        let filter_op_var = filter_op_var.parse().unwrap();
-        let filter_values_var = filter_values_var.parse().unwrap();
-        let meta_context = self.cube_context.meta.clone();
-        move |egraph, subst| {
-            for cube in var_iter!(egraph[subst[cube_var]], FilterReplacerCube) {
-                for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
-                    let op = match expr_op {
-                        Operator::Eq => "equals",
-                        Operator::NotEq => "notEquals",
-                        Operator::Lt => "lt",
-                        Operator::LtEq => "lte",
-                        Operator::Gt => "gt",
-                        Operator::GtEq => "gte",
-                        Operator::Like => "contains",
-                        Operator::NotLike => "notContains",
-                        _ => {
-                            continue;
-                        }
-                    };
-                    for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                        if let Some(cube) = cube
-                            .as_ref()
-                            .and_then(|cube| meta_context.find_cube_with_name(cube.to_string()))
-                        {
-                            let (op, value) = match literal {
-                                ScalarValue::Utf8(Some(value)) => (op, value.to_string()),
-                                ScalarValue::Int64(Some(value)) => (op, value.to_string()),
-                                ScalarValue::Boolean(Some(value)) => (op, value.to_string()),
-                                ScalarValue::Float64(Some(value)) => (op, value.to_string()),
-                                ScalarValue::TimestampNanosecond(Some(value)) => {
-                                    let minus_one = Utc
-                                        .timestamp_nanos(*value - 1000)
-                                        .to_rfc3339_opts(SecondsFormat::Millis, true);
-                                    let value = Utc
-                                        .timestamp_nanos(*value)
-                                        .to_rfc3339_opts(SecondsFormat::Millis, true);
-
-                                    match expr_op {
-                                        Operator::Lt => ("beforeDate", minus_one),
-                                        Operator::LtEq => ("beforeDate", minus_one),
-                                        Operator::Gt => ("afterDate", value),
-                                        Operator::GtEq => ("afterDate", value),
-                                        _ => {
-                                            continue;
-                                        }
-                                    }
-                                }
-                                x => panic!("Unsupported filter scalar: {:?}", x),
-                            };
-
-                            for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
-                                let member_name = format!("{}.{}", cube.name, column.name);
-                                if cube.contains_member(&member_name) {
-                                    subst.insert(
-                                        filter_member_var,
-                                        egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                            FilterMemberMember(member_name.to_string()),
-                                        )),
-                                    );
-
-                                    subst.insert(
-                                        filter_op_var,
-                                        egraph.add(LogicalPlanLanguage::FilterMemberOp(
-                                            FilterMemberOp(op.to_string()),
-                                        )),
-                                    );
-
-                                    subst.insert(
-                                        filter_values_var,
-                                        egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                            FilterMemberValues(vec![value.to_string()]),
-                                        )),
-                                    );
-
-                                    return true;
-                                }
-                            }
                         }
                     }
                 }
@@ -2524,6 +2315,10 @@ impl LogicalPlanToLanguageConverter {
     }
 }
 
+pub trait RewriteRules {
+    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
+}
+
 pub struct WithColumnRelation(String);
 
 impl ExprRewriter for WithColumnRelation {
@@ -2572,7 +2367,7 @@ fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
     }
 }
 
-fn rewrite(
+pub fn rewrite(
     name: &str,
     searcher: String,
     applier: String,
@@ -2585,7 +2380,7 @@ fn rewrite(
     .unwrap()
 }
 
-fn transforming_rewrite<T>(
+pub fn transforming_rewrite<T>(
     name: &str,
     searcher: String,
     applier: String,
@@ -2603,38 +2398,6 @@ where
         TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
-}
-
-fn filter_flatten_rewrite_left(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-left", op),
-        filter_op(
-            filter_op_filters(filter_op(filter_op_filters("?left", "?right"), op), "?tail"),
-            op,
-        ),
-        filter_op(
-            filter_op_filters(filter_op_filters("?left", "?right"), "?tail"),
-            op,
-        ),
-    )
-}
-
-fn filter_flatten_rewrite_right(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-right", op),
-        filter_op(
-            filter_op_filters("?tail", filter_op(filter_op_filters("?left", "?right"), op)),
-            op,
-        ),
-        filter_op(
-            filter_op_filters("?tail", filter_op_filters("?left", "?right")),
-            op,
-        ),
-    )
 }
 
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
@@ -2724,6 +2487,27 @@ fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
 
 fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
     format!("(BinaryExpr {} {} {})", left, op, right)
+}
+
+fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
+    format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn between_expr(
+    expr: impl Display,
+    negated: impl Display,
+    low: impl Display,
+    high: impl Display,
+) -> String {
+    format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
+}
+
+fn is_null_expr(expr: impl Display) -> String {
+    format!("(IsNullExpr {})", expr)
+}
+
+fn is_not_null_expr(expr: impl Display) -> String {
+    format!("(IsNotNullExpr {})", expr)
 }
 
 fn literal_expr(literal: impl Display) -> String {
@@ -2875,7 +2659,7 @@ pub struct LogicalPlanData {
 
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
-    cube_context: CubeContext,
+    cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
 
@@ -3035,22 +2819,36 @@ impl LogicalPlanAnalysis {
         let referenced_columns = |id| egraph.index(id).data.referenced_expr.clone();
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
         let column_name = |id| egraph.index(id).data.column_name.clone();
+        let push_referenced_columns = |id, columns: &mut Vec<Expr>| -> Option<()> {
+            if column_name(id).is_some() {
+                let expr = original_expr(id)?;
+                columns.push(expr);
+            } else {
+                columns.extend(referenced_columns(id)?.into_iter());
+            }
+            Some(())
+        };
         let mut vec = Vec::new();
         match enode {
             LogicalPlanLanguage::BinaryExpr(params) => {
-                if column_name(params[0]).is_some() {
-                    let expr = original_expr(params[0])?;
-                    vec.push(expr);
-                } else {
-                    vec.extend(referenced_columns(params[0])?.into_iter());
-                }
-
-                if column_name(params[2]).is_some() {
-                    let expr = original_expr(params[2])?;
-                    vec.push(expr);
-                } else {
-                    vec.extend(referenced_columns(params[2])?.into_iter());
-                }
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::InListExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::IsNullExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::IsNotNullExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::BetweenExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
@@ -3136,6 +2934,16 @@ impl LogicalPlanAnalysis {
                 }
             }
             LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
+                let mut vec = Vec::new();
+                for p in params.iter() {
+                    vec.extend(match constant(*p)? {
+                        ConstantData::ExprConstant(c) => vec![c].into_iter(),
+                        ConstantData::Intermediate(vec) => vec.into_iter(),
+                    });
+                }
+                Some(ConstantData::Intermediate(vec))
+            }
+            LogicalPlanLanguage::InListExprList(params) => {
                 let mut vec = Vec::new();
                 for p in params.iter() {
                     vec.extend(match constant(*p)? {
@@ -3440,7 +3248,7 @@ macro_rules! match_expr_list_node {
 pub struct LanguageToLogicalPlanConverter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     best_expr: RecExpr<LogicalPlanLanguage>,
-    cube_context: CubeContext,
+    cube_context: Arc<CubeContext>,
     auth_context: Arc<AuthContext>,
 }
 
@@ -3994,7 +3802,11 @@ impl LanguageToLogicalPlanConverter {
                                         result.push(V1LoadRequestQueryFilterItem {
                                             member: Some(member),
                                             operator: Some(op),
-                                            values: Some(values),
+                                            values: if !values.is_empty() {
+                                                Some(values)
+                                            } else {
+                                                None
+                                            },
                                             or: None,
                                             and: None,
                                         });

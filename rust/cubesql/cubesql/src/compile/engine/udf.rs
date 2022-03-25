@@ -875,7 +875,7 @@ pub fn create_date_add_udf() -> ScalarUDF {
             let timestamp = timestamp
                 .checked_add_signed(Duration::milliseconds(interval_millis))
                 .unwrap();
-            builder.append_value(timestamp.timestamp_nanos());
+            builder.append_value(timestamp.timestamp_nanos())?;
         }
         Ok(Arc::new(builder.finish()))
     });
