@@ -40,7 +40,7 @@ function parseInfoFromAssetName(assetName: string): { target: string, type: stri
 
     if (targetAndType.endsWith('-shared')) {
       return {
-        target: targetAndType.substr(0, targetAndType.length - '-shared'.length),
+        target: targetAndType.slice(0, -'-shared'.length),
         format,
         type: 'shared'
       };
