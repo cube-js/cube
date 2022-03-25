@@ -20,6 +20,26 @@ export class MaterializeDriver extends PostgresDriver {
   }
 
   protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
-    // Not supported yet: https://github.com/MaterializeInc/materialize/issues/2157
+    // Support for typcategory field still pending: https://github.com/MaterializeInc/materialize/issues/2157
+  }
+
+  /**
+   * @param {string} schemaName
+   * @return {Promise<Array<unknown>>}
+   */
+  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+    return this.query(
+      `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
+    ).then((schemas) => {
+      if (schemas.length === 0) {
+        return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+      } else return [];
+    });
+  }
+
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
+    // const materializedLoadSql = loadSql.replace(/^CREATE TABLE (\S+) AS/i, `CREATE MATERIALIZED VIEW ${preAggregationTableName} AS`);
+    // return this.query(materializedLoadSql, params, options);
+    return this.query(loadSql, params, options);
   }
 }
