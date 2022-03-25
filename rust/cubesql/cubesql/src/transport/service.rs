@@ -40,6 +40,8 @@ pub struct HttpTransport {
     cache: RwLockAsync<Option<MetaCacheBucket>>,
 }
 
+const CACHE_LIFETIME_DURATION: Duration = Duration::from_secs(5);
+
 impl HttpTransport {
     pub fn new() -> Self {
         Self {
@@ -64,7 +66,7 @@ impl TransportService for HttpTransport {
         {
             let store = self.cache.read().await;
             if let Some(cache_bucket) = &*store {
-                if cache_bucket.lifetime.elapsed() < Duration::from_secs(5) {
+                if cache_bucket.lifetime.elapsed() < CACHE_LIFETIME_DURATION {
                     return Ok(cache_bucket.value.clone());
                 };
             };
@@ -74,7 +76,7 @@ impl TransportService for HttpTransport {
 
         let mut store = self.cache.write().await;
         if let Some(cache_bucket) = &*store {
-            if cache_bucket.lifetime.elapsed() < Duration::from_secs(5) {
+            if cache_bucket.lifetime.elapsed() < CACHE_LIFETIME_DURATION {
                 return Ok(cache_bucket.value.clone());
             }
         };
