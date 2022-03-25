@@ -192,7 +192,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.session.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));

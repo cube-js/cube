@@ -286,8 +286,7 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let plan =
-            convert_sql_to_cube_query(&query.to_string(), Arc::new(meta), self.session.clone())?;
+        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
         match plan {
             crate::compile::QueryPlan::MetaOk(status) => {
                 return Ok(QueryResponse::Ok(status));
