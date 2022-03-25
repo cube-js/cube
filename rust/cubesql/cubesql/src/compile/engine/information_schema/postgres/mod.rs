@@ -15,6 +15,7 @@ mod pg_index;
 mod pg_namespace;
 mod pg_proc;
 mod pg_range;
+mod pg_settings;
 mod pg_tables;
 mod pg_type;
 
@@ -26,5 +27,6 @@ pub use pg_index::*;
 pub use pg_namespace::*;
 pub use pg_proc::*;
 pub use pg_range::*;
+pub use pg_settings::*;
 pub use pg_tables::*;
 pub use pg_type::*;

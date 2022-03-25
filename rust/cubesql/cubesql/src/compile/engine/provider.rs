@@ -33,7 +33,7 @@ use super::information_schema::postgres::{
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogIndexProvider,
     PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 use crate::sql::ColumnType;
@@ -365,6 +365,15 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_proc") {
             return Some(Arc::new(PgCatalogProcProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_settings") {
+            return Some(Arc::new(PgCatalogSettingsProvider::new(
+                context
+                    .sessions
+                    .server
+                    .all_variables(context.session_state.protocol.clone()),
+            )));
         }
 
         None
