@@ -279,7 +279,7 @@ impl TableProvider for CubeTableProvider {
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(
             self.cube
-                .get_columns()
+                .get_scan_columns()
                 .into_iter()
                 .map(|c| {
                     Field::new(

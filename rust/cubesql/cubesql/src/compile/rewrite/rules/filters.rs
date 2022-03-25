@@ -38,13 +38,22 @@ impl RewriteRules for FilterRules {
                 "push-down-filter",
                 filter(
                     "?expr",
-                    cube_scan("?source_table_name", "?members", "?filters", "?order"),
+                    cube_scan(
+                        "?source_table_name",
+                        "?members",
+                        "?filters",
+                        "?order",
+                        "?limit",
+                        "?offset",
+                    ),
                 ),
                 cube_scan(
                     "?source_table_name",
                     "?members",
                     cube_scan_filters("?filters", filter_replacer("?expr", "?cube")),
                     "?order",
+                    "?limit",
+                    "?offset",
                 ),
                 self.push_down_filter("?source_table_name", "?expr", "?cube"),
             ),
