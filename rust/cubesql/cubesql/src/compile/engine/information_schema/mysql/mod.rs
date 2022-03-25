@@ -1,5 +1,6 @@
 pub mod collations;
 pub mod columns;
+pub mod ext;
 pub mod key_column_usage;
 pub mod processlist;
 pub mod referential_constraints;

@@ -16,7 +16,7 @@ use datafusion::{
 
 use crate::transport::{CubeColumn, V1CubeMetaExt};
 
-use super::utils::new_string_array_with_placeholder;
+use super::{ext::CubeColumnMySqlExt, utils::new_string_array_with_placeholder};
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,
@@ -87,7 +87,7 @@ impl InformationSchemaColumnsBuilder {
 
         self.data_type.append_value(column.get_data_type()).unwrap();
         self.column_type
-            .append_value(column.get_column_type())
+            .append_value(column.get_mysql_column_type())
             .unwrap();
 
         self.char_max_length.append_null().unwrap();

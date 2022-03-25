@@ -12,6 +12,7 @@ pub enum ColumnType {
     Int32,
     Int64,
     Blob,
+    Timestamp,
 }
 
 impl ColumnType {
