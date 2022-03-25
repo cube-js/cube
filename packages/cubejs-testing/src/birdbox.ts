@@ -1,11 +1,19 @@
 import path from 'path';
-import fs from 'fs';
+import fs from 'fs-extra';
 import { spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
-import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
-import { execInDir, pausePromise } from '@cubejs-backend/shared';
-import { getLocalHostnameByOs, PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import fsExtra from 'fs-extra';
+import {
+  DockerComposeEnvironment,
+  StartedTestContainer,
+} from 'testcontainers';
+import {
+  execInDir,
+  pausePromise
+} from '@cubejs-backend/shared';
+import {
+  getLocalHostnameByOs,
+  PostgresDBRunner,
+} from '@cubejs-backend/testing-shared';
 
 export interface BirdBoxTestCaseOptions {
   name: string;
@@ -23,14 +31,16 @@ export interface BirdBox {
   };
 }
 
-export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions): Promise<BirdBox> {
+export async function startBirdBoxFromContainer(
+  options: BirdBoxTestCaseOptions
+): Promise<BirdBox> {
   if (process.env.TEST_CUBE_HOST) {
     const host = process.env.TEST_CUBE_HOST || 'localhost';
     const port = process.env.TEST_CUBE_PORT || '8888';
 
     return {
       stop: async () => {
-        console.log('[Birdbox] Closed');
+        process.stdout.write('[Birdbox] Closed\n');
       },
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
@@ -46,8 +56,19 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
 
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
-    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
-    if (execInDir('../..', `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`) !== 0) {
+    const tag = `${
+      process.env.BIRDBOX_CUBEJS_REGISTRY_PATH
+    }cubejs/cube:${
+      process.env.BIRDBOX_CUBEJS_VERSION
+    }`;
+    if (
+      execInDir(
+        '../..',
+        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${
+          tag
+        }`
+      ) !== 0
+    ) {
       throw new Error('[Birdbox] Docker build failed.');
     }
   }
@@ -67,71 +88,92 @@ export async function startBirdBoxFromContainer(options: BirdBoxTestCaseOptions)
       dc = dc.withEnv(k, options.env[k]);
     }
   }
-
-  console.log(`[Birdbox] Using ${composeFile} compose file`);
-
+  process.stdout.write(
+    `[Birdbox] Using ${composeFile} compose file\n`
+  );
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION)
-    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION)
+    .withEnv(
+      'BIRDBOX_CUBEJS_VERSION',
+      process.env.BIRDBOX_CUBEJS_VERSION
+    )
+    .withEnv(
+      'BIRDBOX_CUBESTORE_VERSION',
+      process.env.BIRDBOX_CUBESTORE_VERSION
+    )
     .up();
 
   const host = '127.0.0.1';
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
   const playgroundPort = process.env.TEST_PLAYGROUND_PORT ?? port;
-
   let proxyServer: HttpProxy | null = null;
 
   if (process.env.TEST_PLAYGROUND_PORT) {
-    console.log(`[Birdbox] Creating a proxy server 4000->${port} for local testing`);
+    process.stdout.write(
+      `[Birdbox] Creating a proxy server 4000->${
+        port
+      } for local testing\n`
+    );
     // As local Playground proxies requests to the 4000 port
-    proxyServer = HttpProxy.createProxyServer({ target: `http://localhost:${port}` }).listen(4000);
-
+    proxyServer = HttpProxy.createProxyServer({
+      target: `http://localhost:${port}`
+    }).listen(4000);
     proxyServer.on('error', async (err, req, res) => {
-      console.log('[Proxy Server] error:', err);
-
+      process.stdout.write(`[Proxy Server] error: ${err}\n`);
       if (!res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
-
       res.end(JSON.stringify({ error: err.message }));
     });
   }
 
   if (options.loadScript) {
     const { loadScript } = options;
-    console.log(`[Birdbox] Executing ${loadScript} script`);
-
-    const { output, exitCode } = await env.getContainer('birdbox-db').exec([`/scripts/${loadScript}`]);
+    process.stdout.write(
+      `[Birdbox] Executing ${loadScript} script\n`
+    );
+    const {
+      output,
+      exitCode,
+    } = await env
+      .getContainer('birdbox-db')
+      .exec([`/scripts/${loadScript}`]);
 
     if (exitCode === 0) {
-      console.log(`[Birdbox] Script ${loadScript} finished successfully`);
+      process.stdout.write(
+        `[Birdbox] Script ${loadScript} finished successfully\n`
+      );
     } else {
-      console.log(output);
-
-      console.log(`[Birdbox] Script ${loadScript} finished with error: ${exitCode}`);
-
+      process.stdout.write(`${output}\n`);
+      process.stdout.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished with error: ${
+          exitCode
+        }\n`
+      );
       await env.down();
-
       process.exit(1);
     }
   }
 
   return {
     stop: async () => {
-      console.log('[Birdbox] Closing');
-
+      process.stdout.write('[Birdbox] Closing\n');
       await env.down();
       proxyServer?.close();
-
-      console.log('[Birdbox] Closed');
+      process.stdout.write('[Birdbox] Closed\n');
     },
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
-        ...(process.env.TEST_PLAYGROUND_PORT ? { CUBEJS_DB_HOST: getLocalHostnameByOs() } : null),
+        ...(
+          process.env.TEST_PLAYGROUND_PORT
+            ? { CUBEJS_DB_HOST: getLocalHostnameByOs() }
+            : null
+        ),
       },
     },
   };
@@ -145,39 +187,61 @@ export interface StartCliWithEnvOptions {
   env?: Record<string, string>;
 }
 
-export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Promise<BirdBox> {
+export async function startBirdBoxFromCli(
+  options: StartCliWithEnvOptions
+): Promise<BirdBox> {
   let db: StartedTestContainer;
 
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
         {
-          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
+          source: path.join(
+            __dirname,
+            '..',
+            '..',
+            'birdbox-fixtures',
+            'datasets'
+          ),
           target: '/data',
           bindMode: 'ro',
         },
         {
-          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
+          source: path.join(
+            __dirname,
+            '..',
+            '..',
+            'birdbox-fixtures',
+            'postgresql',
+            'scripts'
+          ),
           target: '/scripts',
           bindMode: 'ro',
         },
       ],
     });
 
-    console.log('[Birdbox] Executing load script');
+    process.stdout.write('[Birdbox] Executing load script\n');
 
     const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
     if (exitCode === 0) {
-      console.log(`[Birdbox] Script ${loadScript} finished successfully`);
+      process.stdout.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished successfully\n`
+      );
     } else {
-      console.log(output);
-
-      console.log(`[Birdbox] Script ${loadScript} finished with error: ${exitCode}`);
-
+      process.stdout.write(`${output}\n`);
+      process.stdout.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished with error: ${
+          exitCode
+        }\n`
+      );
       await db.stop();
-
       process.exit(1);
     }
   }
@@ -190,32 +254,44 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
   }
 
   if (fs.existsSync(path.join(testDir, '.cubestore'))) {
-    fsExtra.removeSync(path.join(testDir, '.cubestore'));
+    fs.removeSync(path.join(testDir, '.cubestore'));
   }
 
-  fsExtra.copySync(
+  fs.copySync(
     path.join(process.cwd(), 'birdbox-fixtures', 'postgresql'),
     path.join(testDir)
   );
 
   if (options.cubejsConfig) {
-    fsExtra.copySync(
-      path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', options.cubejsConfig),
+    fs.copySync(
+      path.join(
+        process.cwd(),
+        'birdbox-fixtures',
+        'postgresql',
+        options.cubejsConfig
+      ),
       path.join(testDir, 'cube.js')
     );
   }
 
   const cli = spawn(
-    options.useCubejsServerBinary ? path.resolve(process.cwd(), '../cubejs-server/bin/server') : 'npm',
-    options.useCubejsServerBinary ? [] : ['run', 'dev'],
+    options.useCubejsServerBinary
+      ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
+      : 'npm',
+    options.useCubejsServerBinary
+      ? []
+      : ['run', 'dev'],
     {
       cwd: testDir,
       shell: true,
+      detached: true,
       // Show output of Cube.js process in console
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        CUBEJS_DB_TYPE: options.dbType === 'postgresql' ? 'postgres' : options.dbType,
+        CUBEJS_DB_TYPE: options.dbType === 'postgresql'
+          ? 'postgres'
+          : options.dbType,
         CUBEJS_DEV_MODE: 'true',
         CUBEJS_API_SECRET: 'mysupersecret',
         CUBEJS_WEB_SOCKETS: 'true',
@@ -233,32 +309,21 @@ export async function startBirdBoxFromCli(options: StartCliWithEnvOptions): Prom
     }
   );
   cli.stdout.on('data', (msg) => {
-    console.log(msg.toString());
+    process.stdout.write(msg);
   });
   cli.stderr.on('data', (msg) => {
-    console.log(msg.toString());
+    process.stdout.write(msg);
   });
-  // cli.on('exit', (code) => {
-  //   throw new Error(
-  //     `Cube.js exited with ${code}`
-  //   );
-  // });
-
   await pausePromise(10 * 1000);
-
   return {
     stop: async () => {
-      console.log('[Birdbox] Closing');
-
+      process.stdout.write('[Birdbox] Closing\n');
       if (db) {
         await db.stop();
       }
-
-      console.log('[Birdbox] Done with DB');
-
-      cli.kill();
-
-      console.log('[Birdbox] Closed');
+      process.stdout.write('[Birdbox] Done with DB\n');
+      process.kill(-cli.pid, 'SIGINT');
+      process.stdout.write('[Birdbox] Closed\n');
     },
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',

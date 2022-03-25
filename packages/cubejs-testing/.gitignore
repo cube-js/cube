@@ -5,3 +5,5 @@ cypress/snapshots
 # BirdBox for CLI is creating a project in package directory
 birdbox-test-project
 birdbox-fixtures/datasets
+birdbox-fixtures/postgresql/.cubestore
+birdbox-fixtures/postgresql/cube.js
