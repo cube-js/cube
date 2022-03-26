@@ -70,33 +70,9 @@ impl CubeContext {
         &self,
         table_provider: Arc<dyn datasource::TableProvider>,
     ) -> Result<String, CubeError> {
-        let any = table_provider.as_any();
-        Ok(if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaTableProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaColumnsProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaStatisticsProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaKeyColumnUsageProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaSchemataProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaReferentialConstraintsProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlSchemaCollationsProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<MySqlPerfSchemaVariablesProvider>() {
-            t.table_name().to_string()
-        } else if let Some(t) = any.downcast_ref::<InfoSchemaProcesslistProvider>() {
-            t.table_name().to_string()
-        } else {
-            return Err(CubeError::internal(format!(
-                "Unknown table provider with schema: {:?}",
-                table_provider.schema()
-            )));
-        })
+        self.session_state
+            .protocol
+            .table_name_by_table_provider(table_provider)
     }
 }
 
@@ -143,6 +119,49 @@ impl DatabaseProtocol {
             DatabaseProtocol::MySQL => self.get_mysql_provider(context, tp),
             DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tp),
         }
+    }
+
+    pub fn table_name_by_table_provider(
+        &self,
+        table_provider: Arc<dyn datasource::TableProvider>,
+    ) -> Result<String, CubeError> {
+        match self {
+            DatabaseProtocol::MySQL => self.get_mysql_table_name(table_provider),
+            DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
+        }
+    }
+
+    pub fn get_mysql_table_name(
+        &self,
+        table_provider: Arc<dyn datasource::TableProvider>,
+    ) -> Result<String, CubeError> {
+        let any = table_provider.as_any();
+        Ok(if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaTableProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaColumnsProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaStatisticsProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaKeyColumnUsageProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaSchemataProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaReferentialConstraintsProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaCollationsProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlPerfSchemaVariablesProvider>() {
+            t.table_name().to_string()
+        } else if let Some(t) = any.downcast_ref::<MySqlSchemaProcesslistProvider>() {
+            t.table_name().to_string()
+        } else {
+            return Err(CubeError::internal(format!(
+                "Unknown table provider with schema: {:?}",
+                table_provider.schema()
+            )));
+        })
     }
 
     fn get_mysql_provider(
@@ -215,6 +234,27 @@ impl DatabaseProtocol {
         }
 
         None
+    }
+
+    pub fn get_postgres_table_name(
+        &self,
+        table_provider: Arc<dyn datasource::TableProvider>,
+    ) -> Result<String, CubeError> {
+        let any = table_provider.as_any();
+        Ok(
+            if let Some(_) = any.downcast_ref::<PostgresSchemaColumnsProvider>() {
+                "information_schema.columns".to_string()
+            } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableProvider>() {
+                "information_schema.tables".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
+                "pg_catalog.pg_tables".to_string()
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Unknown table provider with schema: {:?}",
+                    table_provider.schema()
+                )));
+            },
+        )
     }
 
     fn get_postgres_provider(

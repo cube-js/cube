@@ -180,8 +180,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
-                data_type: measure.get_data_type(),
-                column_type: measure.get_column_type(),
+                column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
         }
@@ -189,9 +188,8 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
-                data_type: dimension.get_data_type(),
-                column_type: dimension.get_column_type(),
-                can_be_null: dimension.mysql_can_be_null(),
+                column_type: dimension.get_sql_type(),
+                can_be_null: dimension.sql_can_be_null(),
             });
         }
 
@@ -215,7 +213,7 @@ impl V1CubeMetaExt for V1CubeMeta {
     }
 
     fn member_type(&self, member_name: &str) -> Option<MemberType> {
-        if let Some(measure) = self
+        if let Some(_) = self
             .measures
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))

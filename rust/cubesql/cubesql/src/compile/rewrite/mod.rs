@@ -5,7 +5,6 @@ use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::rules::filters::FilterRules;
 use crate::sql::auth_service::AuthContext;
-use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
