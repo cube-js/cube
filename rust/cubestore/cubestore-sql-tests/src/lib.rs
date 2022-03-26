@@ -1,7 +1,7 @@
 #![feature(async_closure)]
 #![feature(test)]
 
-pub use crate::tests::TestFn;
+pub use crate::tests::{to_rows, TestFn};
 extern crate test;
 use async_trait::async_trait;
 use cubestore::sql::{QueryPlans, SqlService};

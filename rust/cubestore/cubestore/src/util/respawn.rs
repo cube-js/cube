@@ -8,7 +8,6 @@ use mysql_common::serde::Serialize;
 use crate::sys::process::{avoid_child_zombies, die_with_parent};
 use crate::CubeError;
 use std::any::type_name;
-use std::backtrace::Backtrace;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
@@ -42,9 +41,7 @@ pub fn respawn<Args: Serialize + DeserializeOwned>(
     cmd.envs(envs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     cmd.env(HANDLER_ENV, handler);
     cmd.env(PARENT_PID_ENV, std::process::id().to_string());
-    cmd.env(IPC_ENV, ipc_name.clone());
-
-    println!("RRR Spawn {} {:?} {:?} {:?}", std::process::id(), handler, ipc_name, cmd);
+    cmd.env(IPC_ENV, ipc_name);
 
     let c = cmd.spawn()?;
     let (_, tx) = server.accept()?;
@@ -57,7 +54,6 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
     // We use type_name to simplify usage, although they are not guaranteed to be unique.
     // Hope this does not happen in practice.
     let key = type_name::<Args>();
-    println!("RRR REGISTER {} {}", std::process::id(), key);
     let had_duplicate = handlers
         .insert(
             key,
@@ -67,20 +63,18 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
     assert!(!had_duplicate, "duplicate handler registered for {}", key);
 }
 
-pub fn init(worker_services: ...) {
+pub fn init() {
     avoid_child_zombies();
 
     let handler_name = match std::env::var(HANDLER_ENV) {
         Ok(h) => h,
         Err(_) => return, // we're the main process.
     };
-    println!("RRR INIT {} {}", std::process::id(), Backtrace::capture());
-
-    // let handlers = HANDLERS.read().unwrap();
-    // let handler = match handlers.get(handler_name.as_str()) {
-    //     Some(f) => f,
-    //     None => panic!("no respawn handler for '{}'", handler_name),
-    // };
+    let handlers = HANDLERS.read().unwrap();
+    let handler = match handlers.get(handler_name.as_str()) {
+        Some(f) => f,
+        None => panic!("no respawn handler for '{}'", handler_name),
+    };
 
     let ppid = match std::env::var(PARENT_PID_ENV) {
         Ok(id) => id
@@ -91,15 +85,12 @@ pub fn init(worker_services: ...) {
     die_with_parent(ppid);
 
     let ipc_server = std::env::var(IPC_ENV).expect("could not get IPC channel name");
-
-    println!("RRR HANDLE {} {}", std::process::id(), ipc_server.clone());
-
     exit(handler(ipc_server))
 }
 
-pub const HANDLER_ENV: &'static str = "__CUBESTORE_RESPAWN_PROC";
-pub const PARENT_PID_ENV: &'static str = "__CUBESTORE_RESPAWN_PPID";
-pub const IPC_ENV: &'static str = "__CUBESTORE_IPC_NAME";
+const HANDLER_ENV: &'static str = "__CUBESTORE_RESPAWN_PROC";
+const PARENT_PID_ENV: &'static str = "__CUBESTORE_RESPAWN_PPID";
+const IPC_ENV: &'static str = "__CUBESTORE_IPC_NAME";
 
 static USE_TEST_CMD_ARGS: AtomicBool = AtomicBool::new(false);
 pub fn replace_cmd_args_in_tests() {
