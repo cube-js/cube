@@ -16,6 +16,7 @@ use datafusion::{
 use crate::sql::{SessionManager, SessionProcessList};
 
 use super::utils::new_string_array_with_placeholder;
+use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaProcesslistBuilder {
     id: UInt32Builder,
@@ -87,6 +88,12 @@ impl InformationSchemaProcesslistBuilder {
 
 pub struct InfoSchemaProcesslistProvider {
     sessions: Arc<SessionManager>,
+}
+
+impl TableName for InfoSchemaProcesslistProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.processlist"
+    }
 }
 
 impl InfoSchemaProcesslistProvider {

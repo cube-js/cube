@@ -30,6 +30,7 @@ use crate::{sql::AuthContext, transport::TransportService};
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
     pub schema: DFSchemaRef,
+    pub member_fields: Vec<String>,
     pub request: V1LoadRequestQuery,
     pub auth_context: Arc<AuthContext>,
 }
@@ -37,11 +38,13 @@ pub struct CubeScanNode {
 impl CubeScanNode {
     pub fn new(
         schema: DFSchemaRef,
+        member_fields: Vec<String>,
         request: V1LoadRequestQuery,
         auth_context: Arc<AuthContext>,
     ) -> Self {
         Self {
             schema,
+            member_fields,
             request,
             auth_context,
         }
@@ -83,6 +86,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
 
         Arc::new(CubeScanNode {
             schema: self.schema.clone(),
+            member_fields: self.member_fields.clone(),
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
         })
@@ -113,6 +117,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                 // figure out input name
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema: SchemaRef::new(scan_node.schema().as_ref().into()),
+                    member_fields: scan_node.member_fields.clone(),
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
@@ -128,6 +133,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
 struct CubeScanExecutionPlan {
     // Options from logical node
     schema: SchemaRef,
+    member_fields: Vec<String>,
     request: V1LoadRequestQuery,
     auth_context: Arc<AuthContext>,
     // Shared references which will be injected by extension planner
@@ -140,13 +146,14 @@ impl CubeScanExecutionPlan {
     fn transform_response(&self, response: V1LoadResult) -> Result<RecordBatch> {
         let mut columns = vec![];
 
-        for schema_field in self.schema.fields() {
+        for (i, schema_field) in self.schema.fields().iter().enumerate() {
+            let field_name = &self.member_fields[i];
             let column = match schema_field.data_type() {
                 DataType::Utf8 => {
                     let mut builder = StringBuilder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -176,7 +183,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = Int64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -213,7 +220,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = Float64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -250,7 +257,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = BooleanBuilder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -481,6 +488,11 @@ mod tests {
 
         let scan_node = CubeScanExecutionPlan {
             schema: schema.clone(),
+            member_fields: schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect(),
             request: V1LoadRequestQuery {
                 measures: None,
                 dimensions: None,

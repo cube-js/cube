@@ -15,6 +15,7 @@ use datafusion::{
 };
 
 use super::utils::new_string_array_with_placeholder;
+use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaSchemataBuilder {
     catalog_names: StringBuilder,
@@ -75,6 +76,12 @@ impl InformationSchemaSchemataBuilder {
 
 pub struct InfoSchemaSchemataProvider {
     data: Arc<Vec<ArrayRef>>,
+}
+
+impl TableName for InfoSchemaSchemataProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.schemata"
+    }
 }
 
 impl InfoSchemaSchemataProvider {

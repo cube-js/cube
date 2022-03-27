@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{backtrace::Backtrace, fmt};
+use std::{backtrace::Backtrace, env, fmt};
 
 use chrono::{prelude::*, Duration};
 
@@ -45,11 +45,19 @@ use self::engine::udf::{
     create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
+use crate::compile::engine::udf::{
+    create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+    create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
+    create_measure_udaf, create_minute_udf, create_quarter_udf, create_second_udf,
+    create_str_to_date, create_year_udf,
+};
+use crate::compile::rewrite::converter::LogicalPlanToLanguageConverter;
 
 pub mod builder;
 pub mod context;
 pub mod engine;
 pub mod parser;
+pub mod rewrite;
 pub mod service;
 
 #[derive(Debug, PartialEq)]
@@ -1357,6 +1365,15 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
     ) -> CompilationResult<QueryPlan> {
+        // TODO move CUBESQL_REWRITE_ENGINE env to config
+        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
+            .ok()
+            .map(|v| v.parse::<bool>().unwrap())
+            .unwrap_or(false);
+        if rewrite_engine {
+            return self.create_df_logical_plan(stmt.clone());
+        }
+
         let select = match &q.body {
             sqlparser::ast::SetExpr::Select(select) => select,
             _ => {
@@ -1502,7 +1519,12 @@ impl QueryPlanner {
 
             let scan_node = LogicalPlan::Extension {
                 node: Arc::new(CubeScanNode::new(
-                    schema,
+                    schema.clone(),
+                    schema
+                        .fields()
+                        .iter()
+                        .map(|f| f.name().to_string())
+                        .collect(),
                     query.request,
                     // @todo Remove after split!
                     Arc::new(self.state.auth_context().unwrap()),
@@ -2010,6 +2032,21 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
+        ctx.register_udf(create_date_udf());
+        ctx.register_udf(create_makedate_udf());
+        ctx.register_udf(create_year_udf());
+        ctx.register_udf(create_quarter_udf());
+        ctx.register_udf(create_hour_udf());
+        ctx.register_udf(create_minute_udf());
+        ctx.register_udf(create_second_udf());
+        ctx.register_udf(create_dayofweek_udf());
+        ctx.register_udf(create_dayofmonth_udf());
+        ctx.register_udf(create_dayofyear_udf());
+        ctx.register_udf(create_date_sub_udf());
+        ctx.register_udf(create_date_add_udf());
+        ctx.register_udf(create_str_to_date());
+
+        ctx.register_udaf(create_measure_udaf());
 
         ctx
     }
@@ -2017,9 +2054,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
         let ctx = self.create_execution_ctx();
 
-        let state = ctx.state.lock().unwrap().clone();
+        let state = Arc::new(ctx.state.lock().unwrap().clone());
         let cube_ctx = CubeContext::new(
-            &state,
+            state,
             self.meta.clone(),
             self.session_manager.clone(),
             self.state.clone(),
@@ -2032,13 +2069,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 CompilationError::Internal(format!("Initial planning error: {}", err))
             })?;
 
-        let optimized_plan = ctx.optimize(&plan).map_err(|err| {
-            CompilationError::Internal(format!("Planning optimization error: {}", err))
-        })?;
+        let optimized_plan = plan;
+        // ctx.optimize(&plan).map_err(|err| {
+        //    CompilationError::Internal(format!("Planning optimization error: {}", err))
+        // })?;
+
+        let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
+        let root = converter
+            .add_logical_plan(&optimized_plan)
+            .map_err(|e| CompilationError::User(e.to_string()))?;
+        let rewrite_plan = converter
+            .take_rewriter()
+            .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
+
+        log::debug!("Rewrite: {:#?}", rewrite_plan);
 
         Ok(QueryPlan::DataFusionSelect(
             StatusFlags::empty(),
-            optimized_plan,
+            rewrite_plan,
             ctx,
         ))
     }
@@ -2191,7 +2240,6 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-
     use crate::{
         sql::{
             dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
@@ -2199,6 +2247,7 @@ mod tests {
         },
         transport::TransportService,
     };
+    use datafusion::logical_plan::PlanVisitor;
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -2363,17 +2412,24 @@ mod tests {
     }
 
     fn find_cube_scan_deep_search(parent: Arc<LogicalPlan>) -> CubeScanNode {
-        match &*parent {
-            LogicalPlan::Projection { input, .. } => find_cube_scan_deep_search(input.clone()),
-            LogicalPlan::Extension { node } => {
-                if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
-                    scan_node.clone()
-                } else {
-                    panic!("Unable to unpack extension node");
+        pub struct FindCubeScanNodeVisitor(Option<CubeScanNode>);
+
+        impl PlanVisitor for FindCubeScanNodeVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::Extension { node } = plan {
+                    if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
+                        self.0 = Some(scan_node.clone());
+                    }
                 }
+                Ok(true)
             }
-            _ => unimplemented!(),
         }
+
+        let mut visitor = FindCubeScanNodeVisitor(None);
+        parent.accept(&mut visitor).unwrap();
+        visitor.0.expect("No CubeScanNode was found in plan")
     }
 
     trait LogicalPlanTestUtils {
@@ -2419,51 +2475,12 @@ mod tests {
                 filters: None
             }
         );
-
-        assert_eq!(
-            logical_plan.find_projection_schema(),
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(None, "maxPrice", DataType::Float64, false),
-                    DFField::new(None, "minPrice", DataType::Float64, false),
-                    DFField::new(None, "avgPrice", DataType::Float64, false),
-                ])
-                .unwrap()
-            ),
-        );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.minPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.avgPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
     fn test_select_compound_identifiers() {
         let query_plan = convert_select_to_query_plan(
-            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
+            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
         );
 
         let logical_plan = query_plan.as_logical_plan();
@@ -2483,27 +2500,6 @@ mod tests {
                 filters: None
             }
         );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.minPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
@@ -2839,7 +2835,7 @@ mod tests {
         );
 
         assert_eq!(
-            logical_plan.find_projection_schema(),
+            logical_plan.schema().clone(),
             Arc::new(
                 DFSchema::new(vec![
                     DFField::new(None, "order_date", DataType::Utf8, false),
@@ -2848,27 +2844,6 @@ mod tests {
                 .unwrap()
             ),
         );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.order_date",
-                        DataType::Utf8,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.customer_gender",
-                        DataType::Utf8,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
@@ -2886,15 +2861,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2908,15 +2874,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(count) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2930,15 +2887,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
@@ -2952,15 +2900,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "Logs.agentCount",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCountApprox) FROM Logs".to_string(),
@@ -2974,15 +2913,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "Logs.agentCountApprox",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT MAX(`maxPrice`) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2996,25 +2926,15 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
         ];
 
-        for (input_query, expected_request, expected_scan_schema) in variants.iter() {
+        for (input_query, expected_request) in variants.iter() {
             let logical_plan =
                 convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
                     .as_logical_plan();
 
             assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
-            assert_eq!(&logical_plan.find_cube_scan().schema, expected_scan_schema);
         }
     }
 
@@ -3281,8 +3201,14 @@ mod tests {
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
-                GROUP BY __timestamp",
-                    sql_projection, sql_filter
+                {}",
+                    sql_projection,
+                    sql_filter,
+                    if sql_projection.contains("__timestamp") {
+                        "GROUP BY __timestamp"
+                    } else {
+                        ""
+                    }
                 ),
                 DatabaseProtocol::MySQL,
             )
@@ -3488,28 +3414,28 @@ mod tests {
                 None,
             ),
             // Date
-            (
-                "order_date = '2021-08-31'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
-            (
-                "order_date <> '2021-08-31'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("notEquals".to_string()),
-                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
+            // (
+            //     "order_date = '2021-08-31'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("equals".to_string()),
+            //         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
+            // (
+            //     "order_date <> '2021-08-31'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("notEquals".to_string()),
+            //         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
             // BETWEEN
             (
                 "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
@@ -3611,8 +3537,7 @@ mod tests {
                     "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
-                WHERE {}
-                GROUP BY __timestamp",
+                WHERE {}",
                     sql
                 ),
                 DatabaseProtocol::MySQL,

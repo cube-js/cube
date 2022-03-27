@@ -126,6 +126,21 @@ impl CubeColumn {
 
 pub trait V1CubeMetaExt {
     fn get_columns(&self) -> Vec<CubeColumn>;
+
+    fn get_scan_columns(&self) -> Vec<CubeColumn>;
+
+    fn contains_member(&self, member_name: &str) -> bool;
+
+    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn member_type(&self, member_name: &str) -> Option<MemberType>;
+}
+
+pub enum MemberType {
+    String,
+    Number,
+    Time,
+    Boolean,
 }
 
 impl V1CubeMetaExt for V1CubeMeta {
@@ -157,5 +172,76 @@ impl V1CubeMetaExt for V1CubeMeta {
         }
 
         columns
+    }
+
+    fn get_scan_columns(&self) -> Vec<CubeColumn> {
+        let mut columns = Vec::new();
+
+        for measure in &self.measures {
+            columns.push(CubeColumn {
+                name: measure.get_real_name(),
+                column_type: measure.get_sql_type(),
+                can_be_null: false,
+            });
+        }
+
+        for dimension in &self.dimensions {
+            columns.push(CubeColumn {
+                name: dimension.get_real_name(),
+                column_type: dimension.get_sql_type(),
+                can_be_null: dimension.sql_can_be_null(),
+            });
+        }
+
+        columns
+    }
+
+    fn contains_member(&self, member_name: &str) -> bool {
+        self.measures
+            .iter()
+            .any(|m| m.name.eq_ignore_ascii_case(member_name))
+            || self
+                .dimensions
+                .iter()
+                .any(|m| m.name.eq_ignore_ascii_case(member_name))
+    }
+
+    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+        self.dimensions
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+    }
+
+    fn member_type(&self, member_name: &str) -> Option<MemberType> {
+        if let Some(_) = self
+            .measures
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(MemberType::Number);
+        }
+
+        if let Some(dimension) = self
+            .dimensions
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(match dimension._type.as_str() {
+                "number" => MemberType::Number,
+                "boolean" => MemberType::Boolean,
+                "string" => MemberType::String,
+                "time" => MemberType::Time,
+                x => panic!("Unexpected dimension type: {}", x),
+            });
+        }
+
+        if let Some(_) = self
+            .segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(MemberType::Boolean);
+        }
+        None
     }
 }
