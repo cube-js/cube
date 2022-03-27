@@ -29,7 +29,7 @@ use super::information_schema::postgres::{
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogNamespaceProvider,
     PgCatalogTableProvider, PgCatalogTypeProvider,
 };
-use crate::compile::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
+use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -324,11 +324,17 @@ impl TableProvider for CubeTableProvider {
                 .map(|c| {
                     Field::new(
                         c.get_name(),
-                        match c.get_data_type().as_str() {
-                            "datetime" => DataType::Timestamp(TimeUnit::Millisecond, None),
-                            "boolean" => DataType::Boolean,
-                            "int" => DataType::Int64,
-                            _ => DataType::Utf8,
+                        match c.get_column_type() {
+                            ColumnType::String => DataType::Utf8,
+                            ColumnType::VarStr => DataType::Utf8,
+                            ColumnType::Double => DataType::Float64,
+                            ColumnType::Int8 => DataType::Int64,
+                            ColumnType::Int32 => DataType::Int64,
+                            ColumnType::Int64 => DataType::Int64,
+                            ColumnType::Blob => DataType::Utf8,
+                            ColumnType::Timestamp => {
+                                DataType::Timestamp(TimeUnit::Millisecond, None)
+                            }
                         },
                         true,
                     )

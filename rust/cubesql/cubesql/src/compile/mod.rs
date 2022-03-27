@@ -51,7 +51,7 @@ use crate::compile::engine::udf::{
     create_measure_udaf, create_minute_udf, create_quarter_udf, create_second_udf,
     create_str_to_date, create_year_udf,
 };
-use crate::compile::rewrite::LogicalPlanToLanguageConverter;
+use crate::compile::rewrite::converter::LogicalPlanToLanguageConverter;
 
 pub mod builder;
 pub mod context;
@@ -2079,10 +2079,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .add_logical_plan(&optimized_plan)
             .map_err(|e| CompilationError::User(e.to_string()))?;
         let rewrite_plan = converter
+            .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
             .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
 
-        println!("Rewrite: {:#?}", rewrite_plan);
+        log::debug!("Rewrite: {:#?}", rewrite_plan);
 
         Ok(QueryPlan::DataFusionSelect(
             StatusFlags::empty(),

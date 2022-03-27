@@ -235,7 +235,7 @@ impl V1CubeMetaExt for V1CubeMeta {
             });
         }
 
-        if let Some(segment) = self
+        if let Some(_) = self
             .segments
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))

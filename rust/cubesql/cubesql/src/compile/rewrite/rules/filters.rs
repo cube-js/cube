@@ -1,5 +1,5 @@
 use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::BetweenExprNegated;
+use crate::compile::rewrite::analysis::{ConstantData, LogicalPlanAnalysis};
 use crate::compile::rewrite::FilterMemberOp;
 use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterReplacerCube;
@@ -7,20 +7,28 @@ use crate::compile::rewrite::InListExprNegated;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::TableScanSourceTableName;
+use crate::compile::rewrite::TimeDimensionDateRange;
+use crate::compile::rewrite::TimeDimensionDateRangeReplacerDateRange;
+use crate::compile::rewrite::TimeDimensionDateRangeReplacerMember;
+use crate::compile::rewrite::TimeDimensionGranularity;
+use crate::compile::rewrite::TimeDimensionName;
 use crate::compile::rewrite::{between_expr, FilterMemberMember};
 use crate::compile::rewrite::{
     binary_expr, column_expr, cube_scan, cube_scan_filters, filter, filter_member, filter_op,
-    filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite,
-    LogicalPlanAnalysis, RewriteRules,
+    filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite, RewriteRules,
 };
-use crate::compile::rewrite::{inlist_expr, BinaryExprOp, ConstantData};
+use crate::compile::rewrite::{
+    cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
+    time_dimension_date_range_replacer, time_dimension_expr, BetweenExprNegated,
+};
+use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
 use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
 use crate::transport::ext::V1CubeMetaExt;
 use crate::transport::MemberType;
 use crate::var;
 use crate::var_iter;
 use chrono::{SecondsFormat, TimeZone, Utc};
-use datafusion::logical_plan::Operator;
+use datafusion::logical_plan::{Column, Operator};
 use datafusion::scalar::ScalarValue;
 use egg::{EGraph, Rewrite, Subst};
 use std::fmt::Display;
@@ -193,6 +201,201 @@ impl RewriteRules for FilterRules {
             //     cube_scan_filters("?left", "?right"),
             //     cube_scan_filters("?right", "?left"),
             // ),
+            transforming_rewrite(
+                "filter-replacer-in-date-range",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
+                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                    ),
+                    "and",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+                self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
+            ),
+            transforming_rewrite(
+                "in-date-range-to-time-dimension",
+                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters_empty_tail(),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                self.filter_to_time_dimension_range(
+                    "?member",
+                    "?date_range",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-pull-up-left",
+                cube_scan_filters(
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                    "?right",
+                ),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters("?filters", "?right"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-pull-up-right",
+                cube_scan_filters(
+                    "?left",
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                ),
+                time_dimension_date_range_replacer(
+                    cube_scan_filters("?left", "?filters"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+            ),
+            rewrite(
+                "in-date-range-to-time-dimension-swap-to-members",
+                cube_scan(
+                    "?source_table_name",
+                    "?members",
+                    time_dimension_date_range_replacer(
+                        "?filters",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                    "?order",
+                    "?limit",
+                    "?offset",
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    time_dimension_date_range_replacer(
+                        "?members",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                    "?filters",
+                    "?order",
+                    "?limit",
+                    "?offset",
+                ),
+            ),
+            transforming_rewrite(
+                "time-dimension-date-range-replacer-push-down-left",
+                time_dimension_date_range_replacer(
+                    cube_scan_members("?left", "?right"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    time_dimension_date_range_replacer(
+                        "?left",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                    "?right",
+                ),
+                self.push_down_time_dimension_replacer("?left", "?time_dimension_member"),
+            ),
+            transforming_rewrite(
+                "time-dimension-date-range-replacer-push-down-right",
+                time_dimension_date_range_replacer(
+                    cube_scan_members("?left", "?right"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    "?left",
+                    time_dimension_date_range_replacer(
+                        "?right",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                ),
+                self.push_down_time_dimension_replacer("?right", "?time_dimension_member"),
+            ),
+            transforming_rewrite(
+                "time-dimension-date-range-replacer-push-down-new-time-dimension",
+                time_dimension_date_range_replacer(
+                    "?members",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    time_dimension_expr("?member", "?granularity", "?date_range", "?expr"),
+                    "?members",
+                ),
+                self.push_down_time_dimension_replacer_new_time_dimension(
+                    "?members",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                    "?member",
+                    "?granularity",
+                    "?date_range",
+                    "?expr",
+                ),
+            ),
+            rewrite(
+                "time-dimension-date-range-replacer-skip-measure",
+                time_dimension_date_range_replacer(
+                    cube_scan_members(measure_expr("?measure", "?expr"), "?tail"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    measure_expr("?measure", "?expr"),
+                    time_dimension_date_range_replacer(
+                        "?tail",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                ),
+            ),
+            rewrite(
+                "time-dimension-date-range-replacer-skip-dimension",
+                time_dimension_date_range_replacer(
+                    cube_scan_members(dimension_expr("?dimension", "?expr"), "?tail"),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    dimension_expr("?dimension", "?expr"),
+                    time_dimension_date_range_replacer(
+                        "?tail",
+                        "?time_dimension_member",
+                        "?time_dimension_date_range",
+                    ),
+                ),
+            ),
+            transforming_rewrite(
+                "time-dimension-date-range-replacer-time-dimension",
+                time_dimension_date_range_replacer(
+                    cube_scan_members(
+                        time_dimension_expr("?member", "?granularity", "?date_range", "?expr"),
+                        "?tail",
+                    ),
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                ),
+                cube_scan_members(
+                    time_dimension_expr("?member", "?granularity", "?output_date_range", "?expr"),
+                    "?tail",
+                ),
+                self.replace_time_dimension_date_range(
+                    "?member",
+                    "?date_range",
+                    "?time_dimension_member",
+                    "?time_dimension_date_range",
+                    "?output_date_range",
+                ),
+            ),
         ]
     }
 }
@@ -215,7 +418,6 @@ impl FilterRules {
             for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
                 if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
                     let table_name = table_name.to_string();
-                    println!("push_down_filter");
                     // TODO check referenced_expr
                     subst.insert(
                         cube_var,
@@ -364,8 +566,6 @@ impl FilterRules {
         let filter_values_var = var!(filter_values_var);
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
-            println!("transform_in_filter");
-
             for cube in var_iter!(egraph[subst[cube_var]], FilterReplacerCube) {
                 if let Some(cube) = cube
                     .as_ref()
@@ -374,7 +574,6 @@ impl FilterRules {
                     if let Some(ConstantData::Intermediate(list)) =
                         &egraph[subst[list_var]].data.constant
                     {
-                        println!("transform_in_filter: {:?}", list);
                         let values = list
                             .into_iter()
                             .map(|literal| FilterRules::scalar_to_value(literal))
@@ -521,10 +720,9 @@ impl FilterRules {
                 {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
                         let member_name = format!("{}.{}", cube.name, column.name);
-                        if let Some(dimension) = cube.lookup_dimension(&member_name) {
+                        if let Some(_) = cube.lookup_dimension(&member_name) {
                             for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated)
                             {
-                                println!("transform_between: {:?}", dimension);
                                 let negated = *negated;
                                 if let Some(ConstantData::Intermediate(low)) =
                                     &egraph[subst[low_var]].data.constant
@@ -564,6 +762,227 @@ impl FilterRules {
 
                                         return true;
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn merge_date_range(
+        &self,
+        date_range_start_var: &'static str,
+        date_range_end_var: &'static str,
+        date_range_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let date_range_start_var = date_range_start_var.parse().unwrap();
+        let date_range_end_var = date_range_end_var.parse().unwrap();
+        let date_range_var = date_range_var.parse().unwrap();
+        move |egraph, subst| {
+            for date_range_start in
+                var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
+            {
+                for date_range_end in
+                    var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
+                {
+                    let mut result = Vec::new();
+                    result.extend(date_range_start.clone().into_iter());
+                    result.extend(date_range_end.clone().into_iter());
+                    subst.insert(
+                        date_range_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
+                            result,
+                        ))),
+                    );
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn filter_to_time_dimension_range(
+        &self,
+        member_var: &'static str,
+        date_range_var: &'static str,
+        time_dimension_member_var: &'static str,
+        time_dimension_date_range_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let member_var = member_var.parse().unwrap();
+        let date_range_var = date_range_var.parse().unwrap();
+        let time_dimension_member_var = time_dimension_member_var.parse().unwrap();
+        let time_dimension_date_range_var = time_dimension_date_range_var.parse().unwrap();
+        move |egraph, subst| {
+            for member in var_iter!(egraph[subst[member_var]], FilterMemberMember) {
+                let member = member.to_string();
+                for date_range in var_iter!(egraph[subst[date_range_var]], FilterMemberValues) {
+                    let date_range = date_range.clone();
+                    subst.insert(
+                        time_dimension_member_var,
+                        egraph.add(LogicalPlanLanguage::TimeDimensionDateRangeReplacerMember(
+                            TimeDimensionDateRangeReplacerMember(member.to_string()),
+                        )),
+                    );
+
+                    subst.insert(
+                        time_dimension_date_range_var,
+                        egraph.add(
+                            LogicalPlanLanguage::TimeDimensionDateRangeReplacerDateRange(
+                                TimeDimensionDateRangeReplacerDateRange(date_range.clone()),
+                            ),
+                        ),
+                    );
+
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn push_down_time_dimension_replacer_new_time_dimension(
+        &self,
+        members_var: &'static str,
+        time_dimension_member_var: &'static str,
+        time_dimension_date_range_var: &'static str,
+        member_var: &'static str,
+        granularity_var: &'static str,
+        date_range_var: &'static str,
+        expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let time_dimension_member_var = var!(time_dimension_member_var);
+        let time_dimension_date_range_var = var!(time_dimension_date_range_var);
+        let member_var = var!(member_var);
+        let granularity_var = var!(granularity_var);
+        let date_range_var = var!(date_range_var);
+        let expr_var = var!(expr_var);
+        move |egraph, subst| {
+            for member in var_iter!(
+                egraph[subst[time_dimension_member_var]],
+                TimeDimensionDateRangeReplacerMember
+            ) {
+                let member = member.to_string();
+                if let Some(member_name_to_expr) =
+                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                {
+                    if member_name_to_expr.iter().all(|(m, _)| m != &member) {
+                        let date_range = var_iter!(
+                            egraph[subst[time_dimension_date_range_var]],
+                            TimeDimensionDateRangeReplacerDateRange
+                        )
+                        .next()
+                        .unwrap()
+                        .clone();
+
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionName(TimeDimensionName(
+                                member.to_string(),
+                            ))),
+                        );
+
+                        subst.insert(
+                            granularity_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionGranularity(
+                                TimeDimensionGranularity(None),
+                            )),
+                        );
+
+                        subst.insert(
+                            date_range_var,
+                            egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
+                                TimeDimensionDateRange(Some(date_range)),
+                            )),
+                        );
+
+                        let column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                            ColumnExprColumn(Column::from_name(member.to_string())),
+                        ));
+
+                        subst.insert(
+                            expr_var,
+                            egraph.add(LogicalPlanLanguage::ColumnExpr([column])),
+                        );
+
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn push_down_time_dimension_replacer(
+        &self,
+        members_var: &'static str,
+        time_dimension_member_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let time_dimension_member_var = var!(time_dimension_member_var);
+        move |egraph, subst| {
+            for member in var_iter!(
+                egraph[subst[time_dimension_member_var]],
+                TimeDimensionDateRangeReplacerMember
+            ) {
+                if let Some(member_name_to_expr) =
+                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                {
+                    if member_name_to_expr.iter().any(|(m, _)| m == member) {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn replace_time_dimension_date_range(
+        &self,
+        member_var: &'static str,
+        date_range_var: &'static str,
+        time_dimension_member_var: &'static str,
+        time_dimension_date_range_var: &'static str,
+        output_date_range_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let member_var = var!(member_var);
+        let date_range_var = var!(date_range_var);
+        let time_dimension_member_var = var!(time_dimension_member_var);
+        let time_dimension_date_range_var = var!(time_dimension_date_range_var);
+        let output_date_range_var = var!(output_date_range_var);
+        move |egraph, subst| {
+            for date_range in var_iter!(egraph[subst[date_range_var]], TimeDimensionDateRange) {
+                if date_range.is_none() {
+                    for member in var_iter!(egraph[subst[member_var]], TimeDimensionName) {
+                        for time_dimension_member in var_iter!(
+                            egraph[subst[time_dimension_member_var]],
+                            TimeDimensionDateRangeReplacerMember
+                        ) {
+                            if member == time_dimension_member {
+                                for time_dimension_date_range in var_iter!(
+                                    egraph[subst[time_dimension_date_range_var]],
+                                    TimeDimensionDateRangeReplacerDateRange
+                                ) {
+                                    let time_dimension_date_range =
+                                        time_dimension_date_range.clone();
+                                    subst.insert(
+                                        output_date_range_var,
+                                        egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
+                                            TimeDimensionDateRange(Some(
+                                                time_dimension_date_range.clone(),
+                                            )),
+                                        )),
+                                    );
+
+                                    return true;
                                 }
                             }
                         }
