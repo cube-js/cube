@@ -1,5 +1,6 @@
 use cubeclient::models::V1CubeMeta;
 
+#[derive(Debug)]
 pub struct MetaContext {
     pub cubes: Vec<V1CubeMeta>,
 }

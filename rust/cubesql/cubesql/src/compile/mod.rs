@@ -2339,7 +2339,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<MetaContext, CubeError> {
+            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
