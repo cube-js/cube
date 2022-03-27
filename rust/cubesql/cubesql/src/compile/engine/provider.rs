@@ -26,8 +26,8 @@ use super::information_schema::mysql::{
 
 use super::information_schema::postgres::{
     columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
-    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogNamespaceProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 pub struct CubeContext<'a> {
@@ -182,6 +182,10 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_type") {
             return Some(Arc::new(PgCatalogTypeProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_namespace") {
+            return Some(Arc::new(PgCatalogNamespaceProvider::new()));
         }
 
         None
