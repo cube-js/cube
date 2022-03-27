@@ -248,6 +248,10 @@ impl DatabaseProtocol {
                 "information_schema.tables".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
                 "pg_catalog.pg_tables".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
+                "pg_catalog.pg_type".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogNamespaceProvider>() {
+                "pg_catalog.pg_namespace".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
