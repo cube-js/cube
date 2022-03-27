@@ -1,33 +1,26 @@
 mod analysis;
 pub mod converter;
+mod cost;
 pub mod language;
+mod rewriter;
 mod rules;
 
-use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::converter::LanguageToLogicalPlanConverter;
-use crate::compile::rewrite::rules::dates::DateRules;
-use crate::compile::rewrite::rules::filters::FilterRules;
-use crate::compile::rewrite::rules::members::MemberRules;
-use crate::compile::rewrite::rules::order::OrderRules;
-use crate::sql::auth_service::AuthContext;
 use crate::CubeError;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::window_frames::WindowFrame;
 use datafusion::logical_plan::{Column, ExprRewriter};
-use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, LogicalPlan, Operator};
+use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::functions::BuiltinScalarFunction;
-use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::window_functions::WindowFunction;
 use datafusion::scalar::ScalarValue;
-use egg::{rewrite, Applier, CostFunction, Language, Pattern, PatternAst, Subst, Symbol};
-use egg::{EGraph, Extractor, Id, Rewrite, Runner};
+use egg::{rewrite, Applier, Pattern, PatternAst, Subst, Symbol};
+use egg::{EGraph, Id, Rewrite};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
-use std::sync::Arc;
 
 // trace_macros!(false);
 
@@ -262,70 +255,6 @@ macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
     };
-}
-
-pub struct Rewriter {
-    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    cube_context: Arc<CubeContext>,
-}
-
-impl Rewriter {
-    pub fn new(
-        graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cube_context: Arc<CubeContext>,
-    ) -> Self {
-        Self {
-            graph,
-            cube_context,
-        }
-    }
-
-    pub fn rewrite_runner(&self) -> Runner<LogicalPlanLanguage, LogicalPlanAnalysis> {
-        Runner::<LogicalPlanLanguage, LogicalPlanAnalysis>::new(LogicalPlanAnalysis::new(
-            self.cube_context.clone(),
-            Arc::new(DefaultPhysicalPlanner::default()),
-        ))
-        .with_iter_limit(100)
-        .with_node_limit(10000)
-        .with_egraph(self.graph.clone())
-    }
-
-    pub fn find_best_plan(
-        &mut self,
-        root: Id,
-        auth_context: Arc<AuthContext>,
-    ) -> Result<LogicalPlan, CubeError> {
-        let runner = self.rewrite_runner();
-        let rules = self.rewrite_rules();
-        let runner = runner.run(rules.iter());
-        log::debug!("Iterations: {:?}", runner.iterations);
-        let extractor = Extractor::new(&runner.egraph, BestCubePlan);
-        let (_, best) = extractor.find_best(root);
-        let new_root = Id::from(best.as_ref().len() - 1);
-        log::debug!("Best: {:?}", best);
-        self.graph = runner.egraph.clone();
-        let converter =
-            LanguageToLogicalPlanConverter::new(best, self.cube_context.clone(), auth_context);
-        converter.to_logical_plan(new_root)
-    }
-
-    pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(self.cube_context.clone())),
-            Box::new(FilterRules::new(self.cube_context.clone())),
-            Box::new(DateRules::new(self.cube_context.clone())),
-            Box::new(OrderRules::new(self.cube_context.clone())),
-        ];
-        let mut rewrites = Vec::new();
-        for r in rules {
-            rewrites.extend(r.rewrite_rules());
-        }
-        rewrites
-    }
-}
-
-pub trait RewriteRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
 }
 
 pub struct WithColumnRelation(String);
@@ -708,52 +637,5 @@ where
         } else {
             Vec::new()
         }
-    }
-}
-
-pub struct BestCubePlan;
-
-impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
-    type Cost = (
-        /* Cube nodes */ i64,
-        /* Replacers */ i64,
-        /* Structure points */ i64,
-        /* AST size */ usize,
-    );
-    fn cost<C>(&mut self, enode: &LogicalPlanLanguage, mut costs: C) -> Self::Cost
-    where
-        C: FnMut(Id) -> Self::Cost,
-    {
-        let this_cube_nodes = match enode {
-            LogicalPlanLanguage::CubeScan(_) => -1,
-            LogicalPlanLanguage::Measure(_) => -1,
-            LogicalPlanLanguage::Dimension(_) => -1,
-            LogicalPlanLanguage::TimeDimension(_) => -1,
-            _ => 0,
-        };
-
-        let this_replacers = match enode {
-            LogicalPlanLanguage::FilterReplacer(_) => 1,
-            LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
-            _ => 0,
-        };
-
-        let this_cube_structure = match enode {
-            // TODO needed to get rid of FilterOpFilters on upper level
-            LogicalPlanLanguage::FilterOpFilters(_) => 1,
-            _ => 0,
-        };
-        enode.children().iter().fold(
-            (this_cube_nodes, this_replacers, this_cube_structure, 1),
-            |(cube_nodes, replacers, structure, nodes), id| {
-                let (child_cube_nodes, child_replacers, child_structure, child_nodes) = costs(*id);
-                (
-                    cube_nodes + child_cube_nodes,
-                    replacers + child_replacers,
-                    structure + child_structure,
-                    nodes + child_nodes,
-                )
-            },
-        )
     }
 }

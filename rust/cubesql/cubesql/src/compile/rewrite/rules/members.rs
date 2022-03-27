@@ -1,6 +1,7 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::cube_scan_order_empty_tail;
+use crate::compile::rewrite::rewriter::RewriteRules;
 use crate::compile::rewrite::table_scan;
 use crate::compile::rewrite::AggregateFunctionExprDistinct;
 use crate::compile::rewrite::AggregateFunctionExprFun;
@@ -26,7 +27,7 @@ use crate::compile::rewrite::{
     projection_expr_empty_tail, sort_expr, udaf_expr, WithColumnRelation,
 };
 use crate::compile::rewrite::{
-    binary_expr, column_expr, cube_scan, literal_expr, rewrite, transforming_rewrite, RewriteRules,
+    binary_expr, column_expr, cube_scan, literal_expr, rewrite, transforming_rewrite,
 };
 use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,

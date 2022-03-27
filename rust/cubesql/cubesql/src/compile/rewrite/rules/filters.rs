@@ -1,5 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::{ConstantData, LogicalPlanAnalysis};
+use crate::compile::rewrite::rewriter::RewriteRules;
 use crate::compile::rewrite::FilterMemberOp;
 use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterReplacerCube;
@@ -15,7 +16,7 @@ use crate::compile::rewrite::TimeDimensionName;
 use crate::compile::rewrite::{between_expr, FilterMemberMember};
 use crate::compile::rewrite::{
     binary_expr, column_expr, cube_scan, cube_scan_filters, filter, filter_member, filter_op,
-    filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite, RewriteRules,
+    filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite,
 };
 use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,

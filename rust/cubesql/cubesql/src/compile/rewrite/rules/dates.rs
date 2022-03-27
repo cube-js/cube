@@ -1,7 +1,8 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
+use crate::compile::rewrite::rewriter::RewriteRules;
 use crate::compile::rewrite::LogicalPlanLanguage;
-use crate::compile::rewrite::{binary_expr, column_expr, literal_expr, rewrite, RewriteRules};
+use crate::compile::rewrite::{binary_expr, column_expr, literal_expr, rewrite};
 use crate::compile::rewrite::{fun_expr, literal_string, to_day_interval_expr, udf_expr};
 use egg::Rewrite;
 use std::sync::Arc;

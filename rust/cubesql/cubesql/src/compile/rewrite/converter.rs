@@ -1,6 +1,8 @@
 use crate::compile::engine::df::scan::CubeScanNode;
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
+use crate::compile::rewrite::rewriter::Rewriter;
+use crate::compile::rewrite::AggregateFunctionExprDistinct;
 use crate::compile::rewrite::AggregateFunctionExprFun;
 use crate::compile::rewrite::AggregateUDFExprFun;
 use crate::compile::rewrite::AliasExprAlias;
@@ -43,7 +45,6 @@ use crate::compile::rewrite::TryCastExprDataType;
 use crate::compile::rewrite::UnionAlias;
 use crate::compile::rewrite::WindowFunctionExprFun;
 use crate::compile::rewrite::WindowFunctionExprWindowFrame;
-use crate::compile::rewrite::{AggregateFunctionExprDistinct, Rewriter};
 use crate::sql::auth_service::AuthContext;
 use crate::CubeError;
 use cubeclient::models::{

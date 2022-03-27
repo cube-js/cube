@@ -1,5 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
+use crate::compile::rewrite::rewriter::RewriteRules;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::OrderAsc;
 use crate::compile::rewrite::OrderMember;
@@ -11,7 +12,7 @@ use crate::compile::rewrite::{
     column_name_to_member_name, cube_scan_order, cube_scan_order_empty_tail, expr_column_name,
     order, order_replacer, referenced_columns, sort, sort_exp, sort_exp_empty_tail, sort_expr,
 };
-use crate::compile::rewrite::{cube_scan, rewrite, transforming_rewrite, RewriteRules};
+use crate::compile::rewrite::{cube_scan, rewrite, transforming_rewrite};
 use crate::var;
 use crate::var_iter;
 use egg::{EGraph, Rewrite, Subst};
