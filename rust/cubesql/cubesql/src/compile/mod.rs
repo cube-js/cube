@@ -4834,4 +4834,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgnamespace_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgnamespace_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_namespace".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
