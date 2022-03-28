@@ -1012,12 +1012,12 @@ a.Header__link {
   margin-left: 8px;
 }
 
-.form {
+.Form {
   width: 100%;
   margin-top: 18px;
 }
 
-.form-textarea {
+.Form-textarea {
   font-family: Inter, sans-serif;
   font-size: 14px;
   line-height: 20px;
