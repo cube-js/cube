@@ -1165,6 +1165,18 @@
     core-js "^3.6.5"
     ramda "^0.27.0"
 
+"@datadog/browser-core@4.7.0":
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-core/-/browser-core-4.7.0.tgz#3b890f332c564f26c025c6dce295100808373408"
+  integrity sha512-pzFcyurQGQ/QG/ZdGyel/Lf3hhZAa9WyN0Cxn0KyfSCKnyeISbSss1Xy37pSPPOYStkPSueWfaBM8s4s4Rgkmw==
+
+"@datadog/browser-logs@^4.7.0":
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/@datadog/browser-logs/-/browser-logs-4.7.0.tgz#943c8d5aedd60e8d6a748e37ab698b2fe2403baf"
+  integrity sha512-YWG/JY8/gFLzCBI1xqUF+LLutxITUQR68j317TV0f9eSduB0Qq0mcCGdOVag3Jy2dSPGiun3hFUmBESMs474Ww==
+  dependencies:
+    "@datadog/browser-core" "4.7.0"
+
 "@emotion/hash@^0.8.0":
   version "0.8.0"
   resolved "https://registry.yarnpkg.com/@emotion/hash/-/hash-0.8.0.tgz#bbbff68978fefdbe68ccb533bc8cbe1d1afb5413"
