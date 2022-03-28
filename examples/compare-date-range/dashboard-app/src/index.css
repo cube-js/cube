@@ -1,11 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 
-body {
+.app {
   margin: 0;
+  padding: 16px 32px 24px;
   font-family: 'DM Sans', sans-serif;
   font-feature-settings: 'ss03' on;
   font-feature-settings: 'ss04' on;
-  background-color: #f0f2f5 !important;
+  background-color: #f3f3fb!important;
 }
 
 .ant-popover-disabled-compatible-wrapper {
