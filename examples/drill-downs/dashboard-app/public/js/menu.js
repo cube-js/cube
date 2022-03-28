@@ -81,14 +81,9 @@ const populateExamplesNav = (data) => {
 // dropdown menu accessibilty
 function applyDropdownAccessibility() {
   const dropdownLinks = document.querySelectorAll('.Dropdown__link');
-  dropdownLinks.forEach((link) => {
-    link.addEventListener('focus', function () {
-      dropdownMenuBtn.setAttribute('aria-expanded', true);
-    });
-  });
-
   const lastDropdownLinkItem = dropdownLinks.length - 1;
+  
   dropdownLinks[lastDropdownLinkItem].addEventListener('blur', function () {
-    dropdownMenuBtn.setAttribute('aria-expanded', false);
+    menuButton.setAttribute('aria-expanded', false);
   });
 }
