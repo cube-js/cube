@@ -2863,6 +2863,19 @@ mod tests {
                 },
             ),
             (
+                "SELECT COUNT(*) FROM db.KibanaSampleDataEcommerce".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                },
+            ),
+            (
                 "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),

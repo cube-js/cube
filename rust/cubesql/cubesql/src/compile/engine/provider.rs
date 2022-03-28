@@ -83,7 +83,11 @@ impl ContextProvider for CubeContext {
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
         let table_path = match name {
             datafusion::catalog::TableReference::Partial { schema, table, .. } => {
-                Some(format!("{}.{}", schema, table))
+                if schema == "db" {
+                    Some(table.to_string())
+                } else {
+                    Some(format!("{}.{}", schema, table))
+                }
             }
             datafusion::catalog::TableReference::Full {
                 catalog,
