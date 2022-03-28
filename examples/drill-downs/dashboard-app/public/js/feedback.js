@@ -9,9 +9,9 @@ const feedbackMessageSendBtn = document.querySelector('#feedback-message-send');
 const feedbackMessageCancelBtn = document.querySelector('#feedback-message-cancel');
 
 // UI
-const feedbackBlock = document.querySelector('.feedback-block');
-const feedbackMessageForm = document.querySelector('.feedback-message-form');
-const thanksBlock = document.querySelector('.thanks');
+const feedbackBlock = document.querySelector('.Feedback__block');
+const feedbackMessageForm = document.querySelector('.Feedback__message-form');
+const thanksBlock = document.querySelector('.Feedback__thanks');
 
 const FEEDBACK_LIKE = 'like';
 const FEEDBACK_DISLIKE = 'dislike';
