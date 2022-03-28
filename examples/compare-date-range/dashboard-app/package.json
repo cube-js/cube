@@ -18,6 +18,7 @@
     "apollo-client": "^2.6.10",
     "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
+    "cubedev-tracking": "^1.1.0",
     "graphql": "^15.3.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^5.0.0",
@@ -33,14 +34,15 @@
     "react-scripts": "3.4.4"
   },
   "devDependencies": {
+    "browserify": "^17.0.0",
     "cross-env": "^7.0.2"
   },
   "scripts": {
-    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
-    "build": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "bundle": "browserify public/js/menu.js public/js/index.js public/js/feedback.js public/js/tracking.js -o public/bundle.js",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true yarn run bundle &&  react-scripts start",
+    "build": "cross-env SKIP_PREFLIGHT_CHECK=true yarn run bundle &&  react-scripts build",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production yarn run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
