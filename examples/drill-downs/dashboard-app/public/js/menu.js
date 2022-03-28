@@ -2,7 +2,7 @@ const cubejs = require('@cubejs-client/core').default;
 
 // DOM
 const menuList = document.querySelector('#menu-list');
-const menuCurrent = document.querySelector('#menu-current');
+const menuCurrent = document.querySelector('#menu-button-text');
 const menuButton = document.querySelector('#menu-button');
 
 // CSS
@@ -58,7 +58,7 @@ const populateExamplesNav = (data) => {
 
   // generate nav options from data items
   const navItems = data
-    .map((item) => `<li class="dropdown-list-item"><a class="dropdown-link" href="${item.url}">${item.name}</a></li>`)
+    .map((item) => `<li class="Dropdown__listItem"><a class="Dropdown__link Header__link" href="${item.url}">${item.name}</a></li>`)
     .join('');
 
   // remove loader
@@ -80,7 +80,7 @@ const populateExamplesNav = (data) => {
 
 // dropdown menu accessibilty
 function applyDropdownAccessibility() {
-  const dropdownLinks = document.querySelectorAll('.dropdown-link');
+  const dropdownLinks = document.querySelectorAll('.Dropdown__link');
   dropdownLinks.forEach((link) => {
     link.addEventListener('focus', function () {
       dropdownMenuBtn.setAttribute('aria-expanded', true);
