@@ -832,7 +832,7 @@ a.Header__link {
   .Dropdown__link {
     display: block;
     width: 100%;
-    padding: 12px 16px;
+    padding: 11px 16px;
   }
 
   .Dropdown__link:focus {
