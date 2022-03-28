@@ -90,7 +90,7 @@ headerOverlay.addEventListener("click", ()=>{
   hideNav()
 })
 
-// TODO: need to update in case of changing nav structure
+// update in case of changing nav structure
 const headerNavigationLastChild = document.querySelector(
   "#headerNavigation > :last-child > :last-child"
 );
