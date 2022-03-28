@@ -204,7 +204,6 @@ ul {
 
   font-family: inherit;
   text-decoration: none;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
   line-height: 26px;
@@ -945,6 +944,7 @@ a.Header__link {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 @media only screen and (min-width: 880px) {
