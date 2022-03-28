@@ -81,11 +81,6 @@
   --time: 0.7s;
   --hover: 0.2s;
 
-  /* Z_INDEX */
-  --z-index-1: 100;
-  --z-index-2: 1000;
-  --z-index-3: 10000;
-
   /* BREAKPOINTS */
   /* DON'T REMOVE: USES AT JS  */
   --breakpoint-mobile-s: 480px;
@@ -479,6 +474,8 @@ a.Header__link {
     padding: 0 var(--nav_mobile_padding) 12px var(--nav_mobile_padding);
     box-sizing: border-box;
     display: none;
+
+    z-index: 9999;
   }
 
   .Header__navigation.Header__navigation--open {
@@ -494,30 +491,22 @@ a.Header__link {
     display: contents;
   }
 
-  .Header::before {
+   .Header .Header__overlay{
     background-color: var(--dark_05_a12);
     position: absolute;
     top: 100%;
     left: 0;
     height: calc(100vh - var(--header_height) + var(--additional_scroll_height));
     width: 100%;
+    z-index: 99;
+    opacity: 0;
     pointer-events: none;
+    transition: opacity var(--time);
   }
 
-  .Header.Header--hasOpened::before {
-    content: "";
-    animation-fill-mode: forwards;
-  }
-
-  .Header.Header--hasOpened::before {
+  .Header.Header--open .Header__overlay{
     opacity: 1;
-    animation-duration: calc(100000 * var(--time));
-    animation-name: hide;
-  }
-
-  .Header.Header--open::before {
-    animation-name: open;
-    animation-duration: var(--time);
+    pointer-events: auto;
   }
 
   .Header__linkItem {

@@ -1,6 +1,7 @@
 const navToggleBtn = document.querySelector("#toggleNavVisibilityButton");
 const header = document.querySelector("#header");
 const headerNavigation = document.querySelector("#headerNavigation");
+const headerOverlay = document.querySelector("#headerOverlay")
 const minDesktopWidth = 1180;
 
 const toPX = (n) => (CSS && CSS.px ? CSS.px(n) : n + "px");
@@ -40,12 +41,6 @@ const unLockScroll = () => {
   document.body.style.removeProperty("--additional_scroll_height");
 };
 
-const hideMenuByCLickOutside = (e) => {
-  if (!header.contains(e.target)) {
-    hideNav();
-  }
-};
-
 const toggleHeaderNavigation = () => {
   if (headerNavigation.classList.contains("Header__navigation--open")) {
     // set display:none to navigation after transition end
@@ -73,8 +68,6 @@ const hideNav = () => {
 
   navToggleBtn.setAttribute("aria-expanded", "false");
   navToggleBtn.setAttribute("aria-label", "Open menu");
-
-  document.body.removeEventListener("click", hideMenuByCLickOutside);
 };
 
 const showNav = () => {
@@ -83,8 +76,6 @@ const showNav = () => {
 
   navToggleBtn.setAttribute("aria-expanded", true);
   navToggleBtn.setAttribute("aria-label", "Close menu");
-
-  document.body.addEventListener("click", hideMenuByCLickOutside);
 };
 
 navToggleBtn.addEventListener("click", (e) => {
@@ -94,6 +85,10 @@ navToggleBtn.addEventListener("click", (e) => {
     showNav();
   }
 });
+
+headerOverlay.addEventListener("click", ()=>{
+  hideNav()
+})
 
 // TODO: need to update in case of changing nav structure
 const headerNavigationLastChild = document.querySelector(
