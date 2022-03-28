@@ -198,6 +198,9 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
+  allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
+    .default('false')
+    .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')
       .asString();
