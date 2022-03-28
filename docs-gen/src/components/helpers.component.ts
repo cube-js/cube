@@ -113,7 +113,7 @@ export class ContextAwareHelpersComponent extends ContextAwareRendererComponent 
         includesPath = path.join(this.includes!, includesPath.trim());
         if (fs.existsSync(includesPath) && fs.statSync(includesPath).isFile()) {
           const contents = fs.readFileSync(includesPath, 'utf-8');
-          if (includesPath.substr(-4).toLocaleLowerCase() === '.hbs') {
+          if (includesPath.slice(-4).toLocaleLowerCase() === '.hbs') {
             const template = Handlebars.compile(contents);
             return template(context);
           } else {

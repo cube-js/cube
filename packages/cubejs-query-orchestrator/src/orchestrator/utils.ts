@@ -156,21 +156,21 @@ export function parseRedisUrl(url: Readonly<string>): RedisParsedResult {
   }
 
   if (url.startsWith('redis://')) {
-    return parseUrl(url.substr('redis://'.length), result, parseHostPartBasic);
+    return parseUrl(url.slice('redis://'.length), result, parseHostPartBasic);
   }
 
   if (url.startsWith('rediss://')) {
     result.ssl = true;
 
-    return parseUrl(url.substr('rediss://'.length), result, parseHostPartBasic);
+    return parseUrl(url.slice('rediss://'.length), result, parseHostPartBasic);
   }
 
   if (url.startsWith('redis+sentinel://')) {
-    return parseUrl(url.substr('redis+sentinel://'.length), result, parseHostPartSentinel);
+    return parseUrl(url.slice('redis+sentinel://'.length), result, parseHostPartSentinel);
   }
 
   if (url.startsWith('unix://')) {
-    return parseUnixUrl(url.substr('unix://'.length), result);
+    return parseUnixUrl(url.slice('unix://'.length), result);
   }
 
   return parseUrl(url, result, parseHostPartBasic);
