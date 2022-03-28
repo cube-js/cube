@@ -4815,4 +4815,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgrange_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgrange_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_range".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

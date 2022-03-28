@@ -27,7 +27,7 @@ use super::information_schema::mysql::{
 use super::information_schema::postgres::{
     columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogNamespaceProvider,
-    PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogRangeProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
@@ -256,6 +256,8 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_type".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogNamespaceProvider>() {
                 "pg_catalog.pg_namespace".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogRangeProvider>() {
+                "pg_catalog.pg_range".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -292,6 +294,10 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_namespace") {
             return Some(Arc::new(PgCatalogNamespaceProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_range") {
+            return Some(Arc::new(PgCatalogRangeProvider::new()));
         }
 
         None
