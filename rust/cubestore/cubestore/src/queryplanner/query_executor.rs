@@ -271,7 +271,8 @@ impl QueryExecutorImpl {
             ExecutionConfig::new()
                 .with_batch_size(4096)
                 .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(serialized_plan))),
+                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(serialized_plan)))
+                .with_parquet_metadata_cache(self.parquet_metadata_cache.cache()),
         )))
     }
 }

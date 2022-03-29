@@ -1505,6 +1505,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 rows_per_chunk,
             );
@@ -1559,6 +1560,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 rows_per_chunk,
             );

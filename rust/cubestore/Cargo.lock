@@ -1194,6 +1194,7 @@ dependencies = [
  "lazy_static",
  "log",
  "pretty_assertions",
+ "rocksdb",
  "scopeguard",
  "serde",
  "serde_derive",

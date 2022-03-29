@@ -21,13 +21,14 @@ use std::{
     io::{BufReader, BufWriter, Write},
     sync::Arc,
 };
+use std::backtrace::Backtrace;
 
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, ParquetTableStore};
+use crate::table::parquet::{arrow_schema, CubestoreParquetMetadataCache, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
@@ -159,6 +160,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
+    parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
@@ -282,6 +284,7 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
+        parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
@@ -289,6 +292,7 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
+            parquet_metadata_cache,
             config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
@@ -468,8 +472,9 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk).await?;
+            let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, parquet_metadata_cache);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -532,6 +537,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+    use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -636,6 +642,7 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
+                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 10,
             );
@@ -811,8 +818,9 @@ impl ChunkStore {
             let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
             let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
             let local_file_copy = local_file.clone();
+            let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, parquet_metadata_cache);
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

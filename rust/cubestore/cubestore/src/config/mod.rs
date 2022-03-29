@@ -541,7 +541,7 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-fn env_parse<T>(name: &str, default: T) -> T
+pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
@@ -754,7 +754,7 @@ impl Config {
             if !*initialized {
                 SimpleLogger::new()
                     .with_level(Level::Error.to_level_filter())
-                    .with_module_level("cubestore", Level::Trace.to_level_filter())
+                    // .with_module_level("cubestore", Level::Trace.to_level_filter())
                     .init()
                     .unwrap();
             }
@@ -976,6 +976,7 @@ impl Config {
         self.injector
             .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
                 ChunkStore::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
