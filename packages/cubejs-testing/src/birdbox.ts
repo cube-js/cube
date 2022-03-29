@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs-extra';
-import { spawn } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
 import {
   DockerComposeEnvironment,
@@ -193,6 +193,7 @@ export async function startBirdBoxFromCli(
 ): Promise<BirdBox> {
   const cubejsOutput = options.cubejsOutput || 'pipe';
   let db: StartedTestContainer;
+  let cli: ChildProcess;
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
@@ -279,55 +280,59 @@ export async function startBirdBoxFromCli(
     );
   }
 
-  const cli = spawn(
-    options.useCubejsServerBinary
-      ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
-      : 'npm',
-    options.useCubejsServerBinary
-      ? []
-      : ['run', 'dev'],
-    {
-      cwd: testDir,
-      shell: true,
-      detached: true,
-      // Show output of Cube.js process in console
-      stdio: [
-        cubejsOutput,
-        cubejsOutput,
-        cubejsOutput,
-      ],
-      env: {
-        ...process.env,
-        CUBEJS_DB_TYPE: options.dbType === 'postgresql'
-          ? 'postgres'
-          : options.dbType,
-        CUBEJS_DEV_MODE: 'true',
-        CUBEJS_API_SECRET: 'mysupersecret',
-        CUBEJS_WEB_SOCKETS: 'true',
-        CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-        ...options.env
-          ? options.env
-          : {
-            CUBEJS_DB_HOST: db!.getHost(),
-            CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
-            CUBEJS_DB_NAME: 'test',
-            CUBEJS_DB_USER: 'test',
-            CUBEJS_DB_PASS: 'test',
-          }
-      },
+  try {
+    cli = spawn(
+      options.useCubejsServerBinary
+        ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
+        : 'npm',
+      options.useCubejsServerBinary
+        ? []
+        : ['run', 'dev'],
+      {
+        cwd: testDir,
+        shell: true,
+        detached: true,
+        stdio: [
+          cubejsOutput,
+          cubejsOutput,
+          cubejsOutput,
+        ],
+        env: {
+          ...process.env,
+          CUBEJS_DB_TYPE: options.dbType === 'postgresql'
+            ? 'postgres'
+            : options.dbType,
+          CUBEJS_DEV_MODE: 'true',
+          CUBEJS_API_SECRET: 'mysupersecret',
+          CUBEJS_WEB_SOCKETS: 'true',
+          CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+          ...options.env
+            ? options.env
+            : {
+              CUBEJS_DB_HOST: db!.getHost(),
+              CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
+              CUBEJS_DB_NAME: 'test',
+              CUBEJS_DB_USER: 'test',
+              CUBEJS_DB_PASS: 'test',
+            }
+        },
+      }
+    );
+    if (cli.stdout) {
+      cli.stdout.on('data', (msg) => {
+        process.stdout.write(msg);
+      });
     }
-  );
-  if (cli.stdout) {
-    cli.stdout.on('data', (msg) => {
-      process.stdout.write(msg);
-    });
+    if (cli.stderr) {
+      cli.stderr.on('data', (msg) => {
+        process.stdout.write(msg);
+      });
+    }
+    await pausePromise(10 * 1000);
+  } catch (e) {
+    // @ts-ignore
+    db.stop();
   }
-  if (cli.stderr) {
-    cli.stderr.on('data', (msg) => {
-      process.stdout.write(msg);
-    });
-  }
-  await pausePromise(10 * 1000);
   return {
     stop: async () => {
       if (cubejsOutput === 'pipe') {
