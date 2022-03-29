@@ -47,6 +47,7 @@ options][link-config].
 | `CUBEJS_CUBESTORE_HOST`              | The hostname of the Cube Store deployment                                                                                                                                        | A valid hostname                                            |
 | `CUBEJS_CUBESTORE_PORT`              | The port of the Cube Store deployment                                                                                                                                            | A valid port number                                         |
 | `CUBEJS_TOPIC_NAME`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                             | A valid topic name                                          |
+| `CUBEJS_GH_API_TOKEN`                  | A Github Personal Token to avoid Github API rate limit at downloading cubestore                             | It can be a personal access token, an OAuth token, an installation access token or a JSON Web Token for GitHub App authentication                                          |
 
 [ref-config-sched-refresh-timer]: /config#scheduled-refresh-timer
 [ref-config-preagg-schema-name]: /config#pre-aggregations-schema
