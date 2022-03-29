@@ -16,7 +16,16 @@ impl MetaContext {
     pub fn new(cubes: Vec<V1CubeMeta>) -> Self {
         // 18000 - max system table oid
         let mut oid: u32 = 18000;
-        let tables: Vec<CubeMetaTable> = cubes.iter().map(|cube| { oid += 10; CubeMetaTable { oid, name: cube.name.clone() } }).collect();
+        let tables: Vec<CubeMetaTable> = cubes
+            .iter()
+            .map(|cube| {
+                oid += 10;
+                CubeMetaTable {
+                    oid,
+                    name: cube.name.clone(),
+                }
+            })
+            .collect();
 
         Self { cubes, tables }
     }
@@ -47,25 +56,31 @@ mod tests {
     #[test]
     fn test_find_tables() {
         let test_cubes = vec![
-            V1CubeMeta { name: "test1".to_string(), title: None, dimensions: vec![], measures: vec![], segments: vec![], }, 
-            V1CubeMeta { name: "test2".to_string(), title: None, dimensions: vec![], measures: vec![], segments: vec![], },
+            V1CubeMeta {
+                name: "test1".to_string(),
+                title: None,
+                dimensions: vec![],
+                measures: vec![],
+                segments: vec![],
+            },
+            V1CubeMeta {
+                name: "test2".to_string(),
+                title: None,
+                dimensions: vec![],
+                measures: vec![],
+                segments: vec![],
+            },
         ];
 
         let test_context = MetaContext::new(test_cubes);
 
         match test_context.find_cube_table_with_oid(18010) {
-            Some(table) => assert_eq!(
-                18010,
-                table.oid
-            ),
+            Some(table) => assert_eq!(18010, table.oid),
             _ => panic!("wrong oid!"),
         }
 
         match test_context.find_cube_table_with_name("test2".to_string()) {
-            Some(table) => assert_eq!(
-                18020,
-                table.oid
-            ),
+            Some(table) => assert_eq!(18020, table.oid),
             _ => panic!("wrong name!"),
         }
     }
