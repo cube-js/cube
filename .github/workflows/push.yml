@@ -419,7 +419,20 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Testing Docker image via BirdBox
+      - name: Testing CubeJS (local mode) via BirdBox
+        run: |
+          cd packages/cubejs-testing/
+          export DEBUG=testcontainers
+          yarn run dataset:minimal
+          yarn run birdbox:cli:postgresql
+      - name: Testing drivers (local mode) via BirdBox
+        run: |
+          cd packages/cubejs-testing/
+          export DEBUG=testcontainers
+          yarn run driver:postgre
+          yarn run driver:athena
+          yarn run driver:bigquery
+      - name: Testing CubeJS (Docker image mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
