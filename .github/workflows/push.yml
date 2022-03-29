@@ -424,7 +424,7 @@ jobs:
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           yarn run dataset:minimal
-          yarn run birdbox:cli:postgresql --mode=local
+          yarn run birdbox:local:postgresql
       - name: Testing CubeJS drivers (local mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
