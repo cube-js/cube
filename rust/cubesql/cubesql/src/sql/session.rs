@@ -1,14 +1,24 @@
-use std::sync::{Arc, RwLock as RwLockSync};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock as RwLockSync},
+};
 
-use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContext};
+use crate::sql::database_variables::mysql_default_session_variables;
 
-#[derive(Debug, Clone)]
+use super::{
+    database_variables::DatabaseVariables, server_manager::ServerManager,
+    session_manager::SessionManager, AuthContext,
+};
+
+extern crate lazy_static;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DatabaseProtocol {
     MySQL,
     PostgreSQL,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionProperties {
     user: Option<String>,
     database: Option<String>,
@@ -20,6 +30,11 @@ impl SessionProperties {
     }
 }
 
+lazy_static! {
+    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = HashMap::new();
+    static ref MYSQL_DEFAULT_VARIABLES: DatabaseVariables = mysql_default_session_variables();
+}
+
 #[derive(Debug)]
 pub struct SessionState {
     // connection id, immutable
@@ -28,8 +43,13 @@ pub struct SessionState {
     pub host: String,
     // client protocol, mysql/postgresql, immutable
     pub protocol: DatabaseProtocol,
-    // Connection properties
+
+    // session db variables
+    variables: Option<Arc<RwLockSync<DatabaseVariables>>>,
+
+    // TODO: remove after user defined vars are implemented
     properties: RwLockSync<SessionProperties>,
+
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
     auth_context: RwLockSync<Option<AuthContext>>,
@@ -40,14 +60,14 @@ impl SessionState {
         connection_id: u32,
         host: String,
         protocol: DatabaseProtocol,
-        properties: SessionProperties,
         auth_context: Option<AuthContext>,
     ) -> Self {
         Self {
             connection_id,
             host,
             protocol,
-            properties: RwLockSync::new(properties),
+            variables: None,
+            properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new(auth_context),
         }
     }
@@ -98,6 +118,19 @@ impl SessionState {
             .write()
             .expect("failed to auth_context properties for writting");
         *guard = auth_context;
+    }
+
+    pub fn all_variables(&self) -> DatabaseVariables {
+        match &self.variables {
+            Some(vars) => vars
+                .read()
+                .expect("failed to unlock variables for reading")
+                .clone(),
+            _ => match self.protocol {
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),
+            },
+        }
     }
 }
 

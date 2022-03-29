@@ -1,5 +1,6 @@
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::{any::Any, sync::Arc};
 
+use crate::compile::engine::provider::TableName;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -13,18 +14,25 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use crate::sql::database_variables::DatabaseVariables;
+
 pub struct PerfSchemaVariablesProvider {
-    variables: HashMap<String, String>,
+    table_name: String,
+    variables: DatabaseVariables,
+}
+
+impl TableName for PerfSchemaVariablesProvider {
+    fn table_name(&self) -> &str {
+        &self.table_name
+    }
 }
 
 impl PerfSchemaVariablesProvider {
-    pub fn new() -> Self {
-        let mut variables = HashMap::new();
-        variables.insert("max_allowed_packet".to_string(), "67108864".to_string());
-        variables.insert("sql_mode".to_string(), "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION".to_string());
-        variables.insert("lower_case_table_names".to_string(), "0".to_string());
-
-        Self { variables }
+    pub fn new(table_name: String, vars: DatabaseVariables) -> Self {
+        Self {
+            table_name,
+            variables: vars,
+        }
     }
 }
 
@@ -55,9 +63,9 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut names = StringBuilder::new(100);
         let mut values = StringBuilder::new(100);
 
-        for (key, value) in self.variables.iter() {
+        for (key, variable) in self.variables.iter() {
             names.append_value(key.clone()).unwrap();
-            values.append_value(value.clone()).unwrap();
+            values.append_value(variable.value.to_string()).unwrap();
         }
 
         let mut data: Vec<Arc<dyn Array>> = vec![];

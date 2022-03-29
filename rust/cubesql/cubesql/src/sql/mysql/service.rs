@@ -25,7 +25,7 @@ use tokio::sync::{watch, RwLock};
 use crate::compile::convert_sql_to_cube_query;
 use crate::config::processing_loop::ProcessingLoop;
 
-use crate::sql::DatabaseProtocol;
+use crate::sql::session::DatabaseProtocol;
 use crate::sql::Session;
 use crate::sql::SessionManager;
 use crate::sql::{
@@ -60,7 +60,7 @@ struct MySqlConnection {
 impl Drop for MySqlConnection {
     fn drop(&mut self) {
         trace!(
-            "[MySqlConnection] Drop {}",
+            "[mysql] Droping connection {}",
             self.session.state.connection_id
         );
 
@@ -192,7 +192,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, Arc::new(meta), self.session.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status) => {
                     return Ok(QueryResponse::Ok(status));

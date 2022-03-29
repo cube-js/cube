@@ -10,7 +10,7 @@ use crate::CubeError;
 
 use super::{
     server_manager::ServerManager,
-    session::{DatabaseProtocol, Session, SessionProcessList, SessionProperties, SessionState},
+    session::{DatabaseProtocol, Session, SessionProcessList, SessionState},
 };
 
 #[derive(Debug)]
@@ -43,13 +43,7 @@ impl SessionManager {
         let sess = Session {
             session_manager: self.clone(),
             server: self.server.clone(),
-            state: Arc::new(SessionState::new(
-                connection_id,
-                host,
-                protocol,
-                SessionProperties::new(None, None),
-                None,
-            )),
+            state: Arc::new(SessionState::new(connection_id, host, protocol, None)),
         };
 
         let session_ref = Arc::new(sess);

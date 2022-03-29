@@ -35,7 +35,7 @@ cube(`Customer`, {
   
   dimensions: {
     /**
-     * Step 3.
+     * Step 3 & Step 4 & Step 5
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     cCustkey: {

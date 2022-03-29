@@ -3,7 +3,6 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     io::{Cursor, Error},
-    marker::Send,
 };
 
 use async_trait::async_trait;
@@ -575,16 +574,6 @@ pub trait Deserialize {
     async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
     where
         Self: Sized;
-
-    async fn read_from<Reader: AsyncReadExt + Unpin + Send>(
-        mut reader: &mut Reader,
-    ) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        let cursor = buffer::read_contents(&mut reader).await?;
-        Ok(Self::deserialize(cursor).await?)
-    }
 }
 
 #[cfg(test)]
@@ -702,6 +691,51 @@ mod tests {
             }
             _ => panic!("Wrong message, must be Describe"),
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_password_message() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            70 00 00 00 09 74 65 73 74 00                     p....test.
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::PasswordMessage(body) => {
+                assert_eq!(
+                    body,
+                    PasswordMessage {
+                        password: "test".to_string()
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Describe"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_sequence_sync() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            53 00 00 00 04                                    S....
+            53 00 00 00 04                                    S....
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        // This test demonstrates that protocol can decode two
+        // simple messages without body in sequence
+        read_message(&mut cursor).await?;
+        read_message(&mut cursor).await?;
 
         Ok(())
     }

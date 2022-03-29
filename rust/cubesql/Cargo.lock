@@ -726,6 +726,7 @@ dependencies = [
  "comfy-table",
  "cubeclient",
  "datafusion",
+ "egg",
  "futures",
  "hex",
  "insta",
@@ -737,6 +738,7 @@ dependencies = [
  "mysql_async",
  "mysql_common 0.26.0",
  "nanoid",
+ "paste",
  "portpicker",
  "pretty_assertions",
  "rand 0.8.4",
@@ -758,7 +760,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "5.1.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=55a1d4a0f35cc932f5b4ceda037a302c5e1a3311#55a1d4a0f35cc932f5b4ceda037a302c5e1a3311"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=17c9e3db9ad08dcf43326ba96e996ffdccc0cc77#17c9e3db9ad08dcf43326ba96e996ffdccc0cc77"
 dependencies = [
  "ahash",
  "arrow",
@@ -840,6 +842,23 @@ name = "downcast"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
+
+[[package]]
+name = "egg"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9f1058c150e258252353a8f8e6d41036ced7d266390114d121abf2ace6e1b6b"
+dependencies = [
+ "fxhash",
+ "hashbrown",
+ "indexmap",
+ "instant",
+ "log",
+ "once_cell",
+ "smallvec",
+ "symbolic_expressions",
+ "thiserror",
+]
 
 [[package]]
 name = "either"
@@ -1178,6 +1197,15 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "fxhash"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]
@@ -3181,6 +3209,12 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "symbolic_expressions"
+version = "5.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c68d531d83ec6c531150584c42a4290911964d5f0d79132b193b67252a23b71"
 
 [[package]]
 name = "syn"

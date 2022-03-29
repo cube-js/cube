@@ -520,11 +520,6 @@ impl ConfigObj for ConfigObjImpl {
 }
 
 lazy_static! {
-    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> =
-        std::sync::RwLock::new(None);
-}
-
-lazy_static! {
     pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
         tokio::sync::RwLock::new(false);
 }
@@ -1150,20 +1145,15 @@ impl Config {
         }
     }
 
+    pub async fn worker_services(&self) -> WorkerServices {
+        WorkerServices {
+            query_executor: self.injector.get_service_typed().await,
+        }
+    }
+
     pub async fn configure(&self) -> CubeServices {
         self.configure_injector().await;
         self.cube_services().await
-    }
-
-    pub fn configure_worker_services() {
-        let mut services = WORKER_SERVICES.write().unwrap();
-        *services = Some(WorkerServices {
-            query_executor: Arc::new(QueryExecutorImpl),
-        })
-    }
-
-    pub fn current_worker_services() -> WorkerServices {
-        WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
 }
 

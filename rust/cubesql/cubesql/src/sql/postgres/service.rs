@@ -9,7 +9,7 @@ use tokio::{
 
 use crate::{
     config::processing_loop::ProcessingLoop,
-    sql::{DatabaseProtocol, SessionManager},
+    sql::{session::DatabaseProtocol, SessionManager},
     CubeError,
 };
 
@@ -53,20 +53,6 @@ impl ProcessingLoop for PostgresServer {
                     }
                 }
             };
-
-            // let user = Some("root".to_string());
-            // let auth_context = self.server.auth.authenticate(user.clone()).await?.context;
-
-            // let state = Arc::new(SessionState::new(
-            //     connection_id,
-            //     // FIXME: user, database!
-            //     "127.0.0.1".to_string(),
-            //     DatabaseProtocol::PostgreSQL,
-            //     // FIXME: user, database!
-            //     SessionProperties::new(user, Some("db".to_string())),
-            //     // FIXME: auth_context!
-            //     Some(auth_context),
-            // ));
 
             let session = self.session_manager.create_session(
                 DatabaseProtocol::PostgreSQL,

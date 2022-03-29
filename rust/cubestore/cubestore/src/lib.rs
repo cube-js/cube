@@ -25,6 +25,7 @@ use crate::remotefs::queue::RemoteFsOpResult;
 use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
+use datafusion::cube_ext::catch_unwind::PanicError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
@@ -230,7 +231,17 @@ impl From<Elapsed> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::from_error(v)
+        match v {
+            datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            v => CubeError::from_error(v),
+        }
+    }
+}
+
+impl From<PanicError> for CubeError {
+    fn from(v: PanicError) -> Self {
+        let PanicError { msg } = v;
+        CubeError::panic(msg)
     }
 }
 

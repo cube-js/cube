@@ -37,7 +37,6 @@ fn main() {
     log::info!("Cube Store version {}", version);
 
     let config = Config::default();
-    Config::configure_worker_services();
 
     let trim_every = config.config_obj().malloc_trim_every_secs();
     if trim_every != 0 {

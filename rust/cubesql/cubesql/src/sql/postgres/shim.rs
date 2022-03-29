@@ -5,7 +5,7 @@ use std::{
 };
 
 use datafusion::{dataframe::DataFrame, execution::dataframe_impl::DataFrameImpl};
-use log::{debug, error};
+use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::{
@@ -286,8 +286,7 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let plan =
-            convert_sql_to_cube_query(&query.to_string(), Arc::new(meta), self.session.clone())?;
+        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
         match plan {
             crate::compile::QueryPlan::MetaOk(status) => {
                 return Ok(QueryResponse::Ok(status));
@@ -311,5 +310,18 @@ impl AsyncPostgresShim {
         } else {
             Err(CubeError::internal("must be auth".to_string()))
         }
+    }
+}
+
+impl Drop for AsyncPostgresShim {
+    fn drop(&mut self) {
+        trace!(
+            "[pg] Droping connection {}",
+            self.session.state.connection_id
+        );
+
+        self.session
+            .session_manager
+            .drop_session(self.session.state.connection_id)
     }
 }

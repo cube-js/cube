@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
+
+
+### Features
+
+* Introduce `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` env ([#2941](https://github.com/cube-js/cube.js/issues/2941)) Thanks [@vignesh-123](https://github.com/vignesh-123) ! ([fa829bf](https://github.com/cube-js/cube.js/commit/fa829bf6446279e37c5aee75ceb914d274cba974))
+
+
+
+
+
 ## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
 
 **Note:** Version bump only for package @cubejs-backend/shared

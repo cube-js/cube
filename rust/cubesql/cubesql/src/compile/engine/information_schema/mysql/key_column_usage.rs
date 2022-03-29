@@ -17,12 +17,19 @@ use super::utils::{
     new_boolean_array_with_placeholder, new_string_array_with_placeholder,
     new_uint32_array_with_placeholder,
 };
+use crate::compile::engine::provider::TableName;
 
 pub struct InfoSchemaKeyColumnUsageProvider {}
 
 impl InfoSchemaKeyColumnUsageProvider {
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl TableName for InfoSchemaKeyColumnUsageProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.key_column_usage"
     }
 }
 
