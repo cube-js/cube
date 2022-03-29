@@ -554,10 +554,18 @@ partition as determined by the pre-aggregation's `partitionGranularity`.
 
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
-`updateWindow` from the current time. In the example below, it will refresh
-today's and the last 7 days of partitions once a day. Partitions before the
-`7 day` interval **will not** be refreshed once they are built unless the rollup
-SQL is changed.
+`updateWindow` from the current time.
+
+<WarningBox>
+
+Because incremental refreshes generate their own SQL, you **must not** use the
+[`sql`](#parameters-refresh-key-sql) property here.
+
+</WarningBox>
+
+In the example below, it will refresh today's and the last 7 days of partitions
+once a day. Partitions before the `7 day` interval **will not** be refreshed
+once they are built unless the rollup SQL is changed.
 
 ```javascript
 cube(`Orders`, {
