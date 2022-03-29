@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use comfy_table::{Cell, Table};
 use cubesql::config::Config;
 use mysql_async::{prelude::*, Conn, Opts, Pool, QueryResult, TextProtocol};
+
 use portpicker::pick_unused_port;
 use pretty_assertions::assert_eq;
 
@@ -37,6 +38,7 @@ impl MySqlIntegrationTestSuite {
         };
 
         let random_port = pick_unused_port().expect("No ports free");
+        // let random_port = 3306;
 
         tokio::spawn(async move {
             println!("[MySqlIntegrationTestSuite] Running SQL API");
@@ -120,6 +122,28 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_prepared(&self) -> RunResult {
+        let mut conn = self.pool.get_conn().await.unwrap();
+
+        {
+            let statement = conn.prep("/** 1 */ SELECT ?".to_string()).await.unwrap();
+            conn.exec_iter(&statement, ("test",)).await.unwrap();
+        }
+
+        // @todo Not working, because deserialization on the server?
+        // {
+        //     let statement = conn.prep("/** 2 */ SELECT ?".to_string()).await.unwrap();
+        //     conn.exec_iter(&statement, (true,)).await.unwrap();
+        // }
+
+        // {
+        //     let statement = conn.prep("/** 3 */ SELECT ?".to_string()).await.unwrap();
+        //     conn.exec_iter(&statement, (false,)).await.unwrap();
+        // }
+
+        Ok(())
+    }
+
     fn escape_snapshot_name(&self, name: String) -> String {
         name.to_lowercase()
             // @todo Real escape?
@@ -155,6 +179,7 @@ impl AsyncTestSuite for MySqlIntegrationTestSuite {
 
     async fn run(&mut self) -> RunResult {
         self.test_use().await?;
+        self.test_prepared().await?;
         self.test_execute_query("SELECT COUNT(*), status FROM Orders".to_string())
             .await?;
         self.test_execute_query(

@@ -15,7 +15,7 @@ use log::trace;
 
 //use msql_srv::*;
 use msql_srv::{
-    AsyncMysqlIntermediary, AsyncMysqlShim, Column, ErrorKind, InitWriter, ParamParser, Params,
+    AsyncMysqlIntermediary, AsyncMysqlShim, Column, ErrorKind, InitWriter, ParamParser,
     QueryResultWriter, StatementMetaWriter,
 };
 
@@ -23,9 +23,13 @@ use tokio::net::TcpListener;
 use tokio::sync::{watch, RwLock};
 
 use crate::compile::convert_sql_to_cube_query;
+use crate::compile::parser::parse_sql_to_statement;
 use crate::config::processing_loop::ProcessingLoop;
 
 use crate::sql::session::DatabaseProtocol;
+use crate::sql::statement::BindValue;
+use crate::sql::statement::StatementBinder;
+use crate::sql::statement::StatementPrepare;
 use crate::sql::Session;
 use crate::sql::SessionManager;
 use crate::sql::{
@@ -33,11 +37,13 @@ use crate::sql::{
     AuthContext, ColumnFlags, ColumnType, QueryResponse, StatusFlags,
 };
 use crate::CubeError;
+use msql_srv::ColumnType as MySQLColumnType;
+use sqlparser::ast;
 
 #[derive(Debug)]
 struct PreparedStatements {
     id: u32,
-    statements: HashMap<u32, String>,
+    statements: HashMap<u32, ast::Statement>,
 }
 
 impl PreparedStatements {
@@ -246,10 +252,22 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
 
     async fn on_prepare<'a>(
         &'a mut self,
-        query: &'a str,
+        input: &'a str,
         info: StatementMetaWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_execute: {}", query);
+        debug!("on_execute: {}", input);
+
+        let mut statement =
+            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
+                Ok(s) => s,
+                Err(e) => {
+                    info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
+                    return Ok(());
+                }
+            };
+
+        let mut stmt_prepare = StatementPrepare::new();
+        let paramaters = stmt_prepare.prepare(&mut statement);
 
         let mut state = self.statements.write().await;
         if state.statements.len()
@@ -269,9 +287,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             state.id = state.id + 1;
 
             let next_id = state.id;
-            state.statements.insert(next_id, query.to_string());
+            state.statements.insert(next_id, statement);
 
-            info.reply(state.id, &[], &[])
+            info.reply(state.id, paramaters, &[])
         }
     }
 
@@ -288,23 +306,51 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
 
         std::mem::drop(state);
 
-        let statement = if possible_statement.is_none() {
+        let mut statement = if possible_statement.is_none() {
             return results.error(ErrorKind::ER_INTERNAL_ERROR, b"Unknown statement");
         } else {
             possible_statement.unwrap()
         };
 
-        let params_iter: Params = params_parser.into_iter();
+        let mut values_to_bind: Vec<BindValue> = vec![];
 
-        for _ in params_iter {
-            // @todo Support params injection to query with escaping.
-            return results.error(
-                ErrorKind::ER_UNSUPPORTED_PS,
-                b"Execution of prepared statement with parameters is not supported",
-            );
+        for p in params_parser.into_iter() {
+            let bind_value = match p.coltype {
+                MySQLColumnType::MYSQL_TYPE_TINY => {
+                    BindValue::Bool(Into::<u8>::into(p.value) == 0_u8)
+                }
+                MySQLColumnType::MYSQL_TYPE_SHORT => {
+                    BindValue::Int64(Into::<i16>::into(p.value) as i64)
+                }
+                MySQLColumnType::MYSQL_TYPE_LONG => {
+                    BindValue::Int64(Into::<i32>::into(p.value) as i64)
+                }
+                MySQLColumnType::MYSQL_TYPE_LONGLONG => {
+                    BindValue::Int64(Into::<i64>::into(p.value))
+                }
+                MySQLColumnType::MYSQL_TYPE_FLOAT => {
+                    BindValue::Float64(Into::<f32>::into(p.value) as f64)
+                }
+                MySQLColumnType::MYSQL_TYPE_DOUBLE => {
+                    BindValue::Float64(Into::<f64>::into(p.value))
+                }
+                MySQLColumnType::MYSQL_TYPE_VAR_STRING | MySQLColumnType::MYSQL_TYPE_STRING => {
+                    BindValue::String(Into::<&str>::into(p.value).to_string())
+                }
+                ct => unimplemented!(
+                    "Unsupported column type for biding value into prepared statement: {:?}",
+                    ct
+                ),
+            };
+
+            values_to_bind.push(bind_value);
         }
 
-        self.handle_query(statement.as_str(), results).await
+        let mut binder = StatementBinder::new(values_to_bind);
+        binder.bind(&mut statement);
+
+        self.handle_query(statement.to_string().as_str(), results)
+            .await
     }
 
     async fn on_close<'a>(&'a mut self, _stmt: u32)
@@ -447,6 +493,7 @@ impl ProcessingLoop for MySqlServer {
                 .await
                 {
                     error!("Error during processing MySQL connection: {}", e);
+                    trace!("Details: {:?}", e);
                 }
             });
         }
