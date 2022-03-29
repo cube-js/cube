@@ -498,6 +498,7 @@ class BaseQuery {
         this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false)),
       ] : []).concat(
         R.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           ([multiplied, measure]) => this.withCubeAliasPrefix(
             `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
             () => this.overTimeSeriesQuery(
@@ -562,6 +563,7 @@ class BaseQuery {
     return this.timeDimensions.map(
       d => [
         d,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
       ]
     );
@@ -766,6 +768,7 @@ class BaseQuery {
       renderedReference: R.pipe(
         R.map(m => [m.measure, m.aliasName()]),
         R.fromPairs,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure))),
     };
 
@@ -1826,14 +1829,17 @@ class BaseQuery {
     return evaluateSql;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllInit(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllMerge(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllCardinality(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
@@ -1846,6 +1852,7 @@ class BaseQuery {
     return this.hllMerge(sql);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   countDistinctApprox(sql) {
     throw new UserError('Approximate distinct count is not supported by this DB');
   }
@@ -1930,10 +1937,12 @@ class BaseQuery {
    * @param {string} field
    * @return {string}
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   convertTz(field) {
     throw new Error('Not implemented');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   timeGroupedColumn(granularity, dimension) {
     throw new Error('Not implemented');
   }

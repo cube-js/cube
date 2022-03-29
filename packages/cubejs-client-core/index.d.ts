@@ -168,6 +168,7 @@ declare module '@cubejs-client/core' {
     requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
+    total?: number
   };
 
   export type LoadResponse<T> = {
@@ -797,6 +798,7 @@ declare module '@cubejs-client/core' {
     renewQuery?: boolean;
     ungrouped?: boolean;
     responseFormat?: 'compact' | 'default';
+    total?: boolean;
   }
 
   export class ProgressResult {
