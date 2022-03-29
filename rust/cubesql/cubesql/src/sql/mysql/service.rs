@@ -60,7 +60,7 @@ struct MySqlConnection {
 impl Drop for MySqlConnection {
     fn drop(&mut self) {
         trace!(
-            "[MySqlConnection] Drop {}",
+            "[mysql] Droping connection {}",
             self.session.state.connection_id
         );
 
