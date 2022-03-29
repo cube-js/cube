@@ -424,15 +424,15 @@ jobs:
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           yarn run dataset:minimal
-          yarn run birdbox:cli:postgresql
-      - name: Testing drivers (local mode) via BirdBox
+          yarn run birdbox:cli:postgresql --mode=local
+      - name: Testing CubeJS drivers (local mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
-          yarn run driver:postgre
-          yarn run driver:athena
-          yarn run driver:bigquery
-      - name: Testing CubeJS (Docker image mode) via BirdBox
+          yarn run driver:postgre --mode=local
+          yarn run driver:athena --mode=local
+          yarn run driver:bigquery --mode=local
+      - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
