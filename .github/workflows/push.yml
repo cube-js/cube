@@ -425,18 +425,26 @@ jobs:
           export DEBUG=testcontainers
           yarn run dataset:minimal
           yarn run birdbox:local:postgresql
-      - name: Testing Athena drivers (local mode) via BirdBox
+      - name: Testing Athena driver (local mode) via BirdBox
         env:
           CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
           CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
           CUBEJS_AWS_REGION: us-east-1
           CUBEJS_AWS_S3_OUTPUT_LOCATION: s3://cubejs-opensource/testing/output
           CUBEJS_DB_EXPORT_BUCKET: s3://cubejs-opensource/testing/export
-          # CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
         run: |
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           yarn run driver:athena --mode=local
+      - name: Testing BigQuery driver (local mode) via BirdBox
+        env:
+          CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
+          CUBEJS_DB_BQ_PROJECT_ID: cube-open-source
+          CUBEJS_DB_EXPORT_BUCKET: cube-open-source-export-bucket
+        run: |
+          cd packages/cubejs-testing/
+          export DEBUG=testcontainers
+          yarn run driver:bigquery --mode=local
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
