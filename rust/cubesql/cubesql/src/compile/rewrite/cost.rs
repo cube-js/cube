@@ -24,6 +24,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         };
 
         let this_replacers = match enode {
+            LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
             _ => 0,

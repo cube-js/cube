@@ -26,6 +26,9 @@ use futures::Stream;
 use log::{error, warn};
 
 use crate::{sql::AuthContext, transport::TransportService};
+use chrono::{TimeZone, Utc};
+use datafusion::arrow::array::TimestampNanosecondBuilder;
+use datafusion::arrow::datatypes::TimeUnit;
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
@@ -269,6 +272,42 @@ impl CubeScanExecutionPlan {
                             v => {
                                 error!(
                                     "Unable to map value {:?} to DataType::Boolean (returning null)",
+                                    v
+                                );
+
+                                builder.append_null()?
+                            }
+                        };
+                    }
+
+                    Arc::new(builder.finish()) as ArrayRef
+                }
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                    let mut builder = TimestampNanosecondBuilder::new(response.data.len());
+
+                    for row in response.data.iter() {
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
+                            DataFusionError::Internal(
+                                "Unexpected response from Cube.js, rows are not objects"
+                                    .to_string(),
+                            ),
+                        )?;
+                        match &value {
+                            serde_json::Value::Null => builder.append_null()?,
+                            serde_json::Value::String(s) => {
+                                let timestamp = Utc
+                                    .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                                    .map_err(|e| {
+                                        DataFusionError::Execution(format!(
+                                            "Can't parse timestamp: '{}': {}",
+                                            s, e
+                                        ))
+                                    })?;
+                                builder.append_value(timestamp.timestamp_nanos())?;
+                            }
+                            v => {
+                                error!(
+                                    "Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)",
                                     v
                                 );
 

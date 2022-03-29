@@ -180,6 +180,18 @@ impl RewriteRules for MemberRules {
                 self.transform_projection_member("?source_table_name", "?column", None, "?member"),
             ),
             transforming_rewrite(
+                "member-replacer-dimension",
+                member_replacer(
+                    aggr_group_expr(column_expr("?column"), "?tail_group_expr"),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    dimension_expr("?dimension_name", column_expr("?column")),
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_dimension("?source_table_name", "?column", "?dimension_name"),
+            ),
+            transforming_rewrite(
                 "date-trunc",
                 member_replacer(
                     aggr_group_expr(
@@ -445,6 +457,19 @@ impl RewriteRules for MemberRules {
                 ),
                 cube_scan_members(
                     measure_expr("?measure", "?replaced_alias_expr"),
+                    column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
+                ),
+                self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
+            ),
+            transforming_rewrite(
+                "alias-replacer-dimension",
+                column_alias_replacer(
+                    cube_scan_members(dimension_expr("?dimension", "?expr"), "?tail_group_expr"),
+                    "?aliases",
+                    "?cube",
+                ),
+                cube_scan_members(
+                    dimension_expr("?dimension", "?replaced_alias_expr"),
                     column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
                 ),
                 self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
@@ -767,6 +792,44 @@ impl MemberRules {
                                 );
                                 return true;
                             }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_dimension(
+        &self,
+        cube_var: &'static str,
+        column_var: &'static str,
+        dimension_name_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = var!(cube_var);
+        let column_var = var!(column_var);
+        let dimension_name_var = var!(dimension_name_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for dimension_name in
+                var_iter!(egraph[subst[column_var]], ColumnExprColumn).map(|c| c.name.to_string())
+            {
+                for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName) {
+                    if let Some(cube) = meta_context.find_cube_with_name(cube_name.to_string()) {
+                        let dimension_name = format!("{}.{}", cube_name, dimension_name);
+                        if let Some(dimension) = cube
+                            .dimensions
+                            .iter()
+                            .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
+                        {
+                            subst.insert(
+                                dimension_name_var,
+                                egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
+                                    dimension.name.to_string(),
+                                ))),
+                            );
+
+                            return true;
                         }
                     }
                 }

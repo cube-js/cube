@@ -2248,6 +2248,18 @@ mod tests {
         transport::TransportService,
     };
     use datafusion::logical_plan::PlanVisitor;
+    use log::Level;
+    use simple_logger::SimpleLogger;
+
+    fn init_logger() {
+        let log_level = Level::Trace;
+        let logger = SimpleLogger::new()
+            .with_level(Level::Error.to_level_filter())
+            .with_module_level("cubeclient", log_level.to_level_filter())
+            .with_module_level("cubesql", log_level.to_level_filter());
+        log::set_boxed_logger(Box::new(logger)).unwrap();
+        log::set_max_level(log_level.to_level_filter());
+    }
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -3138,6 +3150,8 @@ mod tests {
 
     #[test]
     fn test_where_filter_daterange() {
+        init_logger();
+
         let to_check = vec![
             // Filter push down to TD (day) - Superset
             (
@@ -3205,6 +3219,19 @@ mod tests {
                     ])),
                 }])
             ),
+            // Stacked chart
+            (
+                "COUNT(*), customer_gender, DATE(order_date) AS __timestamp".to_string(),
+                "customer_gender = 'FEMALE' AND (order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'))".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
@@ -3217,7 +3244,11 @@ mod tests {
                 {}",
                     sql_projection,
                     sql_filter,
-                    if sql_projection.contains("__timestamp") {
+                    if sql_projection.contains("__timestamp")
+                        && sql_projection.contains("customer_gender")
+                    {
+                        "GROUP BY customer_gender, __timestamp"
+                    } else if sql_projection.contains("__timestamp") {
                         "GROUP BY __timestamp"
                     } else {
                         ""
