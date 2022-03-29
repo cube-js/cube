@@ -88,7 +88,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -113,7 +113,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -130,23 +130,23 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
     // },
-    // dailyOrderPriceAvgPerCustomer: {
+    // dailyOrderPriceAvgPerBalance: {
     //   measures: [
     //     Order.totalPriceAvg
     //   ],
     //   dimensions: [
-    //     Customer.cName
+    //     Customer.cAcctbal
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -175,14 +175,14 @@ cube(`Order`, {
     //      * Default value is 1 hour.
     //      * Refreshes pre-aggregations based on a time interval.
     //      */
-    //     // every: `1 minute`, // This will refresh every minute
+    //     // every: `1 hour`, // This will refresh every hour
     //     // incremental: true,
     //     // updateWindow: `7 day`,
     //     /**
     //      * Option 2
     //      * Refreshes pre-aggregations based on a CRON string.
     //      */
-    //     // every: `* * * * *`, // This will refresh every minute
+    //     // every: `0 * * * *`, // This will refresh every hour
     //     // incremental: true,
     //     // updateWindow: `7 day`,
     //     /**
@@ -196,16 +196,11 @@ cube(`Order`, {
     //      * => every: '10 second' for all other databases
     //      */
     //     // sql: `
-    //     //   SELECT 
-    //     //     MAX(O_UPDATEDAT) FROM tpc_h.order
-    //     //   WHERE 
-    //     //     O_UPDATEDAT
-    //     //   BETWEEN 
-    //     //     TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
-    //     //   AND 
-    //     //     CURRENT_TIMESTAMP();
+    //     // SELECT
+    //     //   MAX(O_UPDATEDAT) FROM tpc_h.order 
+    //     // WHERE ${FILTER_PARAMS.Cube.createdAt.filter('O_CREATED_AT')}
     //     // `,
-    //     // every: `1 minute`
+    //     // every: `1 hour`
     //   },
     // },
 
@@ -225,7 +220,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -239,7 +234,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   },
@@ -280,7 +275,7 @@ cube(`Order`, {
     //   granularity: `month`,
     //   partitionGranularity: `month`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `1 month`,
     //   },
