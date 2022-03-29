@@ -2343,9 +2343,7 @@ mod tests {
     }
 
     fn get_test_tenant_ctx() -> Arc<MetaContext> {
-        Arc::new(MetaContext {
-            cubes: get_test_meta(),
-        })
+        Arc::new(MetaContext::new(get_test_meta()))
     }
 
     fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {

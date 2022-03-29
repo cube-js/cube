@@ -81,9 +81,7 @@ impl TransportService for HttpTransport {
             }
         };
 
-        let value = Arc::new(MetaContext {
-            cubes: response.cubes.unwrap_or_else(Vec::new),
-        });
+        let value = Arc::new(MetaContext::new(response.cubes.unwrap_or_else(Vec::new)));
 
         *store = Some(MetaCacheBucket {
             lifetime: Instant::now(),
