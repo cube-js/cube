@@ -65,9 +65,9 @@ impl TransportService for NodeBridgeTransport {
         .await?;
         trace!("[transport] Meta <- {:?}", response);
 
-        Ok(Arc::new(MetaContext {
-            cubes: response.cubes.unwrap_or_default(),
-        }))
+        Ok(Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_default(),
+        )))
     }
 
     async fn load(
