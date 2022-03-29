@@ -39,3 +39,34 @@ impl MetaContext {
         self.tables.iter().find(|table| table.name == name).cloned()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_tables() {
+        let test_cubes = vec![
+            V1CubeMeta { name: "test1".to_string(), title: None, dimensions: vec![], measures: vec![], segments: vec![], }, 
+            V1CubeMeta { name: "test2".to_string(), title: None, dimensions: vec![], measures: vec![], segments: vec![], },
+        ];
+
+        let test_context = MetaContext::new(test_cubes);
+
+        match test_context.find_cube_table_with_oid(18010) {
+            Some(table) => assert_eq!(
+                18010,
+                table.oid
+            ),
+            _ => panic!("wrong oid!"),
+        }
+
+        match test_context.find_cube_table_with_name("test2".to_string()) {
+            Some(table) => assert_eq!(
+                18020,
+                table.oid
+            ),
+            _ => panic!("wrong name!"),
+        }
+    }
+}
