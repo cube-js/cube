@@ -799,7 +799,7 @@ class ApiGateway {
       })
     );
     response.total = normalizedQuery.total
-      ? total.data[0][QueryAlias.TOTAL_COUNT]
+      ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
       : undefined;
     return response;
   }

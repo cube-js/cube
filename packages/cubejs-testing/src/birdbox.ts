@@ -184,14 +184,15 @@ export interface StartCliWithEnvOptions {
   useCubejsServerBinary?: boolean;
   loadScript?: string;
   cubejsConfig?: string;
+  cubejsOutput?: 'pipe' | 'ignore';
   env?: Record<string, string>;
 }
 
 export async function startBirdBoxFromCli(
   options: StartCliWithEnvOptions
 ): Promise<BirdBox> {
+  const cubejsOutput = options.cubejsOutput || 'pipe';
   let db: StartedTestContainer;
-
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
@@ -221,26 +222,30 @@ export async function startBirdBoxFromCli(
       ],
     });
 
-    process.stdout.write('[Birdbox] Executing load script\n');
+    if (cubejsOutput === 'pipe') {
+      process.stdout.write('[Birdbox] Executing load script\n');
+    }
 
     const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
-    if (exitCode === 0) {
+    if (exitCode === 0 && cubejsOutput === 'pipe') {
       process.stdout.write(
         `[Birdbox] Script ${
           loadScript
         } finished successfully\n`
       );
     } else {
-      process.stdout.write(`${output}\n`);
-      process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished with error: ${
-          exitCode
-        }\n`
-      );
+      if (cubejsOutput === 'pipe') {
+        process.stdout.write(`${output}\n`);
+        process.stdout.write(
+          `[Birdbox] Script ${
+            loadScript
+          } finished with error: ${
+            exitCode
+          }\n`
+        );
+      }
       await db.stop();
       process.exit(1);
     }
@@ -286,7 +291,11 @@ export async function startBirdBoxFromCli(
       shell: true,
       detached: true,
       // Show output of Cube.js process in console
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: [
+        cubejsOutput,
+        cubejsOutput,
+        cubejsOutput,
+      ],
       env: {
         ...process.env,
         CUBEJS_DB_TYPE: options.dbType === 'postgresql'
@@ -308,22 +317,32 @@ export async function startBirdBoxFromCli(
       },
     }
   );
-  cli.stdout.on('data', (msg) => {
-    process.stdout.write(msg);
-  });
-  cli.stderr.on('data', (msg) => {
-    process.stdout.write(msg);
-  });
+  if (cli.stdout) {
+    cli.stdout.on('data', (msg) => {
+      process.stdout.write(msg);
+    });
+  }
+  if (cli.stderr) {
+    cli.stderr.on('data', (msg) => {
+      process.stdout.write(msg);
+    });
+  }
   await pausePromise(10 * 1000);
   return {
     stop: async () => {
-      process.stdout.write('[Birdbox] Closing\n');
+      if (cubejsOutput === 'pipe') {
+        process.stdout.write('[Birdbox] Closing\n');
+      }
       if (db) {
         await db.stop();
       }
-      process.stdout.write('[Birdbox] Done with DB\n');
+      if (cubejsOutput === 'pipe') {
+        process.stdout.write('[Birdbox] Done with DB\n');
+      }
       process.kill(-cli.pid, 'SIGINT');
-      process.stdout.write('[Birdbox] Closed\n');
+      if (cubejsOutput === 'pipe') {
+        process.stdout.write('[Birdbox] Closed\n');
+      }
     },
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',

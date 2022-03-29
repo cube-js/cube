@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`athena driver tests base query engine cube with pre-aggs: order: query 1`] = `
+exports[`postgresql driver tests base query engine cube with pre-aggs: order: query 1`] = `
 Array [
   Object {
     "OrdersPA.amount": "100.1",
@@ -45,7 +45,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests base query engine cube with pre-aggs: order: query 2`] = `
+exports[`postgresql driver tests base query engine cube with pre-aggs: order: query 2`] = `
 Array [
   Object {
     "OrdersPA.amount": "600.6",
@@ -90,7 +90,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests base query engine cube with pre-aggs: query: query 1`] = `
+exports[`postgresql driver tests base query engine cube with pre-aggs: query: query 1`] = `
 Array [
   Object {
     "OrdersPA.amount": "600.6",
@@ -135,7 +135,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests base query engine cube without pre-aggs: order: query 1`] = `
+exports[`postgresql driver tests base query engine cube without pre-aggs: order: query 1`] = `
 Array [
   Object {
     "Orders.status": "new",
@@ -152,7 +152,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests base query engine cube without pre-aggs: order: query 2`] = `
+exports[`postgresql driver tests base query engine cube without pre-aggs: order: query 2`] = `
 Array [
   Object {
     "Orders.status": "processed",
@@ -169,7 +169,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests base query engine cube without pre-aggs: query: query 1`] = `
+exports[`postgresql driver tests base query engine cube without pre-aggs: query: query 1`] = `
 Array [
   Object {
     "Orders.status": "processed",
@@ -186,7 +186,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests pre-aggregation engine cube with pre-aggs: order: query 1`] = `
+exports[`postgresql driver tests pre-aggregation engine cube with pre-aggs: order: query 1`] = `
 Array [
   Object {
     "OrdersPA.amount": "100.1",
@@ -231,7 +231,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests pre-aggregation engine cube with pre-aggs: order: query 2`] = `
+exports[`postgresql driver tests pre-aggregation engine cube with pre-aggs: order: query 2`] = `
 Array [
   Object {
     "OrdersPA.amount": "600.6",
@@ -276,7 +276,7 @@ Array [
 ]
 `;
 
-exports[`athena driver tests pre-aggregation engine cube with pre-aggs: query: query 1`] = `
+exports[`postgresql driver tests pre-aggregation engine cube with pre-aggs: query: query 1`] = `
 Array [
   Object {
     "OrdersPA.amount": "600.6",
