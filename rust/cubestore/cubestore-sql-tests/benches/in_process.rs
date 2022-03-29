@@ -21,19 +21,16 @@ use cubestore_sql_tests::{SqlClient, to_rows};
 pub trait Bench<T>: Send + Sync {
     fn name(self: &Self) -> &'static str;
     async fn setup(self: &Self, service: Arc<dyn SqlService>) -> T;
-    async fn bench(self: &Self, service: Arc<dyn SqlService>, state: &T) -> T;
+    async fn bench(self: &Self, service: Arc<dyn SqlService>, state: &T);
 }
 
 #[derive(Debug)]
 struct ParquetMetadataCacheBenchState {
     repos: Arc<Vec<String>>,
-    pos: usize,
 }
 impl ParquetMetadataCacheBenchState {
-    fn next(self: &Self) -> (Self, &str) {
-        // let pos = self.pos + 1;
-        let pos = self.pos;
-        (ParquetMetadataCacheBenchState { repos: self.repos.clone(), pos }, self.repos[self.pos].as_str())
+    fn repo(self: &Self) -> &str {
+        self.repos[1234].as_str()
     }
 }
 struct ParquetMetadataCacheBench;
@@ -62,17 +59,19 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
             }
         }).collect::<Vec<_>>();
         assert_eq!(repos.len(), 51533);
-        let state = ParquetMetadataCacheBenchState { repos: Arc::new(repos), pos: 1234 };
-        // warmup cache
-        self.bench(service, &state).await
+        let state = ParquetMetadataCacheBenchState { repos: Arc::new(repos) };
+        // warmup metadata cache
+        self.bench(service.clone(), &state).await;
+        // flush query cache, assuming capacity <= 1
+        let _ = service.exec_query("SELECT 23").await;
+        state
     }
 
-    async fn bench(self: &Self, service: Arc<dyn SqlService>, state: &ParquetMetadataCacheBenchState) -> ParquetMetadataCacheBenchState {
-        let (state, repo) = state.next();
+    async fn bench(self: &Self, service: Arc<dyn SqlService>, state: &ParquetMetadataCacheBenchState) {
+        let repo = state.repo();
         let r = service.exec_query(format!("SELECT COUNT(*) FROM test.table WHERE repo = '{}' GROUP BY repo", repo).as_str()).await.unwrap();
         let rows = to_rows(&r);
         assert_eq!(rows.len(), 1);
-        state
     }
 }
 
@@ -81,6 +80,7 @@ fn inline_bench(criterion: &mut Criterion) {
 
     let runtime = Builder::new_current_thread().enable_all().build().unwrap();
     let config = Config::test(bench.name()).update_config(|mut c| {
+        c.max_cached_queries = 0;
         c.max_cached_metadata = env_parse("CUBESTORE_MAX_CACHED_METADATA", 0);
         c
     });
@@ -91,8 +91,8 @@ fn inline_bench(criterion: &mut Criterion) {
         let (services, state) = runtime.block_on(async {
             let services = config.configure().await;
             services.start_processing_loops().await.unwrap();
-            let state = bench.setup(services.sql_service.clone()).await;
-            (services, Arc::new(Mutex::new(state)))
+            let state = Arc::new(bench.setup(services.sql_service.clone()).await);
+            (services, state)
         });
 
         criterion.bench_function(bench.name(), |b| {
@@ -101,8 +101,7 @@ fn inline_bench(criterion: &mut Criterion) {
                 let sql_service = services.sql_service.clone();
                 let state = state.clone();
                 async move {
-                    let mut state = state.lock().unwrap();
-                    *state = bench.bench(sql_service, &state).await;
+                    bench.bench(sql_service, &state).await;
                 }.await;
             });
         });
