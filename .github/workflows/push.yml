@@ -427,7 +427,6 @@ jobs:
           export DEBUG=testcontainers
           yarn run dataset:minimal
           yarn run birdbox:local:postgresql
-          yarn run birdbox:local:postgresql-pre-aggregations
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
