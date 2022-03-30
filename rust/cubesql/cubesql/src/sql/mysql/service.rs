@@ -255,7 +255,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         input: &'a str,
         info: StatementMetaWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_execute: {}", input);
+        debug!("[mysql] on_execute: {}", input);
 
         let mut statement =
             match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
@@ -299,17 +299,17 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         params_parser: ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_execute: {}", id);
+        debug!("[mysql] on_execute: {}", id);
 
-        let mut state = self.statements.write().await;
-        let possible_statement = state.statements.remove(&id);
+        let mut statement = {
+            let state = self.statements.read().await;
+            let possible_statement = state.statements.get(&id);
 
-        std::mem::drop(state);
-
-        let mut statement = if possible_statement.is_none() {
-            return results.error(ErrorKind::ER_INTERNAL_ERROR, b"Unknown statement");
-        } else {
-            possible_statement.unwrap()
+            if possible_statement.is_none() {
+                return results.error(ErrorKind::ER_INTERNAL_ERROR, b"Unknown statement");
+            } else {
+                possible_statement.unwrap().clone()
+            }
         };
 
         let mut values_to_bind: Vec<BindValue> = vec![];
@@ -353,11 +353,19 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
     }
 
-    async fn on_close<'a>(&'a mut self, _stmt: u32)
+    /// On close will be called when client sends COM_STMT_CLOSE
+    async fn on_close<'a>(&'a mut self, id: u32)
     where
         W: 'async_trait,
     {
-        trace!("on_close");
+        trace!("[mysql] on_close");
+
+        let mut state = self.statements.write().await;
+        let removed_statement = state.statements.remove(&id);
+
+        if removed_statement.is_none() {
+            trace!("[mysql] Client tries to deallocate unknown statement");
+        }
     }
 
     async fn on_query<'a>(
@@ -365,7 +373,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         query: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_query: {}", query);
+        debug!("[mysql] on_query: {}", query);
 
         self.handle_query(query, results).await
     }
@@ -423,7 +431,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         database: &'a str,
         writter: InitWriter<'a, W>,
     ) -> Result<(), Self::Error> {
-        debug!("on_init: USE {}", database);
+        debug!("[mysql] on_init: USE {}", database);
 
         if self
             .execute_query(&format!("USE {}", database))
