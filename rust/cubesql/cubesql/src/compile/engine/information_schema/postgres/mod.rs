@@ -10,6 +10,7 @@ pub mod tables;
 // pg_catalog
 mod pg_attrdef;
 mod pg_attribute;
+mod pg_class;
 mod pg_index;
 mod pg_namespace;
 mod pg_range;
@@ -19,6 +20,7 @@ mod pg_type;
 use super::utils;
 pub use pg_attrdef::*;
 pub use pg_attribute::*;
+pub use pg_class::*;
 pub use pg_index::*;
 pub use pg_namespace::*;
 pub use pg_range::*;
