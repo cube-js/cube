@@ -4,9 +4,9 @@ use chrono::{SecondsFormat, TimeZone, Utc};
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, BooleanArray, Float64Array, Int32Array, Int64Array, IntervalDayTimeArray,
-        IntervalYearMonthArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
-        UInt32Array, UInt64Array,
+        Array, BooleanArray, Float64Array, Int16Array, Int32Array, Int64Array,
+        IntervalDayTimeArray, IntervalYearMonthArray, StringArray, TimestampMicrosecondArray,
+        TimestampNanosecondArray, UInt32Array, UInt64Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
@@ -244,6 +244,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
+                DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int64, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int64, i64),
                 DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int64, i64),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int64, i64),

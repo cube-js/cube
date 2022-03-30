@@ -25,8 +25,13 @@ use super::information_schema::mysql::{
 };
 
 use super::information_schema::postgres::{
+    character_sets::InfoSchemaCharacterSetsProvider as PostgresSchemaCharacterSetsProvider,
     columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
-    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogNamespaceProvider,
+    key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
+    referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
+    table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
+    PgCatalogAttributeProvider, PgCatalogIndexProvider, PgCatalogNamespaceProvider,
     PgCatalogRangeProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 use crate::sql::ColumnType;
@@ -250,6 +255,16 @@ impl DatabaseProtocol {
                 "information_schema.columns".to_string()
             } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableProvider>() {
                 "information_schema.tables".to_string()
+            } else if let Some(_) = any.downcast_ref::<PostgresSchemaCharacterSetsProvider>() {
+                "information_schema.character_sets".to_string()
+            } else if let Some(_) = any.downcast_ref::<PostgresSchemaKeyColumnUsageProvider>() {
+                "information_schema.key_column_usage".to_string()
+            } else if let Some(_) =
+                any.downcast_ref::<PostgresSchemaReferentialConstraintsProvider>()
+            {
+                "information_schema.referential_constraints".to_string()
+            } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
+                "information_schema.table_constraints".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
                 "pg_catalog.pg_tables".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -258,6 +273,12 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_namespace".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogRangeProvider>() {
                 "pg_catalog.pg_range".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogAttrdefProvider>() {
+                "pg_catalog.pg_attrdef".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogAttributeProvider>() {
+                "pg_catalog.pg_attribute".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogIndexProvider>() {
+                "pg_catalog.pg_index".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -284,12 +305,30 @@ impl DatabaseProtocol {
             )));
         }
 
+        if tp.eq_ignore_ascii_case("information_schema.character_sets") {
+            return Some(Arc::new(PostgresSchemaCharacterSetsProvider::new(
+                &context.session_state.database().unwrap_or("db".to_string()),
+            )));
+        }
+
+        if tp.eq_ignore_ascii_case("information_schema.key_column_usage") {
+            return Some(Arc::new(PostgresSchemaKeyColumnUsageProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {
+            return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("information_schema.table_constraints") {
+            return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()));
+        }
+
         if tp.eq_ignore_ascii_case("pg_catalog.pg_tables") {
             return Some(Arc::new(PgCatalogTableProvider::new(&context.meta.cubes)));
         }
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_type") {
-            return Some(Arc::new(PgCatalogTypeProvider::new()));
+            return Some(Arc::new(PgCatalogTypeProvider::new(&context.meta.tables)));
         }
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_namespace") {
@@ -298,6 +337,20 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_range") {
             return Some(Arc::new(PgCatalogRangeProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_attrdef") {
+            return Some(Arc::new(PgCatalogAttrdefProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_attribute") {
+            return Some(Arc::new(PgCatalogAttributeProvider::new(
+                &context.meta.tables,
+            )));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_index") {
+            return Some(Arc::new(PgCatalogIndexProvider::new()));
         }
 
         None
