@@ -198,7 +198,7 @@ cube(`Order`, {
     //     // sql: `
     //     // SELECT
     //     //   MAX(O_UPDATEDAT) FROM tpc_h.order 
-    //     // WHERE ${FILTER_PARAMS.Cube.createdAt.filter('O_CREATED_AT')}
+    //     // WHERE ${FILTER_PARAMS.Order.createdAt.filter('O_CREATEDAT')}
     //     // `,
     //     // every: `1 hour`
     //   },
@@ -284,7 +284,7 @@ cube(`Order`, {
 
   joins: {
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     // Customer: {
@@ -342,7 +342,7 @@ cube(`Order`, {
     // },
 
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Using dedicated pre-aggregations for large and complex queries
      */
     // totalPriceAvg: {
@@ -386,7 +386,7 @@ cube(`Order`, {
 
   dimensions: {
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     oCustkey: {
