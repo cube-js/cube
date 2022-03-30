@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.table_constraints\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+-------------------+-----------------+---------------+--------------+------------+-----------------+---------------+--------------------+----------+
+| constraint_catalog | constraint_schema | constraint_name | table_catalog | table_schema | table_name | constraint_type | is_deferrable | initially_deferred | enforced |
++--------------------+-------------------+-----------------+---------------+--------------+------------+-----------------+---------------+--------------------+----------+
++--------------------+-------------------+-----------------+---------------+--------------+------------+-----------------+---------------+--------------------+----------+
