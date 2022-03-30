@@ -1,4 +1,10 @@
+use std::ops::RangeFrom;
+
 use cubeclient::models::V1CubeMeta;
+
+use crate::sql::ColumnType;
+
+use super::V1CubeMetaExt;
 
 #[derive(Debug)]
 pub struct MetaContext {
@@ -8,22 +14,42 @@ pub struct MetaContext {
 
 #[derive(Debug, Clone)]
 pub struct CubeMetaTable {
-    oid: u32,
-    name: String,
+    pub oid: u32,
+    pub record_oid: u32,
+    pub array_handler_oid: u32,
+    pub name: String,
+    pub columns: Vec<CubeMetaColumn>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CubeMetaColumn {
+    pub oid: u32,
+    pub name: String,
+    pub column_type: ColumnType,
+    pub can_be_null: bool,
 }
 
 impl MetaContext {
     pub fn new(cubes: Vec<V1CubeMeta>) -> Self {
         // 18000 - max system table oid
-        let mut oid: u32 = 18000;
+        let mut oid_iter: RangeFrom<u32> = 18000..;
         let tables: Vec<CubeMetaTable> = cubes
             .iter()
-            .map(|cube| {
-                oid += 10;
-                CubeMetaTable {
-                    oid,
-                    name: cube.name.clone(),
-                }
+            .map(|cube| CubeMetaTable {
+                oid: oid_iter.next().unwrap_or(0),
+                record_oid: oid_iter.next().unwrap_or(0),
+                array_handler_oid: oid_iter.next().unwrap_or(0),
+                name: cube.name.clone(),
+                columns: cube
+                    .get_columns()
+                    .iter()
+                    .map(|column| CubeMetaColumn {
+                        oid: oid_iter.next().unwrap_or(0),
+                        name: column.get_name().clone(),
+                        column_type: column.get_column_type().clone(),
+                        can_be_null: column.sql_can_be_null(),
+                    })
+                    .collect(),
             })
             .collect();
 
@@ -74,13 +100,13 @@ mod tests {
 
         let test_context = MetaContext::new(test_cubes);
 
-        match test_context.find_cube_table_with_oid(18010) {
-            Some(table) => assert_eq!(18010, table.oid),
+        match test_context.find_cube_table_with_oid(18000) {
+            Some(table) => assert_eq!(18000, table.oid),
             _ => panic!("wrong oid!"),
         }
 
         match test_context.find_cube_table_with_name("test2".to_string()) {
-            Some(table) => assert_eq!(18020, table.oid),
+            Some(table) => assert_eq!(18003, table.oid),
             _ => panic!("wrong name!"),
         }
     }

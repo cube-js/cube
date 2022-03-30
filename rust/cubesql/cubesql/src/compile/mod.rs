@@ -4763,6 +4763,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_information_schema_character_sets_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_character_sets_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.character_sets".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_key_column_usage_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_key_column_usage_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.key_column_usage".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_referential_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_referential_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.referential_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_table_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_table_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.table_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgtables_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgtables_postgres",
@@ -4810,6 +4866,48 @@ mod tests {
             "pgcatalog_pgrange_postgres",
             execute_query(
                 "SELECT * FROM pg_catalog.pg_range".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattrdef_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattrdef_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attrdef".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattribute_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattribute_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attribute".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgindex_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgindex_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_index".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
