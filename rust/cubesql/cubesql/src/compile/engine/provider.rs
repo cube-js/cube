@@ -285,6 +285,8 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_class".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
                 "pg_catalog.pg_proc".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
+                "pg_catalog.pg_settings".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -358,7 +360,6 @@ impl DatabaseProtocol {
         if tp.eq_ignore_ascii_case("pg_catalog.pg_index") {
             return Some(Arc::new(PgCatalogIndexProvider::new()));
         }
-
         if tp.eq_ignore_ascii_case("pg_catalog.pg_class") {
             return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)));
         }
