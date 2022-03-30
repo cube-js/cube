@@ -31,6 +31,7 @@ spec:
           {{- else }}
           image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
           {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.config.apiPort }}
