@@ -1614,9 +1614,7 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_to_plan(&statement)
-            }
+            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -4802,6 +4800,15 @@ mod tests {
             execute_query(
                 "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string(),
                 DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        // EXPLAIN for Postgres
+        insta::assert_snapshot!(
+            execute_query(
+                "explain select 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );
