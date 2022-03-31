@@ -41,10 +41,10 @@ use self::engine::df::scan::CubeScanNode;
 use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
-    create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
-    create_version_udf,
+    create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+    create_current_user_udf, create_db_udf, create_if_udf, create_instr_udf, create_isnull_udf,
+    create_least_udf, create_locate_udf, create_time_format_udf, create_timediff_udf,
+    create_ucase_udf, create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 use crate::compile::engine::udf::{
@@ -2184,6 +2184,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date());
+        ctx.register_udf(create_current_schema_udf());
 
         ctx.register_udaf(create_measure_udaf());
 
@@ -5103,6 +5104,20 @@ mod tests {
             "pgcatalog_pgconstraint_postgres",
             execute_query(
                 "SELECT * FROM pg_catalog.pg_constraint".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_current_schema_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schema_postgres",
+            execute_query(
+                "SELECT current_schema()".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
