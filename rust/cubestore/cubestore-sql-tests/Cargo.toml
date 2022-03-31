@@ -50,6 +50,9 @@ rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["async_tokio"] }
+flate2 = "1.0.22"
+reqwest = "0.11.10"
+tar = "0.4.38"
 
 [[bench]]
 name = "in_process"

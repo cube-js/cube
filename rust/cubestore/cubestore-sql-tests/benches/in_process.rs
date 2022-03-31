@@ -1,9 +1,12 @@
 use std::fs;
+use std::io::Cursor;
 use async_trait::async_trait;
 use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
+use flate2::read::GzDecoder;
 use tokio::runtime::Builder;
 use rocksdb::{Options, DB};
+use tar::Archive;
 use cubestore::config::{Config, CubeServices, env_parse};
 use cubestore::table::TableValue;
 use cubestore_sql_tests::{SqlClient, to_rows};
@@ -28,15 +31,30 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
     }
 
     async fn setup(self: &Self, services: &CubeServices) -> ParquetMetadataCacheBenchState {
+        let dir = std::env::current_dir().unwrap().join("data");
+        let path = dir.join("github-commits-000.csv");
+        if !path.exists() {
+            let response = reqwest::get("https://media.githubusercontent.com/media/cube-js/testing-fixtures/master/github-commits-000.tar.gz").await.unwrap();
+            let content =  Cursor::new(response.bytes().await.unwrap());
+            let tarfile = GzDecoder::new(content);
+            let mut archive = Archive::new(tarfile);
+            archive.unpack(dir).unwrap();
+        }
+        assert!(path.exists());
         let _ = services.sql_service
             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
             .await
             .unwrap();
-        let path = "./github-commits-000.csv";
         let _ = services.sql_service
-            .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+            .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path.to_str().unwrap()).as_str())
             .await
             .unwrap();
+
+        // println!("QQQ P 1 {:#?}", services.meta_store.get_partition(1).await.unwrap());
+        // println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
+        // let compactor: Arc<dyn CompactionService> = services.injector.get_service_typed().await;
+        // compactor.compact(2).await.unwrap();
+        // println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
 
         let r = services.sql_service.exec_query("SELECT repo FROM test.table GROUP BY repo").await.unwrap();
         let repos = to_rows(&r).iter().map(|row| {
