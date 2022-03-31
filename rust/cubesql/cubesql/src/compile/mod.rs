@@ -5082,4 +5082,32 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgdescription_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgdescription_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_description".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgconstraint_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgconstraint_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_constraint".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

@@ -31,9 +31,10 @@ use super::information_schema::postgres::{
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogIndexProvider,
-    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
+    PgCatalogDescriptionProvider, PgCatalogIndexProvider, PgCatalogNamespaceProvider,
+    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogSettingsProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 use crate::sql::ColumnType;
@@ -285,6 +286,12 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_class".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
                 "pg_catalog.pg_proc".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
+                "pg_catalog.pg_settings".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogDescriptionProvider>() {
+                "pg_catalog.pg_description".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogConstraintProvider>() {
+                "pg_catalog.pg_constraint".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -358,7 +365,6 @@ impl DatabaseProtocol {
         if tp.eq_ignore_ascii_case("pg_catalog.pg_index") {
             return Some(Arc::new(PgCatalogIndexProvider::new()));
         }
-
         if tp.eq_ignore_ascii_case("pg_catalog.pg_class") {
             return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)));
         }
@@ -374,6 +380,14 @@ impl DatabaseProtocol {
                     .server
                     .all_variables(context.session_state.protocol.clone()),
             )));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_description") {
+            return Some(Arc::new(PgCatalogDescriptionProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_constraint") {
+            return Some(Arc::new(PgCatalogConstraintProvider::new()));
         }
 
         None
