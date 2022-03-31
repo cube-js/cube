@@ -8,25 +8,39 @@ use datafusion::dataframe::DataFrame as DFDataFrame;
 use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-use crate::sql::postgres::pg_type::{PgType, PgTypeId};
+use crate::sql::dataframe::DataFrame;
+use crate::sql::statement::StatementPlaceholderReplacer;
 use crate::{
-    compile::convert_sql_to_cube_query,
+    compile::{
+        convert_sql_to_cube_query, convert_statement_to_cube_query, parser::parse_sql_to_statement,
+        QueryPlan,
+    },
     sql::{
         dataframe::{batch_to_dataframe, TableValue},
-        AuthContext, QueryResponse, Session,
+        session::DatabaseProtocol,
+        statement::StatementParamsFinder,
+        AuthContext, PgType, PgTypeId, Session,
     },
     CubeError,
 };
 
 use super::{
     buffer,
-    protocol::{self, FrontendMessage, SSL_REQUEST_PROTOCOL},
+    protocol::{self, FrontendMessage, RowDescriptionField, SSL_REQUEST_PROTOCOL},
+    statement::PreparedStatement,
 };
+
+pub struct Portal {
+    plan: QueryPlan,
+}
 
 pub struct AsyncPostgresShim {
     socket: TcpStream,
     #[allow(unused)]
     parameters: HashMap<String, String>,
+    statements: HashMap<String, PreparedStatement>,
+    portals: HashMap<String, Portal>,
+    // Shared
     session: Arc<Session>,
 }
 
@@ -42,6 +56,8 @@ impl AsyncPostgresShim {
         let mut shim = Self {
             socket,
             parameters: HashMap::new(),
+            portals: HashMap::new(),
+            statements: HashMap::new(),
             session,
         };
         match shim.run().await {
@@ -83,7 +99,12 @@ impl AsyncPostgresShim {
 
         loop {
             match buffer::read_message(&mut self.socket).await? {
-                FrontendMessage::Query(query) => self.process_query(query).await?,
+                FrontendMessage::Query(body) => self.process_query(body.query).await?,
+                FrontendMessage::Parse(body) => self.parse(body).await?,
+                FrontendMessage::Bind(body) => self.bind(body).await?,
+                FrontendMessage::Execute(body) => self.execute(body).await?,
+                FrontendMessage::Describe(body) => self.describe(body).await?,
+                FrontendMessage::Sync => self.sync().await?,
                 FrontendMessage::Terminate => return Ok(()),
                 command_id => {
                     return Err(Error::new(
@@ -103,7 +124,7 @@ impl AsyncPostgresShim {
     }
 
     pub async fn process_startup_message(&mut self) -> Result<StartupState, Error> {
-        let mut buffer = buffer::read_contents(&mut self.socket).await?;
+        let mut buffer = buffer::read_contents(&mut self.socket, 0).await?;
 
         let startup_message = protocol::StartupMessage::from(&mut buffer).await?;
 
@@ -217,9 +238,257 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn process_query(&mut self, query: protocol::Query) -> Result<(), Error> {
-        let query = query.query;
+    pub async fn sync(&mut self) -> Result<(), Error> {
+        self.write(protocol::ReadyForQuery::new(
+            protocol::TransactionStatus::Idle,
+        ))
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn describe(&mut self, describe: protocol::Describe) -> Result<(), Error> {
+        let (parameters, description) = match describe.typ {
+            protocol::DescribeType::Statement => {
+                let stmt = self.statements.get(&describe.name);
+
+                if let Some(s) = stmt {
+                    (s.parameters.clone(), s.description.clone())
+                } else {
+                    self.write(protocol::ErrorResponse::new(
+                        protocol::ErrorSeverity::Error,
+                        protocol::ErrorCode::InvalidSqlStatement,
+                        "missing statement".to_string(),
+                    ))
+                    .await?;
+
+                    return Ok(());
+                }
+            }
+            protocol::DescribeType::Portal => {
+                unimplemented!("Unable to describe portal");
+            }
+        };
+
+        self.write(parameters).await?;
+        self.write(description).await?;
+
+        Ok(())
+    }
+
+    pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), Error> {
+        let portal = self.portals.get(&execute.portal);
+        match portal {
+            Some(portal) => {
+                if execute.max_rows == 0 {
+                    match self.execute_plan(portal.plan.clone(), false).await {
+                        Err(e) => {
+                            self.write(protocol::ErrorResponse::new(
+                                protocol::ErrorSeverity::Error,
+                                protocol::ErrorCode::InternalError,
+                                e.message,
+                            ))
+                            .await?;
+                        }
+                        Ok(_) => {}
+                    }
+                } else {
+                    self.write(protocol::ErrorResponse::new(
+                        protocol::ErrorSeverity::Error,
+                        protocol::ErrorCode::InternalError,
+                        "Execute with limited rows is not supported".to_string(),
+                    ))
+                    .await?;
+                }
+            }
+            None => {
+                self.write(protocol::ReadyForQuery::new(
+                    protocol::TransactionStatus::Idle,
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn bind(&mut self, bind: protocol::Bind) -> Result<(), Error> {
+        let source_statement = self
+            .statements
+            .get(&bind.statement)
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Unknown statement"))?;
+
+        let prepared_statement = source_statement.bind(vec![]);
+
+        let meta = self
+            .session
+            .server
+            .transport
+            .meta(self.auth_context().unwrap())
+            .await
+            .unwrap();
+
+        let plan = convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
+            .unwrap();
+
+        let portal = Portal { plan };
+
+        self.portals.insert(bind.portal, portal);
+
+        self.write(protocol::BindComplete::new()).await?;
+
+        Ok(())
+    }
+
+    pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), Error> {
+        let mut query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
+
+        let stmt_finder = StatementParamsFinder::new();
+        let parameters: Vec<PgTypeId> = stmt_finder
+            .prepare(&mut query)
+            .into_iter()
+            .map(|_p| PgTypeId::TEXT)
+            .collect();
+
+        let meta = self
+            .session
+            .server
+            .transport
+            .meta(self.auth_context().unwrap())
+            .await
+            .unwrap();
+
+        let stmt_replacer = StatementPlaceholderReplacer::new();
+        let hacked_query = stmt_replacer.replace(&mut query);
+
+        let plan =
+            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
+
+        let fields: Vec<RowDescriptionField> = match plan {
+            QueryPlan::MetaOk(_) => vec![],
+            QueryPlan::MetaTabular(_, frame) => {
+                let mut result = vec![];
+
+                for _field in frame.get_columns() {
+                    result.push(RowDescriptionField::new(
+                        "?column?".to_string(),
+                        PgType::get_by_tid(PgTypeId::TEXT),
+                    ));
+                }
+
+                result
+            }
+            QueryPlan::DataFusionSelect(_, logical_plan, _) => {
+                let mut result = vec![];
+
+                for _field in logical_plan.schema().fields() {
+                    result.push(RowDescriptionField::new(
+                        "?column?".to_string(),
+                        PgType::get_by_tid(PgTypeId::TEXT),
+                    ));
+                }
+
+                result
+            }
+        };
+
+        self.statements.insert(
+            parse.name,
+            PreparedStatement {
+                query,
+                parameters: protocol::ParameterDescription::new(parameters),
+                description: protocol::RowDescription::new(fields),
+            },
+        );
+
+        self.write(protocol::ParseComplete::new()).await?;
+
+        Ok(())
+    }
+
+    async fn write_batch(
+        &mut self,
+        frame: Arc<DataFrame>,
+        description: bool,
+    ) -> Result<(), CubeError> {
+        if description {
+            let mut fields = Vec::new();
+
+            for column in frame.get_columns().iter() {
+                fields.push(protocol::RowDescriptionField::new(
+                    column.get_name(),
+                    PgType::get_by_tid(PgTypeId::TEXT),
+                ))
+            }
+
+            self.write(protocol::RowDescription::new(fields)).await?;
+        }
+
+        for row in frame.get_rows().iter() {
+            let mut values = Vec::new();
+            for value in row.values().iter() {
+                let value = match value {
+                    TableValue::Null => None,
+                    TableValue::String(v) => Some(v.clone()),
+                    TableValue::Int64(v) => Some(format!("{}", v)),
+                    TableValue::Boolean(v) => Some((if *v { "t" } else { "v" }).to_string()),
+                    TableValue::Float64(v) => Some(format!("{}", v)),
+                    TableValue::Timestamp(v) => Some(v.to_string()),
+                };
+                values.push(value);
+            }
+
+            self.write(protocol::DataRow::new(values)).await?;
+        }
+
+        self.write(protocol::CommandComplete::new(
+            protocol::CommandCompleteTag::Select,
+            0,
+        ))
+        .await?;
+
+        Ok(())
+    }
+
+    async fn execute_plan(&mut self, plan: QueryPlan, description: bool) -> Result<(), CubeError> {
+        match plan {
+            QueryPlan::MetaOk(_) => {
+                self.write(protocol::CommandComplete::new(
+                    protocol::CommandCompleteTag::Select,
+                    0,
+                ))
+                .await?;
+            }
+            QueryPlan::MetaTabular(_, data_frame) => {
+                self.write_batch(data_frame, description).await?;
+            }
+            QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                let df = DFDataFrame::new(ctx.state, &plan);
+                let batches = df.collect().await?;
+                let data_frame = batch_to_dataframe(&batches)?;
+
+                self.write_batch(Arc::new(data_frame), description).await?;
+            }
+        };
+
+        Ok(())
+    }
+
+    pub async fn execute_query(&mut self, query: &str) -> Result<(), CubeError> {
+        let meta = self
+            .session
+            .server
+            .transport
+            .meta(self.auth_context()?)
+            .await?;
+
+        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
+        self.execute_plan(plan, true).await
+    }
+
+    pub async fn process_query(&mut self, query: String) -> Result<(), Error> {
         debug!("Query: {}", query);
+
         match self.execute_query(&query).await {
             Err(e) => {
                 let error_message = e.to_string();
@@ -231,43 +500,7 @@ impl AsyncPostgresShim {
                 ))
                 .await?;
             }
-            Ok(QueryResponse::Ok(_)) => {
-                self.write(protocol::CommandComplete::new(
-                    protocol::CommandCompleteTag::Select,
-                    0,
-                ))
-                .await?;
-            }
-            Ok(QueryResponse::ResultSet(_, frame)) => {
-                let mut fields = Vec::new();
-                for column in frame.get_columns().iter() {
-                    fields.push(protocol::RowDescriptionField::new(
-                        column.get_name(),
-                        PgType::get_by_tid(PgTypeId::TEXT),
-                    ))
-                }
-
-                self.write(protocol::RowDescription::new(fields)).await?;
-
-                for row in frame.get_rows().iter() {
-                    let mut values = Vec::new();
-                    for value in row.values().iter() {
-                        let value = match value {
-                            TableValue::Null => None,
-                            TableValue::String(v) => Some(v.clone()),
-                            TableValue::Int64(v) => Some(format!("{}", v)),
-                            TableValue::Boolean(v) => {
-                                Some((if *v { "t" } else { "v" }).to_string())
-                            }
-                            TableValue::Float64(v) => Some(format!("{}", v)),
-                            TableValue::Timestamp(v) => Some(v.to_string()),
-                        };
-                        values.push(value);
-                    }
-
-                    self.write(protocol::DataRow::new(values)).await?;
-                }
-
+            Ok(_) => {
                 self.write(protocol::CommandComplete::new(
                     protocol::CommandCompleteTag::Select,
                     0,
@@ -275,37 +508,13 @@ impl AsyncPostgresShim {
                 .await?;
             }
         }
+
         self.write(protocol::ReadyForQuery::new(
             protocol::TransactionStatus::Idle,
         ))
         .await?;
+
         Ok(())
-    }
-
-    pub async fn execute_query(&mut self, query: &str) -> Result<QueryResponse, CubeError> {
-        let meta = self
-            .session
-            .server
-            .transport
-            .meta(self.auth_context()?)
-            .await?;
-
-        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
-        match plan {
-            crate::compile::QueryPlan::MetaOk(status) => {
-                return Ok(QueryResponse::Ok(status));
-            }
-            crate::compile::QueryPlan::MetaTabular(status, data_frame) => {
-                return Ok(QueryResponse::ResultSet(status, data_frame));
-            }
-            crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
-                let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let response = batch_to_dataframe(&batches)?;
-
-                return Ok(QueryResponse::ResultSet(status, Arc::new(response)));
-            }
-        }
     }
 
     pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {

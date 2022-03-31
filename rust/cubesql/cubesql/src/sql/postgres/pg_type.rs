@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum PgTypeId {
     UNSPECIFIED = 0,

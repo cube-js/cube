@@ -5,9 +5,9 @@ use log::Level;
 use simple_logger::SimpleLogger;
 use tests::{
     basic::{AsyncTestConstructorResult, AsyncTestSuite},
-    mysql::MySqlIntegrationTestSuite,
     postgres::PostgresIntegrationTestSuite,
 };
+use crate::tests::mysql::MySqlIntegrationTestSuite;
 
 pub mod tests;
 

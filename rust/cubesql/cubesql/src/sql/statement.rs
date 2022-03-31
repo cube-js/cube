@@ -1,6 +1,8 @@
 use msql_srv::{Column, ColumnFlags, ColumnType};
 use sqlparser::ast;
 
+
+
 #[derive(Debug)]
 pub enum BindValue {
     String(String),
@@ -113,40 +115,49 @@ trait Visitor<'ast> {
 }
 
 #[derive(Debug)]
-pub struct StatementPrepare {
-    parameters: Vec<Column>,
-}
+pub struct FoundParameter {}
 
-impl StatementPrepare {
-    pub fn new() -> Self {
-        Self { parameters: vec![] }
-    }
-
-    pub fn prepare(&mut self, stmt: &mut ast::Statement) -> &Vec<Column> {
-        self.visit_statement(stmt);
-
-        &self.parameters
-    }
-}
-
-impl<'ast> Visitor<'ast> for StatementPrepare {
-    fn visit_value(&mut self, _: &mut ast::Value) {
-        self.parameters.push(Column {
+impl Into<Column> for FoundParameter {
+    fn into(self) -> Column {
+        Column {
             table: String::new(),
             column: "not implemented".to_owned(),
             coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
             colflags: ColumnFlags::empty(),
-        })
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct StatementBinder {
+pub struct StatementParamsFinder {
+    parameters: Vec<FoundParameter>,
+}
+
+impl StatementParamsFinder {
+    pub fn new() -> Self {
+        Self { parameters: vec![] }
+    }
+
+    pub fn prepare(mut self, stmt: &mut ast::Statement) -> Vec<FoundParameter> {
+        self.visit_statement(stmt);
+
+        self.parameters
+    }
+}
+
+impl<'ast> Visitor<'ast> for StatementParamsFinder {
+    fn visit_value(&mut self, _: &mut ast::Value) {
+        self.parameters.push(FoundParameter {})
+    }
+}
+
+#[derive(Debug)]
+pub struct StatementParamsBinder {
     position: usize,
     values: Vec<BindValue>,
 }
 
-impl StatementBinder {
+impl StatementParamsBinder {
     pub fn new(values: Vec<BindValue>) -> Self {
         Self {
             position: 0,
@@ -154,12 +165,12 @@ impl StatementBinder {
         }
     }
 
-    pub fn bind(&mut self, stmt: &mut ast::Statement) {
+    pub fn bind(mut self, stmt: &mut ast::Statement) {
         self.visit_statement(stmt);
     }
 }
 
-impl<'ast> Visitor<'ast> for StatementBinder {
+impl<'ast> Visitor<'ast> for StatementParamsBinder {
     fn visit_value(&mut self, value: &mut ast::Value) {
         match &value {
             ast::Value::Placeholder(_) => {
@@ -195,6 +206,32 @@ impl<'ast> Visitor<'ast> for StatementBinder {
     }
 }
 
+#[derive(Debug)]
+pub struct StatementPlaceholderReplacer {}
+
+impl StatementPlaceholderReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &mut ast::Statement) -> &mut ast::Statement {
+        self.visit_statement(stmt);
+
+        stmt
+    }
+}
+
+impl<'ast> Visitor<'ast> for StatementPlaceholderReplacer {
+    fn visit_value(&mut self, value: &mut ast::Value) {
+        match &value {
+            ast::Value::Placeholder(_) => {
+                *value = ast::Value::SingleQuotedString("replaced_placeholder".to_string());
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,7 +241,7 @@ mod tests {
     fn test_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let mut binder = StatementBinder::new(values);
+        let binder = StatementParamsBinder::new(values);
         let mut input = stmts[0].clone();
         binder.bind(&mut input);
 
@@ -298,6 +335,25 @@ mod tests {
             "SELECT * FROM (SELECT * FROM testdata WHERE fieldA = 'test1')",
             vec![BindValue::String("test1".to_string())],
         )?;
+
+        Ok(())
+    }
+
+    fn assert_placeholder_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let binder = StatementPlaceholderReplacer::new();
+        let mut input = stmts[0].clone();
+        binder.replace(&mut input);
+
+        assert_eq!(input.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_placeholder_replacer() -> Result<(), CubeError> {
+        assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
 
         Ok(())
     }

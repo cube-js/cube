@@ -2,7 +2,7 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::sql::pg_type::PgType;
+use crate::sql::PgType;
 use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{

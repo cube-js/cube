@@ -4,6 +4,7 @@ use std::{
     marker::Send,
 };
 
+use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::protocol::{self, Deserialize, FrontendMessage, Serialize};
@@ -13,13 +14,14 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
 ) -> Result<FrontendMessage, Error> {
     // https://www.postgresql.org/docs/14/protocol-message-formats.html
     let message_tag = reader.read_u8().await?;
-    let cursor = read_contents(reader).await?;
+    let cursor = read_contents(reader, message_tag).await?;
 
-    Ok(match message_tag {
+    let message = match message_tag {
         b'Q' => FrontendMessage::Query(protocol::Query::deserialize(cursor).await?),
         b'P' => FrontendMessage::Parse(protocol::Parse::deserialize(cursor).await?),
         b'B' => FrontendMessage::Bind(protocol::Bind::deserialize(cursor).await?),
         b'D' => FrontendMessage::Describe(protocol::Describe::deserialize(cursor).await?),
+        b'E' => FrontendMessage::Execute(protocol::Execute::deserialize(cursor).await?),
         b'p' => {
             FrontendMessage::PasswordMessage(protocol::PasswordMessage::deserialize(cursor).await?)
         }
@@ -28,14 +30,19 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
         identifier => {
             return Err(Error::new(
                 ErrorKind::InvalidData,
-                format!("Unknown message identifier: {}", identifier),
+                format!("Unknown message identifier: {:X?}", identifier),
             ))
         }
-    })
+    };
+
+    trace!("[pg] Decoded {:X?}", message,);
+
+    Ok(message)
 }
 
 pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
+    message_tag: u8,
 ) -> Result<Cursor<Vec<u8>>, Error> {
     // protocol defines length for all types of messages
     let length = reader.read_u32().await?;
@@ -45,15 +52,31 @@ pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
             "Unexpectedly small (<0) message size",
         ));
     }
+
+    trace!(
+        "[pg] Receive package {:X?} with length {}",
+        message_tag,
+        length
+    );
+
     let length = usize::try_from(length - 4).map_err(|_| {
         Error::new(
             ErrorKind::OutOfMemory,
             "Unable to convert message length to a suitable memory size",
         )
     })?;
-    let mut buffer = vec![0; length];
-    reader.read_exact(&mut buffer).await?;
+
+    let buffer = if length == 0 {
+        vec![0; 0]
+    } else {
+        let mut buffer = vec![0; length];
+        reader.read_exact(&mut buffer).await?;
+
+        buffer
+    };
+
     let cursor = Cursor::new(buffer);
+
     Ok(cursor)
 }
 
@@ -61,19 +84,24 @@ pub async fn read_string<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
 ) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(64);
+
     loop {
+        // PostgreSQL uses a null-terminated string (C-style string)
         let byte = reader.read_u8().await?;
         if byte == 0 {
             break;
         }
+
         bytes.push(byte);
     }
+
     let string = String::from_utf8(bytes).map_err(|_| {
         Error::new(
             ErrorKind::InvalidData,
             "Unable to parse bytes as a UTF-8 string",
         )
     })?;
+
     Ok(string)
 }
 

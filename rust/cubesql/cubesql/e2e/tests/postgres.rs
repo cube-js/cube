@@ -1,3 +1,4 @@
+
 use std::{env, time::Duration};
 
 use async_trait::async_trait;
@@ -37,7 +38,6 @@ impl PostgresIntegrationTestSuite {
             );
         };
 
-        // let random_port = 5432_u16;
         let random_port = pick_unused_port().expect("No ports free");
 
         tokio::spawn(async move {
@@ -60,7 +60,7 @@ impl PostgresIntegrationTestSuite {
 
         let (client, connection) = tokio_postgres::connect(
             format!(
-                "host=127.0.0.1 port={} user=ovr password=skipped",
+                "host=127.0.0.1 port={} user=test password=test",
                 random_port
             )
             .as_str(),
@@ -133,6 +133,16 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    async fn test_prepare(&self) -> RunResult {
+        let stmt = self.client.prepare("SELECT $1").await.unwrap();
+        self.client.query(&stmt, &[&"test"]).await.unwrap();
+
+        // let stmt = self.client.prepare("SELECT $1").await.unwrap();
+        // self.client.query(&stmt, &[&true]).await.unwrap();
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -142,21 +152,11 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult {
-        // self.test_use().await?;
-        // self.test_execute_query("SELECT COUNT(*), status FROM Orders".to_string())
+        self.test_prepare().await?;
+        // self.test_execute_query(
+        //     "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+        // )
         //     .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, createdAt FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, DATE_TRUNC('month', createdAt) FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, DATE_TRUNC('quarter', createdAt) FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
 
         Ok(())
     }
