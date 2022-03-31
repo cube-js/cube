@@ -32,9 +32,10 @@ use super::information_schema::postgres::{
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogIndexProvider,
-    PgCatalogNamespaceProvider, PgCatalogRangeProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
+
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
@@ -282,6 +283,8 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_index".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
                 "pg_catalog.pg_class".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
+                "pg_catalog.pg_proc".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -358,6 +361,10 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_class") {
             return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_proc") {
+            return Some(Arc::new(PgCatalogProcProvider::new()));
         }
 
         None

@@ -4929,4 +4929,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgproc_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgproc_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_proc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
