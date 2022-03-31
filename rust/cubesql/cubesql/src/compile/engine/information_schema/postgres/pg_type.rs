@@ -530,7 +530,7 @@ impl PgCatalogTypeProvider {
         });
         builder.add_type(&PgType {
             oid: 26,
-            typname: "oid",
+            typname: "oid".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 4,
@@ -539,10 +539,14 @@ impl PgCatalogTypeProvider {
             typcategory: "N",
             typisprefered: true,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1028,
         });
         builder.add_type(&PgType {
             oid: 27,
-            typname: "tid",
+            typname: "tid".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 6,
@@ -551,10 +555,14 @@ impl PgCatalogTypeProvider {
             typcategory: "U",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1010,
         });
         builder.add_type(&PgType {
             oid: 700,
-            typname: "float4",
+            typname: "float4".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 4,
@@ -563,10 +571,14 @@ impl PgCatalogTypeProvider {
             typcategory: "N",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1021,
         });
         builder.add_type(&PgType {
             oid: 701,
-            typname: "float8",
+            typname: "float8".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 8,
@@ -575,10 +587,14 @@ impl PgCatalogTypeProvider {
             typcategory: "N",
             typisprefered: true,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1022,
         });
         builder.add_type(&PgType {
             oid: 790,
-            typname: "money",
+            typname: "money".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 8,
@@ -587,10 +603,14 @@ impl PgCatalogTypeProvider {
             typcategory: "N",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 791,
         });
         builder.add_type(&PgType {
             oid: 869,
-            typname: "inet",
+            typname: "inet".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: -1,
@@ -599,10 +619,14 @@ impl PgCatalogTypeProvider {
             typcategory: "I",
             typisprefered: true,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1041,
         });
         builder.add_type(&PgType {
             oid: 1042,
-            typname: "bpchar",
+            typname: "bpchar".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: -1,
@@ -611,10 +635,14 @@ impl PgCatalogTypeProvider {
             typcategory: "S",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1014,
         });
         builder.add_type(&PgType {
             oid: 1083,
-            typname: "time",
+            typname: "time".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 8,
@@ -623,10 +651,14 @@ impl PgCatalogTypeProvider {
             typcategory: "D",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1183,
         });
         builder.add_type(&PgType {
             oid: 1186,
-            typname: "interval",
+            typname: "interval".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 16,
@@ -635,10 +667,14 @@ impl PgCatalogTypeProvider {
             typcategory: "T",
             typisprefered: true,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1187,
         });
         builder.add_type(&PgType {
             oid: 1266,
-            typname: "timetz",
+            typname: "timetz".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 12,
@@ -647,10 +683,14 @@ impl PgCatalogTypeProvider {
             typcategory: "D",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 1270,
         });
         builder.add_type(&PgType {
             oid: 3220,
-            typname: "pg_lsn",
+            typname: "pg_lsn".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 8,
@@ -659,10 +699,14 @@ impl PgCatalogTypeProvider {
             typcategory: "U",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 3221,
         });
         builder.add_type(&PgType {
             oid: 2249,
-            typname: "record",
+            typname: "record".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: -1,
@@ -671,10 +715,14 @@ impl PgCatalogTypeProvider {
             typcategory: "P",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 2287,
         });
         builder.add_type(&PgType {
             oid: 2277,
-            typname: "anyarray",
+            typname: "anyarray".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: -1,
@@ -683,10 +731,14 @@ impl PgCatalogTypeProvider {
             typcategory: "P",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
         });
         builder.add_type(&PgType {
             oid: 2283,
-            typname: "anyelement",
+            typname: "anyelement".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 4,
@@ -695,10 +747,14 @@ impl PgCatalogTypeProvider {
             typcategory: "P",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
         });
         builder.add_type(&PgType {
             oid: 3500,
-            typname: "anyenum",
+            typname: "anyenum".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: 4,
@@ -707,10 +763,14 @@ impl PgCatalogTypeProvider {
             typcategory: "P",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
         });
         builder.add_type(&PgType {
             oid: 3831,
-            typname: "anyrange",
+            typname: "anyrange".to_string(),
             typnamespace: 11,
             typowner: 10,
             typlen: -1,
@@ -719,6 +779,10 @@ impl PgCatalogTypeProvider {
             typcategory: "P",
             typisprefered: false,
             typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
         });
 
         for table in tables {
