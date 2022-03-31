@@ -31,8 +31,9 @@ use super::information_schema::postgres::{
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogIndexProvider, PgCatalogNamespaceProvider,
-    PgCatalogRangeProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogIndexProvider,
+    PgCatalogNamespaceProvider, PgCatalogRangeProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
@@ -279,6 +280,8 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_attribute".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogIndexProvider>() {
                 "pg_catalog.pg_index".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
+                "pg_catalog.pg_class".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -351,6 +354,10 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_index") {
             return Some(Arc::new(PgCatalogIndexProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_class") {
+            return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)));
         }
 
         None
