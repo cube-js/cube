@@ -21,7 +21,6 @@ use std::{
     io::{BufReader, BufWriter, Write},
     sync::Arc,
 };
-use std::backtrace::Backtrace;
 
 use crate::cluster::Cluster;
 use crate::config::injection::DIService;

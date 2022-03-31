@@ -7,7 +7,7 @@ use parquet::arrow::{ArrowReader, ArrowWriter};
 use parquet::file::properties::{WriterProperties, WriterVersion};
 use std::fs::File;
 use std::sync::Arc;
-use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
+use datafusion::physical_plan::parquet::ParquetMetadataCache;
 use crate::config::injection::DIService;
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {

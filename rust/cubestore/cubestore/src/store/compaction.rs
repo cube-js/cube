@@ -871,14 +871,12 @@ mod tests {
     use arrow::array::StringArray;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 
     #[tokio::test]
     async fn compaction() {
         let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore("compaction");
         let mut chunk_store = MockChunkDataStore::new();
         let mut config = MockConfigObj::new();
-        let parquet_metadata_cache = NoopParquetMetadataCache::new();
         metastore
             .create_schema("foo".to_string(), false)
             .await
