@@ -1,9 +1,8 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync},
-};
+use std::sync::{Arc, RwLock as RwLockSync};
 
-use crate::sql::database_variables::mysql_default_session_variables;
+use crate::sql::database_variables::{
+    mysql_default_session_variables, postgres_default_session_variables,
+};
 
 use super::{
     database_variables::DatabaseVariables, server_manager::ServerManager,
@@ -31,7 +30,7 @@ impl SessionProperties {
 }
 
 lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = HashMap::new();
+    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = postgres_default_session_variables();
     static ref MYSQL_DEFAULT_VARIABLES: DatabaseVariables = mysql_default_session_variables();
 }
 
@@ -45,9 +44,8 @@ pub struct SessionState {
     pub protocol: DatabaseProtocol,
 
     // session db variables
-    variables: Option<Arc<RwLockSync<DatabaseVariables>>>,
+    variables: RwLockSync<Option<DatabaseVariables>>,
 
-    // TODO: remove after user defined vars are implemented
     properties: RwLockSync<SessionProperties>,
 
     // @todo Remove RWLock after split of Connection & SQLWorker
@@ -66,7 +64,7 @@ impl SessionState {
             connection_id,
             host,
             protocol,
-            variables: None,
+            variables: RwLockSync::new(None),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new(auth_context),
         }
@@ -121,15 +119,51 @@ impl SessionState {
     }
 
     pub fn all_variables(&self) -> DatabaseVariables {
-        match &self.variables {
-            Some(vars) => vars
-                .read()
-                .expect("failed to unlock variables for reading")
-                .clone(),
+        let guard = self
+            .variables
+            .read()
+            .expect("failed to unlock variables for reading")
+            .clone();
+
+        match guard {
+            Some(vars) => vars,
             _ => match self.protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.clone(),
-                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
             },
+        }
+    }
+
+    pub fn set_variables(&self, variables: DatabaseVariables) {
+        let mut to_override = false;
+
+        let mut current_variables = self.all_variables();
+        for (new_var_key, new_var_value) in variables.iter() {
+            let mut key_to_update: Option<String> = Some(new_var_key.to_string());
+            for (current_var_key, current_var_value) in current_variables.iter() {
+                if current_var_key.to_lowercase() == new_var_key.to_lowercase() {
+                    key_to_update = if current_var_value.readonly {
+                        None
+                    } else {
+                        Some(current_var_key.clone())
+                    };
+
+                    break;
+                }
+            }
+            if key_to_update.is_some() {
+                to_override = true;
+                current_variables.insert(key_to_update.unwrap(), new_var_value.clone());
+            }
+        }
+
+        if to_override {
+            let mut guard = self
+                .variables
+                .write()
+                .expect("failed to unlock variables for writing");
+
+            *guard = Some(current_variables);
         }
     }
 }
