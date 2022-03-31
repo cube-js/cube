@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.29.23",
+  "version": "0.29.33",
   "engines": {},
   "repository": {
     "type": "git",
@@ -13,8 +13,8 @@
   "types": "index.d.ts",
   "author": "Cube Dev, Inc.",
   "dependencies": {
-    "@babel/runtime": "^7.1.2",
     "@babel/plugin-transform-runtime": "^7.17.0",
+    "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
     "dayjs": "^1.10.4",

@@ -25,11 +25,15 @@ use datafusion::{
 use futures::Stream;
 use log::{error, warn};
 
-use crate::{mysql::AuthContext, transport::TransportService};
+use crate::{sql::AuthContext, transport::TransportService};
+use chrono::{TimeZone, Utc};
+use datafusion::arrow::array::TimestampNanosecondBuilder;
+use datafusion::arrow::datatypes::TimeUnit;
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
     pub schema: DFSchemaRef,
+    pub member_fields: Vec<String>,
     pub request: V1LoadRequestQuery,
     pub auth_context: Arc<AuthContext>,
 }
@@ -37,11 +41,13 @@ pub struct CubeScanNode {
 impl CubeScanNode {
     pub fn new(
         schema: DFSchemaRef,
+        member_fields: Vec<String>,
         request: V1LoadRequestQuery,
         auth_context: Arc<AuthContext>,
     ) -> Self {
         Self {
             schema,
+            member_fields,
             request,
             auth_context,
         }
@@ -83,6 +89,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
 
         Arc::new(CubeScanNode {
             schema: self.schema.clone(),
+            member_fields: self.member_fields.clone(),
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
         })
@@ -113,6 +120,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                 // figure out input name
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema: SchemaRef::new(scan_node.schema().as_ref().into()),
+                    member_fields: scan_node.member_fields.clone(),
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
@@ -128,6 +136,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
 struct CubeScanExecutionPlan {
     // Options from logical node
     schema: SchemaRef,
+    member_fields: Vec<String>,
     request: V1LoadRequestQuery,
     auth_context: Arc<AuthContext>,
     // Shared references which will be injected by extension planner
@@ -140,13 +149,14 @@ impl CubeScanExecutionPlan {
     fn transform_response(&self, response: V1LoadResult) -> Result<RecordBatch> {
         let mut columns = vec![];
 
-        for schema_field in self.schema.fields() {
+        for (i, schema_field) in self.schema.fields().iter().enumerate() {
+            let field_name = &self.member_fields[i];
             let column = match schema_field.data_type() {
                 DataType::Utf8 => {
                     let mut builder = StringBuilder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -176,7 +186,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = Int64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -213,7 +223,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = Float64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -250,7 +260,7 @@ impl CubeScanExecutionPlan {
                     let mut builder = BooleanBuilder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(schema_field.name()).ok_or(
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
                             DataFusionError::Internal(
                                 "Unexpected response from Cube.js, rows are not objects"
                                     .to_string(),
@@ -262,6 +272,42 @@ impl CubeScanExecutionPlan {
                             v => {
                                 error!(
                                     "Unable to map value {:?} to DataType::Boolean (returning null)",
+                                    v
+                                );
+
+                                builder.append_null()?
+                            }
+                        };
+                    }
+
+                    Arc::new(builder.finish()) as ArrayRef
+                }
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                    let mut builder = TimestampNanosecondBuilder::new(response.data.len());
+
+                    for row in response.data.iter() {
+                        let value = row.as_object().unwrap().get(field_name).ok_or(
+                            DataFusionError::Internal(
+                                "Unexpected response from Cube.js, rows are not objects"
+                                    .to_string(),
+                            ),
+                        )?;
+                        match &value {
+                            serde_json::Value::Null => builder.append_null()?,
+                            serde_json::Value::String(s) => {
+                                let timestamp = Utc
+                                    .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                                    .map_err(|e| {
+                                        DataFusionError::Execution(format!(
+                                            "Can't parse timestamp: '{}': {}",
+                                            s, e
+                                        ))
+                                    })?;
+                                builder.append_value(timestamp.timestamp_nanos())?;
+                            }
+                            v => {
+                                error!(
+                                    "Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)",
                                     v
                                 );
 
@@ -427,7 +473,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<MetaContext, CubeError> {
+            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
@@ -481,6 +527,11 @@ mod tests {
 
         let scan_node = CubeScanExecutionPlan {
             schema: schema.clone(),
+            member_fields: schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect(),
             request: V1LoadRequestQuery {
                 measures: None,
                 dimensions: None,

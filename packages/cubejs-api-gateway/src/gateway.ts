@@ -201,6 +201,14 @@ class ApiGateway {
       });
     }));
 
+    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      await this.sql({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
       await this.meta({
         context: req.context,
@@ -714,7 +722,7 @@ class ApiGateway {
    * data.
    */
   public async load(request: QueryRequest) {
-    let query;
+    let query: Query | Query[] | undefined;
     const {
       context,
       res,
@@ -725,7 +733,11 @@ class ApiGateway {
 
     try {
       query = this.parseQueryParam(request.query);
-      const resType = query.responseFormat || ResultType.DEFAULT;
+      let resType: ResultType = ResultType.DEFAULT;
+
+      if (!Array.isArray(query) && query.responseFormat) {
+        resType = query.responseFormat;
+      }
 
       this.log({
         type: 'Load Request',
@@ -818,6 +830,7 @@ class ApiGateway {
           queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
             .length,
           queriesWithData: results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
         },
         context
       );

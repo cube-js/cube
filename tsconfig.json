@@ -26,6 +26,9 @@
       "path": "packages/cubejs-schema-compiler"
     },
     {
+      "path": "packages/cubejs-testing-shared"
+    },
+    {
       "path": "packages/cubejs-testing"
     },
     {
@@ -36,6 +39,9 @@
     },
     {
       "path": "packages/cubejs-postgres-driver"
+    },
+    {
+      "path": "packages/cubejs-questdb-driver"
     },
     {
       "path": "packages/cubejs-mongobi-driver"

@@ -1,4 +1,4 @@
-import { MysqlDBRunner } from '@cubejs-backend/testing';
+import { MysqlDBRunner } from '@cubejs-backend/testing-shared';
 import { createDriver } from './mysql.db.runner';
 
 describe('MySqlDriver Pool', () => {

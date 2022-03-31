@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`athena query: query 1`] = `
+Array [
+  Object {
+    "OrdersPA.amount": "600.6",
+    "OrdersPA.amount2": "600.6",
+    "OrdersPA.id": "5",
+    "OrdersPA.id2": "5",
+    "OrdersPA.status": "shipped",
+    "OrdersPA.status2": "shipped",
+  },
+  Object {
+    "OrdersPA.amount": "500.5",
+    "OrdersPA.amount2": "500.5",
+    "OrdersPA.id": "4",
+    "OrdersPA.id2": "4",
+    "OrdersPA.status": "processed",
+    "OrdersPA.status2": "processed",
+  },
+  Object {
+    "OrdersPA.amount": "300.3",
+    "OrdersPA.amount2": "300.3",
+    "OrdersPA.id": "3",
+    "OrdersPA.id2": "3",
+    "OrdersPA.status": "processed",
+    "OrdersPA.status2": "processed",
+  },
+  Object {
+    "OrdersPA.amount": "200.2",
+    "OrdersPA.amount2": "200.2",
+    "OrdersPA.id": "2",
+    "OrdersPA.id2": "2",
+    "OrdersPA.status": "new",
+    "OrdersPA.status2": "new",
+  },
+  Object {
+    "OrdersPA.amount": "100.1",
+    "OrdersPA.amount2": "100.1",
+    "OrdersPA.id": "1",
+    "OrdersPA.id2": "1",
+    "OrdersPA.status": "new",
+    "OrdersPA.status2": "new",
+  },
+]
+`;

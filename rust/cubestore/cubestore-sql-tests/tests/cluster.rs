@@ -16,9 +16,6 @@ const WORKER_PORTS: [u16; 2] = [51337, 51338];
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
-    // Prepare workers.
-    Config::configure_worker_services();
-
     respawn::register_handler(multiproc_child_main::<ClusterSqlTest>);
     respawn::init(); // TODO: logs in worker processes.
 

@@ -27,14 +27,20 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube.js Docs" />
+        <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
+
+        <InfoBox>
+        The advanced pre-aggregations workshop is on March 30th at 9-10:30 am PT! Following our <a href="https://cube.dev/events/pre-aggregations/">first pre-aggregations workshop</a> in August, this workshop will cover more advanced use cases.
+        <br />
+        You can register for the workshop at <a href="https://cube.dev/events/adv-pre-aggregations/">the event page</a>.
+        </InfoBox>
 
         <Row>
           <Col span={24}>
             <p>
               Read about major concepts, dive into technical details or follow
-              practical examples to learn how Cube.js works.
+              practical examples to learn how Cube works.
             </p>
           </Col>
         </Row>
@@ -47,40 +53,40 @@ class IndexPage extends Component<Props> {
               to="/getting-started"
             />
             <MainTab
-              title="Connecting to the Database"
+              title="Connect to Data Sources"
               img={imgInsights}
-              desc="How to connect to your database"
+              desc="Connecting to data warehouses, query engines, relational databases, etc."
               to="/config/databases"
               right
             />
           </Row>
           <Row>
             <MainTab
-              title="Data Schema"
+              title="Data Model"
               img={imgForDevs}
-              desc="Learn how to build Data Schemas for"
+              desc="Building the data model, the single source of truth for your metrics"
               to="/schema/getting-started"
             />
             <MainTab
-              title="Caching"
+              title="Connect to Visualization Tools"
               img={imgDashboards}
-              desc="Find out how to get the best performance from Cube"
-              to="/caching"
+              desc="Integrating Cube with BI tools, data apps, notebooks, and front-end tools"
+              to="/config/downstream"
               right
             />
           </Row>
           <Row>
             <MainTab
-              title="Deployment"
-              img={imgInsights}
-              desc="How to deploy your application"
-              to="/deployment"
+              title="Caching"
+              img={imgDashboards}
+              desc="Accelerating queries and getting the best performance from Cube"
+              to="/caching"
             />
             <MainTab
-              title="Frontend"
-              img={imgDashboards}
-              desc="Frontend libraries tutorials and API reference"
-              to="/frontend-introduction"
+              title="Deployment"
+              img={imgInsights}
+              desc="Deploying your application to Cube Cloud, a public cloud, or on-premise"
+              to="/deployment"
               right
             />
           </Row>

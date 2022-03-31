@@ -56,13 +56,13 @@ const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
   fieldType: Joi.any().valid('string'),
-  valuesAsSegments: Joi.boolean(),
-  primaryKey: Joi.boolean(),
-  shown: Joi.boolean(),
+  valuesAsSegments: Joi.boolean().strict(),
+  primaryKey: Joi.boolean().strict(),
+  shown: Joi.boolean().strict(),
   title: Joi.string(),
   description: Joi.string(),
-  suggestFilterValues: Joi.boolean(),
-  enableSuggestions: Joi.boolean(),
+  suggestFilterValues: Joi.boolean().strict(),
+  enableSuggestions: Joi.boolean().strict(),
   format: Joi.alternatives([
     Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
     Joi.object().keys({
@@ -74,16 +74,16 @@ const BaseDimensionWithoutSubQuery = {
 };
 
 const BaseDimension = Object.assign({
-  subQuery: Joi.boolean(),
-  propagateFiltersToSubQuery: Joi.boolean()
+  subQuery: Joi.boolean().strict(),
+  propagateFiltersToSubQuery: Joi.boolean().strict()
 }, BaseDimensionWithoutSubQuery);
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: Joi.any().valid('percent', 'currency', 'number'),
-  shown: Joi.boolean(),
-  visible: Joi.boolean(),
-  cumulative: Joi.boolean(),
+  shown: Joi.boolean().strict(),
+  visible: Joi.boolean().strict(),
+  cumulative: Joi.boolean().strict(),
   filters: Joi.array().items(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -143,7 +143,7 @@ const PreAggregationRefreshKeySchema = condition(
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
       timezone: everyCronTimeZone,
-      incremental: Joi.boolean(),
+      incremental: Joi.boolean().strict(),
       updateWindow: everyInterval
     }),
     requireOneOf('sql', 'every')
@@ -153,9 +153,9 @@ const PreAggregationRefreshKeySchema = condition(
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema,
   sqlAlias: Joi.string().optional(),
-  useOriginalSqlPreAggregations: Joi.boolean(),
-  external: Joi.boolean(),
-  scheduledRefresh: Joi.boolean(),
+  useOriginalSqlPreAggregations: Joi.boolean().strict(),
+  external: Joi.boolean().strict(),
+  scheduledRefresh: Joi.boolean().strict(),
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
       sql: Joi.func().required()
@@ -353,7 +353,7 @@ const CubeRefreshKeySchema = condition(
   condition(
     (s) => defined(s.immutable),
     Joi.object().keys({
-      immutable: Joi.boolean().required()
+      immutable: Joi.boolean().strict().required()
     }),
     requireOneOf('every', 'sql', 'immutable')
   )
@@ -405,7 +405,7 @@ const cubeSchema = Joi.object().keys({
   sqlAlias: Joi.string(),
   dataSource: Joi.string(),
   description: Joi.string(),
-  rewriteQueries: Joi.boolean(),
+  rewriteQueries: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
     relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()

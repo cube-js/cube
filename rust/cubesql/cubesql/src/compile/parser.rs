@@ -1,6 +1,6 @@
-use sqlparser::{ast::Statement, dialect::Dialect, parser::Parser};
+use sqlparser::{ast::Statement, dialect::Dialect, dialect::PostgreSqlDialect, parser::Parser};
 
-use crate::compile::CompilationError;
+use crate::{compile::CompilationError, sql::session::DatabaseProtocol};
 
 use super::CompilationResult;
 
@@ -29,9 +29,26 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-pub fn parse_sql_to_statement(query: &String) -> CompilationResult<Statement> {
-    let dialect = MySqlDialectWithBackTicks {};
-    let parse_result = Parser::parse_sql(&dialect, query.as_str());
+pub fn parse_sql_to_statement(
+    query: &String,
+    protocol: DatabaseProtocol,
+) -> CompilationResult<Statement> {
+    // @todo Support without workarounds
+    // metabase
+    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
+    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
+    // @todo Implement CONVERT function
+    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
+    // @todo problem with parser, space in types
+    let query = query.replace("signed integer", "bigint");
+    let query = query.replace("SIGNED INTEGER", "bigint");
+    let query = query.replace("unsigned integer", "bigint");
+    let query = query.replace("UNSIGNED INTEGER", "bigint");
+
+    let parse_result = match protocol {
+        DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
+        DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+    };
 
     match parse_result {
         Err(error) => Err(CompilationError::User(format!(
@@ -61,9 +78,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_no_statements() {
-        let result =
-            parse_sql_to_statement(&"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string());
+    fn test_no_statements_mysql() {
+        let result = parse_sql_to_statement(
+            &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
+            DatabaseProtocol::MySQL,
+        );
         match result {
             Ok(_) => panic!("This test should throw an error"),
             Err(err) => assert_eq!(
@@ -75,8 +94,11 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_statements() {
-        let result = parse_sql_to_statement(&"SELECT NOW(); SELECT NOW();".to_string());
+    fn test_multiple_statements_mysql() {
+        let result = parse_sql_to_statement(
+            &"SELECT NOW(); SELECT NOW();".to_string(),
+            DatabaseProtocol::MySQL,
+        );
         match result {
             Ok(_) => panic!("This test should throw an error"),
             Err(err) => assert_eq!(
@@ -88,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_line_comments() {
+    fn test_single_line_comments_mysql() {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba
             SELECT DATE(`createdAt`) AS __timestamp,
@@ -100,6 +122,60 @@ mod tests {
             -- 6dcd92a04feb50f14bbcf07c661680ba
         "
             .to_string(),
+            DatabaseProtocol::MySQL,
+        );
+        match result {
+            Ok(_) => {}
+            Err(err) => panic!("{}", err),
+        }
+    }
+
+    #[test]
+    fn test_no_statements_postgres() {
+        let result = parse_sql_to_statement(
+            &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+        match result {
+            Ok(_) => panic!("This test should throw an error"),
+            Err(err) => assert_eq!(
+                true,
+                err.to_string()
+                    .contains("Invalid query, no statements was specified")
+            ),
+        }
+    }
+
+    #[test]
+    fn test_multiple_statements_postgres() {
+        let result = parse_sql_to_statement(
+            &"SELECT NOW(); SELECT NOW();".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+        match result {
+            Ok(_) => panic!("This test should throw an error"),
+            Err(err) => assert_eq!(
+                true,
+                err.to_string()
+                    .contains("Multiple statements was specified in one query")
+            ),
+        }
+    }
+
+    #[test]
+    fn test_single_line_comments_postgres() {
+        let result = parse_sql_to_statement(
+            &"-- 6dcd92a04feb50f14bbcf07c661680ba
+            SELECT createdAt AS __timestamp,
+                   COUNT(*) AS count
+            FROM Orders
+            GROUP BY createdAt
+            ORDER BY count DESC
+            LIMIT 10000
+            -- 6dcd92a04feb50f14bbcf07c661680ba
+        "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
         );
         match result {
             Ok(_) => {}
