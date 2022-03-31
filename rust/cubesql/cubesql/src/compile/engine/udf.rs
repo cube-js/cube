@@ -131,6 +131,24 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_current_schema_udf() -> ScalarUDF {
+    let current_schema = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+
+        builder.append_value("public").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "current_schema",
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        current_schema,
+    )
+}
+
 #[allow(unused_macros)]
 macro_rules! downcast_boolean_arr {
     ($ARG:expr) => {{
