@@ -118,8 +118,8 @@ fn inline_bench(criterion: &mut Criterion) {
         });
     }
 
-    // let _ = DB::destroy(&Options::default(), config.meta_store_path());
-    // let _ = fs::remove_dir_all(config.local_dir().clone());
+    let _ = DB::destroy(&Options::default(), config.meta_store_path());
+    let _ = fs::remove_dir_all(config.local_dir().clone());
 }
 
 criterion_group!(benches, inline_bench);
