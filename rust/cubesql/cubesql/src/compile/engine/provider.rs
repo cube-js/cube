@@ -12,19 +12,16 @@ use crate::{
     sql::{session::DatabaseProtocol, SessionManager, SessionState},
 };
 
-use super::information_schema::{
-    mysql::{
-        collations::InfoSchemaCollationsProvider as MySqlSchemaCollationsProvider,
-        columns::InfoSchemaColumnsProvider as MySqlSchemaColumnsProvider,
-        key_column_usage::InfoSchemaKeyColumnUsageProvider as MySqlSchemaKeyColumnUsageProvider,
-        processlist::InfoSchemaProcesslistProvider as MySqlSchemaProcesslistProvider,
-        referential_constraints::InfoSchemaReferentialConstraintsProvider as MySqlSchemaReferentialConstraintsProvider,
-        schemata::InfoSchemaSchemataProvider as MySqlSchemaSchemataProvider,
-        statistics::InfoSchemaStatisticsProvider as MySqlSchemaStatisticsProvider,
-        tables::InfoSchemaTableProvider as MySqlSchemaTableProvider,
-        variables::PerfSchemaVariablesProvider as MySqlPerfSchemaVariablesProvider,
-    },
-    postgres::PgCatalogClassProvider,
+use super::information_schema::mysql::{
+    collations::InfoSchemaCollationsProvider as MySqlSchemaCollationsProvider,
+    columns::InfoSchemaColumnsProvider as MySqlSchemaColumnsProvider,
+    key_column_usage::InfoSchemaKeyColumnUsageProvider as MySqlSchemaKeyColumnUsageProvider,
+    processlist::InfoSchemaProcesslistProvider as MySqlSchemaProcesslistProvider,
+    referential_constraints::InfoSchemaReferentialConstraintsProvider as MySqlSchemaReferentialConstraintsProvider,
+    schemata::InfoSchemaSchemataProvider as MySqlSchemaSchemataProvider,
+    statistics::InfoSchemaStatisticsProvider as MySqlSchemaStatisticsProvider,
+    tables::InfoSchemaTableProvider as MySqlSchemaTableProvider,
+    variables::PerfSchemaVariablesProvider as MySqlPerfSchemaVariablesProvider,
 };
 
 use super::information_schema::postgres::{
@@ -34,8 +31,9 @@ use super::information_schema::postgres::{
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogIndexProvider, PgCatalogNamespaceProvider,
-    PgCatalogRangeProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogIndexProvider,
+    PgCatalogNamespaceProvider, PgCatalogRangeProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;

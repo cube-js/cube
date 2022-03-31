@@ -198,7 +198,7 @@ impl PgCatalogClassProvider {
         let mut builder = PgCatalogClassBuilder::new();
 
         for table in cube_tables.iter() {
-            let class: PgClass = PgClass {
+            builder.add_class(&PgClass {
                 oid: table.oid,
                 relname: table.name.clone(),
                 relnamespace: 2200,
@@ -213,9 +213,7 @@ impl PgCatalogClassProvider {
                 relreplident: "p".to_string(),
                 relfrozenxid: 0,
                 relminmxid: 1,
-            };
-
-            builder.add_class(&class);
+            });
         }
 
         Self {
