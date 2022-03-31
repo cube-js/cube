@@ -14,12 +14,19 @@ use datafusion::{
 };
 
 use super::utils::new_string_array_with_placeholder;
+use crate::compile::engine::provider::TableName;
 
 pub struct InfoSchemaReferentialConstraintsProvider {}
 
 impl InfoSchemaReferentialConstraintsProvider {
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl TableName for InfoSchemaReferentialConstraintsProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.referential_constraints"
     }
 }
 

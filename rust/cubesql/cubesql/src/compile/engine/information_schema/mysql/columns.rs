@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder, UInt32Builder},
@@ -14,9 +13,10 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::transport::{CubeColumn, V1CubeMetaExt};
+use crate::transport::{CubeColumn, MetaContext, V1CubeMetaExt};
 
-use super::utils::new_string_array_with_placeholder;
+use super::{ext::CubeColumnMySqlExt, utils::new_string_array_with_placeholder};
+use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,
@@ -87,7 +87,7 @@ impl InformationSchemaColumnsBuilder {
 
         self.data_type.append_value(column.get_data_type()).unwrap();
         self.column_type
-            .append_value(column.get_column_type())
+            .append_value(column.get_mysql_column_type())
             .unwrap();
 
         self.char_max_length.append_null().unwrap();
@@ -151,11 +151,17 @@ pub struct InfoSchemaColumnsProvider {
     data: Arc<Vec<ArrayRef>>,
 }
 
+impl TableName for InfoSchemaColumnsProvider {
+    fn table_name(&self) -> &str {
+        "information_schema.columns"
+    }
+}
+
 impl InfoSchemaColumnsProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(meta: Arc<MetaContext>) -> Self {
         let mut builder = InformationSchemaColumnsBuilder::new();
 
-        for cube in cubes {
+        for cube in meta.cubes.iter() {
             let position = 0;
 
             for column in cube.get_columns() {

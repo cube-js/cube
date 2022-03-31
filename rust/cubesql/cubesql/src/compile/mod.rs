@@ -1,10 +1,11 @@
 use std::sync::Arc;
-use std::{backtrace::Backtrace, fmt};
+use std::{backtrace::Backtrace, env, fmt};
 
 use chrono::{prelude::*, Duration};
 
 use datafusion::arrow::datatypes::DataType;
 use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr};
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -18,6 +19,7 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
+use crate::sql::database_variables::{DatabaseVariable, DatabaseVariables};
 use crate::sql::session::DatabaseProtocol;
 use crate::sql::{
     dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
@@ -36,19 +38,29 @@ use self::context::*;
 use self::engine::context::VariablesProvider;
 use self::engine::df::planner::CubeQueryPlanner;
 use self::engine::df::scan::CubeScanNode;
+use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
+    create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+    create_current_schemas_udf, create_current_user_udf, create_db_udf, create_if_udf,
+    create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
     create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
     create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
+use crate::compile::engine::udf::{
+    create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+    create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
+    create_measure_udaf, create_minute_udf, create_quarter_udf, create_second_udf,
+    create_str_to_date, create_year_udf,
+};
+use crate::compile::rewrite::converter::LogicalPlanToLanguageConverter;
 
 pub mod builder;
 pub mod context;
 pub mod engine;
 pub mod parser;
+pub mod rewrite;
 pub mod service;
 
 #[derive(Debug, PartialEq)]
@@ -1356,6 +1368,15 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
     ) -> CompilationResult<QueryPlan> {
+        // TODO move CUBESQL_REWRITE_ENGINE env to config
+        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
+            .ok()
+            .map(|v| v.parse::<bool>().unwrap())
+            .unwrap_or(false);
+        if rewrite_engine {
+            return self.create_df_logical_plan(stmt.clone());
+        }
+
         let select = match &q.body {
             sqlparser::ast::SetExpr::Select(select) => select,
             _ => {
@@ -1501,7 +1522,12 @@ impl QueryPlanner {
 
             let scan_node = LogicalPlan::Extension {
                 node: Arc::new(CubeScanNode::new(
-                    schema,
+                    schema.clone(),
+                    schema
+                        .fields()
+                        .iter()
+                        .map(|f| f.name().to_string())
+                        .collect(),
                     query.request,
                     // @todo Remove after split!
                     Arc::new(self.state.auth_context().unwrap()),
@@ -1554,12 +1580,10 @@ impl QueryPlanner {
                 Ok(QueryPlan::MetaOk(StatusFlags::empty()))
             }
             // TODO: enable for Postgres after variables are supported
-            (ast::Statement::SetVariable { key_values }, DatabaseProtocol::MySQL) => {
+            (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
             }
-            (ast::Statement::ShowVariable { variable }, DatabaseProtocol::MySQL) => {
-                self.show_variable_to_plan(variable)
-            }
+            (ast::Statement::ShowVariable { variable }, _) => self.show_variable_to_plan(variable),
             (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
                 self.show_variables_to_plan(&filter)
             }
@@ -1590,9 +1614,7 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_to_plan(&statement)
-            }
+            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -1613,7 +1635,25 @@ impl QueryPlanner {
 
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
         let name = ObjectName(variable.to_vec()).to_string();
-        if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
+        if self.state.protocol == DatabaseProtocol::PostgreSQL {
+            let stmt = if name.eq_ignore_ascii_case("all") {
+                parse_sql_to_statement(
+                    &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
+                        .to_string(),
+                    self.state.protocol.clone(),
+                )?
+            } else {
+                parse_sql_to_statement(
+                    &format!(
+                        "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
+                        name.to_lowercase()
+                    ),
+                    self.state.protocol.clone(),
+                )?
+            };
+
+            self.create_df_logical_plan(stmt)
+        } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Arc::new(dataframe::DataFrame::new(
@@ -1734,7 +1774,7 @@ impl QueryPlanner {
                 fields.push(format!(
                     "`{}` {}{}",
                     column.get_name(),
-                    column.get_column_type(),
+                    column.get_mysql_column_type(),
                     if column.sql_can_be_null() { " NOT NULL" } else { "" }
                 ));
             }
@@ -1967,11 +2007,125 @@ WHERE `TABLE_SCHEMA` = '{}'",
     ) -> Result<QueryPlan, CompilationError> {
         let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
-        if key_values
-            .iter()
-            .any(|set| set.key.value.to_lowercase() == "autocommit".to_string())
-        {
-            flags |= StatusFlags::AUTOCOMMIT;
+        let mut session_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+        let mut global_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+
+        match self.state.protocol {
+            DatabaseProtocol::PostgreSQL => {
+                for key_value in key_values.iter() {
+                    let value: String = match &key_value.value[0] {
+                        ast::Expr::Identifier(ident) => ident.value.to_string(),
+                        ast::Expr::Value(val) => match val {
+                            ast::Value::SingleQuotedString(single_quoted_str) => {
+                                single_quoted_str.to_string()
+                            }
+                            ast::Value::DoubleQuotedString(double_quoted_str) => {
+                                double_quoted_str.to_string()
+                            }
+                            ast::Value::Number(number, _) => number.to_string(),
+                            _ => {
+                                return Err(CompilationError::User(format!(
+                                    "invalid {} variable format",
+                                    key_value.key.value
+                                )))
+                            }
+                        },
+                        _ => {
+                            return Err(CompilationError::User(format!(
+                                "invalid {} variable format",
+                                key_value.key.value
+                            )))
+                        }
+                    };
+
+                    global_columns_to_update.insert(
+                        key_value.key.value.to_lowercase(),
+                        DatabaseVariable::system(
+                            key_value.key.value.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ),
+                    );
+                }
+            }
+            DatabaseProtocol::MySQL => {
+                for key_value in key_values.iter() {
+                    if key_value.key.value.to_lowercase() == "autocommit".to_string() {
+                        flags |= StatusFlags::AUTOCOMMIT;
+
+                        break;
+                    }
+
+                    let symbols: Vec<char> = key_value.key.value.chars().collect();
+                    if symbols.len() < 2 {
+                        continue;
+                    }
+
+                    let is_user_defined_var = symbols[0] == '@' && symbols[1] != '@';
+                    let is_global_var =
+                        (symbols[0] == '@' && symbols[1] == '@') || symbols[0] != '@';
+
+                    let value: String = match &key_value.value[0] {
+                        ast::Expr::Identifier(ident) => ident.value.to_string(),
+                        ast::Expr::Value(val) => match val {
+                            ast::Value::SingleQuotedString(single_quoted_str) => {
+                                single_quoted_str.to_string()
+                            }
+                            ast::Value::DoubleQuotedString(double_quoted_str) => {
+                                double_quoted_str.to_string()
+                            }
+                            ast::Value::Number(number, _) => number.to_string(),
+                            _ => {
+                                return Err(CompilationError::User(format!(
+                                    "invalid {} variable format",
+                                    key_value.key.value
+                                )))
+                            }
+                        },
+                        _ => {
+                            return Err(CompilationError::User(format!(
+                                "invalid {} variable format",
+                                key_value.key.value
+                            )))
+                        }
+                    };
+
+                    if is_global_var {
+                        let key = if symbols[0] == '@' {
+                            key_value.key.value[2..].to_lowercase()
+                        } else {
+                            key_value.key.value.to_lowercase()
+                        };
+                        global_columns_to_update.insert(
+                            key.clone(),
+                            DatabaseVariable::system(
+                                key.clone(),
+                                ScalarValue::Utf8(Some(value.clone())),
+                                None,
+                            ),
+                        );
+                    } else if is_user_defined_var {
+                        let key = key_value.key.value[1..].to_lowercase();
+                        session_columns_to_update.insert(
+                            key.clone(),
+                            DatabaseVariable::user_defined(
+                                key.clone(),
+                                ScalarValue::Utf8(Some(value.clone())),
+                                None,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
+        if !session_columns_to_update.is_empty() {
+            self.state.set_variables(session_columns_to_update);
+        }
+        if !global_columns_to_update.is_empty() {
+            self.session_manager
+                .server
+                .set_variables(global_columns_to_update, self.state.protocol.clone());
         }
 
         Ok(QueryPlan::MetaTabular(
@@ -1990,8 +2144,15 @@ WHERE `TABLE_SCHEMA` = '{}'",
         );
 
         if self.state.protocol == DatabaseProtocol::MySQL {
-            let variable_provider = VariablesProvider::new(self.state.clone(), VarType::System);
-            ctx.register_variable(VarType::System, Arc::new(variable_provider));
+            let system_variable_provider =
+                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
+            let user_defined_variable_provider =
+                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
+            ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
+            ctx.register_variable(
+                VarType::UserDefined,
+                Arc::new(user_defined_variable_provider),
+            );
         }
 
         ctx.register_udf(create_version_udf());
@@ -2009,6 +2170,23 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
+        ctx.register_udf(create_date_udf());
+        ctx.register_udf(create_makedate_udf());
+        ctx.register_udf(create_year_udf());
+        ctx.register_udf(create_quarter_udf());
+        ctx.register_udf(create_hour_udf());
+        ctx.register_udf(create_minute_udf());
+        ctx.register_udf(create_second_udf());
+        ctx.register_udf(create_dayofweek_udf());
+        ctx.register_udf(create_dayofmonth_udf());
+        ctx.register_udf(create_dayofyear_udf());
+        ctx.register_udf(create_date_sub_udf());
+        ctx.register_udf(create_date_add_udf());
+        ctx.register_udf(create_str_to_date());
+        ctx.register_udf(create_current_schema_udf());
+        ctx.register_udf(create_current_schemas_udf());
+
+        ctx.register_udaf(create_measure_udaf());
 
         ctx
     }
@@ -2016,9 +2194,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
         let ctx = self.create_execution_ctx();
 
-        let state = ctx.state.lock().unwrap().clone();
+        let state = Arc::new(ctx.state.lock().unwrap().clone());
         let cube_ctx = CubeContext::new(
-            &state,
+            state,
             self.meta.clone(),
             self.session_manager.clone(),
             self.state.clone(),
@@ -2031,13 +2209,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 CompilationError::Internal(format!("Initial planning error: {}", err))
             })?;
 
-        let optimized_plan = ctx.optimize(&plan).map_err(|err| {
-            CompilationError::Internal(format!("Planning optimization error: {}", err))
-        })?;
+        let optimized_plan = plan;
+        // ctx.optimize(&plan).map_err(|err| {
+        //    CompilationError::Internal(format!("Planning optimization error: {}", err))
+        // })?;
+
+        let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
+        let root = converter
+            .add_logical_plan(&optimized_plan)
+            .map_err(|e| CompilationError::User(e.to_string()))?;
+        let rewrite_plan = converter
+            .take_rewriter()
+            .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
+
+        log::debug!("Rewrite: {:#?}", rewrite_plan);
 
         Ok(QueryPlan::DataFusionSelect(
             StatusFlags::empty(),
-            optimized_plan,
+            rewrite_plan,
             ctx,
         ))
     }
@@ -2164,18 +2354,6 @@ pub fn convert_sql_to_cube_query(
     meta: Arc<MetaContext>,
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
-    // @todo Support without workarounds
-    // metabase
-    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
-    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
-    // @todo Implement CONVERT function
-    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo problem with parser, space in types
-    let query = query.replace("signed integer", "bigint");
-    let query = query.replace("SIGNED INTEGER", "bigint");
-    let query = query.replace("unsigned integer", "bigint");
-    let query = query.replace("UNSIGNED INTEGER", "bigint");
-
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone())?;
     convert_statement_to_cube_query(&stmt, meta, session)
 }
@@ -2190,7 +2368,6 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-
     use crate::{
         sql::{
             dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
@@ -2198,6 +2375,19 @@ mod tests {
         },
         transport::TransportService,
     };
+    use datafusion::logical_plan::PlanVisitor;
+    use log::Level;
+    use simple_logger::SimpleLogger;
+
+    fn init_logger() {
+        let log_level = Level::Trace;
+        let logger = SimpleLogger::new()
+            .with_level(Level::Error.to_level_filter())
+            .with_module_level("cubeclient", log_level.to_level_filter())
+            .with_module_level("cubesql", log_level.to_level_filter());
+        log::set_boxed_logger(Box::new(logger)).unwrap();
+        log::set_max_level(log_level.to_level_filter());
+    }
 
     fn get_test_meta() -> Vec<V1CubeMeta> {
         vec![
@@ -2281,9 +2471,7 @@ mod tests {
     }
 
     fn get_test_tenant_ctx() -> Arc<MetaContext> {
-        Arc::new(MetaContext {
-            cubes: get_test_meta(),
-        })
+        Arc::new(MetaContext::new(get_test_meta()))
     }
 
     fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
@@ -2338,7 +2526,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<MetaContext, CubeError> {
+            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
@@ -2362,17 +2550,24 @@ mod tests {
     }
 
     fn find_cube_scan_deep_search(parent: Arc<LogicalPlan>) -> CubeScanNode {
-        match &*parent {
-            LogicalPlan::Projection { input, .. } => find_cube_scan_deep_search(input.clone()),
-            LogicalPlan::Extension { node } => {
-                if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
-                    scan_node.clone()
-                } else {
-                    panic!("Unable to unpack extension node");
+        pub struct FindCubeScanNodeVisitor(Option<CubeScanNode>);
+
+        impl PlanVisitor for FindCubeScanNodeVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::Extension { node } = plan {
+                    if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
+                        self.0 = Some(scan_node.clone());
+                    }
                 }
+                Ok(true)
             }
-            _ => unimplemented!(),
         }
+
+        let mut visitor = FindCubeScanNodeVisitor(None);
+        parent.accept(&mut visitor).unwrap();
+        visitor.0.expect("No CubeScanNode was found in plan")
     }
 
     trait LogicalPlanTestUtils {
@@ -2418,51 +2613,12 @@ mod tests {
                 filters: None
             }
         );
-
-        assert_eq!(
-            logical_plan.find_projection_schema(),
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(None, "maxPrice", DataType::Float64, false),
-                    DFField::new(None, "minPrice", DataType::Float64, false),
-                    DFField::new(None, "avgPrice", DataType::Float64, false),
-                ])
-                .unwrap()
-            ),
-        );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.minPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.avgPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
     fn test_select_compound_identifiers() {
         let query_plan = convert_select_to_query_plan(
-            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, `KibanaSampleDataEcommerce`.`minPrice` AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
+            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
         );
 
         let logical_plan = query_plan.as_logical_plan();
@@ -2482,27 +2638,6 @@ mod tests {
                 filters: None
             }
         );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.minPrice",
-                        DataType::Float64,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
@@ -2838,7 +2973,7 @@ mod tests {
         );
 
         assert_eq!(
-            logical_plan.find_projection_schema(),
+            logical_plan.schema().clone(),
             Arc::new(
                 DFSchema::new(vec![
                     DFField::new(None, "order_date", DataType::Utf8, false),
@@ -2847,27 +2982,6 @@ mod tests {
                 .unwrap()
             ),
         );
-
-        assert_eq!(
-            logical_plan.find_cube_scan().schema,
-            Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.order_date",
-                        DataType::Utf8,
-                        false
-                    ),
-                    DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.customer_gender",
-                        DataType::Utf8,
-                        false
-                    ),
-                ])
-                .unwrap()
-            ),
-        )
     }
 
     #[test]
@@ -2885,15 +2999,19 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
+            ),
+            (
+                "SELECT COUNT(*) FROM db.KibanaSampleDataEcommerce".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                },
             ),
             (
                 "SELECT COUNT(1) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2907,15 +3025,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(count) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2929,15 +3038,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.count",
-                        DataType::Int64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCount) FROM Logs".to_string(),
@@ -2951,15 +3051,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "Logs.agentCount",
-                        DataType::Float64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT COUNT(DISTINCT agentCountApprox) FROM Logs".to_string(),
@@ -2973,15 +3064,6 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "Logs.agentCountApprox",
-                        DataType::Float64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
             (
                 "SELECT MAX(`maxPrice`) FROM KibanaSampleDataEcommerce".to_string(),
@@ -2995,25 +3077,15 @@ mod tests {
                     offset: None,
                     filters: None,
                 },
-                Arc::new(
-                    DFSchema::new(vec![DFField::new(
-                        None,
-                        "KibanaSampleDataEcommerce.maxPrice",
-                        DataType::Float64,
-                        false,
-                    )])
-                    .unwrap(),
-                ),
             ),
         ];
 
-        for (input_query, expected_request, expected_scan_schema) in variants.iter() {
+        for (input_query, expected_request) in variants.iter() {
             let logical_plan =
                 convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
                     .as_logical_plan();
 
             assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
-            assert_eq!(&logical_plan.find_cube_scan().schema, expected_scan_schema);
         }
     }
 
@@ -3204,6 +3276,8 @@ mod tests {
 
     #[test]
     fn test_where_filter_daterange() {
+        init_logger();
+
         let to_check = vec![
             // Filter push down to TD (day) - Superset
             (
@@ -3271,6 +3345,19 @@ mod tests {
                     ])),
                 }])
             ),
+            // Stacked chart
+            (
+                "COUNT(*), customer_gender, DATE(order_date) AS __timestamp".to_string(),
+                "customer_gender = 'FEMALE' AND (order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') AND order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'))".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
@@ -3280,8 +3367,18 @@ mod tests {
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
-                GROUP BY __timestamp",
-                    sql_projection, sql_filter
+                {}",
+                    sql_projection,
+                    sql_filter,
+                    if sql_projection.contains("__timestamp")
+                        && sql_projection.contains("customer_gender")
+                    {
+                        "GROUP BY customer_gender, __timestamp"
+                    } else if sql_projection.contains("__timestamp") {
+                        "GROUP BY __timestamp"
+                    } else {
+                        ""
+                    }
                 ),
                 DatabaseProtocol::MySQL,
             )
@@ -3487,28 +3584,28 @@ mod tests {
                 None,
             ),
             // Date
-            (
-                "order_date = '2021-08-31'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
-            (
-                "order_date <> '2021-08-31'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("notEquals".to_string()),
-                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
+            // (
+            //     "order_date = '2021-08-31'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("equals".to_string()),
+            //         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
+            // (
+            //     "order_date <> '2021-08-31'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("notEquals".to_string()),
+            //         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
             // BETWEEN
             (
                 "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
@@ -3610,8 +3707,7 @@ mod tests {
                     "SELECT
                 COUNT(*)
                 FROM KibanaSampleDataEcommerce
-                WHERE {}
-                GROUP BY __timestamp",
+                WHERE {}",
                     sql
                 ),
                 DatabaseProtocol::MySQL,
@@ -4084,39 +4180,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_show_create_table() -> Result<(), CubeError> {
-        let exepected =
-            "+---------------------------+-----------------------------------------------+\n\
-        | Table                     | Create Table                                  |\n\
-        +---------------------------+-----------------------------------------------+\n\
-        | KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` (\r    |\n\
-        |                           |   `count` int,\r                                |\n\
-        |                           |   `maxPrice` int,\r                             |\n\
-        |                           |   `minPrice` int,\r                             |\n\
-        |                           |   `avgPrice` int,\r                             |\n\
-        |                           |   `order_date` datetime NOT NULL,\r             |\n\
-        |                           |   `customer_gender` varchar(255) NOT NULL,\r    |\n\
-        |                           |   `taxful_total_price` varchar(255) NOT NULL,\r |\n\
-        |                           |   `is_male` boolean,\r                          |\n\
-        |                           |   `is_female` boolean\r                         |\n\
-        |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4       |\n\
-        +---------------------------+-----------------------------------------------+";
-
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_create_table",
             execute_query(
                 "show create table KibanaSampleDataEcommerce;".to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            exepected.clone()
+            .await?
         );
 
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_create_table",
             execute_query(
                 "show create table `db`.`KibanaSampleDataEcommerce`;".to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            exepected
+            .await?
         );
 
         Ok(())
@@ -4725,6 +4804,15 @@ mod tests {
             .await?
         );
 
+        // EXPLAIN for Postgres
+        insta::assert_snapshot!(
+            execute_query(
+                "explain select 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -4824,6 +4912,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_information_schema_character_sets_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_character_sets_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.character_sets".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_key_column_usage_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_key_column_usage_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.key_column_usage".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_referential_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_referential_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.referential_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_table_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_table_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.table_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgtables_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgtables_postgres",
@@ -4836,4 +4980,183 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgtype_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgtype_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_type".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgnamespace_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgnamespace_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_namespace".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgrange_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgrange_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_range".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattrdef_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattrdef_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attrdef".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattribute_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattribute_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attribute".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgindex_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgindex_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_index".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgclass_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgclass_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_class".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgproc_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgproc_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_proc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgdescription_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgdescription_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_description".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgconstraint_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgconstraint_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_constraint".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_current_schema_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schema_postgres",
+            execute_query(
+                "SELECT current_schema()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    /* TODO: @ovr
+    #[tokio::test]
+    async fn test_current_schemas_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schemas_postgres",
+            execute_query(
+                "SELECT current_schemas(false)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "current_schemas_including_implicit_postgres",
+            execute_query(
+                "SELECT current_schemas(true)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+    */
 }

@@ -3,7 +3,6 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     io::{Cursor, Error},
-    marker::Send,
 };
 
 use async_trait::async_trait;

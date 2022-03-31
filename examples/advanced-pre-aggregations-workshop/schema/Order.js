@@ -88,7 +88,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -113,7 +113,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -130,23 +130,23 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
     // },
-    // dailyOrderPriceAvgPerCustomer: {
+    // dailyOrderPriceAvgPerBalance: {
     //   measures: [
     //     Order.totalPriceAvg
     //   ],
     //   dimensions: [
-    //     Customer.cName
+    //     Customer.cAcctbal
     //   ],
     //   timeDimension: Order.oOrderdate,
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -175,14 +175,14 @@ cube(`Order`, {
     //      * Default value is 1 hour.
     //      * Refreshes pre-aggregations based on a time interval.
     //      */
-    //     // every: `1 minute`, // This will refresh every minute
+    //     // every: `1 hour`, // This will refresh every hour
     //     // incremental: true,
     //     // updateWindow: `7 day`,
     //     /**
     //      * Option 2
     //      * Refreshes pre-aggregations based on a CRON string.
     //      */
-    //     // every: `* * * * *`, // This will refresh every minute
+    //     // every: `0 * * * *`, // This will refresh every hour
     //     // incremental: true,
     //     // updateWindow: `7 day`,
     //     /**
@@ -196,16 +196,11 @@ cube(`Order`, {
     //      * => every: '10 second' for all other databases
     //      */
     //     // sql: `
-    //     //   SELECT 
-    //     //     MAX(O_UPDATEDAT) FROM tpc_h.order
-    //     //   WHERE 
-    //     //     O_UPDATEDAT
-    //     //   BETWEEN 
-    //     //     TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
-    //     //   AND 
-    //     //     CURRENT_TIMESTAMP();
+    //     // SELECT
+    //     //   MAX(O_UPDATEDAT) FROM tpc_h.order 
+    //     // WHERE ${FILTER_PARAMS.Order.createdAt.filter('O_CREATEDAT')}
     //     // `,
-    //     // every: `1 minute`
+    //     // every: `1 hour`
     //   },
     // },
 
@@ -225,7 +220,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   }
@@ -239,7 +234,7 @@ cube(`Order`, {
     //   granularity: `day`,
     //   partitionGranularity: `day`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `7 day`,
     //   },
@@ -280,7 +275,7 @@ cube(`Order`, {
     //   granularity: `month`,
     //   partitionGranularity: `month`,
     //   refreshKey: {
-    //     every: `1 minute`,
+    //     every: `1 hour`,
     //     incremental: true,
     //     updateWindow: `1 month`,
     //   },
@@ -289,7 +284,7 @@ cube(`Order`, {
 
   joins: {
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     // Customer: {
@@ -347,7 +342,7 @@ cube(`Order`, {
     // },
 
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Using dedicated pre-aggregations for large and complex queries
      */
     // totalPriceAvg: {
@@ -391,7 +386,7 @@ cube(`Order`, {
 
   dimensions: {
     /**
-     * Step 3 & Step 4 & Step 5
+     * Step 3 & Step 4 & Step 5 & Step 6
      * Introducing joins for large queries and dedicated pre-aggregations
      */
     oCustkey: {

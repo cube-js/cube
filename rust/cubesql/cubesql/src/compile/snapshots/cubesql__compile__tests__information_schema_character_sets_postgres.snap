@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.character_sets\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------+----------------------+--------------------+----------------------+-------------+-------------------------+------------------------+----------------------+
+| character_set_catalog | character_set_schema | character_set_name | character_repertoire | form_of_use | default_collate_catalog | default_collate_schema | default_collate_name |
++-----------------------+----------------------+--------------------+----------------------+-------------+-------------------------+------------------------+----------------------+
+| NULL                  | NULL                 | UTF8               | UCS                  | UTF8        | db                      | pg_catalog             | en_US.utf8           |
++-----------------------+----------------------+--------------------+----------------------+-------------+-------------------------+------------------------+----------------------+

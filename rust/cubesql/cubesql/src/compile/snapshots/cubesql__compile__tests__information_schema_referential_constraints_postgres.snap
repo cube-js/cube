@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.referential_constraints\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+-------------------+-----------------+---------------------------+--------------------------+------------------------+--------------+-------------+-------------+
+| constraint_catalog | constraint_schema | constraint_name | unique_constraint_catalog | unique_constraint_schema | unique_constraint_name | match_option | update_rule | delete_rule |
++--------------------+-------------------+-----------------+---------------------------+--------------------------+------------------------+--------------+-------------+-------------+
++--------------------+-------------------+-----------------+---------------------------+--------------------------+------------------------+--------------+-------------+-------------+
