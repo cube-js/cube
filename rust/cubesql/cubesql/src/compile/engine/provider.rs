@@ -31,10 +31,10 @@ use super::information_schema::postgres::{
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogDescriptionProvider,
-    PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
+    PgCatalogDescriptionProvider, PgCatalogIndexProvider, PgCatalogNamespaceProvider,
+    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogSettingsProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 use crate::sql::ColumnType;
@@ -290,6 +290,8 @@ impl DatabaseProtocol {
                 "pg_catalog.pg_settings".to_string()
             } else if let Some(_) = any.downcast_ref::<PgCatalogDescriptionProvider>() {
                 "pg_catalog.pg_description".to_string()
+            } else if let Some(_) = any.downcast_ref::<PgCatalogConstraintProvider>() {
+                "pg_catalog.pg_constraint".to_string()
             } else {
                 return Err(CubeError::internal(format!(
                     "Unknown table provider with schema: {:?}",
@@ -382,6 +384,10 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_description") {
             return Some(Arc::new(PgCatalogDescriptionProvider::new()));
+        }
+
+        if tp.eq_ignore_ascii_case("pg_catalog.pg_constraint") {
+            return Some(Arc::new(PgCatalogConstraintProvider::new()));
         }
 
         None
