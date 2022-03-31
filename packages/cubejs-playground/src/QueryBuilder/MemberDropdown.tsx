@@ -75,6 +75,7 @@ export default function MemberMenu({
   onClick,
   ...buttonProps
 }: MemberDropdownProps) {
+  const searchInputRef = useRef<Input | null>(null);
   const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
@@ -117,8 +118,25 @@ export default function MemberMenu({
   return (
     <ButtonDropdown
       {...buttonProps}
+      onKeyDown={(e) => {
+        searchInputRef.current?.focus({ preventScroll: true });
+        buttonProps.onKeyDown?.(e);
+      }}
+      onClick={() => {
+        // we need to delay focusing since React needs to render <Menu /> first :)
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        });
+      }}
       overlay={
         <Menu
+          onKeyDown={(e) => {
+            if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
+              return;
+            }
+
+            searchInputRef.current?.focus({ preventScroll: true });
+          }}
           onClick={(event) => {
             setSearch('');
             setFilteredKeys([]);
@@ -127,8 +145,9 @@ export default function MemberMenu({
         >
           {hasMembers ? (
             <>
-              <SearchMenuItem disabled>
+              <SearchMenuItem disabled key="search_field">
                 <Input
+                  ref={searchInputRef}
                   placeholder="Search"
                   autoFocus
                   value={search}
