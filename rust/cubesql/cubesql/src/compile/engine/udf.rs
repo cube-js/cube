@@ -5,11 +5,11 @@ use datafusion::{
     arrow::{
         array::{
             Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
+            IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
         },
         compute::cast,
         datatypes::{
-            DataType, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
+            DataType, Field, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
             TimestampNanosecondType, UInt64Type,
         },
     },
@@ -128,6 +128,24 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
         version,
+    )
+}
+
+pub fn create_current_schema_udf() -> ScalarUDF {
+    let current_schema = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+
+        builder.append_value("public").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "current_schema",
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        current_schema,
     )
 }
 
@@ -948,6 +966,36 @@ pub fn create_str_to_date() -> ScalarUDF {
         &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
+    )
+}
+
+pub fn create_current_schemas_udf() -> ScalarUDF {
+    let current_schemas = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let primitive_builder = StringBuilder::new(2);
+        let mut builder = ListBuilder::new(primitive_builder);
+
+        let including_implicit = downcast_boolean_arr!(&args[0]).value(0);
+        if including_implicit {
+            builder.values().append_value("pg_catalog").unwrap();
+        }
+        builder.values().append_value("public").unwrap();
+        builder.append(true).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "current_schemas",
+        vec![DataType::Boolean],
+        Arc::new(DataType::List(Box::new(Field::new(
+            "item",
+            DataType::Int32,
+            true,
+        )))),
+        Volatility::Immutable,
+        current_schemas,
     )
 }
 

@@ -5,6 +5,7 @@ use chrono::{prelude::*, Duration};
 
 use datafusion::arrow::datatypes::DataType;
 use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr};
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
@@ -18,6 +19,7 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
+use crate::sql::database_variables::{DatabaseVariable, DatabaseVariables};
 use crate::sql::session::DatabaseProtocol;
 use crate::sql::{
     dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
@@ -39,8 +41,9 @@ use self::engine::df::scan::CubeScanNode;
 use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
+    create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+    create_current_schemas_udf, create_current_user_udf, create_db_udf, create_if_udf,
+    create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
     create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
     create_version_udf,
 };
@@ -1577,12 +1580,10 @@ impl QueryPlanner {
                 Ok(QueryPlan::MetaOk(StatusFlags::empty()))
             }
             // TODO: enable for Postgres after variables are supported
-            (ast::Statement::SetVariable { key_values }, DatabaseProtocol::MySQL) => {
+            (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
             }
-            (ast::Statement::ShowVariable { variable }, DatabaseProtocol::MySQL) => {
-                self.show_variable_to_plan(variable)
-            }
+            (ast::Statement::ShowVariable { variable }, _) => self.show_variable_to_plan(variable),
             (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
                 self.show_variables_to_plan(&filter)
             }
@@ -1613,9 +1614,7 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_to_plan(&statement)
-            }
+            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -1636,7 +1635,25 @@ impl QueryPlanner {
 
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
         let name = ObjectName(variable.to_vec()).to_string();
-        if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
+        if self.state.protocol == DatabaseProtocol::PostgreSQL {
+            let stmt = if name.eq_ignore_ascii_case("all") {
+                parse_sql_to_statement(
+                    &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
+                        .to_string(),
+                    self.state.protocol.clone(),
+                )?
+            } else {
+                parse_sql_to_statement(
+                    &format!(
+                        "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
+                        name.to_lowercase()
+                    ),
+                    self.state.protocol.clone(),
+                )?
+            };
+
+            self.create_df_logical_plan(stmt)
+        } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Arc::new(dataframe::DataFrame::new(
@@ -1990,11 +2007,125 @@ WHERE `TABLE_SCHEMA` = '{}'",
     ) -> Result<QueryPlan, CompilationError> {
         let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
-        if key_values
-            .iter()
-            .any(|set| set.key.value.to_lowercase() == "autocommit".to_string())
-        {
-            flags |= StatusFlags::AUTOCOMMIT;
+        let mut session_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+        let mut global_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+
+        match self.state.protocol {
+            DatabaseProtocol::PostgreSQL => {
+                for key_value in key_values.iter() {
+                    let value: String = match &key_value.value[0] {
+                        ast::Expr::Identifier(ident) => ident.value.to_string(),
+                        ast::Expr::Value(val) => match val {
+                            ast::Value::SingleQuotedString(single_quoted_str) => {
+                                single_quoted_str.to_string()
+                            }
+                            ast::Value::DoubleQuotedString(double_quoted_str) => {
+                                double_quoted_str.to_string()
+                            }
+                            ast::Value::Number(number, _) => number.to_string(),
+                            _ => {
+                                return Err(CompilationError::User(format!(
+                                    "invalid {} variable format",
+                                    key_value.key.value
+                                )))
+                            }
+                        },
+                        _ => {
+                            return Err(CompilationError::User(format!(
+                                "invalid {} variable format",
+                                key_value.key.value
+                            )))
+                        }
+                    };
+
+                    global_columns_to_update.insert(
+                        key_value.key.value.to_lowercase(),
+                        DatabaseVariable::system(
+                            key_value.key.value.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ),
+                    );
+                }
+            }
+            DatabaseProtocol::MySQL => {
+                for key_value in key_values.iter() {
+                    if key_value.key.value.to_lowercase() == "autocommit".to_string() {
+                        flags |= StatusFlags::AUTOCOMMIT;
+
+                        break;
+                    }
+
+                    let symbols: Vec<char> = key_value.key.value.chars().collect();
+                    if symbols.len() < 2 {
+                        continue;
+                    }
+
+                    let is_user_defined_var = symbols[0] == '@' && symbols[1] != '@';
+                    let is_global_var =
+                        (symbols[0] == '@' && symbols[1] == '@') || symbols[0] != '@';
+
+                    let value: String = match &key_value.value[0] {
+                        ast::Expr::Identifier(ident) => ident.value.to_string(),
+                        ast::Expr::Value(val) => match val {
+                            ast::Value::SingleQuotedString(single_quoted_str) => {
+                                single_quoted_str.to_string()
+                            }
+                            ast::Value::DoubleQuotedString(double_quoted_str) => {
+                                double_quoted_str.to_string()
+                            }
+                            ast::Value::Number(number, _) => number.to_string(),
+                            _ => {
+                                return Err(CompilationError::User(format!(
+                                    "invalid {} variable format",
+                                    key_value.key.value
+                                )))
+                            }
+                        },
+                        _ => {
+                            return Err(CompilationError::User(format!(
+                                "invalid {} variable format",
+                                key_value.key.value
+                            )))
+                        }
+                    };
+
+                    if is_global_var {
+                        let key = if symbols[0] == '@' {
+                            key_value.key.value[2..].to_lowercase()
+                        } else {
+                            key_value.key.value.to_lowercase()
+                        };
+                        global_columns_to_update.insert(
+                            key.clone(),
+                            DatabaseVariable::system(
+                                key.clone(),
+                                ScalarValue::Utf8(Some(value.clone())),
+                                None,
+                            ),
+                        );
+                    } else if is_user_defined_var {
+                        let key = key_value.key.value[1..].to_lowercase();
+                        session_columns_to_update.insert(
+                            key.clone(),
+                            DatabaseVariable::user_defined(
+                                key.clone(),
+                                ScalarValue::Utf8(Some(value.clone())),
+                                None,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
+        if !session_columns_to_update.is_empty() {
+            self.state.set_variables(session_columns_to_update);
+        }
+        if !global_columns_to_update.is_empty() {
+            self.session_manager
+                .server
+                .set_variables(global_columns_to_update, self.state.protocol.clone());
         }
 
         Ok(QueryPlan::MetaTabular(
@@ -2013,8 +2144,15 @@ WHERE `TABLE_SCHEMA` = '{}'",
         );
 
         if self.state.protocol == DatabaseProtocol::MySQL {
-            let variable_provider = VariablesProvider::new(self.state.clone(), VarType::System);
-            ctx.register_variable(VarType::System, Arc::new(variable_provider));
+            let system_variable_provider =
+                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
+            let user_defined_variable_provider =
+                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
+            ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
+            ctx.register_variable(
+                VarType::UserDefined,
+                Arc::new(user_defined_variable_provider),
+            );
         }
 
         ctx.register_udf(create_version_udf());
@@ -2045,6 +2183,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date());
+        ctx.register_udf(create_current_schema_udf());
+        ctx.register_udf(create_current_schemas_udf());
 
         ctx.register_udaf(create_measure_udaf());
 
@@ -4664,6 +4804,15 @@ mod tests {
             .await?
         );
 
+        // EXPLAIN for Postgres
+        insta::assert_snapshot!(
+            execute_query(
+                "explain select 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -4763,6 +4912,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_information_schema_character_sets_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_character_sets_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.character_sets".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_key_column_usage_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_key_column_usage_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.key_column_usage".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_referential_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_referential_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.referential_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_schema_table_constraints_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_table_constraints_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.table_constraints".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgtables_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgtables_postgres",
@@ -4817,4 +5022,141 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattrdef_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattrdef_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attrdef".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgattribute_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgattribute_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_attribute".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgindex_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgindex_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_index".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgclass_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgclass_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_class".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgproc_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgproc_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_proc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgdescription_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgdescription_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_description".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgconstraint_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgconstraint_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_constraint".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_current_schema_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schema_postgres",
+            execute_query(
+                "SELECT current_schema()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    /* TODO: @ovr
+    #[tokio::test]
+    async fn test_current_schemas_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schemas_postgres",
+            execute_query(
+                "SELECT current_schemas(false)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "current_schemas_including_implicit_postgres",
+            execute_query(
+                "SELECT current_schemas(true)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+    */
 }

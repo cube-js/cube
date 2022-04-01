@@ -122,6 +122,26 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_prepared_reset(&self) -> RunResult {
+        let mut conn = self.pool.get_conn().await.unwrap();
+
+        // Server should deallocate statement on execution
+        let statement = conn.prep("SELECT ?".to_string()).await.unwrap();
+        conn.exec_iter(&statement, ("test",)).await.unwrap();
+        conn.exec_iter(&statement, ("test",)).await.unwrap();
+
+        // Close statement
+        let statement = conn.prep("SELECT ?".to_string()).await.unwrap();
+        conn.exec_iter(&statement, ("test",)).await.unwrap();
+        conn.close(statement);
+
+        // Client will allocate a new one
+        let statement = conn.prep("SELECT ?".to_string()).await.unwrap();
+        conn.exec_iter(&statement, ("test",)).await.unwrap();
+
+        Ok(())
+    }
+
     async fn test_prepared(&self) -> RunResult {
         let mut conn = self.pool.get_conn().await.unwrap();
 
@@ -180,6 +200,7 @@ impl AsyncTestSuite for MySqlIntegrationTestSuite {
     async fn run(&mut self) -> RunResult {
         self.test_use().await?;
         self.test_prepared().await?;
+        self.test_prepared_reset().await?;
         self.test_execute_query("SELECT COUNT(*), status FROM Orders".to_string())
             .await?;
         self.test_execute_query(
