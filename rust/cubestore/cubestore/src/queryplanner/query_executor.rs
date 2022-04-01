@@ -81,6 +81,14 @@ pub trait QueryExecutor: DIService + Send + Sync {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
+
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError>;
+
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -236,6 +244,29 @@ impl QueryExecutor for QueryExecutorImpl {
             plan_to_move,
         ))
     }
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError> {
+        let (physical_plan, _) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
+
+        let worker_plan;
+        if let Some((p, _)) = get_worker_plan(&physical_plan) {
+            worker_plan = p;
+        } else {
+            error!("No worker marker in physical plan: {:?}", physical_plan);
+            return Err(CubeError::internal(
+                "Invalid physical plan on worker".to_string(),
+            ));
+        }
+
+        Ok(pp_phys_plan(worker_plan.as_ref()))
+    }
+
 }
 
 impl QueryExecutorImpl {

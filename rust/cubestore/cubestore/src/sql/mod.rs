@@ -48,9 +48,10 @@ use crate::metastore::{
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
+use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor, ClusterSendExec};
 use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
@@ -512,6 +513,111 @@ impl SqlServiceImpl {
             vec![Row::new(vec![TableValue::String(dump_dir)])],
         )))
     }
+    async fn explain(&self, statement :Statement, analyze :bool) -> Result<Arc<DataFrame>, CubeError>
+    {
+        fn extract_worker_plans(p: &Arc<dyn ExecutionPlan>, dest :&mut Vec<(String, SerializedPlan)>)
+        {
+            if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
+                for (node_name, partitions) in p.partitions.iter() {
+
+                    let mut ps = HashMap::<_, RowFilter>::new();
+                    for (id, range) in partitions {
+                        ps.entry(*id).or_default().append_or(range.clone())
+                    }
+                    let mut ps = ps.into_iter().collect_vec();
+                    ps.sort_unstable_by_key(|(id, _)| *id);
+
+                    let plan = p.serialized_plan.with_partition_id_to_execute(ps);
+                    dest.push((node_name.to_string(), plan));
+                }
+            } else {
+                for c in p.children() {
+                    extract_worker_plans(&c, dest);
+                }
+            }
+        }
+
+        let query_plan = self
+            .query_planner
+            .logical_plan(DFStatement::Statement(statement))
+            .await?;
+        let res = match query_plan {
+            QueryPlan::Select(serialized, _) => {
+                let res = if !analyze {
+                    let logical_plan = serialized.logical_plan(HashMap::new(), HashMap::new())?;
+
+                    DataFrame::new(
+                        vec![Column::new("logical plan".to_string(), ColumnType::String, 0)],
+                        vec![
+                        Row::new(vec![
+                                 TableValue::String(pp_plan(&logical_plan))
+                        ])
+                        ]
+                        )
+
+                } else {
+
+                    let cluster = self.cluster.clone();
+                    let executor = self.query_executor.clone();
+                    let headers :Vec<Column> = vec![
+                        Column::new("node type".to_string(), ColumnType::String, 0),
+                        Column::new("node name".to_string(), ColumnType::String, 1),
+                        Column::new("physical plan".to_string(), ColumnType::String, 2)
+                    ];
+                    let mut rows = Vec::new();
+
+                    let router_plan = executor.router_plan(serialized.clone(), cluster).await?.0;
+                    rows.push(
+                        Row::new(vec![
+                                 TableValue::String("router".to_string()),
+                                 TableValue::String("".to_string()),
+                                 TableValue::String(pp_phys_plan(router_plan.as_ref()))
+                        ])
+                    );
+
+                    let mut worker_plans = Vec::new();
+                    extract_worker_plans(&router_plan, &mut worker_plans);
+
+                    let worker_futures = worker_plans
+                         .into_iter()
+                         .map(|(name, plan)| {
+                            async move {
+                                self
+                                    .cluster
+                                    .run_explain_analyze(&name, plan.clone())
+                                    .await
+                                    .map(|p| (name, p))
+                            }
+                         })
+                         .collect::<Vec<_>>();
+                    join_all(worker_futures)
+                        .await
+                        .into_iter()
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_iter()
+                        .for_each(|(name, pp_plan)| {
+                            rows.push(
+                                Row::new(vec![
+                                         TableValue::String("worker".to_string()),
+                                         TableValue::String(name.to_string()),
+                                         TableValue::String(pp_plan)
+                                ])
+                            );
+                        });
+
+                    DataFrame::new(
+                        headers, 
+                        rows
+                    )
+                };
+                Ok(res) 
+
+            }
+            _ => Err(CubeError::user("Explain not supported for selects from system tables".to_string()))
+        }?;
+        Ok(Arc::new(res))
+    }
+
 }
 
 #[derive(Debug)]
@@ -915,7 +1021,20 @@ impl SqlService for SqlServiceImpl {
                     }
                 };
                 Ok(res)
-            }
+            },
+            CubeStoreStatement::Statement(Statement::Explain {
+                analyze,
+                verbose: _,
+                statement
+            }) => {
+                match *statement {
+                    Statement::Query(q) => {
+                        self.explain(Statement::Query(q.clone()), analyze).await
+                    },
+                    _ => Err(CubeError::user(format!("Unsupported explain request: '{}'", query)))
+                }
+            },
+
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
