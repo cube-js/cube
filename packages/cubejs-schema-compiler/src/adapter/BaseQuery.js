@@ -442,37 +442,39 @@ class BaseQuery {
    * @returns {string}
    */
   buildParamAnnotatedSql() {
+    let sql;
+    let preAggForQuery;
     if (!this.options.preAggregationQuery && !this.ungrouped) {
-      const preAggregationForQuery =
+      preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery) {
-        const {
-          multipliedMeasures,
-          regularMeasures,
-          cumulativeMeasures,
-        } = this.fullKeyQueryAggregateMeasures();
+    }
+    if (preAggForQuery) {
+      const {
+        multipliedMeasures,
+        regularMeasures,
+        cumulativeMeasures,
+      } = this.fullKeyQueryAggregateMeasures();
 
-        if (!cumulativeMeasures.length) {
-          return this.preAggregations.rollupPreAggregation(
-            preAggregationForQuery,
-            this.measures,
-            true,
-          );
-        }
-
-        return this.regularAndTimeSeriesRollupQuery(
+      if (cumulativeMeasures.length === 0) {
+        sql = this.preAggregations.rollupPreAggregation(
+          preAggForQuery,
+          this.measures,
+          true,
+        );
+      } else {
+        sql = this.regularAndTimeSeriesRollupQuery(
           regularMeasures,
           multipliedMeasures,
           cumulativeMeasures,
-          preAggregationForQuery,
+          preAggForQuery,
         );
       }
-    }
-    if (this.options.totalQuery) {
-      return this.countAllQuery(this.fullKeyQueryAggregate());
     } else {
-      return this.fullKeyQueryAggregate();
+      sql = this.fullKeyQueryAggregate();
     }
+    return this.options.totalQuery
+      ? this.countAllQuery(sql)
+      : sql;
   }
 
   /**
