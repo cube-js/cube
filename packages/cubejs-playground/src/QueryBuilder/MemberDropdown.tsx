@@ -24,8 +24,8 @@ const SearchMenuItem = styled(Menu.Item)`
   top: 0;
   background: white;
   padding-top: 10px;
-  padding-bottom: 0;
-  margin-bottom: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
 
   ::after {
     display: block;
