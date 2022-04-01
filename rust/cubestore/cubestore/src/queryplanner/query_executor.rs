@@ -970,6 +970,28 @@ impl ClusterSendExec {
             use_streaming: self.use_streaming,
         }
     }
+
+    pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
+        let mut res = Vec::new();
+        for (node_name, partitions) in self.partitions.iter() {
+            res.push(
+                (node_name.clone(), self.serialized_plan_for_partitions(partitions))
+            );
+        }
+        res
+    }
+
+    fn serialized_plan_for_partitions(&self, partitions: &Vec<(u64, RowRange)>) -> SerializedPlan {
+
+        let mut ps = HashMap::<_, RowFilter>::new();
+        for (id, range) in partitions {
+            ps.entry(*id).or_default().append_or(range.clone())
+        }
+        let mut ps = ps.into_iter().collect_vec();
+        ps.sort_unstable_by_key(|(id, _)| *id);
+
+        self.serialized_plan.with_partition_id_to_execute(ps)
+    }
 }
 
 #[async_trait]
@@ -1019,14 +1041,8 @@ impl ExecutionPlan for ClusterSendExec {
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
-        let mut ps = HashMap::<_, RowFilter>::new();
-        for (id, range) in partitions {
-            ps.entry(*id).or_default().append_or(range.clone())
-        }
-        let mut ps = ps.into_iter().collect_vec();
-        ps.sort_unstable_by_key(|(id, _)| *id);
+        let plan = self.serialized_plan_for_partitions(partitions);
 
-        let plan = self.serialized_plan.with_partition_id_to_execute(ps);
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)
         } else {
@@ -1036,6 +1052,9 @@ impl ExecutionPlan for ClusterSendExec {
             memory_exec.execute(0).await
         }
     }
+
+
+    
 }
 
 impl fmt::Debug for ClusterSendExec {

@@ -515,25 +515,18 @@ impl SqlServiceImpl {
     }
     async fn explain(&self, statement :Statement, analyze :bool) -> Result<Arc<DataFrame>, CubeError>
     {
-        fn extract_worker_plans(p: &Arc<dyn ExecutionPlan>, dest :&mut Vec<(String, SerializedPlan)>)
+        fn extract_worker_plans(p: &Arc<dyn ExecutionPlan>) -> Option<Vec<(String, SerializedPlan)>>
         {
             if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
-                for (node_name, partitions) in p.partitions.iter() {
-
-                    let mut ps = HashMap::<_, RowFilter>::new();
-                    for (id, range) in partitions {
-                        ps.entry(*id).or_default().append_or(range.clone())
-                    }
-                    let mut ps = ps.into_iter().collect_vec();
-                    ps.sort_unstable_by_key(|(id, _)| *id);
-
-                    let plan = p.serialized_plan.with_partition_id_to_execute(ps);
-                    dest.push((node_name.to_string(), plan));
-                }
+                Some(p.worker_plans())
             } else {
                 for c in p.children() {
-                    extract_worker_plans(&c, dest);
+                    let res = extract_worker_plans(&c);
+                    if res.is_some() {
+                        return res;
+                    }
                 }
+                None
             }
         }
 
@@ -556,7 +549,6 @@ impl SqlServiceImpl {
                         )
 
                 } else {
-
                     let cluster = self.cluster.clone();
                     let executor = self.query_executor.clone();
                     let headers :Vec<Column> = vec![
@@ -575,35 +567,36 @@ impl SqlServiceImpl {
                         ])
                     );
 
-                    let mut worker_plans = Vec::new();
-                    extract_worker_plans(&router_plan, &mut worker_plans);
+                    if let Some(worker_plans) = extract_worker_plans(&router_plan)
+                    {
+                        let worker_futures = worker_plans
+                             .into_iter()
+                             .map(|(name, plan)| {
+                                async move {
+                                    self
+                                        .cluster
+                                        .run_explain_analyze(&name, plan.clone())
+                                        .await
+                                        .map(|p| (name, p))
+                                }
+                             })
+                             .collect::<Vec<_>>();
+                        join_all(worker_futures)
+                            .await
+                            .into_iter()
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter()
+                            .for_each(|(name, pp_plan)| {
+                                rows.push(
+                                    Row::new(vec![
+                                             TableValue::String("worker".to_string()),
+                                             TableValue::String(name.to_string()),
+                                             TableValue::String(pp_plan)
+                                    ])
+                                );
+                            });
+                    }
 
-                    let worker_futures = worker_plans
-                         .into_iter()
-                         .map(|(name, plan)| {
-                            async move {
-                                self
-                                    .cluster
-                                    .run_explain_analyze(&name, plan.clone())
-                                    .await
-                                    .map(|p| (name, p))
-                            }
-                         })
-                         .collect::<Vec<_>>();
-                    join_all(worker_futures)
-                        .await
-                        .into_iter()
-                        .collect::<Result<Vec<_>, _>>()?
-                        .into_iter()
-                        .for_each(|(name, pp_plan)| {
-                            rows.push(
-                                Row::new(vec![
-                                         TableValue::String("worker".to_string()),
-                                         TableValue::String(name.to_string()),
-                                         TableValue::String(pp_plan)
-                                ])
-                            );
-                        });
 
                     DataFrame::new(
                         headers, 
