@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.39](https://github.com/cube-js/cube.js/compare/v0.29.38...v0.29.39) (2022-04-01)
+
+
+### Bug Fixes
+
+* **native:** Post installation issue with npm (avoid bundledDependencies) ([6163838](https://github.com/cube-js/cube.js/commit/6163838926586cf1a17bea353cb23b61e48469ca))
+
+
+
+
+
 ## [0.29.38](https://github.com/cube-js/cube.js/compare/v0.29.37...v0.29.38) (2022-04-01)
 
 
