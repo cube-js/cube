@@ -12,18 +12,25 @@ const DriverManager = require('jdbc/lib/drivermanager');
 const Connection = require('jdbc/lib/connection');
 const DatabaseMetaData = require('jdbc/lib/databasemetadata');
 const jinst = require('jdbc/lib/jinst');
-const mvn = promisify(require('node-java-maven'));
+const mvn = require('node-java-maven');
 
 let mvnPromise = null;
 
 const initMvn = (customClassPath) => {
   if (!mvnPromise) {
-    mvnPromise = mvn().then((mvnResults) => {
-      if (!jinst.isJvmCreated()) {
-        jinst.addOption('-Xrs');
-        const classPath = mvnResults.classpath.concat(customClassPath || []);
-        jinst.setupClasspath(classPath);
-      }
+    mvnPromise = new Promise((resolve, reject) => {
+      mvn((err, mvnResults) => {
+        if (err && !err.message.includes('Could not find java property')) {
+          reject(err);
+        } else {
+          if (!jinst.isJvmCreated()) {
+            jinst.addOption('-Xrs');
+            const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
+            jinst.setupClasspath(classPath);
+          }
+          resolve();
+        }
+      });
     });
   }
   return mvnPromise;
@@ -76,7 +83,15 @@ export class JDBCDriver extends BaseDriver {
         }
 
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
-        return new Connection(await getConnection(this.config.url, this.jdbcProps));
+        console.log(this.config.url, this.jdbcProps);
+        try {
+          const d = await getConnection(this.config.url, this.jdbcProps);
+          console.log(d);
+          return new Connection(d);
+        } catch (error) {
+          console.log(error);
+          throw error;
+        }
       },
       destroy: async (connection) => promisify(connection.close.bind(connection)),
       validate: (connection) => {
