@@ -4561,16 +4561,9 @@ async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
     let r = service
         .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
         .await
-        .err()
         .unwrap();
 
-    assert!(
-        r.elide_backtrace()
-            .message
-            .contains("InList does not support datatype"),
-        "Expected unwind panic error but got: {}",
-        r.elide_backtrace().message
-    );
+    assert_eq!(to_rows(&r), rows(&[(2)]));
 }
 
 async fn panic_worker(service: Box<dyn SqlClient>) {
