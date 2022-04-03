@@ -6,7 +6,7 @@ import FlexSearch from 'flexsearch';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import useDeepMemo from '../hooks/deep-memo';
+import { useDeepMemo } from '../hooks/deep-memo';
 import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`

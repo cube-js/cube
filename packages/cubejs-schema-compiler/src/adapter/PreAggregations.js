@@ -221,10 +221,15 @@ export class PreAggregations {
       R.pipe(
         R.map(m => {
           const leafMeasures = query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures');
-          measureToLeafMeasures[m.measure] = leafMeasures.map((measure) => ({
-            measure,
-            additive: query.newMeasure(measure).isAdditive()
-          }));
+          measureToLeafMeasures[m.measure] = leafMeasures.map((measure) => {
+            const baseMeasure = query.newMeasure(measure);
+            
+            return {
+              measure,
+              additive: baseMeasure.isAdditive(),
+              type: baseMeasure.definition().type
+            };
+          });
           
           return leafMeasures;
         }),
@@ -352,6 +357,8 @@ export class PreAggregations {
   }
 
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    const filterDimensionsSingleValueEqual = new Map(Object.entries(transformedQuery.filterDimensionsSingleValueEqual || {}));
+    
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
@@ -385,8 +392,8 @@ export class PreAggregations {
       const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
       return transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
       (
-        references.dimensions.length === transformedQuery.filterDimensionsSingleValueEqual.size &&
-        R.all(d => transformedQuery.filterDimensionsSingleValueEqual.has(d), references.dimensions)
+        references.dimensions.length === filterDimensionsSingleValueEqual.size &&
+        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions)
       ) &&
       (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
