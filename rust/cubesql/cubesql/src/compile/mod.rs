@@ -2201,7 +2201,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             self.session_manager.clone(),
             self.state.clone(),
         );
-        let df_query_planner = SqlToRel::new(&cube_ctx);
+        let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
 
         let plan = df_query_planner
             .statement_to_plan(&DFStatement::Statement(stmt))
@@ -3306,6 +3306,20 @@ mod tests {
                     ])),
                 }])
             ),
+            // Column precedence vs projection alias
+            (
+                "COUNT(*), DATE(order_date) AS order_date".to_string(),
+                // Now replaced with exact date
+                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
             // Create a new TD (dateRange filter pushdown)
             (
                 "COUNT(*)".to_string(),
@@ -3361,28 +3375,29 @@ mod tests {
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
-            let logical_plan = convert_select_to_query_plan(
-                format!(
-                    "SELECT
+            let query = format!(
+                "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 {}",
-                    sql_projection,
-                    sql_filter,
-                    if sql_projection.contains("__timestamp")
-                        && sql_projection.contains("customer_gender")
-                    {
-                        "GROUP BY customer_gender, __timestamp"
-                    } else if sql_projection.contains("__timestamp") {
-                        "GROUP BY __timestamp"
-                    } else {
-                        ""
-                    }
-                ),
-                DatabaseProtocol::MySQL,
-            )
-            .as_logical_plan();
+                sql_projection,
+                sql_filter,
+                if sql_projection.contains("__timestamp")
+                    && sql_projection.contains("customer_gender")
+                {
+                    "GROUP BY customer_gender, __timestamp"
+                } else if sql_projection.contains("__timestamp") {
+                    "GROUP BY __timestamp"
+                } else if sql_projection.contains("order_date") {
+                    "GROUP BY DATE(order_date)"
+                } else {
+                    ""
+                }
+            );
+            println!("Query: {}", query);
+            let logical_plan =
+                convert_select_to_query_plan(query, DatabaseProtocol::MySQL).as_logical_plan();
 
             assert_eq!(
                 logical_plan.find_cube_scan().request.time_dimensions,
