@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.41](https://github.com/cube-js/cube.js/compare/v0.29.40...v0.29.41) (2022-04-03)
+
+
+### Bug Fixes
+
+* **jdbc-driver:** Handle mvn error for empty java dependencies ([#4307](https://github.com/cube-js/cube.js/issues/4307)) ([9e12511](https://github.com/cube-js/cube.js/commit/9e12511e29655d855846781b90db6fd2e43ddff4))
+
+
+
+
+
 ## [0.29.40](https://github.com/cube-js/cube.js/compare/v0.29.39...v0.29.40) (2022-04-03)
 
 
