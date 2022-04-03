@@ -242,6 +242,23 @@ export class BaseFilter extends BaseDimension {
     return `${column} <= ${this.firstParameter()}`;
   }
 
+  tsQueryWhere(column) {
+    return `${column} @@ phraseto_tsquery(CAST(${this.firstParameter()} AS varchar))`;
+  }
+
+  arrayContainsWhere(column) {
+    // return `${column} @> ARRAY[${this.firstParameter()}]`;
+    return `${column} @> ARRAY[${join(', ', this.filterParams().map(p => this.allocateCastParam(p)))}]`
+  }
+
+  fieldContainsWhere(column) {
+    return `${column} @> ${this.firstParameter()}`;
+  }
+
+  arrayStringContainsWhere(column) {
+    return `${column} @> ARRAY[${this.firstParameter()}]`;
+  }
+
   expressionEqualsWhere(column) {
     return `${column} = ${this.values[0]}`;
   }
