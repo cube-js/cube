@@ -1,7 +1,7 @@
 # CAUTION: This workflow exposes secrets. It is only supposed to be run on "merge into master" condition.
 name: 'Cloud Tests'
 on:
-  push:
+  pull_request:
     paths:
       - '.github/actions/integration/**'
       - '.github/workflows/cloud.yml'
@@ -14,8 +14,6 @@ on:
       - 'yarn.lock'
       - 'docs-gen/**'
       - 'docs/**'
-    branches:
-      - master
 
 jobs:
   integration-cloud:
@@ -59,6 +57,8 @@ jobs:
         run: yarn policies set-version v1.22.5
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Yarn build
+        run: yarn build
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
