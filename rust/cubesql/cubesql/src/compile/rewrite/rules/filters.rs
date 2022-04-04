@@ -1,12 +1,12 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::{ConstantData, LogicalPlanAnalysis};
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::FilterMemberOp;
 use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterReplacerCube;
 use crate::compile::rewrite::InListExprNegated;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
+use crate::compile::rewrite::SegmentMemberMember;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TimeDimensionDateRange;
 use crate::compile::rewrite::TimeDimensionDateRangeReplacerDateRange;
@@ -24,6 +24,7 @@ use crate::compile::rewrite::{
 };
 use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
 use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
+use crate::compile::rewrite::{segment_member, FilterMemberOp};
 use crate::transport::ext::V1CubeMetaExt;
 use crate::transport::MemberType;
 use crate::var;
@@ -82,6 +83,15 @@ impl RewriteRules for FilterRules {
                     "?filter_op",
                     "?filter_values",
                 ),
+            ),
+            transforming_rewrite(
+                "segment-replacer",
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
+                    "?cube",
+                ),
+                segment_member("?segment"),
+                self.transform_segment("?column", "?op", "?literal", "?cube", "?segment"),
             ),
             transforming_rewrite(
                 "filter-replacer-in-filter",
@@ -537,6 +547,64 @@ impl FilterRules {
                                     );
 
                                     return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_segment(
+        &self,
+        column_var: &'static str,
+        op_var: &'static str,
+        literal_var: &'static str,
+        cube_var: &'static str,
+        segment_member_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = column_var.parse().unwrap();
+        let op_var = op_var.parse().unwrap();
+        let literal_var = literal_var.parse().unwrap();
+        let cube_var = cube_var.parse().unwrap();
+        let segment_member_var = segment_member_var.parse().unwrap();
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for cube in var_iter!(egraph[subst[cube_var]], FilterReplacerCube) {
+                for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                    for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                        if let Some(cube) = cube
+                            .as_ref()
+                            .and_then(|cube| meta_context.find_cube_with_name(cube.to_string()))
+                        {
+                            if expr_op == &Operator::Eq {
+                                if literal == &ScalarValue::Boolean(Some(true)) {
+                                    for column in
+                                        var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                    {
+                                        let member_name = format!("{}.{}", cube.name, column.name);
+                                        if let Some(_) = cube
+                                            .segments
+                                            .iter()
+                                            .find(|s| s.name.eq_ignore_ascii_case(&member_name))
+                                        {
+                                            subst.insert(
+                                                segment_member_var,
+                                                egraph.add(
+                                                    LogicalPlanLanguage::SegmentMemberMember(
+                                                        SegmentMemberMember(
+                                                            member_name.to_string(),
+                                                        ),
+                                                    ),
+                                                ),
+                                            );
+
+                                            return true;
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -3622,62 +3622,62 @@ mod tests {
             //     None,
             // ),
             // BETWEEN
-            (
-                "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
-                // This filter will be pushed to time_dimension
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ])),
-                }]),
-            ),
-            (
-                "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("notInDateRange".to_string()),
-                    values: Some(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
+            // (
+            //     "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
+            //     // This filter will be pushed to time_dimension
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
+            // (
+            //     "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("notInDateRange".to_string()),
+            //         values: Some(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
             // SIMILAR as BETWEEN but manually
-            (
-                "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
-                // This filter will be pushed to time_dimension
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        // -1 milleseconds hack for cube.js
-                        "2021-09-06T23:59:59.999Z".to_string(),
-                    ])),
-                }]),
-            ),
-            //  SIMILAR as BETWEEN but without -1 nanosecond because <=
-            (
-                "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        // without -1 because <=
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ])),
-                }]),
-            ),
+            // (
+            //     "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
+            //     // This filter will be pushed to time_dimension
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             // -1 milleseconds hack for cube.js
+            //             "2021-09-06T23:59:59.999Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
+            // //  SIMILAR as BETWEEN but without -1 nanosecond because <=
+            // (
+            //     "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             // without -1 because <=
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
             // LIKE
             (
                 "customer_gender LIKE 'female'".to_string(),
