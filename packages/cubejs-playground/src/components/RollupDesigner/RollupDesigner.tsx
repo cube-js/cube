@@ -1,8 +1,5 @@
 import { EditOutlined, WarningFilled } from '@ant-design/icons';
-import {
-  isQueryPresent,
-  TimeDimensionBase,
-} from '@cubejs-client/core';
+import { isQueryPresent, TimeDimensionBase } from '@cubejs-client/core';
 import { AvailableMembers } from '@cubejs-client/react';
 import {
   Alert,
@@ -20,7 +17,7 @@ import styled from 'styled-components';
 import { CodeSnippet, FatalError } from '../../atoms';
 import { Box, Flex } from '../../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
-import useDeepMemo from '../../hooks/deep-memo';
+import { useDeepMemo } from '../../hooks/deep-memo';
 import { useCloud } from '../../playground/cloud';
 import { getNameMemberPairs, request } from '../../shared/helpers';
 import { QueryMemberKey } from '../../types';
@@ -226,42 +223,63 @@ export function RollupDesigner({
     return cubeName;
   }, [transformedQuery, references]);
 
-  const [showDecomposedMeasureAlert, showNonAdditiveMeasureAlert] =
-    useDeepMemo(() => {
-      const { measureToLeafMeasures = {} } = transformedQuery || {};
+  const [
+    showDecomposedMeasureAlert,
+    showNonAdditiveMeasureAlert,
+    showCountDistinctAlert,
+  ] = useDeepMemo(() => {
+    const { measureToLeafMeasures = {} } = transformedQuery || {};
 
-      let showDecomposedMeasureAlert = false;
-      let showNonAdditiveMeasureAlert = false;
+    let showDecomposedMeasureAlert = false;
+    let showNonAdditiveMeasureAlert = false;
+    let showCountDistinctAlert = false;
 
-      if (nonAdditiveMeasure && measureToLeafMeasures[nonAdditiveMeasure]) {
-        showDecomposedMeasureAlert = measureToLeafMeasures[
-          nonAdditiveMeasure
-        ].every(({ additive }) => additive);
-      }
+    if (nonAdditiveMeasure && measureToLeafMeasures[nonAdditiveMeasure]) {
+      showDecomposedMeasureAlert = measureToLeafMeasures[
+        nonAdditiveMeasure
+      ].every(({ additive }) => additive);
+    }
 
-      if (transformedQuery && !transformedQuery?.leafMeasureAdditive) {
-        const allLeafMeasures = Object.values(measureToLeafMeasures).reduce(
-          (memo, leafMeasures) => [...memo, ...leafMeasures],
-          []
+    if (transformedQuery && !transformedQuery.leafMeasureAdditive) {
+      const allLeafMeasures = Object.values(measureToLeafMeasures).reduce(
+        (memo, leafMeasures) => [...memo, ...leafMeasures],
+        []
+      );
+
+      showNonAdditiveMeasureAlert = references.measures.some((measure) => {
+        const leafMeasure = allLeafMeasures.find(
+          (leafMeasure) => leafMeasure.measure === measure
         );
 
-        showNonAdditiveMeasureAlert = references.measures.some(
-          (measure) => {
-            const leafMeasure = allLeafMeasures.find(
-              (leafMeasure) => leafMeasure.measure === measure
-            );
-            
-            if (!leafMeasure) {
-              return false;
-            }
+        if (!leafMeasure) {
+          return false;
+        }
 
-            return !leafMeasure.additive;
-          }
+        return !leafMeasure.additive;
+      });
+
+      const hasCountDistinctMeasures = references.measures.some((measure) => {
+        const leafMeasure = allLeafMeasures.find(
+          (leafMeasure) => leafMeasure.measure === measure
         );
-      }
 
-      return [showDecomposedMeasureAlert, showNonAdditiveMeasureAlert];
-    }, [references, transformedQuery, nonAdditiveMeasure]);
+        if (!leafMeasure) {
+          return false;
+        }
+
+        return leafMeasure.type === 'countDistinct';
+      });
+
+      showCountDistinctAlert =
+        hasCountDistinctMeasures && !references.timeDimensions[0]?.granularity;
+    }
+
+    return [
+      showDecomposedMeasureAlert,
+      showNonAdditiveMeasureAlert,
+      showCountDistinctAlert,
+    ];
+  }, [references, transformedQuery, nonAdditiveMeasure]);
 
   const indexedMembers = Object.fromEntries(
     getNameMemberPairs([
@@ -602,41 +620,56 @@ export function RollupDesigner({
             >
               <Flex direction="column" justifyContent="flex-start">
                 <Box style={{ marginBottom: 32 }}>
-                  {matching ? (
-                    <Text>This rollup will match the following query:</Text>
-                  ) : (
-                    <Space direction="vertical">
+                  <Space direction="vertical" size={24}>
+                    {showCountDistinctAlert && (
                       <Alert
-                        data-testid="rd-incompatible-query"
                         type="warning"
                         message={
                           <Text>
-                            This rollup does <b>NOT</b> match the following
-                            query:
+                            This query does not have any time dimension
+                            granularity, which prevents pre-aggregating any
+                            count distinct measures.
                           </Text>
                         }
                       />
+                    )}
 
-                      {!hideMatchRollupButton && (
-                        <Button
-                          data-testid="rd-match-rollup-btn"
-                          type="primary"
-                          ghost
-                          onClick={() => {
-                            setReferences(
-                              getPreAggregationReferences(
-                                transformedQuery,
-                                segments
-                              )
-                            );
-                            setMatching(true);
-                          }}
-                        >
-                          Match Rollup
-                        </Button>
-                      )}
-                    </Space>
-                  )}
+                    {matching ? (
+                      <Text>This rollup will match the following query:</Text>
+                    ) : (
+                      <>
+                        <Alert
+                          data-testid="rd-incompatible-query"
+                          type="warning"
+                          message={
+                            <Text>
+                              This rollup does <b>NOT</b> match the following
+                              query:
+                            </Text>
+                          }
+                        />
+
+                        {!hideMatchRollupButton && (
+                          <Button
+                            data-testid="rd-match-rollup-btn"
+                            type="primary"
+                            ghost
+                            onClick={() => {
+                              setReferences(
+                                getPreAggregationReferences(
+                                  transformedQuery,
+                                  segments
+                                )
+                              );
+                              setMatching(true);
+                            }}
+                          >
+                            Match Rollup
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </Space>
                 </Box>
 
                 <CodeSnippet

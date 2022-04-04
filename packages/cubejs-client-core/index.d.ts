@@ -134,6 +134,7 @@ declare module '@cubejs-client/core' {
   type LeafMeasure = {
     measure: string;
     additive: boolean;
+    type: 'count' | 'countDistinct' | 'sum' | 'min' | 'max' | 'number' | 'countDistinctApprox'
   };
 
   export type TransformedQuery = {
