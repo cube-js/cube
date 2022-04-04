@@ -3,7 +3,7 @@ title: "Getting Started with Cube Cloud: Create a project"
 permalink: /cloud/getting-started/create
 ---
 
-This guide walks you through setting up Cloud and connecting your Cube project to your database.
+This guide walks you through setting up Cube Cloud and connecting your Cube project to your database.
 
 ## Step 1: Create an account
 
