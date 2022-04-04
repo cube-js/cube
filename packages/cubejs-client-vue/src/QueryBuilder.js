@@ -23,27 +23,24 @@ const toOrderMember = (member) => ({
 const reduceOrderMembers = (array) =>
   array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
 
-const validateFilter = (f) => f.operator;
-
 const operators = ['and', 'or'];
 
 const validateFilters = (filters) =>
   filters.reduce((acc, raw) => {
-    const validated = { ...raw };
+    if (raw.operator) {
+      return [...acc, raw];
+    }
 
-    operators.reduce((acc, operator) => {
+    const validOperator = operators.reduce((acc, operator) => {
       const filters = raw[operator];
-      if (filters) {
-        acc[operator] = filters.filter(validateFilter);
+      if (filters && Object.keys(acc) == 0) {
+        return { ...acc, [operator]: validateFilters(filters) };
       }
       return acc;
-    }, validated);
+    }, {});
 
-    if (
-      validated.operator ||
-      operators.some((operator) => validated[operator] && validated[operator].length)
-    ) {
-      acc.push(validated);
+    if (operators.some((operator) => validOperator[operator] && validOperator[operator].length)) {
+      return [...acc, validOperator];
     }
 
     return acc;
@@ -55,7 +52,16 @@ const getDimensionOrMeasure = (meta, m) => {
 };
 
 const resolveMembers = (meta, arr) =>
-  arr && arr.map((e, index) => ({ ...e, member: getDimensionOrMeasure(meta, e), index }));
+  arr &&
+  arr.map((e, index) => {
+    return {
+      ...e,
+      member: getDimensionOrMeasure(meta, e),
+      index,
+      and: resolveMembers(meta, e.and),
+      or: resolveMembers(meta, e.or),
+    };
+  });
 
 export default {
   components: {
