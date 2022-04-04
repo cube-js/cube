@@ -2,12 +2,17 @@ use std::fs;
 use std::io::Cursor;
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use flate2::read::GzDecoder;
 use tokio::runtime::Builder;
 use rocksdb::{Options, DB};
 use tar::Archive;
+use tokio::time::timeout;
+use cubestore::cluster::Cluster;
 use cubestore::config::{Config, CubeServices, env_parse};
+use cubestore::metastore::{IdRow, MetaStore, MetaStoreTable, RowKey, TableId};
+use cubestore::metastore::job::JobType;
 use cubestore::table::TableValue;
 use cubestore_sql_tests::{SqlClient, to_rows};
 
@@ -34,6 +39,7 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
         let dir = std::env::current_dir().unwrap().join("data");
         let path = dir.join("github-commits-000.csv");
         if !path.exists() {
+            println!("Downloading github-commits-000.csv");
             let response = reqwest::get("https://media.githubusercontent.com/media/cube-js/testing-fixtures/master/github-commits-000.tar.gz").await.unwrap();
             let content =  Cursor::new(response.bytes().await.unwrap());
             let tarfile = GzDecoder::new(content);
@@ -55,6 +61,22 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
         // let compactor: Arc<dyn CompactionService> = services.injector.get_service_typed().await;
         // compactor.compact(2).await.unwrap();
         // println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
+
+        // let partitions = services.meta_store.partition_table().all_rows().await.unwrap();
+        // for p in partitions {
+        //     // schedule_repartition_if_needed or schedule_partition_to_compact
+        //     let r = services.scheduler.schedule_partition_to_compact(&p).await.unwrap();
+        //     println!("QQQ P {:#?} {:#?}", p, r);
+        // }
+
+        let listener = services.cluster.job_result_listener();
+        let wait = listener.wait_for_job_results(vec![
+            (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
+        ]);
+        wait.await.unwrap();
+        // timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
+
+        println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
 
         let r = services.sql_service.exec_query("SELECT repo FROM test.table GROUP BY repo").await.unwrap();
         let repos = to_rows(&r).iter().map(|row| {
@@ -83,7 +105,7 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
 fn inline_bench(criterion: &mut Criterion) {
     let bench = Arc::new(ParquetMetadataCacheBench {});
 
-    let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
     let config = Config::test(bench.name()).update_config(|mut c| {
         c.partition_split_threshold = 10_000_000;
         c.max_partition_split_threshold = 10_000_000;
