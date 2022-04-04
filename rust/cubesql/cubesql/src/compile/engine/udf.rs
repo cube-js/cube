@@ -4,8 +4,9 @@ use std::sync::Arc;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
+            Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
+            Int32Builder, IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringBuilder,
+            StructBuilder, UInt32Builder,
         },
         compute::cast,
         datatypes::{
@@ -996,6 +997,42 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
         )))),
         Volatility::Immutable,
         current_schemas,
+    )
+}
+
+pub fn create_pg_expandarray_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        // assert!(args.len() == 1);
+
+        let mut x_builder = Int32Builder::new(1);
+        x_builder.append_value(1)?;
+
+        let mut n_builder = StringBuilder::new(1);
+        n_builder.append_value("kek")?;
+
+        let field_builders: Vec<Box<dyn ArrayBuilder>> =
+            vec![Box::new(x_builder), Box::new(n_builder)];
+
+        let mut builder = StructBuilder::new(
+            vec![
+                Field::new("x", DataType::Int32, false),
+                Field::new("n", DataType::Utf8, false),
+            ],
+            field_builders,
+        );
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "information_schema._pg_expandarray",
+        vec![], //vec![DataType::Union(vec![Field::new("", DataType::Int32, false)])],
+        Arc::new(DataType::Struct(vec![
+            Field::new("x", DataType::Int32, false),
+            Field::new("n", DataType::Utf8, false),
+        ])),
+        Volatility::Immutable,
+        fun,
     )
 }
 
