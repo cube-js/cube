@@ -4568,7 +4568,11 @@ mod tests {
         // Postgres escaped with quotes
         insta::assert_snapshot!(
             "show_variable_quoted",
-            execute_query("show \"max_allowed_packet\";".to_string(), DatabaseProtocol::PostgreSQL).await?
+            execute_query(
+                "show \"max_allowed_packet\";".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
         );
 
         Ok(())
