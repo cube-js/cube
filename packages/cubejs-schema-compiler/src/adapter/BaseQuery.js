@@ -457,7 +457,7 @@ class BaseQuery {
         this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false)),
       ] : []).concat(
         R.map(
-          ([multiplied, measure]) => this.withCubeAliasPrefix(
+          ([_, measure]) => this.withCubeAliasPrefix(
             `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
             () => this.overTimeSeriesQuery(
               (measures, filters) => this.preAggregations.rollupPreAggregation(
@@ -515,7 +515,7 @@ class BaseQuery {
     return this.timeDimensions.map(
       d => [
         d,
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+        (dateFrom, dateTo, dateField, dimensionDateFrom, _) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
       ]
     );
   }
@@ -669,7 +669,7 @@ class BaseQuery {
       renderedReference: R.pipe(
         R.map(m => [m.measure, m.aliasName()]),
         R.fromPairs,
-      )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure))),
+      )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([_, measure]) => measure))),
     };
 
     const join = R.drop(1, toJoin)
@@ -1729,15 +1729,15 @@ class BaseQuery {
     return evaluateSql;
   }
 
-  hllInit(sql) {
+  hllInit() {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  hllMerge(sql) {
+  hllMerge() {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  hllCardinality(sql) {
+  hllCardinality() {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
@@ -1749,7 +1749,7 @@ class BaseQuery {
     return this.hllMerge(sql);
   }
 
-  countDistinctApprox(sql) {
+  countDistinctApprox() {
     throw new UserError('Approximate distinct count is not supported by this DB');
   }
 
