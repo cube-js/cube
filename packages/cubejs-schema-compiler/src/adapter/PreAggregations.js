@@ -357,8 +357,13 @@ export class PreAggregations {
   }
 
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
-    const filterDimensionsSingleValueEqual = new Map(Object.entries(transformedQuery.filterDimensionsSingleValueEqual || {}));
-    
+    const filterDimensionsSingleValueEqual =
+      transformedQuery.filterDimensionsSingleValueEqual instanceof Set
+        ? transformedQuery.filterDimensionsSingleValueEqual
+        : new Set(
+          Object.keys(transformedQuery.filterDimensionsSingleValueEqual || {})
+        );
+      
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
