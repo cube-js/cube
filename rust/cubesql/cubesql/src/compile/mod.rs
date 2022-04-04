@@ -1634,7 +1634,7 @@ impl QueryPlanner {
     }
 
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
-        let name = ObjectName(variable.to_vec()).to_string();
+        let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
             let stmt = if name.eq_ignore_ascii_case("all") {
                 parse_sql_to_statement(
@@ -1644,9 +1644,10 @@ impl QueryPlanner {
                 )?
             } else {
                 parse_sql_to_statement(
+                    // TODO: column name might be expected to match variable name
                     &format!(
                         "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                        name.to_lowercase()
+                        escape_single_quote_string(&name.to_lowercase()),
                     ),
                     self.state.protocol.clone(),
                 )?
@@ -4562,6 +4563,12 @@ mod tests {
         insta::assert_snapshot!(
             "show_variables",
             execute_query("show variables;".to_string(), DatabaseProtocol::MySQL).await?
+        );
+
+        // Postgres escaped with quotes
+        insta::assert_snapshot!(
+            "show_variable_quoted",
+            execute_query("show \"max_allowed_packet\";".to_string(), DatabaseProtocol::PostgreSQL).await?
         );
 
         Ok(())
