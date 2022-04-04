@@ -2732,6 +2732,133 @@ mod tests {
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
     }
+
+    #[tokio::test]
+    async fn explain_logical_plan() {
+        Config::run_test("explain_logical_plan", async move |services| {
+            let service = services.sql_service;
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
+                ).await.unwrap();
+
+            let result = service.exec_query(
+                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+            ).await.unwrap();
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get_columns().len(), 1);
+
+            let pp_plan = match &result
+                .get_rows()[0]
+                .values()[0] {
+                    TableValue::String(pp_plan) => pp_plan,
+                    _ => {assert!(false); ""}
+                };
+            assert_eq!(
+                pp_plan,
+                "Projection, [foo.orders.platform, SUM(foo.orders.amount)]\
+                \n  Aggregate\
+                \n    ClusterSend, indices: [[1]]\
+                \n      Filter\
+                \n        Scan foo.orders, source: CubeTable(index: default:1:[1]), fields: [platform, age, amount]"
+            );
+        }).await;
+    }
+    #[tokio::test]
+    async fn explain_physical_plan() {
+        Config::test("explain_analyze_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14006".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15006".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("expalain_analyze_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14006".to_string());
+                config.server_name = "127.0.0.1:14006".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15006".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_analyze_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
+                    ).await.unwrap();
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                    ).await.unwrap();
+
+                assert_eq!(result.len(), 2);
+
+                assert_eq!(result.get_columns().len(), 3);
+
+                let router_row = &result.get_rows()[0];
+                
+                match &router_row
+                    .values()[0] {
+                        TableValue::String(node_type) => {assert_eq!(node_type, "router");},
+                        _ => {assert!(false);}
+                    };
+                match &router_row
+                    .values()[1] {
+                        TableValue::String(node_name) => {assert!(node_name.is_empty());},
+                        _ => {assert!(false);}
+                    };
+                match &router_row
+                    .values()[2] {
+                        TableValue::String(pp_plan) => {
+                            assert_eq!(
+                                pp_plan,
+                                "Projection, [platform, SUM(foo.orders.amount)@1:SUM(amount)]\
+                                \n  FinalHashAggregate\
+                                \n    ClusterSend, partitions: [[1]]"
+                            );
+                        },
+                        _ => {assert!(false);}
+                    };
+
+                let worker_row = &result.get_rows()[1];
+                match &worker_row
+                    .values()[0] {
+                        TableValue::String(node_type) => {assert_eq!(node_type, "worker");},
+                        _ => {assert!(false);}
+                    };
+                match &worker_row
+                    .values()[1] {
+                        TableValue::String(node_name) => {assert_eq!(node_name, "127.0.0.1:14006");},
+                        _ => {assert!(false);}
+                    };
+                match &worker_row
+                    .values()[2] {
+                        TableValue::String(pp_plan) => {
+                            /*
+                             */
+                            let regex = Regex::new(
+                                r"PartialHas+hAggregate\s+Filter\s+Merge\s+Scan, index: default:1:\[1\], fields+: \[platform, age, amount\]\s+ParquetScan, files+: .*\.chunk\.parquet"
+                            ).unwrap();
+                            let matches = regex.captures_iter(&pp_plan).count();
+                            assert_eq!(matches, 1);
+                        },
+                        _ => {assert!(false);}
+                    };
+
+
+            }).await;
+        }).await;
+    }
 }
 
 impl SqlServiceImpl {
