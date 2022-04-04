@@ -5,6 +5,7 @@ import App from './App';
 
 import CubeExampleWrapper from "cube-example-wrapper";
 import "cube-example-wrapper/public/style.css";
+import "cube-example-wrapper/public/bundle.js";
 
 CubeExampleWrapper.description = {
   title: "Data Blending",
