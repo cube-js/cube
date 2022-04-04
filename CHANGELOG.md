@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Download numbers with 0 scale as integers in pre-aggregations ([42eb582](https://github.com/cube-js/cube.js/commit/42eb582908080d4e9e2856c09290950957230fcd))
+* **cubesql:** Allow quoted variables with SHOW <variable> syntax ([#4313](https://github.com/cube-js/cube.js/issues/4313)) ([3eece0e](https://github.com/cube-js/cube.js/commit/3eece0e70817b2b72406b146a95a5757cdfb994c))
+* **playground:** adding a query parameter in Playground requires one extra click to type in search field ([#4295](https://github.com/cube-js/cube.js/issues/4295)) ([4abab96](https://github.com/cube-js/cube.js/commit/4abab964ce05afe5583832958205eff75c1417b0))
+* **playground:** rollup designer count distinct warning ([#4309](https://github.com/cube-js/cube.js/issues/4309)) ([add2dd3](https://github.com/cube-js/cube.js/commit/add2dd3106f7fd9deb3ea88fa74467ccd1b9244f))
+* **playground:** transparency under the searchbar in some cases ([#4301](https://github.com/cube-js/cube.js/issues/4301)) ([6cdb20c](https://github.com/cube-js/cube.js/commit/6cdb20cd5a7e36559327f389221b8568c2f68bb0))
+
+
+### Features
+
+* **cubesql:** Rewrite engine segments support ([48b0767](https://github.com/cube-js/cube.js/commit/48b0767aa880a2373d6a6fa15b2e0a1815bb1865))
+
+
+
+
+
 ## [0.29.41](https://github.com/cube-js/cube.js/compare/v0.29.40...v0.29.41) (2022-04-03)
 
 
