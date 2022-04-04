@@ -1,0 +1,197 @@
+name: Build native
+
+on:
+  push:
+    paths:
+      - '.github/workflows/rust-cubesql.yml'
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
+      - 'rust/cubesql/**'
+    branches:
+      - 'master'
+  pull_request:
+    paths:
+      - '.github/workflows/rust-cubesql.yml'
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
+      - 'rust/cubesql/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 20
+    name: Check fmt/clippy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt, clippy
+      - name: Lint CubeSQL
+        run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
+      - name: Lint Native
+        run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
+      - name: Clippy Native
+        run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
+      # CubeSQL is not ready for Clippy
+      #- name: Clippy CubeSQL
+      #  run: cd rust/cubesql && cargo clippy -- -D warnings
+
+  unit:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 20
+    name: Unit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+      - name: Install tarpaulin@0.19.1
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-tarpaulin --version 0.19.1
+      - name: Unit tests
+        env:
+          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
+          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v2
+        with:
+          files: ./rust/cubesql/cobertura.xml
+          verbose: true
+          flags: cubesql
+          fail_ci_if_error: true
+
+  native_linux:
+    needs: [lint,unit]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
+    strategy:
+      matrix:
+        node-version: [12, 14, 16, 17]
+        target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+      fail-fast: false
+    container:
+      image: cubejs/rust-cross:${{ matrix.target }}-10052021
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+          target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+          sharedKey: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/cubesql/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build native
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build
+      - name: Test native
+        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run test:unit
+
+  native:
+    needs: [lint,unit]
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x, 17.x]
+        os-version: [windows-2019, macos-11]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/cubesql/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Yarn install
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        run: yarn install --frozen-lockfile
+      - name: Build native
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit

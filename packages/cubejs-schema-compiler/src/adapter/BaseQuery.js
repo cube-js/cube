@@ -1,4 +1,11 @@
 /* eslint-disable no-unused-vars,prefer-template */
+
+/**
+ * @fileoverview BaseQuery class definition.
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ */
+
 import R from 'ramda';
 import cronParser from 'cron-parser';
 
@@ -38,7 +45,39 @@ const SecondsDurations = {
   second: 1
 };
 
-export class BaseQuery {
+/**
+ * Set of the schema compilers.
+ * @typedef {Object} Compilers
+ * @property {DataSchemaCompiler} compiler
+ * @property {CubeToMetaTransformer} metaTransformer
+ * @property {CubeEvaluator} cubeEvaluator
+ * @property {ContextEvaluator} contextEvaluator
+ * @property {JoinGraph} joinGraph
+ * @property {CompilerCache} compilerCache
+ * @property {*} headCommitId
+ */
+
+export
+
+/**
+ * BaseQuery class. BaseQuery object encapsulates the logic of
+ * transforming an incoming to a specific cube request to the
+ * SQL-query string.
+ *
+ * This class is a parent class for the set of dialect specific
+ * query adapters (for ex. MysqlQuery, OracleQuery, etc.).
+ *
+ * You should never instantiate this class manually. Instead, you
+ * should use {@code CompilerApi#getDialectClass} method, which
+ * should return query object based on the datasource, database type
+ * and {@code CompilerApi} configuration.
+ */
+class BaseQuery {
+  /**
+   * BaseQuery class constructor.
+   * @param {Compilers|*} compilers
+   * @param {*} options
+   */
   constructor(compilers, options) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
@@ -578,7 +617,11 @@ export class BaseQuery {
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
-                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+                ([keyCubeName, measures]) => this
+                  .withCubeAliasPrefix(
+                    `${this.aliasName(keyCubeName)}_key`,
+                    () => this.aggregateSubQuery(keyCubeName, measures)
+                  )
               )
             )(multipliedMeasures)
           ).concat(
@@ -646,7 +689,8 @@ export class BaseQuery {
     );
 
     // TODO all having filters should be pushed down
-    if (toJoin.length === 1 && this.measureFilters.length === 0) {
+    // subQuery dimensions can introduce projection remapping
+    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
@@ -892,17 +936,20 @@ export class BaseQuery {
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
-    // TODO params independent sql caching
-    const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
     if (
-      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
-      parser.isSimpleAsteriskQuery()
+      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries
     ) {
-      const conditions = parser.extractWhereConditions(cubeAlias);
-      if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
-        this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+      // TODO params independent sql caching
+      const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
+      if (parser.isSimpleAsteriskQuery()) {
+        const conditions = parser.extractWhereConditions(cubeAlias);
+        if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
+          this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+        }
+        return [parser.extractTableFrom(), cubeAlias, conditions];
+      } else {
+        return [sql, cubeAlias];
       }
-      return [parser.extractTableFrom(), cubeAlias, conditions];
     } else {
       return [sql, cubeAlias];
     }
@@ -1514,9 +1561,21 @@ export class BaseQuery {
     return this.evaluateSymbolSqlWithContext(fn, { cubeAliasPrefix });
   }
 
+  /**
+   * Evaluate escaped SQL-alias for cube or cube's property
+   * (measure, dimention).
+   * @param {string} cubeName
+   * @returns string
+   */
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
-    return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
+    return this.escapeColumnName(
+      this.aliasName(
+        `${prefix
+          ? prefix + '__' + this.aliasName(cubeName)
+          : cubeName}`
+      )
+    );
   }
 
   collectCubeNamesFor(fn) {
@@ -1782,6 +1841,12 @@ export class BaseQuery {
     throw new Error('Not implemented');
   }
 
+  /**
+   * Evaluate alias for specific cube's property.
+   * @param {string} name Property name.
+   * @param {boolean?} isPreAggregationName Pre-agg flag.
+   * @returns {string}
+   */
   aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
@@ -1790,6 +1855,7 @@ export class BaseQuery {
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
     }
+    // TODO: https://github.com/cube-js/cube.js/issues/4019
     // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
@@ -2311,13 +2377,13 @@ export class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(refreshKey, limitedWithMax = true) {
+  refreshKeyRenewalThresholdForInterval(refreshKey, everyWithoutSql = true) {
     const { every } = refreshKey;
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / 10), 1);
+      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / (everyWithoutSql ? 10 : 1)), 1);
 
-      if (limitedWithMax) {
+      if (everyWithoutSql) {
         return Math.min(threshold, 300);
       }
 
@@ -2325,9 +2391,9 @@ export class BaseQuery {
     }
 
     const { interval } = this.calcIntervalForCronString(refreshKey);
-    const threshold = Math.max(Math.round(interval / 10), 1);
+    const threshold = Math.max(Math.round(interval / (everyWithoutSql ? 10 : 1)), 1);
 
-    if (limitedWithMax) {
+    if (everyWithoutSql) {
       return Math.min(threshold, 300);
     }
 
@@ -2393,7 +2459,7 @@ export class BaseQuery {
           unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
-          typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
+          typeof propValue === 'object' && propValue !== null && this.contextSymbolsProxy(propValue) ||
           methods(propValue);
       }
     });

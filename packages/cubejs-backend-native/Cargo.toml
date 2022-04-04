@@ -13,8 +13,8 @@ exclude = ["index.node"]
 crate-type = ["cdylib"]
 
 [dependencies]
-cubesql = { path = "../../rust/cubesql" }
-cubeclient = { path = "../../rust/cubeclient" }
+cubesql = { path = "../../rust/cubesql/cubesql" }
+cubeclient = { path = "../../rust/cubesql/cubeclient" }
 tokio = { version = "1.0", features = ["full", "rt"] }
 async-trait = "0.1.36"
 serde_derive = "1.0.115"
@@ -25,6 +25,6 @@ simple_logger = "1.7.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [dependencies.neon]
-version = "0.10.0-alpha.2"
+version = "=0.10.0-alpha.2"
 default-features = false
 features = ["napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]

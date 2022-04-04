@@ -1,0 +1,17 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce;\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+---
++--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
+| Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |
++--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
+| count              | int          | NULL               | NO   |     | NULL    |       | select     |         |
+| maxPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
+| minPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
+| avgPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
+| order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |
+| customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |
+| taxful_total_price | numeric      | NULL               | YES  |     | NULL    |       | select     |         |
+| is_male            | boolean      | NULL               | NO   |     | NULL    |       | select     |         |
+| is_female          | boolean      | NULL               | NO   |     | NULL    |       | select     |         |
++--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+

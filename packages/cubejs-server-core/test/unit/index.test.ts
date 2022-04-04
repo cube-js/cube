@@ -229,7 +229,8 @@ describe('index.test', () => {
       },
       dashboardAppPath: 'string',
       dashboardAppPort: 4444,
-      livePreview: true
+      livePreview: true,
+      allowNodeRequire: false,
     };
 
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
@@ -261,6 +262,13 @@ describe('index.test', () => {
       }
     ]);
     createOrchestratorApiSpy.mockRestore();
+
+    const compilerApi = cubejsServerCore.getCompilerApi({
+      authInfo: null,
+      securityContext: null,
+      requestId: 'XXX'
+    });
+    expect(compilerApi.options.allowNodeRequire).toStrictEqual(false);
 
     await cubejsServerCore.releaseConnections();
   });

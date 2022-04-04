@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_range\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++----------+------------+---------------+--------------+-----------+---------------------+-------------------+
+| rngtypid | rngsubtype | rngmultitypid | rngcollation | rngsubopc | rngcanonical        | rngsubdiff        |
++----------+------------+---------------+--------------+-----------+---------------------+-------------------+
+| 3904     | 23         | 4451          | 0            | 1978      | int4range_canonical | int4range_subdiff |
+| 3906     | 1700       | 4532          | 0            | 3125      | -                   | numrange_subdiff  |
+| 3908     | 1114       | 4533          | 0            | 3128      | -                   | tsrange_subdiff   |
+| 3910     | 1184       | 4534          | 0            | 3127      | -                   | tstzrange_subdiff |
+| 3912     | 1082       | 4535          | 0            | 3122      | daterange_canonical | daterange_subdiff |
+| 3926     | 20         | 4536          | 0            | 3124      | int8range_canonical | int8range_subdiff |
++----------+------------+---------------+--------------+-----------+---------------------+-------------------+

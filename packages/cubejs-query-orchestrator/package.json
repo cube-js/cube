@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.64",
+  "version": "0.29.37",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -31,7 +31,8 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.28.55",
+    "@cubejs-backend/shared": "^0.29.37",
+    "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",
     "ioredis": "^4.27.8",
     "lru-cache": "^6.0.0",
@@ -41,11 +42,11 @@
     "redis": "^3.0.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.28.22",
+    "@cubejs-backend/linter": "^0.29.23",
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.19.3",
     "@types/jest": "^26.0.15",
-    "@types/node": "^10.17.51",
+    "@types/node": "^12",
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
@@ -65,5 +66,8 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ]
+  },
+  "resolutions": {
+    "es5-ext": "0.10.53"
   }
 }

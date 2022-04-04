@@ -9,8 +9,14 @@
 
 Native module for Cube.js (binding to Rust codebase).
 
+## Supported architectures and platforms
+
+> If your platform/architecture is not supported, you can launch Cube
+> using Docker.
+
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
 Cube.js Native is [Apache 2.0 licensed](./LICENSE).
+

@@ -2,7 +2,7 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
-import { PreAggregations, PreAggregationDescription } from './PreAggregations';
+import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
@@ -108,9 +108,12 @@ export class QueryOrchestrator {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
+    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
+
     if (!queryBody.query) {
       return {
-        usedPreAggregations
+        usedPreAggregations,
+        lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
       };
     }
 
@@ -119,11 +122,14 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
+    lastRefreshTimestamp = getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()]);
+
     return {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
-      usedPreAggregations
+      usedPreAggregations,
+      lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
     };
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.28.63",
+  "version": "0.29.40",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -16,29 +16,28 @@
     "native:build-debug": "npm run native:build --",
     "native:build-release": "npm run native:build -- --release",
     "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
+    "upload-binary-cross": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package --target_arch=$PACKAGE_TARGET_ARCH --target_platform=$PACKAGE_TARGET_PLATFORM --target_libc=$PACKAGE_TARGET_LIBC && node-pre-gyp-github publish",
     "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:unit": "jest --forceExit test",
     "test:cargo": "cargo test"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "files": [
     "dist/js"
   ],
-  "bundledDependencies": [
-    "@mapbox/node-pre-gyp"
-  ],
   "devDependencies": {
-    "@cubejs-infra/node-pre-gyp-github": "^1",
+    "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
-    "@types/node": "^10",
+    "@types/node": "^12",
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
     "mysql2": "^2.3.3",
     "typescript": "~4.1.5"
   },
   "dependencies": {
+    "@cubejs-backend/cubesql": "^0.29.40",
     "@mapbox/node-pre-gyp": "^1"
   },
   "binary": {

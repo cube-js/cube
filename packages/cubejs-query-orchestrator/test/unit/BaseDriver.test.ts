@@ -5,7 +5,7 @@ class BaseDriverImplementedMock extends BaseDriver {
     super();
   }
 
-  public async query(query, values) {
+  public async query(_query, _values) {
     return this.response;
   }
 }

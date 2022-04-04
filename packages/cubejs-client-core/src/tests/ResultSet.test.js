@@ -1,3 +1,11 @@
+/**
+ * @license Apache-2.0
+ * @copyright Cube Dev, Inc.
+ * @fileoverview ResultSet class unit tests.
+ */
+
+/* globals describe,test,expect */
+
 import 'jest';
 import ResultSet from '../ResultSet';
 
@@ -187,7 +195,7 @@ describe('ResultSet', () => {
         {
           x: 'Name 1',
           
-          'Foo.count': null,
+          'Foo.count': 0,
           xValues: [
             'Name 1'
           ],
@@ -235,8 +243,7 @@ describe('ResultSet', () => {
       expect(resultSet.chartPivot()).toEqual([
         {
           x: 'Name 1',
-          
-          'Foo.count': undefined,
+          'Foo.count': 0,
           xValues: [
             'Name 1'
           ],

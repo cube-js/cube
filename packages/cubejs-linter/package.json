@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/linter",
   "description": "Cube.js ESLint (virtual package) for linting code",
   "author": "Cube Dev, Inc.",
-  "version": "0.28.22",
+  "version": "0.29.23",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-mssql-driver"
   },
   "engines": {
-    "node": ">=10.8.0"
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
   },
   "main": "index.js",
   "peerDependencies": {

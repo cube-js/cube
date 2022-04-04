@@ -2,9 +2,12 @@ use log::{debug, error, trace};
 use neon::prelude::*;
 
 use async_trait::async_trait;
-use cubeclient::models::{V1LoadConinueWait, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
+use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
-    compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
+    di_service,
+    sql::AuthContext,
+    transport::{MetaContext, TransportService},
+    CubeError,
 };
 use serde_derive::Serialize;
 use std::sync::Arc;
@@ -43,8 +46,8 @@ struct MetaRequest {
 }
 
 #[async_trait]
-impl SchemaService for NodeBridgeTransport {
-    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
+impl TransportService for NodeBridgeTransport {
+    async fn meta(&self, ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
         trace!("[transport] Meta ->");
 
         let request_id = Uuid::new_v4().to_string();
@@ -62,15 +65,15 @@ impl SchemaService for NodeBridgeTransport {
         .await?;
         trace!("[transport] Meta <- {:?}", response);
 
-        Ok(TenantContext {
-            cubes: response.cubes.unwrap_or_default(),
-        })
+        Ok(Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_default(),
+        )))
     }
 
-    async fn request(
+    async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: &AuthContext,
+        ctx: Arc<AuthContext>,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
@@ -85,6 +88,7 @@ impl SchemaService for NodeBridgeTransport {
                 user: Some(ctx.access_token.clone()),
                 query: query.clone(),
             })?;
+
             let response: serde_json::Value = call_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.on_load.clone(),
@@ -100,7 +104,7 @@ impl SchemaService for NodeBridgeTransport {
                 Err(err) => err,
             };
 
-            if let Ok(res) = serde_json::from_value::<V1LoadConinueWait>(response) {
+            if let Ok(res) = serde_json::from_value::<V1Error>(response) {
                 if res.error.to_lowercase() == *"continue wait" {
                     debug!(
                         "[transport] load - retrying request (continue wait) requestId: {}, span: {}",
@@ -116,7 +120,7 @@ impl SchemaService for NodeBridgeTransport {
                         res
                     );
 
-                    return Err(CubeError::internal(load_err.to_string()));
+                    return Err(CubeError::internal(res.error));
                 }
             };
 
@@ -125,4 +129,4 @@ impl SchemaService for NodeBridgeTransport {
     }
 }
 
-di_service!(NodeBridgeTransport, [SchemaService]);
+di_service!(NodeBridgeTransport, [TransportService]);

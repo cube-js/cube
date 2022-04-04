@@ -42,7 +42,9 @@ import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
 
-const MyH4 = (props) => <h4 name={kebabCase(props.id)} {...props} />;
+const MyH4: React.FC<{ children: string }> = ({ children }) => {
+  return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
+}
 
 const components = {
   DangerBox,
@@ -297,7 +299,7 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
+        <Helmet title={`${frontmatter.title} | Cube Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
             <h1 name="top">{frontmatter.title}</h1>

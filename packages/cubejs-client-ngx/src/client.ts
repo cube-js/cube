@@ -32,7 +32,7 @@ export class CubejsClient {
     }
   }
 
-  private apiInstace(): CubejsApi {
+  private apiInstance(): CubejsApi {
     if (!this.cubeJsApi) {
       if (this.config instanceof Observable) {
         this.config.subscribe((config) => {
@@ -56,33 +56,38 @@ export class CubejsClient {
     query: Query | Query[],
     options?: LoadMethodOptions
   ): Observable<ResultSet> {
-    return from(<Promise<ResultSet>>this.apiInstace().load(query, options));
+    return from(<Promise<ResultSet>>this.apiInstance().load(query, options));
   }
 
   public sql(
     query: Query | Query[],
     options?: LoadMethodOptions
   ): Observable<SqlQuery> {
-    return from(this.apiInstace().sql(query, options));
+    return from(this.apiInstance().sql(query, options));
   }
 
   public dryRun(
     query: Query | Query[],
     options?: LoadMethodOptions
   ): Observable<DryRunResponse> {
-    return from(this.apiInstace().dryRun(query, options));
+    return from(this.apiInstance().dryRun(query, options));
   }
 
   public meta(options?: LoadMethodOptions): Observable<Meta> {
-    return from(this.apiInstace().meta(options));
+    return from(this.apiInstance().meta(options));
   }
 
   public watch(query, params = {}): Observable<ResultSet> {
     return new Observable((observer) =>
       query.subscribe({
         next: async (query) => {
-          const resultSet = await this.apiInstace().load(query, params);
-          observer.next(resultSet);
+          try {
+            const resultSet = await this.apiInstance().load(query, params);
+            observer.next(resultSet);
+          } catch(err) {
+            observer.error(err);
+          }
+
         },
       })
     );

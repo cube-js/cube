@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4147
+expression: "execute_query(\"show full tables;\".to_string()).await?"
+
+---
++---------------------------+------------+
+| Tables_in_db              | Table_type |
++---------------------------+------------+
+| KibanaSampleDataEcommerce | BASE TABLE |
+| Logs                      | BASE TABLE |
++---------------------------+------------+

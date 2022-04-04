@@ -201,7 +201,7 @@ export default class QueryBuilder extends React.Component {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
         : { dateRange: member.dateRange };
-        
+
       return removeEmpty({
         dimension: member.dimension.name,
         granularity: member.granularity,
@@ -223,10 +223,9 @@ export default class QueryBuilder extends React.Component {
       },
       remove: (member) => {
         const { query } = this.state;
-        const members = (query[memberType] || []).concat([]);
-        members.splice(member.index, 1);
+
         return this.updateQuery({
-          [memberType]: members,
+          [memberType]: (query[memberType] || []).filter((_, index) => index !== member.index),
         });
       },
       update: (member, updateWith) => {

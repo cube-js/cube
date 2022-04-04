@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -10,7 +11,7 @@ export class QueryQueue {
     this.redisQueuePrefix = redisQueuePrefix;
     this.concurrency = options.concurrency || 2;
     this.continueWaitTimeout = options.continueWaitTimeout || 5;
-    this.executionTimeout = options.executionTimeout || 600;
+    this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
     this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
@@ -79,8 +80,7 @@ export class QueryQueue {
 
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
-      // eslint-disable-next-line no-unused-vars
-      const [added, b, c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
+      const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
@@ -389,8 +389,7 @@ export class QueryQueue {
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
     let insertedCount;
-    // eslint-disable-next-line no-unused-vars
-    let removedCount;
+    let _removedCount;
     let activeKeys;
     let queueSize;
     let query;
@@ -399,7 +398,7 @@ export class QueryQueue {
       const processingId = await redisClient.getNextProcessingId();
       const retrieveResult = await redisClient.retrieveForProcessing(queryKey, processingId);
       if (retrieveResult) {
-        [insertedCount, removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {

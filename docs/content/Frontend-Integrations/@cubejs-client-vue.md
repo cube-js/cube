@@ -64,7 +64,7 @@ API from Cube.js Backend.
 - `setOffset`, `removeOffset` - functions to control the number of rows skipped before results returned. Use with limit to control pagination.
 
 ### <--{"id" : "QueryBuilder"}--> Example
-<a href="https://codesandbox.io/s/vuejs-query-builder-with-vuejs-forked-5fn8z" target="_blank">Open in CodeSandbox</a>
+<a href="https://codesandbox.io/s/vue-js-query-builder-with-vue-js-0ydws" target="_blank">Open in CodeSandbox</a>
 
 ```html
 <template>

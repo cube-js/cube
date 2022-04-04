@@ -144,7 +144,7 @@ export class CubejsServerCore {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
 
-    this.contextToOrchestratorId = this.options.contextToOrchestratorId || this.contextToAppId;
+    this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -336,6 +336,12 @@ export class CubejsServerCore {
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation to configure Cube Store https://cube.dev/docs/caching/running-in-production'
+      );
+    }
+
+    if (devServer && externalDbType !== 'cubestore') {
+      displayCLIWarning(
+        `Using ${externalDbType} as an external database is deprecated. Please use Cube Store instead: https://cube.dev/docs/caching/running-in-production`
       );
     }
 
@@ -601,7 +607,8 @@ export class CubejsServerCore {
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context,
-          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema
+          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
+          allowNodeRequire: this.options.allowNodeRequire,
         }
       );
 
@@ -745,12 +752,16 @@ export class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
+      allowUngroupedWithoutPrimaryKey:
+          this.options.allowUngroupedWithoutPrimaryKey ||
+          getEnv("allowUngroupedWithoutPrimaryKey"),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
+      standalone: this.standalone,
+      allowNodeRequire: options.allowNodeRequire,
     });
   }
 

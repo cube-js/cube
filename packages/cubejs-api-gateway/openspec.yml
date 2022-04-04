@@ -16,6 +16,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/V1MetaResponse"
+        "4XX":
+          description: "Request could not be completed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
+        "5XX":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
   "/v1/load":
     post:
       summary: "Load data via Cube JSON Query"
@@ -32,12 +44,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/V1LoadResponse"
-        "400":
-          description: "successful operation"
+        "4XX":
+          description: "Request could not be completed"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/V1LoadResponse400"
+                $ref: "#/components/schemas/V1Error"
+        "5XX":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
 security:
   - bearerAuth: []
 components:
@@ -151,7 +169,7 @@ components:
           type: "array"
           items:
             type: "object"
-    V1LoadResponse400:
+    V1Error:
       type: "object"
       required:
         - "error"

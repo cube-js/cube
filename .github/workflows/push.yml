@@ -6,11 +6,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,11 +23,10 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/js-wrapper/**'
-      - 'rust/tsconfig.json'
-      - 'rust/package.json'
+      - 'rust/cubestore/js-wrapper/**'
+      - 'rust/cubestore/tsconfig.json'
+      - 'rust/cubestore/package.json'
       - 'rust/cubesql/**'
-      - 'rust/cubeclient/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -45,7 +43,6 @@ jobs:
 
     strategy:
       matrix:
-        # We should use our minimal version (10.x), but there are problems with packages...
         node-version: [12.x, 14.x, 16.x]
       fail-fast: false
 
@@ -78,7 +75,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -97,6 +94,7 @@ jobs:
         if: (matrix.node-version == '16.x')
         with:
           files: ./packages/*/coverage/clover.xml
+          flags: cube-backend
           verbose: true # optional (default = false)
 
   lint:
@@ -127,7 +125,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -169,7 +167,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -204,7 +202,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
       fail-fast: false
 
     steps:
@@ -229,7 +227,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -277,7 +275,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x]
+        node-version: [14.x]
         db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless', 'cubestore']
       fail-fast: false
 
@@ -357,7 +355,7 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   docker-dev:
-    needs: [build, unit, lint, latest-tag-sha]
+    needs: [latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-20.04
@@ -408,7 +406,7 @@ jobs:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
-            rust/node_modules
+            rust/cubestore/node_modules
             packages/*/node_modules
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
@@ -430,6 +428,7 @@ jobs:
           yarn run dataset:minimal
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
+          yarn run birdbox:questdb
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}

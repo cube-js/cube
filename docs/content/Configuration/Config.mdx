@@ -191,21 +191,25 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> contextToOrchestratorId
 
-`contextToOrchestratorId` is a function to determine a caching key for Query
-Orchestrator instance. Query Orchestrator instance holds database connections,
-execution queues, pre-aggregation table caches. By default, returns the same
-value as `contextToAppId`.
+<WarningBox>
 
-Override it only in case multiple tenants should share the same execution queue
-and database connections while having different schemas instead of default Query
-Orchestrator per tenant strategy.
+In versions of Cube.js prior to v0.29, each tenant would have an individual
+instance of the Query Orchestrator.
+
+</WarningBox>
+
+`contextToOrchestratorId` is a function used to determine a caching key for the
+Query Orchestrator instance. The Query Orchestrator holds database connections,
+execution queues, pre-aggregation table caches. By default, the same instance is
+used for **all** tenants; override this property in situations where each tenant
+requires their own Query Orchestrator.
 
 Called on each request.
 
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.tenantId}_${securityContext.user_id}`,
+    `CUBEJS_APP_${securityContext.tenantId}`,
   contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.tenantId}`,
 };
@@ -266,8 +270,10 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> checkSqlAuth
 
-Used in [SQL API][ref-sql-api], and can be an `async` function. Default implementation verify username & password from environment variables: `CUBE_SQL_USERNAME`, `CUBE_SQL_PASSWORD`,
-but in [development mode][ref-development-mode] it ignores validation.
+Used in [SQL API][ref-sql-api], and can be an `async` function. Default
+implementation verify username & password from environment variables:
+`CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
+mode][ref-development-mode] it ignores validation.
 
 Called on each request from Cube SQL API.
 
@@ -480,9 +486,10 @@ values that your extendContext object key can have.
 
 <WarningBox>
 
-`extendContext` is applied only to requests that go through API.
-It isn't applied to refresh worker execution.
-If you're looking for a way to provide global environment variables for your schema please see [Execution environment docs][ref-exec-environment-globals].
+`extendContext` is applied only to requests that go through API. It isn't
+applied to refresh worker execution. If you're looking for a way to provide
+global environment variables for your schema please see [Execution environment
+docs][ref-exec-environment-globals].
 
 </WarningBox>
 
@@ -548,7 +555,22 @@ module.exports = {
 #### cors
 
 CORS settings for the Cube.js REST API can be configured by providing an object
-with options [from here][link-express-cors-opts].
+with options [from here][link-express-cors-opts]:
+
+```javascript
+module.exports = {
+  http: {
+    cors: {
+      origin: '*',
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+      maxAge: 86400,
+      credentials: true,
+    },
+  },
+};
+```
 
 ### <--{"id" : "Options Reference"}--> jwt
 
@@ -718,4 +740,5 @@ the additional transpiler for check duplicates.
 [self-repofactory]: #repositoryFactory
 [self-schemafilerepo]: #SchemaFileRepository
 [self-schemapath]: #schemaPath
-[ref-exec-environment-globals]: /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
+[ref-exec-environment-globals]:
+  /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others

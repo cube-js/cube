@@ -1,12 +1,14 @@
 /* eslint-disable max-len */
-
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
   name: string;
   type: GenericDataBaseType;
+  attributes?: string[]
 }
 export type TableStructure = TableColumn[];
+export type SchemaStructure = Record<string, TableStructure>;
+export type DatabaseStructure = Record<string, SchemaStructure>;
 
 // It's more easy to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
@@ -30,6 +32,11 @@ export interface DownloadTableCSVData extends DownloadTableBase {
    * Some drivers know types of response
    */
   types?: TableStructure;
+
+  /**
+   * Some drivers export csv files with no header row.
+   */
+  csvNoHeader?: boolean;
 }
 
 export interface StreamTableData extends DownloadTableBase {
@@ -111,4 +118,8 @@ export interface DriverInterface {
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
   // Some drivers can implement UNLOAD data to external storage
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
+  // Current timestamp, defaults to new Date().getTime()
+  nowTimestamp(): number;
+  // Shutdown the driver
+  release(): Promise<void>
 }

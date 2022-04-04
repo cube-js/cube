@@ -1,0 +1,70 @@
+# CAUTION: This workflow exposes secrets. It is only supposed to be run on "merge into master" condition.
+name: 'Cloud Tests'
+on:
+  push:
+    paths:
+      - '.github/actions/integration/**'
+      - '.github/workflows/cloud.yml'
+      - 'packages/**'
+      - '.eslintrc.js'
+      - '.prettierrc'
+      - 'lerna.json'
+      - 'package.json'
+      - 'rollup.config.js'
+      - 'yarn.lock'
+      - 'docs-gen/**'
+      - 'docs/**'
+    branches:
+      - master
+
+jobs:
+  integration-cloud:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        node-version: [ 14.x ]
+        db: [ 'athena', 'bigquery' ]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2021-07-04
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Run Integration tests for ${{ matrix.db }} matrix
+        timeout-minutes: 30
+        env:
+          CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
+          CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
+          CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+        run: ./.github/actions/integration/${{ matrix.db }}.sh

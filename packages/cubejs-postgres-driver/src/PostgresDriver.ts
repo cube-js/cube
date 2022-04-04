@@ -1,6 +1,7 @@
 import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
+import { getEnv } from '@cubejs-backend/shared';
 import * as moment from 'moment';
 import {
   BaseDriver,
@@ -42,7 +43,7 @@ const timestampDataTypes = [
 const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
-  val.substr(2),
+  val.slice(2),
   'hex'
 ).toString('base64');
 
@@ -80,6 +81,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
     this.config = {
       ...this.getInitialConfiguration(),
+      executionTimeout: getEnv('dbQueryTimeout'),
       ...config,
     };
   }
@@ -142,8 +144,21 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
     if (!this.userDefinedTypes) {
+      // Postgres enum types defined as typcategory = 'E' these can be assumed
+      // to be of type varchar for the drivers purposes.
+      // TODO: if full implmentation the constraints can be looked up via pg_enum
+      // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
       const customTypes = await conn.query(
-        'SELECT oid, typname FROM pg_type WHERE typcategory = \'U\'',
+        `SELECT
+            oid,
+            CASE
+                WHEN typcategory = 'E' THEN 'varchar'
+                ELSE typname
+            END
+        FROM
+            pg_type
+        WHERE
+            typcategory in ('U', 'E')`,
         []
       );
 

@@ -1,4 +1,4 @@
-import { pipeline } from 'stream';
+import { pipeline, Writable } from 'stream';
 import { createGzip } from 'zlib';
 import { createWriteStream, createReadStream } from 'fs';
 import { unlink } from 'fs-extra';
@@ -41,7 +41,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     super();
 
     this.config = {
+      batchingRowSplitCount: getEnv('batchingRowSplitCount'),
       ...config,
+      // TODO Can arrive as null somehow?
       host: config?.host || getEnv('cubeStoreHost'),
       port: config?.port || getEnv('cubeStorePort'),
       user: config?.user || getEnv('cubeStoreUser'),
@@ -68,7 +70,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public getPrefixTablesQuery(schemaName, tablePrefixes) {
-    const prefixWhere = tablePrefixes.map(p => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
+    const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
@@ -149,10 +151,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
+    const inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
 
     if (files.length > 0) {
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
+      const createTableSqlWithLocation = `${createTableSql} WITH (input_format = '${inputFormat}') ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
       return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
         e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
         throw e;
@@ -167,37 +169,103 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, queryTracingObj?: any) {
-    const writer = csvWriter({ headers: columns.map(c => c.name) });
-    const gzipStream = createGzip();
-    const tempFile = tempy.file();
-
+    const tempFiles: string[] = [];
     try {
-      const outputStream = createWriteStream(tempFile);
-      await new Promise(
-        (resolve, reject) => pipeline(
-          tableData.rowStream, writer, gzipStream, outputStream, (err) => (err ? reject(err) : resolve(null))
-        )
-      );
-      const fileName = `${table}.csv.gz`;
-      const res = await fetch(`${this.baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
-        method: 'POST',
-        body: createReadStream(tempFile),
-      });
+      const pipelinePromises: Promise<any>[] = [];
+      const filePromises: Promise<string>[] = [];
+      let currentFileStream: { stream: NodeJS.WritableStream, tempFile: string } | null = null;
+
+      const { baseUrl } = this;
+      let fileCounter = 0;
 
       const createTableSql = this.createTableSql(table, columns);
       // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ?`;
+      const createTableSqlWithoutLocation = `${createTableSql}${indexes ? ` ${indexes}` : ''}`;
 
-      if (res.status !== 200) {
-        const err = await res.json();
-        throw new Error(`Error during create table: ${createTableSqlWithLocation}: ${err.error}`);
-      }
-      await this.query(createTableSqlWithLocation, [`temp://${fileName}`], queryTracingObj).catch(e => {
-        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
+      const getFileStream = () => {
+        if (!currentFileStream) {
+          const writer = csvWriter({ headers: columns.map(c => c.name) });
+          const tempFile = tempy.file();
+          tempFiles.push(tempFile);
+          const gzipStream = createGzip();
+          pipelinePromises.push(new Promise((resolve, reject) => {
+            pipeline(writer, gzipStream, createWriteStream(tempFile), (err) => {
+              if (err) {
+                reject(err);
+              }
+
+              const fileName = `${table}-${fileCounter++}.csv.gz`;
+              filePromises.push(fetch(`${baseUrl.replace(/^ws/, 'http')}/upload-temp-file?name=${fileName}`, {
+                method: 'POST',
+                body: createReadStream(tempFile),
+              }).then(async res => {
+                if (res.status !== 200) {
+                  const error = await res.json();
+                  throw new Error(`Error during upload of ${fileName} create table: ${createTableSqlWithoutLocation}: ${error.error}`);
+                }
+                return fileName;
+              }));
+
+              resolve(null);
+            });
+            currentFileStream = { stream: writer, tempFile };
+          }));
+        }
+        if (!currentFileStream) {
+          throw new Error('Stream init error');
+        }
+        return currentFileStream;
+      };
+
+      let rowCount = 0;
+
+      const endStream = (chunk, encoding, callback) => {
+        const { stream } = getFileStream();
+        currentFileStream = null;
+        rowCount = 0;
+        if (chunk) {
+          stream.end(chunk, encoding, callback);
+        } else {
+          stream.end(callback);
+        }
+      };
+
+      const { batchingRowSplitCount } = this.config;
+
+      const outputStream = new Writable({
+        write(chunk, encoding, callback) {
+          rowCount++;
+          if (rowCount >= batchingRowSplitCount) {
+            endStream(chunk, encoding, callback);
+          } else {
+            getFileStream().stream.write(chunk, encoding, callback);
+          }
+        },
+        final(callback: (error?: (Error | null)) => void) {
+          endStream(null, null, callback);
+        },
+        objectMode: true
+      });
+
+      await new Promise(
+        (resolve, reject) => pipeline(
+          tableData.rowStream, outputStream, (err) => (err ? reject(err) : resolve(null))
+        )
+      );
+
+      await Promise.all(pipelinePromises);
+
+      const files = await Promise.all(filePromises);
+      const sqlWithLocation = files.length ? `${createTableSqlWithoutLocation} LOCATION ${files.map(_ => '?').join(', ')}` : createTableSqlWithoutLocation;
+      await this.query(
+        sqlWithLocation,
+        files.map(fileName => `temp://${fileName}`), queryTracingObj
+      ).catch(e => {
+        e.message = `Error during create table: ${sqlWithLocation}: ${e.message}`;
         throw e;
       });
     } finally {
-      await unlink(tempFile);
+      await Promise.all(tempFiles.map(tempFile => unlink(tempFile)));
     }
   }
 

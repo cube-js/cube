@@ -22,7 +22,8 @@ const menuOrderCloud = [
   'Configuration',
   'Developer Tools',
   'Deploys',
-  'Inspecting Queries'
+  'Inspecting Queries',
+  'Release Notes',
 ];
 
 const menuOrder = [
