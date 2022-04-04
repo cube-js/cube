@@ -22,10 +22,14 @@ const Menu = styled(AntdMenu)`
 const SearchMenuItem = styled(Menu.Item)`
   position: sticky;
   top: 0;
-  background: white;
+  // this isn't the best solution ever, but according to the situation other solutions are worse
+  // antd uses double class pattern (.disabled.active.active) to override the value of background color. actually the
+  // easiest way to override it is to use smtn with higher specificity
+  background: white !important;
   padding-top: 10px;
   padding-bottom: 0;
   margin-bottom: 16px;
+  cursor: default;
 
   ::after {
     display: block;
