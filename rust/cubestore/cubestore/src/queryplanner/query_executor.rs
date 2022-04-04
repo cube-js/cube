@@ -88,7 +88,6 @@ pub trait QueryExecutor: DIService + Send + Sync {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<String, CubeError>;
-
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -266,7 +265,6 @@ impl QueryExecutor for QueryExecutorImpl {
 
         Ok(pp_phys_plan(worker_plan.as_ref()))
     }
-
 }
 
 impl QueryExecutorImpl {
@@ -974,15 +972,15 @@ impl ClusterSendExec {
     pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
         let mut res = Vec::new();
         for (node_name, partitions) in self.partitions.iter() {
-            res.push(
-                (node_name.clone(), self.serialized_plan_for_partitions(partitions))
-            );
+            res.push((
+                node_name.clone(),
+                self.serialized_plan_for_partitions(partitions),
+            ));
         }
         res
     }
 
     fn serialized_plan_for_partitions(&self, partitions: &Vec<(u64, RowRange)>) -> SerializedPlan {
-
         let mut ps = HashMap::<_, RowFilter>::new();
         for (id, range) in partitions {
             ps.entry(*id).or_default().append_or(range.clone())
@@ -1052,9 +1050,6 @@ impl ExecutionPlan for ClusterSendExec {
             memory_exec.execute(0).await
         }
     }
-
-
-    
 }
 
 impl fmt::Debug for ClusterSendExec {
