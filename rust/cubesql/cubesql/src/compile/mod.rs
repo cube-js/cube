@@ -41,8 +41,9 @@ use self::engine::df::scan::CubeScanNode;
 use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
 use self::engine::provider::CubeContext;
 use self::engine::udf::{
-    create_connection_id_udf, create_convert_tz_udf, create_current_user_udf, create_db_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
+    create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+    create_current_schemas_udf, create_current_user_udf, create_db_udf, create_if_udf,
+    create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
     create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
     create_version_udf,
 };
@@ -1613,9 +1614,7 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_to_plan(&statement)
-            }
+            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -2184,6 +2183,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date());
+        ctx.register_udf(create_current_schema_udf());
+        ctx.register_udf(create_current_schemas_udf());
 
         ctx.register_udaf(create_measure_udaf());
 
@@ -2200,7 +2201,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             self.session_manager.clone(),
             self.state.clone(),
         );
-        let df_query_planner = SqlToRel::new(&cube_ctx);
+        let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
 
         let plan = df_query_planner
             .statement_to_plan(&DFStatement::Statement(stmt))
@@ -3305,6 +3306,20 @@ mod tests {
                     ])),
                 }])
             ),
+            // Column precedence vs projection alias
+            (
+                "COUNT(*), DATE(order_date) AS order_date".to_string(),
+                // Now replaced with exact date
+                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
             // Create a new TD (dateRange filter pushdown)
             (
                 "COUNT(*)".to_string(),
@@ -3360,28 +3375,29 @@ mod tests {
         ];
 
         for (sql_projection, sql_filter, expected_tdm) in to_check.iter() {
-            let logical_plan = convert_select_to_query_plan(
-                format!(
-                    "SELECT
+            let query = format!(
+                "SELECT
                 {}
                 FROM KibanaSampleDataEcommerce
                 WHERE {}
                 {}",
-                    sql_projection,
-                    sql_filter,
-                    if sql_projection.contains("__timestamp")
-                        && sql_projection.contains("customer_gender")
-                    {
-                        "GROUP BY customer_gender, __timestamp"
-                    } else if sql_projection.contains("__timestamp") {
-                        "GROUP BY __timestamp"
-                    } else {
-                        ""
-                    }
-                ),
-                DatabaseProtocol::MySQL,
-            )
-            .as_logical_plan();
+                sql_projection,
+                sql_filter,
+                if sql_projection.contains("__timestamp")
+                    && sql_projection.contains("customer_gender")
+                {
+                    "GROUP BY customer_gender, __timestamp"
+                } else if sql_projection.contains("__timestamp") {
+                    "GROUP BY __timestamp"
+                } else if sql_projection.contains("order_date") {
+                    "GROUP BY DATE(order_date)"
+                } else {
+                    ""
+                }
+            );
+            println!("Query: {}", query);
+            let logical_plan =
+                convert_select_to_query_plan(query, DatabaseProtocol::MySQL).as_logical_plan();
 
             assert_eq!(
                 logical_plan.find_cube_scan().request.time_dimensions,
@@ -3606,62 +3622,62 @@ mod tests {
             //     None,
             // ),
             // BETWEEN
-            (
-                "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
-                // This filter will be pushed to time_dimension
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ])),
-                }]),
-            ),
-            (
-                "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("notInDateRange".to_string()),
-                    values: Some(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ]),
-                    or: None,
-                    and: None,
-                }]),
-                None,
-            ),
+            // (
+            //     "order_date BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
+            //     // This filter will be pushed to time_dimension
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
+            // (
+            //     "order_date NOT BETWEEN '2021-08-31' AND '2021-09-07'".to_string(),
+            //     Some(vec![V1LoadRequestQueryFilterItem {
+            //         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            //         operator: Some("notInDateRange".to_string()),
+            //         values: Some(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ]),
+            //         or: None,
+            //         and: None,
+            //     }]),
+            //     None,
+            // ),
             // SIMILAR as BETWEEN but manually
-            (
-                "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
-                // This filter will be pushed to time_dimension
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        // -1 milleseconds hack for cube.js
-                        "2021-09-06T23:59:59.999Z".to_string(),
-                    ])),
-                }]),
-            ),
-            //  SIMILAR as BETWEEN but without -1 nanosecond because <=
-            (
-                "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
-                None,
-                Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        // without -1 because <=
-                        "2021-09-07T00:00:00.000Z".to_string(),
-                    ])),
-                }]),
-            ),
+            // (
+            //     "order_date >= '2021-08-31' AND order_date < '2021-09-07'".to_string(),
+            //     // This filter will be pushed to time_dimension
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             // -1 milleseconds hack for cube.js
+            //             "2021-09-06T23:59:59.999Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
+            // //  SIMILAR as BETWEEN but without -1 nanosecond because <=
+            // (
+            //     "order_date >= '2021-08-31' AND order_date <= '2021-09-07'".to_string(),
+            //     None,
+            //     Some(vec![V1LoadRequestQueryTimeDimension {
+            //         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //         granularity: None,
+            //         date_range: Some(json!(vec![
+            //             "2021-08-31T00:00:00.000Z".to_string(),
+            //             // without -1 because <=
+            //             "2021-09-07T00:00:00.000Z".to_string(),
+            //         ])),
+            //     }]),
+            // ),
             // LIKE
             (
                 "customer_gender LIKE 'female'".to_string(),
@@ -4803,6 +4819,15 @@ mod tests {
             .await?
         );
 
+        // EXPLAIN for Postgres
+        insta::assert_snapshot!(
+            execute_query(
+                "explain select 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -5110,4 +5135,43 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_current_schema_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schema_postgres",
+            execute_query(
+                "SELECT current_schema()".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    /* TODO: @ovr
+    #[tokio::test]
+    async fn test_current_schemas_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "current_schemas_postgres",
+            execute_query(
+                "SELECT current_schemas(false)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "current_schemas_including_implicit_postgres",
+            execute_query(
+                "SELECT current_schemas(true)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+    */
 }

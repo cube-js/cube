@@ -6,7 +6,7 @@ import FlexSearch from 'flexsearch';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import useDeepMemo from '../hooks/deep-memo';
+import { useDeepMemo } from '../hooks/deep-memo';
 import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`
@@ -22,10 +22,14 @@ const Menu = styled(AntdMenu)`
 const SearchMenuItem = styled(Menu.Item)`
   position: sticky;
   top: 0;
-  background: white;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  margin-bottom: 6px;
+  // this isn't the best solution ever, but according to the situation other solutions are worse
+  // antd uses double class pattern (.disabled.active.active) to override the value of background color. actually the
+  // easiest way to override it is to use smtn with higher specificity
+  background: white !important;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  cursor: default;
 
   ::after {
     display: block;

@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.40](https://github.com/cube-js/cube.js/compare/v0.29.39...v0.29.40) (2022-04-03)
+
+
+### Bug Fixes
+
+* **cubesql:** Table columns should take precedence over projection to mimic MySQL and Postgres behavior ([60d6e45](https://github.com/cube-js/cube.js/commit/60d6e4511267b132df204fe7b637953d81e5f980))
+
+
+
+
+
+## [0.29.39](https://github.com/cube-js/cube.js/compare/v0.29.38...v0.29.39) (2022-04-01)
+
+
+### Bug Fixes
+
+* **native:** Post installation issue with npm (avoid bundledDependencies) ([6163838](https://github.com/cube-js/cube.js/commit/6163838926586cf1a17bea353cb23b61e48469ca))
+
+
+
+
+
+## [0.29.38](https://github.com/cube-js/cube.js/compare/v0.29.37...v0.29.38) (2022-04-01)
+
+
+### Bug Fixes
+
+* **native:** Post installation issue with npm ([#4302](https://github.com/cube-js/cube.js/issues/4302)) ([8aa9c71](https://github.com/cube-js/cube.js/commit/8aa9c71b1ae473579b6d438aeebdac28a7fd3d19))
+
+
+
+
+
 ## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/native
