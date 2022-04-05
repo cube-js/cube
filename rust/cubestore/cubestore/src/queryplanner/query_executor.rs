@@ -298,7 +298,7 @@ pub struct CubeTable {
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     schema: SchemaRef,
     #[serde(skip, default = "NoopParquetMetadataCache::new")]
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,  // injected during deserialization
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>, // injected during deserialization
 }
 
 impl Debug for CubeTable {
