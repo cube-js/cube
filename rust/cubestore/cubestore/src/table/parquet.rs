@@ -117,7 +117,6 @@ mod tests {
         TimestampMicrosecondArray,
     };
     use arrow::record_batch::RecordBatch;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use itertools::Itertools;
     use parquet::data_type::DataType;
     use parquet::file::reader::FileReader;

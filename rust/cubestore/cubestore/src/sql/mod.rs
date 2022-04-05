@@ -1457,7 +1457,6 @@ mod tests {
     use std::{env, fs};
 
     use async_compression::tokio::write::GzipEncoder;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
@@ -1481,7 +1480,6 @@ mod tests {
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
-    use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
     use regex::Regex;
 
     #[tokio::test]
@@ -1506,7 +1504,6 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
-                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 rows_per_chunk,
             );
@@ -1561,7 +1558,6 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
-                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 rows_per_chunk,
             );

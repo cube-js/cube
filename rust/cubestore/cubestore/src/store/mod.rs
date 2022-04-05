@@ -27,7 +27,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, CubestoreParquetMetadataCache, ParquetTableStore};
+use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
@@ -469,7 +469,7 @@ impl ChunkDataStore for ChunkStore {
         } else {
             let (local_file, index) = self.download_chunk(chunk).await?;
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, parquet_metadata_cache);
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -527,9 +527,7 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
-    use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
     use crate::{metastore::ColumnType, table::TableValue};
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use rocksdb::{Options, DB};
     use std::fs;
     use std::path::PathBuf;
@@ -637,7 +635,6 @@ mod tests {
                 meta_store.clone(),
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
-                CubestoreParquetMetadataCacheImpl::new(NoopParquetMetadataCache::new()),
                 config.config_obj(),
                 10,
             );
@@ -814,12 +811,10 @@ impl ChunkStore {
             let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
-            let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
                 let parquet = ParquetTableStore::new(
                     index.get_row().clone(),
                     ROW_GROUP_SIZE,
-                    parquet_metadata_cache,
                 );
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())

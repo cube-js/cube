@@ -184,7 +184,6 @@ impl CompactionService for CompactionServiceImpl {
         let store = ParquetTableStore::new(
             index.get_row().clone(),
             ROW_GROUP_SIZE,
-            NoopParquetMetadataCache::new(),
         );
         let old_partition_remote = match &new_chunk {
             Some(_) => None,
@@ -1150,7 +1149,7 @@ impl MultiSplit {
             }
         });
 
-        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE, NoopParquetMetadataCache::new());
+        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE);
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
