@@ -1,6 +1,13 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { PoolClient } from 'pg';
+import { DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
+import { PoolClient, types } from 'pg';
+import Stream from './Stream';
 
+const NativeTypeToPostgresType: Record<string, string> = {};
+
+Object.entries(types.builtins).forEach(([key, value]) => {
+  NativeTypeToPostgresType[value] = key;
+});
 export class MaterializeDriver extends PostgresDriver {
   public constructor(options: PostgresDriverConfiguration) {
     super(options);
@@ -37,9 +44,70 @@ export class MaterializeDriver extends PostgresDriver {
     });
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    // const materializedLoadSql = loadSql.replace(/^CREATE TABLE (\S+) AS/i, `CREATE MATERIALIZED VIEW ${preAggregationTableName} AS`);
-    // return this.query(materializedLoadSql, params, options);
-    return this.query(loadSql, params, options);
+  public async uploadTableWithIndexes(
+    table: string,
+    columns: TableStructure,
+    tableData: DownloadTableMemoryData,
+    indexesSql: IndexesSQL
+  ) {
+    if (!tableData.rows) {
+      throw new Error(`${this.constructor} driver supports only rows upload`);
+    }
+
+    await this.createTable(table, columns);
+
+    try {
+      for (let i = 0; i < tableData.rows.length; i++) {
+        await this.query(
+          `INSERT INTO ${table}
+        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+        VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
+          columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
+        );
+      }
+
+      for (let i = 0; i < indexesSql.length; i++) {
+        const [query, p] = indexesSql[i].sql;
+        await this.query(query, p);
+      }
+    } catch (e) {
+      await this.dropTable(table);
+      throw e;
+    }
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
+    const conn = await this.pool.connect();
+
+    try {
+      const cursorId = 'mz_cursor';
+      await this.prepareConnection(conn);
+      await conn.query('BEGIN;', []);
+      await conn.query(`DECLARE ${cursorId} CURSOR FOR ${query}`, values);
+      const { fields } = await conn.query({
+        text: `FETCH 0 FROM ${cursorId};`,
+        values: [],
+        types: {
+          getTypeParser: this.getTypeParser,
+        },
+      });
+      const rowStream = new Stream(conn, cursorId, highWaterMark, this.getTypeParser);
+
+      return {
+        rowStream,
+        types: this.mapFields(fields),
+        release: async () => {
+          await conn.release();
+        }
+      };
+    } catch (e) {
+      await conn.release();
+
+      throw e;
+    }
   }
 }
