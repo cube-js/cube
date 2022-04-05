@@ -6,7 +6,7 @@ import { MaterializeDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
 
-describe('PostgresDriver', () => {
+describe('MaterializeDriver', () => {
   let container: StartedTestContainer;
   let driver: MaterializeDriver;
 
