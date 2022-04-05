@@ -48,6 +48,7 @@ use arrow::datatypes::{DataType, Field};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::{fmt, mem};
+use std::backtrace::Backtrace;
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
@@ -4219,6 +4220,8 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
+        // println!("JJJ {:#?} {:#?}", job, Backtrace::capture());
+        // println!("JJJ {:#?}", job);
         self.write_operation(move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref.clone());
 

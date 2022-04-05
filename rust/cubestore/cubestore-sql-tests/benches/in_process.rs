@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use flate2::read::GzDecoder;
+use futures::future::join_all;
 use tokio::runtime::Builder;
 use rocksdb::{Options, DB};
 use tar::Archive;
@@ -24,9 +25,7 @@ pub trait Bench<T>: Send + Sync {
 }
 
 #[derive(Debug)]
-struct ParquetMetadataCacheBenchState {
-    repos: Arc<Vec<String>>,
-}
+struct ParquetMetadataCacheBenchState {}
 
 struct ParquetMetadataCacheBench;
 #[async_trait]
@@ -56,27 +55,12 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
             .await
             .unwrap();
 
-        // println!("QQQ P 1 {:#?}", services.meta_store.get_partition(1).await.unwrap());
-        // println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
-        // let compactor: Arc<dyn CompactionService> = services.injector.get_service_typed().await;
-        // compactor.compact(2).await.unwrap();
-        // println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
-
-        // let partitions = services.meta_store.partition_table().all_rows().await.unwrap();
-        // for p in partitions {
-        //     // schedule_repartition_if_needed or schedule_partition_to_compact
-        //     let r = services.scheduler.schedule_partition_to_compact(&p).await.unwrap();
-        //     println!("QQQ P {:#?} {:#?}", p, r);
-        // }
-
+        let partitions = services.meta_store.partition_table().all_rows().await.unwrap();
+        let scheduler = services.scheduler.clone();
+        join_all(partitions.iter().map(|p| scheduler.schedule_partition_to_compact(&p))).await.into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        let jobs = partitions.iter().map(|p| (RowKey::Table(TableId::Partitions, p.get_id()), JobType::PartitionCompaction)).collect::<Vec<_>>();
         let listener = services.cluster.job_result_listener();
-        let wait = listener.wait_for_job_results(vec![
-            (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
-        ]);
-        wait.await.unwrap();
-        // timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
-
-        println!("QQQ C/P 2 {:#?}", services.meta_store.get_chunks_by_partition(2, false).await.unwrap());
+        timeout(Duration::from_secs(10), listener.wait_for_job_results(jobs)).await.unwrap().unwrap();
 
         let r = services.sql_service.exec_query("SELECT repo FROM test.table GROUP BY repo").await.unwrap();
         let repos = to_rows(&r).iter().map(|row| {
@@ -87,15 +71,16 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
             }
         }).collect::<Vec<_>>();
         assert_eq!(repos.len(), 51533);
-        let state = ParquetMetadataCacheBenchState { repos: Arc::new(repos) };
+
+        let state = ParquetMetadataCacheBenchState {};
         // warmup metadata cache
         self.bench(services, &state).await;
+
         state
     }
 
     async fn bench(self: &Self, services: &CubeServices, state: &ParquetMetadataCacheBenchState) {
-        let repo = &state.repos[12345];
-        assert_eq!(repo, "2degrees/twod.wsgi");
+        let repo = "2degrees/twod.wsgi";
         let r = services.sql_service.exec_query(format!("SELECT COUNT(*) FROM test.table WHERE repo = '{}' GROUP BY repo", repo).as_str()).await.unwrap();
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(6)]]);
@@ -104,7 +89,6 @@ impl Bench<ParquetMetadataCacheBenchState> for ParquetMetadataCacheBench {
 
 fn inline_bench(criterion: &mut Criterion) {
     let bench = Arc::new(ParquetMetadataCacheBench {});
-
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
     let config = Config::test(bench.name()).update_config(|mut c| {
         c.partition_split_threshold = 10_000_000;

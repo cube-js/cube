@@ -1,3 +1,4 @@
+use std::backtrace::Backtrace;
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
@@ -687,6 +688,8 @@ impl SchedulerImpl {
         &self,
         p: &IdRow<Partition>,
     ) -> Result<(), CubeError> {
+        // println!("SSS {:#?} {:#?}", p, Backtrace::capture());
+        // println!("SSS {:#?}", p);
         let node = self.cluster.node_name_by_partition(p);
         let job = self
             .meta_store

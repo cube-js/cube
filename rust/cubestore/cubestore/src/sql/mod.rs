@@ -2550,6 +2550,9 @@ mod tests {
                 "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25), (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
             ).await.unwrap();
 
+            println!("TTT {:#?}", services.meta_store.all_jobs().await.unwrap());
+            // assert_eq!(1, 2);
+
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
             ]);
