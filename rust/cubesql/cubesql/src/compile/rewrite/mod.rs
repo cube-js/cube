@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
-// trace_macros!(false);
+// trace_macros!(true);
 
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
