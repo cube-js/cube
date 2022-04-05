@@ -10,7 +10,8 @@ fn bench_main(criterion: &mut Criterion) {
     for bench in benches.iter() {
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-        let config = Config::test(bench.name()).update_config(|mut c| {
+        let name = format!("in-process::{}", bench.name());
+        let config = Config::test(name.as_str()).update_config(|mut c| {
             c.partition_split_threshold = 10_000_000;
             c.max_partition_split_threshold = 10_000_000;
             c.max_cached_queries = 0;
@@ -28,7 +29,7 @@ fn bench_main(criterion: &mut Criterion) {
                 (services, state)
             });
 
-            criterion.bench_function(bench.name(), |b| {
+            criterion.bench_function(name.as_str(), |b| {
                 b.to_async(&runtime).iter(|| async {
                     let bench = bench.clone();
                     let services = services.clone();
