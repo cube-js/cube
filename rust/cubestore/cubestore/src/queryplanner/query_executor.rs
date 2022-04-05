@@ -292,13 +292,14 @@ impl QueryExecutorImpl {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
+    schema: SchemaRef,
+    // Filled by workers
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: Vec<(u64, RowFilter)>,
     #[serde(skip, default)]
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    schema: SchemaRef,
     #[serde(skip, default = "NoopParquetMetadataCache::new")]
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>, // injected during deserialization
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
 impl Debug for CubeTable {
