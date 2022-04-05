@@ -48,10 +48,9 @@ where
         ))
     }
 
-    let timeout = test.worker_init_timeout();
     Runtime::new_current_thread().inner().block_on(async move {
         // Wait until the workers are ready.
-        tokio::time::timeout(timeout, async move {
+        tokio::time::timeout(test.worker_init_timeout(), async move {
             let mut recv_init = recv_inits;
             for _ in 0..num_workers as usize {
                 recv_init = tokio::task::spawn_blocking(move || {
@@ -64,59 +63,11 @@ where
         })
         .await
         .expect("starting the processes took too long");
-    });
 
-    Runtime::new_current_thread().inner().block_on(async move {
         // Finally start the main node and run the tests.
         tokio::time::timeout(timeout, test.drive())
             .await
             .expect("executing the test took too long");
-    });
-}
-
-pub fn start_multiproc_workers<T>(test: T)
-where
-    T: MultiProcTest,
-    T::WorkerArgs: Serialize + DeserializeOwned,
-    T::WorkerProc: WorkerProc<T::WorkerArgs>,
-{
-    let timeout = test.timeout();
-
-    // Start worker processes. Each process sends an empty IPC message to indicate it is ready.
-    let (send_init, recv_inits) = ipc_channel::ipc::bytes_channel().unwrap();
-    let worker_inputs = test.worker_arguments();
-    let num_workers = worker_inputs.len();
-    let mut join_workers = Vec::with_capacity(num_workers);
-    for inputs in worker_inputs {
-        let (send_done, recv_done) = ipc_channel::ipc::bytes_channel().unwrap();
-        let args = (send_init.clone(), recv_done, inputs, timeout);
-        let handle = respawn(args, &[], &[]).unwrap();
-        // Ensure we signal completion to all started workers even if errors occur along the way.
-        join_workers.push(scopeguard::guard(
-            (send_done, handle),
-            |(send_done, mut handle)| {
-                ack_error(send_done.send(&[]));
-                ack_error(handle.wait());
-            },
-        ))
-    }
-
-    let timeout = test.worker_init_timeout();
-    Runtime::new_current_thread().inner().block_on(async move {
-        // Wait until the workers are ready.
-        tokio::time::timeout(timeout, async move {
-            let mut recv_init = recv_inits;
-            for _ in 0..num_workers as usize {
-                recv_init = tokio::task::spawn_blocking(move || {
-                    recv_init.recv().unwrap();
-                    recv_init
-                })
-                .await
-                .unwrap();
-            }
-        })
-        .await
-        .expect("starting the processes took too long");
     });
 }
 
@@ -211,12 +162,12 @@ fn ack_error<R, E: Debug>(r: Result<R, E>) -> () {
 }
 
 /// Ensures we do not wait indefinitely for blocking tasks on drop. Really important for tests.
-pub struct Runtime {
+struct Runtime {
     rt: Option<tokio::runtime::Runtime>,
 }
 
 impl Runtime {
-    pub fn new_current_thread() -> Runtime {
+    fn new_current_thread() -> Runtime {
         Self::wrap(
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -225,11 +176,11 @@ impl Runtime {
         )
     }
 
-    pub fn inner(&self) -> &tokio::runtime::Runtime {
+    fn inner(&self) -> &tokio::runtime::Runtime {
         self.rt.as_ref().unwrap()
     }
 
-    pub fn wrap(rt: tokio::runtime::Runtime) -> Runtime {
+    fn wrap(rt: tokio::runtime::Runtime) -> Runtime {
         Runtime { rt: Some(rt) }
     }
 }
