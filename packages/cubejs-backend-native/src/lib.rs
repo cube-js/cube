@@ -1,5 +1,4 @@
 #![feature(async_closure)]
-#![feature(raw)]
 
 mod auth;
 mod channel;
