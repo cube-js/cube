@@ -48,6 +48,7 @@ use arrow::datatypes::{DataType, Field};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::{fmt, mem};
+use std::backtrace::Backtrace;
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
@@ -1964,6 +1965,13 @@ fn meta_store_merge(
     Some(result)
 }
 
+impl Drop for RocksMetaStore {
+    fn drop(&mut self) {
+        // println!("no more rocks {:#?}", Backtrace::capture());
+        println!("no more rocks");
+    }
+}
+
 impl RocksMetaStore {
     pub fn with_listener(
         path: impl AsRef<Path>,
@@ -1986,6 +1994,7 @@ impl RocksMetaStore {
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
+        println!("rocks on the blocks");
         let db = DB::open(&opts, path).unwrap();
         let db_arc = Arc::new(db);
 

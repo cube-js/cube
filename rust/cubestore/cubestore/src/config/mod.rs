@@ -49,6 +49,13 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
 
+pub struct Bobo {}
+impl Drop for Bobo {
+    fn drop(&mut self) {
+        println!("No more Bobo :(")
+    }
+}
+
 #[derive(Clone)]
 pub struct CubeServices {
     pub injector: Arc<Injector>,
@@ -58,6 +65,7 @@ pub struct CubeServices {
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
     pub remote_fs: Arc<QueueRemoteFs>,
+    pub bobo: Arc<Bobo>,
 }
 
 #[derive(Clone)]
@@ -1210,6 +1218,7 @@ impl Config {
             meta_store: self.injector.get_service_typed().await,
             cluster: self.injector.get_service_typed().await,
             remote_fs: self.injector.get_service_typed().await,
+            bobo: Arc::new(Bobo {}),
         }
     }
 
