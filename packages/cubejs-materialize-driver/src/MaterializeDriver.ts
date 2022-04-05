@@ -1,13 +1,8 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
-import { PoolClient, types } from 'pg';
+import { PoolClient } from 'pg';
 import Stream from './Stream';
 
-const NativeTypeToPostgresType: Record<string, string> = {};
-
-Object.entries(types.builtins).forEach(([key, value]) => {
-  NativeTypeToPostgresType[value] = key;
-});
 export class MaterializeDriver extends PostgresDriver {
   public constructor(options: PostgresDriverConfiguration) {
     super(options);
