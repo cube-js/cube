@@ -1,8 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4147
-expression: "execute_query(\"show full tables;\".to_string()).await?"
-
+assertion_line: 4684
+expression: "execute_query(\"show full tables;\".to_string(), DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+------------+
 | Tables_in_db              | Table_type |

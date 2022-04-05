@@ -1,9 +1,14 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{backtrace::Backtrace, env, fmt};
 
 use chrono::{prelude::*, Duration};
 
 use datafusion::arrow::datatypes::DataType;
+use datafusion::execution::context::{
+    default_session_builder, SessionConfig as DFSessionConfig, SessionContext as DFSessionContext,
+};
+use datafusion::logical_plan::plan::{Extension, Projection};
 use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr};
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -278,7 +283,9 @@ fn function_arguments_unpack2<'a>(
     fn_name: String,
 ) -> CompilationResult<(&'a ast::Expr, &'a ast::Expr)> {
     match f.args.as_slice() {
-        [ast::FunctionArg::Unnamed(arg1), ast::FunctionArg::Unnamed(arg2)] => Ok((arg1, arg2)),
+        [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg1)), ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg2))] => {
+            Ok((&arg1, &arg2))
+        }
         _ => Err(CompilationError::User(format!(
             "Unsupported signature for {} function: {:?}",
             fn_name, f
@@ -328,7 +335,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
 // Extracts the date part of the date or datetime expression expr.
 fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<CompiledExpression> {
     let date_expr = match f.args.as_slice() {
-        [ast::FunctionArg::Unnamed(date_expr)] => date_expr,
+        [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(date_expr))] => date_expr,
         _ => {
             return Err(CompilationError::User(format!(
                 "Unsupported signature for DATE function: {:?}",
@@ -1520,7 +1527,7 @@ impl QueryPlanner {
             let projection_expr = query.meta_as_df_projection_expr();
             let projection_schema = query.meta_as_df_projection_schema();
 
-            let scan_node = LogicalPlan::Extension {
+            let scan_node = LogicalPlan::Extension(Extension {
                 node: Arc::new(CubeScanNode::new(
                     schema.clone(),
                     schema
@@ -1532,13 +1539,13 @@ impl QueryPlanner {
                     // @todo Remove after split!
                     Arc::new(self.state.auth_context().unwrap()),
                 )),
-            };
-            let logical_plan = LogicalPlan::Projection {
+            });
+            let logical_plan = LogicalPlan::Projection(Projection {
                 expr: projection_expr,
                 input: Arc::new(scan_node),
                 schema: projection_schema,
                 alias: None,
-            };
+            });
 
             let ctx = self.create_execution_ctx();
             Ok(QueryPlan::DataFusionSelect(
@@ -2135,13 +2142,18 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ))
     }
 
-    fn create_execution_ctx(&self) -> ExecutionContext {
-        let mut ctx = ExecutionContext::with_config(
-            ExecutionConfig::new()
-                .with_query_planner(Arc::new(CubeQueryPlanner::new(
-                    self.session_manager.server.transport.clone(),
-                )))
-                .with_information_schema(false),
+    fn create_execution_ctx(&self) -> DFSessionContext {
+        let query_planner = Arc::new(CubeQueryPlanner::new(
+            self.session_manager.server.transport.clone(),
+        ));
+        let mut ctx = DFSessionContext::with_state(
+            default_session_builder(
+                DFSessionConfig::new()
+                    .create_default_catalog_and_schema(false)
+                    .with_information_schema(false)
+                    .with_default_catalog_and_schema("db", "public"),
+            )
+            .with_query_planner(query_planner),
         );
 
         if self.state.protocol == DatabaseProtocol::MySQL {
@@ -2149,6 +2161,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
             let user_defined_variable_provider =
                 VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
+
             ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
             ctx.register_variable(
                 VarType::UserDefined,
@@ -2156,6 +2169,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             );
         }
 
+        // udf
         ctx.register_udf(create_version_udf());
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
         ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
@@ -2186,7 +2200,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_str_to_date());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
-
+        // udaf
         ctx.register_udaf(create_measure_udaf());
 
         ctx
@@ -2195,9 +2209,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
         let ctx = self.create_execution_ctx();
 
-        let state = Arc::new(ctx.state.lock().unwrap().clone());
+        let df_state = Arc::new(ctx.state.write().clone());
         let cube_ctx = CubeContext::new(
-            state,
+            df_state,
             self.meta.clone(),
             self.session_manager.clone(),
             self.state.clone(),
@@ -2205,7 +2219,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
 
         let plan = df_query_planner
-            .statement_to_plan(&DFStatement::Statement(stmt))
+            .statement_to_plan(DFStatement::Statement(Box::new(stmt)))
             .map_err(|err| {
                 CompilationError::Internal(format!("Initial planning error: {}", err))
             })?;
@@ -2284,7 +2298,7 @@ impl CompiledQuery {
             ));
         }
 
-        DFSchemaRef::new(DFSchema::new(fields).unwrap())
+        DFSchemaRef::new(DFSchema::new_with_metadata(fields, HashMap::new()).unwrap())
     }
 
     pub fn meta_as_df_schema(&self) -> Arc<DFSchema> {
@@ -2310,7 +2324,7 @@ impl CompiledQuery {
             }
         }
 
-        DFSchemaRef::new(DFSchema::new(fields).unwrap())
+        DFSchemaRef::new(DFSchema::new_with_metadata(fields, HashMap::new()).unwrap())
     }
 }
 
@@ -2320,7 +2334,7 @@ pub enum QueryPlan {
     MetaOk(StatusFlags),
     MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
-    DataFusionSelect(StatusFlags, LogicalPlan, ExecutionContext),
+    DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
 }
 
 impl QueryPlan {
@@ -2365,7 +2379,7 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
-    use datafusion::execution::dataframe_impl::DataFrameImpl;
+    use datafusion::dataframe::DataFrame as DFDataFrame;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -2557,8 +2571,8 @@ mod tests {
             type Error = CubeError;
 
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::Extension { node } = plan {
-                    if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
+                if let LogicalPlan::Extension(ext) = plan {
+                    if let Some(scan_node) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
                         self.0 = Some(scan_node.clone());
                     }
                 }
@@ -2580,7 +2594,7 @@ mod tests {
     impl LogicalPlanTestUtils for LogicalPlan {
         fn find_projection_schema(&self) -> DFSchemaRef {
             match self {
-                LogicalPlan::Projection { schema, .. } => schema.clone(),
+                LogicalPlan::Projection(proj) => proj.schema.clone(),
                 _ => panic!("Root plan node is not projection!"),
             }
         }
@@ -2966,10 +2980,13 @@ mod tests {
         assert_eq!(
             logical_plan.schema().clone(),
             Arc::new(
-                DFSchema::new(vec![
-                    DFField::new(None, "order_date", DataType::Utf8, false),
-                    DFField::new(None, "customer_gender", DataType::Utf8, false),
-                ])
+                DFSchema::new_with_metadata(
+                    vec![
+                        DFField::new(None, "order_date", DataType::Utf8, false),
+                        DFField::new(None, "customer_gender", DataType::Utf8, false),
+                    ],
+                    HashMap::new()
+                )
                 .unwrap()
             ),
         );
@@ -4191,7 +4208,7 @@ mod tests {
         let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
-                let df = DataFrameImpl::new(ctx.state, &plan);
+                let df = DFDataFrame::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let frame = batch_to_dataframe(&batches)?;
 

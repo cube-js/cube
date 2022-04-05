@@ -15,11 +15,11 @@ use datafusion::{
         record_batch::RecordBatch,
     },
     error::{DataFusionError, Result},
-    execution::context::ExecutionContextState,
+    execution::context::SessionState,
     logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode},
     physical_plan::{
-        planner::ExtensionPlanner, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalPlanner,
-        RecordBatchStream, SendableRecordBatchStream, Statistics,
+        expressions::PhysicalSortExpr, planner::ExtensionPlanner, DisplayFormatType, ExecutionPlan,
+        Partitioning, PhysicalPlanner, RecordBatchStream, SendableRecordBatchStream, Statistics,
     },
 };
 use futures::Stream;
@@ -29,6 +29,7 @@ use crate::{sql::AuthContext, transport::TransportService};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::array::TimestampNanosecondBuilder;
 use datafusion::arrow::datatypes::TimeUnit;
+use datafusion::execution::context::TaskContext;
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
@@ -110,7 +111,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
         node: &dyn UserDefinedLogicalNode,
         logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        _ctx_state: &ExecutionContextState,
+        _session_state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         Ok(
             if let Some(scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
@@ -348,6 +349,10 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         Partitioning::UnknownPartitioning(1)
     }
 
+    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
+        None
+    }
+
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
         vec![]
     }
@@ -362,7 +367,11 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         )))
     }
 
-    async fn execute(&self, _partition: usize) -> Result<SendableRecordBatchStream> {
+    async fn execute(
+        &self,
+        _partition: usize,
+        _context: Arc<TaskContext>,
+    ) -> Result<SendableRecordBatchStream> {
         let result = self
             .transport
             .load(self.request.clone(), self.auth_context.clone())
@@ -459,8 +468,13 @@ mod tests {
             array::{BooleanArray, Float64Array, StringArray},
             datatypes::{Field, Schema},
         },
+        execution::{
+            context::TaskContext,
+            runtime_env::{RuntimeConfig, RuntimeEnv},
+        },
         physical_plan::common,
     };
+    use std::collections::HashMap;
 
     use super::*;
     use crate::{compile::MetaContext, CubeError};
@@ -549,7 +563,18 @@ mod tests {
             transport: get_test_transport(),
         };
 
-        let stream = scan_node.execute(0).await.unwrap();
+        let runtime = Arc::new(
+            RuntimeEnv::new(RuntimeConfig::new()).expect("Unable to create RuntimeEnv for testing"),
+        );
+        let task = Arc::new(TaskContext::new(
+            "test".to_string(),
+            "session".to_string(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            runtime,
+        ));
+        let stream = scan_node.execute(0, task).await.unwrap();
         let batches = common::collect(stream).await.unwrap();
 
         assert_eq!(

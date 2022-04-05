@@ -202,6 +202,17 @@ macro_rules! variant_field_struct {
                 AggregateFunction::Max => "Max",
                 AggregateFunction::Avg => "Avg",
                 AggregateFunction::ApproxDistinct => "ApproxDistinct",
+                AggregateFunction::ArrayAgg => "ArrayAgg",
+                AggregateFunction::Variance => "Variance",
+                AggregateFunction::VariancePop => "VariancePop",
+                AggregateFunction::Stddev => "Stddev",
+                AggregateFunction::StddevPop => "StddevPop",
+                AggregateFunction::Covariance => "Covariance",
+                AggregateFunction::CovariancePop => "CovariancePop",
+                AggregateFunction::Correlation => "Correlation",
+                AggregateFunction::ApproxPercentileCont => "ApproxPercentileCont",
+                AggregateFunction::ApproxPercentileContWithWeight => "ApproxPercentileContWithWeight",
+                AggregateFunction::ApproxMedian => "ApproxMedian",
             }
         );
     };
@@ -303,6 +314,8 @@ macro_rules! variant_field_struct {
                 Operator::RegexNotIMatch => "!~*",
                 Operator::IsDistinctFrom => "IS_DISTINCT_FROM",
                 Operator::IsNotDistinctFrom => "IS_NOT_DISTINCT_FROM",
+                Operator::BitwiseAnd => "&",
+                Operator::BitwiseOr => "|",
             }
         );
     };
