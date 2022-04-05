@@ -6,7 +6,6 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
-use datafusion::execution::dataframe_impl::DataFrameImpl;
 use datafusion::prelude::DataFrame as DFDataFrame;
 
 use log::debug;
@@ -207,7 +206,7 @@ impl MySqlConnection {
                     return Ok(QueryResponse::ResultSet(status, data_frame));
                 },
                 crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
-                    let df = DataFrameImpl::new(
+                    let df = DFDataFrame::new(
                         ctx.state,
                         &plan,
                     );

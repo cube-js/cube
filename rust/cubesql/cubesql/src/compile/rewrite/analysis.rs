@@ -15,7 +15,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{DFSchema, Expr};
 use datafusion::physical_plan::functions::Volatility;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-use datafusion::physical_plan::ColumnarValue;
+use datafusion::physical_plan::{ColumnarValue, PhysicalPlanner};
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::ContextProvider;
 use egg::{Analysis, DidMerge};

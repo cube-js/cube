@@ -1058,6 +1058,8 @@ impl MemberRules {
                                         AggregateFunction::Max => "max",
                                         AggregateFunction::Avg => "avg",
                                         AggregateFunction::ApproxDistinct => "countDistinctApprox",
+                                        // TODO: Fix me
+                                        _ => "unknown_aggregation_type_hardcoded",
                                     })
                                 };
 

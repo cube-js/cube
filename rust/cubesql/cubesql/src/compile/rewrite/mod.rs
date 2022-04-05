@@ -10,7 +10,7 @@ use crate::CubeError;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::{Column, ExprRewriter};
+use datafusion::logical_plan::{Column, ExprRewritable, ExprRewriter};
 use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::functions::BuiltinScalarFunction;
@@ -108,6 +108,7 @@ crate::plan_to_language! {
             column: Column,
         },
         ScalarVariableExpr {
+            data_type: DataType,
             variable: Vec<String>,
         },
         LiteralExpr { value: ScalarValue, },
