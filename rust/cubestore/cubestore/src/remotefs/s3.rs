@@ -281,10 +281,10 @@ impl RemoteFs for S3RemoteFs {
 impl S3RemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
-            "{}/{}",
+            "{}{}",
             self.sub_path
                 .as_ref()
-                .map(|p| p.to_string())
+                .map(|p| format!("{}/", p.to_string()))
                 .unwrap_or_else(|| "".to_string()),
             remote_path
         )
