@@ -688,8 +688,6 @@ impl SchedulerImpl {
         &self,
         p: &IdRow<Partition>,
     ) -> Result<(), CubeError> {
-        // println!("SSS {:#?} {:#?}", p, Backtrace::capture());
-        // println!("SSS {:#?}", p);
         let node = self.cluster.node_name_by_partition(p);
         let job = self
             .meta_store

@@ -2,6 +2,7 @@
 #![feature(test)]
 
 pub use crate::tests::{to_rows, TestFn};
+pub use crate::benches::cubestore_benches;
 extern crate test;
 use async_trait::async_trait;
 use cubestore::sql::{QueryPlans, SqlService};
@@ -20,6 +21,7 @@ pub mod multiproc;
 #[allow(unused_parens, non_snake_case)]
 mod rows;
 mod tests;
+mod benches;
 
 #[async_trait]
 pub trait SqlClient: Send + Sync {
