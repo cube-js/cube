@@ -2631,7 +2631,7 @@ mod tests {
             service.exec_query(
                 "INSERT INTO foo.table (t) VALUES (NULL), (1), (3), (5), (10), (20), (25), (25), (25), (25), (25), (NULL), (NULL), (NULL), (2), (4), (5), (27), (28), (29)"
             ).await.unwrap();
-            
+
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::PartitionCompaction),
             ]);
