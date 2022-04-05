@@ -65,7 +65,6 @@ use rocksdb::backup::BackupEngineOptions;
 use rocksdb::checkpoint::Checkpoint;
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
-use std::backtrace::Backtrace;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
@@ -4220,8 +4219,6 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
-        // println!("JJJ {:#?} {:#?}", job, Backtrace::capture());
-        // println!("JJJ {:#?}", job);
         self.write_operation(move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref.clone());
 
