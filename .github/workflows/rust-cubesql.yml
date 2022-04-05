@@ -28,7 +28,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt, clippy
       - name: Lint CubeSQL
@@ -55,7 +55,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
@@ -101,7 +101,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
@@ -162,7 +162,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}

@@ -440,6 +440,8 @@ macro_rules! variant_field_struct {
 
             impl core::hash::Hash for [<$variant $var_field:camel>] {
                 fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+                    // @todo Care about enums
+                    #[allow(enum_intrinsics_non_enums)]
                     std::mem::discriminant(&self.0).hash(state);
                 }
             }

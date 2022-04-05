@@ -85,6 +85,14 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
+pub fn ensure_temp_file_is_dropped(path: String) {
+    if std::fs::metadata(path.clone()).is_ok() {
+        if let Err(e) = std::fs::remove_file(path) {
+            log::error!("Error during cleaning up temp file: {}", e);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LocalDirRemoteFs {
     remote_dir_for_debug: Option<PathBuf>,

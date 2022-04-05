@@ -7,7 +7,7 @@ import styled from 'styled-components';
 import { useMemo } from 'react';
 import 'graphiql/graphiql.min.css';
 
-import useDeepMemo from '../../hooks/deep-memo';
+import { useDeepMemo } from '../../hooks/deep-memo';
 import { metaToTypes } from '../../utils';
 import { CubeGraphQLConverter } from './CubeGraphQLConverter';
 import { useSecurityContext, useToken } from '../../hooks';

@@ -32,6 +32,7 @@ use crate::compile::rewrite::ProjectionAlias;
 use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::ScalarUDFExprFun;
 use crate::compile::rewrite::ScalarVariableExprVariable;
+use crate::compile::rewrite::SegmentMemberMember;
 use crate::compile::rewrite::SortExprAsc;
 use crate::compile::rewrite::SortExprNullsFirst;
 use crate::compile::rewrite::TableScanLimit;
@@ -1059,9 +1060,10 @@ impl LanguageToLogicalPlanConverter {
                         fn to_filter(
                             filters: Vec<LogicalPlanLanguage>,
                             node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
-                        ) -> Result<Vec<V1LoadRequestQueryFilterItem>, CubeError>
+                        ) -> Result<(Vec<V1LoadRequestQueryFilterItem>, Vec<String>), CubeError>
                         {
                             let mut result = Vec::new();
+                            let mut segments_result = Vec::new();
                             for f in filters {
                                 match f {
                                     LogicalPlanLanguage::FilterOp(params) => {
@@ -1072,7 +1074,7 @@ impl LanguageToLogicalPlanConverter {
                                         );
                                         let op =
                                             match_data_node!(node_by_id, params[1], FilterOpOp);
-                                        let filters = to_filter(filters, node_by_id)?;
+                                        let (filters, segments) = to_filter(filters, node_by_id)?;
                                         match op.as_str() {
                                             "and" => {
                                                 result.push(V1LoadRequestQueryFilterItem {
@@ -1087,6 +1089,7 @@ impl LanguageToLogicalPlanConverter {
                                                             .collect(),
                                                     ),
                                                 });
+                                                segments_result.extend(segments);
                                             }
                                             "or" => {
                                                 result.push(V1LoadRequestQueryFilterItem {
@@ -1101,6 +1104,11 @@ impl LanguageToLogicalPlanConverter {
                                                     ),
                                                     and: None,
                                                 });
+                                                if !segments.is_empty() {
+                                                    return Err(CubeError::internal(
+                                                        "Can't or segments".to_string(),
+                                                    ));
+                                                }
                                             }
                                             x => panic!("Unsupported filter operator: {}", x),
                                         }
@@ -1130,16 +1138,30 @@ impl LanguageToLogicalPlanConverter {
                                             and: None,
                                         });
                                     }
+                                    LogicalPlanLanguage::SegmentMember(params) => {
+                                        let member = match_data_node!(
+                                            node_by_id,
+                                            params[0],
+                                            SegmentMemberMember
+                                        );
+                                        segments_result.push(member);
+                                    }
                                     x => panic!("Expected filter but found {:?}", x),
                                 }
                             }
-                            Ok(result)
+                            Ok((result, segments_result))
                         }
 
-                        let filters = to_filter(filters, node_by_id)?;
+                        let (filters, segments) = to_filter(filters, node_by_id)?;
 
                         query.filters = if filters.len() > 0 {
                             Some(filters)
+                        } else {
+                            None
+                        };
+
+                        query.segments = if segments.len() > 0 {
+                            Some(segments)
                         } else {
                             None
                         };

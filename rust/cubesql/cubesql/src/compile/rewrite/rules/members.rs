@@ -180,6 +180,15 @@ impl RewriteRules for MemberRules {
                 self.transform_projection_member("?source_table_name", "?column", None, "?member"),
             ),
             transforming_rewrite(
+                "projection-segment",
+                member_replacer(
+                    projection_expr(column_expr("?column"), "?tail_group_expr"),
+                    "?source_table_name",
+                ),
+                member_replacer("?tail_group_expr", "?source_table_name"),
+                self.transform_segment("?source_table_name", "?column"),
+            ),
+            transforming_rewrite(
                 "member-replacer-dimension",
                 member_replacer(
                     aggr_group_expr(column_expr("?column"), "?tail_group_expr"),
@@ -792,6 +801,39 @@ impl MemberRules {
                                 );
                                 return true;
                             }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_segment(
+        &self,
+        cube_var: &'static str,
+        column_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = cube_var.parse().unwrap();
+        let column_var = column_var.parse().unwrap();
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for member_name in
+                var_iter!(egraph[subst[column_var]], ColumnExprColumn).map(|c| c.name.to_string())
+            {
+                for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName) {
+                    if let Some(cube) = meta_context
+                        .cubes
+                        .iter()
+                        .find(|c| c.name.eq_ignore_ascii_case(cube_name))
+                    {
+                        let member_name = format!("{}.{}", cube_name, member_name);
+                        if let Some(_) = cube
+                            .segments
+                            .iter()
+                            .find(|d| d.name.eq_ignore_ascii_case(&member_name))
+                        {
+                            return true;
                         }
                     }
                 }

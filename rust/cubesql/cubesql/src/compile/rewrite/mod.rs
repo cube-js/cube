@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
-// trace_macros!(false);
+// trace_macros!(true);
 
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
@@ -198,6 +198,9 @@ crate::plan_to_language! {
             member: String,
             op: String,
             values: Vec<String>,
+        },
+        SegmentMember {
+            member: String,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
@@ -549,6 +552,10 @@ fn filter_op_filters(left: impl Display, right: impl Display) -> String {
 
 fn filter_member(member: impl Display, op: impl Display, values: impl Display) -> String {
     format!("(FilterMember {} {} {})", member, op, values)
+}
+
+fn segment_member(member: impl Display) -> String {
+    format!("(SegmentMember {})", member)
 }
 
 fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {

@@ -3,12 +3,13 @@ title: "Getting Started with Cube Cloud: Create a project"
 permalink: /cloud/getting-started/create
 ---
 
-This guide walks you through creating a deployment on Cube Cloud and connecting your Cube project to your
-database.
+This guide walks you through setting up Cube Cloud and connecting your Cube project to your database.
 
-## Step 1: Create a new Deployment
+## Step 1: Create an account
 
-The first step of creating a Cube application from scratch in Cube Cloud is to create a deployment.
+Navigate to [cubecloud.dev](https://cubecloud.dev/), and create a new Cube Cloud account.
+
+## Step 2: Create a new Deployment
 
 Click the `Create Deployment` button. This is the first step in the deployment creation. Give
 it a name and select the cloud provider and region of your choice.
@@ -24,7 +25,7 @@ it a name and select the cloud provider and region of your choice.
   />
 </div>
 
-## Step 2: Set up the Cube project from scratch
+## Step 3: Set up the Cube project from scratch
 
 Next up, the second step in creating a Cube App from scratch in Cube Cloud is to click the `+ create` button.
 
@@ -39,7 +40,7 @@ Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
   />
 </div>
 
-## Step 3: Connect your Database
+## Step 4: Connect your Database
 
 Enter your credentials to connect to your database. Check the [connecting to
 databases][link-connecting-to-databases] guide for more details.
@@ -91,7 +92,7 @@ In the UI it'll look exactly like the image below.
 
 If you run into issues here, make sure to allow the Cube Cloud IPs to access your database. This means you need to enable these IPs in your firewall. If you are using AWS, this would mean adding a security group with allowed IPs.
 
-## Step 4: Generate the Data Schema
+## Step 5: Generate the Data Schema
 
 Step four in this case consists of generating a data schema. Start by selecting the database tables to generate the data schema from, then hit `generate`.
 
@@ -121,7 +122,7 @@ Cube Cloud will generate the data schema and spin up your Cube deployment. With 
 
 You're ready for the last step, running queries in the Playground.
 
-## Step 5: Try out Cube Cloud
+## Step 6: Try out Cube Cloud
 
 Now you can navigate to Playground to try out your queries or connect your
 application to Cube Cloud API.
