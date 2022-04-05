@@ -4,7 +4,7 @@ use crate::CubeError;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::parquet::ParquetMetadataCache;
+use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
 use parquet::arrow::{ArrowReader, ArrowWriter};
 use parquet::file::properties::{WriterProperties, WriterVersion};
 use std::fs::File;
@@ -39,12 +39,11 @@ impl CubestoreParquetMetadataCache for CubestoreParquetMetadataCacheImpl {
 pub struct ParquetTableStore {
     table: Index,
     row_group_size: usize,
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let mut r = self.parquet_metadata_cache.arrow_reader(path)?;
+        let mut r = NoopParquetMetadataCache::new().arrow_reader(path)?;
         let mut batches = Vec::new();
         for b in r.get_record_reader(self.row_group_size)? {
             batches.push(b?)
@@ -57,12 +56,10 @@ impl ParquetTableStore {
     pub fn new(
         table: Index,
         row_group_size: usize,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     ) -> ParquetTableStore {
         ParquetTableStore {
             table,
             row_group_size,
-            parquet_metadata_cache,
         }
     }
 
@@ -157,7 +154,7 @@ mod tests {
         .unwrap();
 
         let dest_file = NamedTempFile::new().unwrap();
-        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE, NoopParquetMetadataCache::new());
+        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE);
 
         let data: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(vec![
@@ -246,7 +243,6 @@ mod tests {
             )
             .unwrap(),
             row_group_size: 10,
-            parquet_metadata_cache: NoopParquetMetadataCache::new(),
         };
         let file = NamedTempFile::new().unwrap();
         let file_name = file.path().to_str().unwrap();
@@ -309,7 +305,6 @@ mod tests {
             ParquetTableStore::new(
                 store.table.clone(),
                 store.row_group_size,
-                NoopParquetMetadataCache::new(),
             ),
             vec![split_1.to_string(), split_2.to_string()],
         )
@@ -362,7 +357,7 @@ mod tests {
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
             let store =
-                ParquetTableStore::new(index.clone(), NUM_ROWS, NoopParquetMetadataCache::new());
+                ParquetTableStore::new(index.clone(), NUM_ROWS);
             store
                 .write_data(
                     tmp_file.path().to_str().unwrap(),
@@ -418,7 +413,7 @@ mod tests {
 
         let data = rows_to_columns(&index.columns(), &rows);
 
-        let w = ParquetTableStore::new(index.clone(), NUM_ROWS, NoopParquetMetadataCache::new());
+        let w = ParquetTableStore::new(index.clone(), NUM_ROWS);
         w.write_data(file, data.clone()).unwrap();
         let r = concat_record_batches(&w.read_columns(file).unwrap());
         assert_eq_columns!(r.columns(), &data);

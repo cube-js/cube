@@ -159,7 +159,6 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
-    parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
@@ -283,7 +282,6 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
-        parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
@@ -291,7 +289,6 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            parquet_metadata_cache,
             config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
@@ -471,7 +468,6 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk).await?;
-            let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
                 let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, parquet_metadata_cache);
                 Ok(parquet.read_columns(&local_file)?)
