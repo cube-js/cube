@@ -5,7 +5,7 @@ use crate::metastore::partition::partition_file_name;
 use crate::metastore::{
     deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, Partition, PartitionData,
 };
-use crate::remotefs::RemoteFs;
+use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
@@ -208,6 +208,13 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let new_local_files2 = new_local_files.clone();
+
+        let new_local_files = scopeguard::guard(new_local_files, |files| {
+            for f in files {
+                ensure_temp_file_is_dropped(f);
+            }
+        });
+
         let key_size = index.get_row().sort_key_size() as usize;
         let (store, new) = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
             // Concat rows from all chunks.
@@ -1133,7 +1140,13 @@ impl MultiSplit {
             out_remote_paths.push(remote_path);
         }
 
-        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE, NoopParquetMetadataCache::new());
+        let out_files = scopeguard::guard(out_files, |files| {
+            for f in files {
+                ensure_temp_file_is_dropped(f);
+            }
+        });
+
+        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE);
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
@@ -1149,7 +1162,7 @@ impl MultiSplit {
                 .await?
         };
         let row_counts =
-            write_to_files_by_keys(records, store, out_files.clone(), self.keys.clone()).await?;
+            write_to_files_by_keys(records, store, out_files.to_vec(), self.keys.clone()).await?;
 
         for i in 0..row_counts.len() {
             mrow_counts[i] += row_counts[i] as u64;
@@ -1163,8 +1176,8 @@ impl MultiSplit {
                 continue;
             }
             let fs = self.fs.clone();
-            let local_path = take(&mut out_files[i]);
-            let remote_path = take(&mut out_remote_paths[i]);
+            let local_path = out_files[i].to_string();
+            let remote_path = out_files[i].to_string();
             uploads.push(cube_ext::spawn(async move {
                 fs.upload_file(&local_path, &remote_path).await
             }));

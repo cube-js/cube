@@ -165,6 +165,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             unique_key_and_multi_measures_for_stream_table,
         ),
         t("divide_by_zero", divide_by_zero),
+        t(
+            "filter_multiple_in_for_decimal",
+            filter_multiple_in_for_decimal,
+        ),
         t("panic_worker", panic_worker),
     ];
 
@@ -4542,6 +4546,24 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
         r.elide_backtrace(),
         CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
     );
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[(2)]));
 }
 
 async fn panic_worker(service: Box<dyn SqlClient>) {

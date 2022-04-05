@@ -1473,11 +1473,12 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
     use crate::queryplanner::pretty_printers::pp_phys_plan;
+    use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use regex::Regex;
@@ -1615,6 +1616,87 @@ mod tests {
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[derive(Debug)]
+    pub struct FailingRemoteFs(Arc<dyn RemoteFs>);
+
+    crate::di_service!(FailingRemoteFs, [RemoteFs]);
+
+    #[async_trait::async_trait]
+    impl RemoteFs for FailingRemoteFs {
+        async fn upload_file(
+            &self,
+            _temp_upload_path: &str,
+            _remote_path: &str,
+        ) -> Result<u64, CubeError> {
+            Err(CubeError::internal("Not allowed".to_string()))
+        }
+
+        async fn download_file(
+            &self,
+            remote_path: &str,
+            expected_file_size: Option<u64>,
+        ) -> Result<String, CubeError> {
+            self.0.download_file(remote_path, expected_file_size).await
+        }
+
+        async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+            self.0.delete_file(remote_path).await
+        }
+
+        async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+            self.0.list(remote_prefix).await
+        }
+
+        async fn list_with_metadata(
+            &self,
+            remote_prefix: &str,
+        ) -> Result<Vec<RemoteFile>, CubeError> {
+            self.0.list_with_metadata(remote_prefix).await
+        }
+
+        async fn local_path(&self) -> String {
+            self.0.local_path().await
+        }
+
+        async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+            self.0.local_file(remote_path).await
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_upload_drop() {
+        Config::test("failed_upload_drop").start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn RemoteFs, _, _, _>(async move |injector| {
+                Arc::new(FailingRemoteFs(
+                    injector.get_service_typed::<QueueRemoteFs>().await,
+                ))
+            })
+                .await
+        }, async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await
+                .unwrap();
+
+            let res = service
+                .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12), (5, NULL, NULL), (6, NULL, NULL), (7, NULL, NULL), (NULL, NULL, NULL)")
+                .await;
+
+            assert!(res.is_err(), "Expected {:?} to be not allowed error", res);
+
+            let remote_fs = services.injector.get_service_typed::<QueueRemoteFs>().await;
+
+            let temp_upload = remote_fs.temp_upload_path("").await.unwrap();
+            let res = fs::read_dir(temp_upload.clone()).unwrap();
+            assert!(res.into_iter().next().is_none(), "Expected empty uploads directory but found: {:?}", fs::read_dir(temp_upload).unwrap().into_iter().map(|e| e.unwrap().path().to_string_lossy().to_string()).collect::<Vec<_>>());
+        })
+            .await;
     }
 
     #[tokio::test]

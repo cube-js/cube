@@ -12,7 +12,7 @@ use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
     MetaStore, Partition, WAL,
 };
-use crate::remotefs::RemoteFs;
+use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use arrow::datatypes::Schema;
@@ -816,6 +816,7 @@ impl ChunkStore {
             trace!("New chunk allocated during partitioning: {:?}", chunk);
             let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
             let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
+            let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
             let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {

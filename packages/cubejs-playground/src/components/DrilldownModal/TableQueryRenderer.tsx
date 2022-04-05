@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table } from 'antd';
 
-import useDeepMemo from '../../hooks/deep-memo';
+import { useDeepMemo } from '../../hooks/deep-memo';
 
 const TABLE_PAGE_SIZE = 50;
 

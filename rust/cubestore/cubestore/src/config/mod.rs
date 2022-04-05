@@ -39,6 +39,7 @@ use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
@@ -732,22 +733,60 @@ impl Config {
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(true, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            true,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(false, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            false,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
-    pub async fn start_test_with_options<T>(
+    pub async fn start_with_injector_override<T1, T2>(
+        &self,
+        configure_injector: impl FnOnce(Arc<Injector>) -> T1,
+        test_fn: impl FnOnce(CubeServices) -> T2,
+    ) where
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+    {
+        self.start_test_with_options(true, Some(configure_injector), test_fn)
+            .await
+    }
+
+    pub async fn start_test_with_options<T1, T2, I, F>(
         &self,
         clean_remote: bool,
-        test_fn: impl FnOnce(CubeServices) -> T,
+        configure_injector: Option<I>,
+        test_fn: F,
     ) where
-        T: Future<Output = ()> + Send,
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+        I: FnOnce(Arc<Injector>) -> T1,
+        F: FnOnce(CubeServices) -> T2,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -772,7 +811,11 @@ impl Config {
             }
         }
         {
-            let services = self.configure().await;
+            self.configure_injector().await;
+            if let Some(configure_injector) = configure_injector {
+                configure_injector(self.injector.clone()).await;
+            }
+            let services = self.cube_services().await;
             services.start_processing_loops().await.unwrap();
 
             // Should be long enough even for CI.
