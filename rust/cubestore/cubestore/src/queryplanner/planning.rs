@@ -46,11 +46,11 @@ use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, Ser
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::iter::FromIterator;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 
 #[cfg(test)]
 pub async fn choose_index(

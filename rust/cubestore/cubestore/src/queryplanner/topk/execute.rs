@@ -781,9 +781,9 @@ mod tests {
     use futures::StreamExt;
     use itertools::Itertools;
 
+    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use std::iter::FromIterator;
     use std::sync::Arc;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 
     #[tokio::test]
     async fn topk_simple() {

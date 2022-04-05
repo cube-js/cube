@@ -10,6 +10,7 @@ use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
+use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
 use arrow::array::{
@@ -35,7 +36,9 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache};
+use datafusion::physical_plan::parquet::{
+    NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
+};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
     collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
@@ -53,7 +56,6 @@ use std::mem::take;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
-use crate::table::parquet::CubestoreParquetMetadataCache;
 
 #[automock]
 #[async_trait]
@@ -216,7 +218,11 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(HashMap::new(), HashMap::new(), NoopParquetMetadataCache::new())?;
+        let plan_to_move = plan.logical_plan(
+            HashMap::new(),
+            HashMap::new(),
+            NoopParquetMetadataCache::new(),
+        )?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -231,7 +237,11 @@ impl QueryExecutor for QueryExecutorImpl {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(remote_to_local_names, chunk_id_to_record_batches, self.parquet_metadata_cache.cache().clone())?;
+        let plan_to_move = plan.logical_plan(
+            remote_to_local_names,
+            chunk_id_to_record_batches,
+            self.parquet_metadata_cache.cache().clone(),
+        )?;
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -244,7 +254,9 @@ impl QueryExecutor for QueryExecutorImpl {
 
 impl QueryExecutorImpl {
     pub fn new(parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>) -> Arc<Self> {
-        Arc::new(QueryExecutorImpl { parquet_metadata_cache })
+        Arc::new(QueryExecutorImpl {
+            parquet_metadata_cache,
+        })
     }
 
     fn router_context(

@@ -1481,8 +1481,8 @@ mod tests {
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
-    use regex::Regex;
     use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
+    use regex::Regex;
 
     #[tokio::test]
     async fn create_schema_test() {

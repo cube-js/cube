@@ -1,4 +1,3 @@
-use std::backtrace::Backtrace;
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobType};
@@ -18,6 +17,7 @@ use flatbuffers::bitflags::_core::cmp::Ordering;
 use flatbuffers::bitflags::_core::time::Duration;
 use futures_timer::Delay;
 use log::error;
+use std::backtrace::Backtrace;
 use std::collections::{BinaryHeap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;

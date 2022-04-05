@@ -58,12 +58,12 @@ where
                     recv_init.recv().unwrap();
                     recv_init
                 })
-                    .await
-                    .unwrap();
+                .await
+                .unwrap();
             }
         })
-            .await
-            .expect("starting the processes took too long");
+        .await
+        .expect("starting the processes took too long");
     });
 
     Runtime::new_current_thread().inner().block_on(async move {
@@ -75,10 +75,10 @@ where
 }
 
 pub fn start_multiproc_workers<T>(test: T)
-    where
-        T: MultiProcTest,
-        T::WorkerArgs: Serialize + DeserializeOwned,
-        T::WorkerProc: WorkerProc<T::WorkerArgs>,
+where
+    T: MultiProcTest,
+    T::WorkerArgs: Serialize + DeserializeOwned,
+    T::WorkerProc: WorkerProc<T::WorkerArgs>,
 {
     let timeout = test.timeout();
 
@@ -111,12 +111,12 @@ pub fn start_multiproc_workers<T>(test: T)
                     recv_init.recv().unwrap();
                     recv_init
                 })
-                    .await
-                    .unwrap();
+                .await
+                .unwrap();
             }
         })
-            .await
-            .expect("starting the processes took too long");
+        .await
+        .expect("starting the processes took too long");
     });
 }
 

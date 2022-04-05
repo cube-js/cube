@@ -1,14 +1,14 @@
+use crate::config::injection::DIService;
 use crate::metastore::Index;
 use crate::CubeError;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::parquet::ParquetMetadataCache;
 use parquet::arrow::{ArrowReader, ArrowWriter};
 use parquet::file::properties::{WriterProperties, WriterVersion};
 use std::fs::File;
 use std::sync::Arc;
-use datafusion::physical_plan::parquet::ParquetMetadataCache;
-use crate::config::injection::DIService;
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
     fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache>;
@@ -16,10 +16,13 @@ pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
 
 #[derive(Debug)]
 pub struct CubestoreParquetMetadataCacheImpl {
-    cache: Arc<dyn ParquetMetadataCache>
+    cache: Arc<dyn ParquetMetadataCache>,
 }
 
-crate::di_service!(CubestoreParquetMetadataCacheImpl, [CubestoreParquetMetadataCache]);
+crate::di_service!(
+    CubestoreParquetMetadataCacheImpl,
+    [CubestoreParquetMetadataCache]
+);
 
 impl CubestoreParquetMetadataCacheImpl {
     pub fn new(cache: Arc<dyn ParquetMetadataCache>) -> Arc<CubestoreParquetMetadataCacheImpl> {
@@ -51,7 +54,11 @@ impl ParquetTableStore {
 }
 
 impl ParquetTableStore {
-    pub fn new(table: Index, row_group_size: usize, parquet_metadata_cache: Arc<dyn ParquetMetadataCache>) -> ParquetTableStore {
+    pub fn new(
+        table: Index,
+        row_group_size: usize,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+    ) -> ParquetTableStore {
         ParquetTableStore {
             table,
             row_group_size,
@@ -113,6 +120,7 @@ mod tests {
         TimestampMicrosecondArray,
     };
     use arrow::record_batch::RecordBatch;
+    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use itertools::Itertools;
     use parquet::data_type::DataType;
     use parquet::file::reader::FileReader;
@@ -120,7 +128,6 @@ mod tests {
     use parquet::file::statistics::{Statistics, TypedStatistics};
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -299,7 +306,11 @@ mod tests {
         let count_min = compaction::write_to_files(
             to_stream(to_split_batch).await,
             to_split.len(),
-            ParquetTableStore::new(store.table.clone(), store.row_group_size, NoopParquetMetadataCache::new()),
+            ParquetTableStore::new(
+                store.table.clone(),
+                store.row_group_size,
+                NoopParquetMetadataCache::new(),
+            ),
             vec![split_1.to_string(), split_2.to_string()],
         )
         .await
@@ -350,7 +361,8 @@ mod tests {
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
-            let store = ParquetTableStore::new(index.clone(), NUM_ROWS, NoopParquetMetadataCache::new());
+            let store =
+                ParquetTableStore::new(index.clone(), NUM_ROWS, NoopParquetMetadataCache::new());
             store
                 .write_data(
                     tmp_file.path().to_str().unwrap(),

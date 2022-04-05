@@ -1,8 +1,8 @@
 #![feature(async_closure)]
 #![feature(test)]
 
-pub use crate::tests::{to_rows, TestFn};
 pub use crate::benches::cubestore_benches;
+pub use crate::tests::{to_rows, TestFn};
 extern crate test;
 use async_trait::async_trait;
 use cubestore::sql::{QueryPlans, SqlService};
@@ -15,13 +15,13 @@ use test::TestFn::DynTestFn;
 use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
 use tests::sql_tests;
 
+mod benches;
 mod files;
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
 #[allow(unused_parens, non_snake_case)]
 mod rows;
 mod tests;
-mod benches;
 
 #[async_trait]
 pub trait SqlClient: Send + Sync {

@@ -531,12 +531,12 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
+    use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
     use crate::{metastore::ColumnType, table::TableValue};
+    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use rocksdb::{Options, DB};
     use std::fs;
     use std::path::PathBuf;
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
-    use crate::table::parquet::CubestoreParquetMetadataCacheImpl;
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -820,7 +820,11 @@ impl ChunkStore {
             let local_file_copy = local_file.clone();
             let parquet_metadata_cache = self.parquet_metadata_cache.cache();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, parquet_metadata_cache);
+                let parquet = ParquetTableStore::new(
+                    index.get_row().clone(),
+                    ROW_GROUP_SIZE,
+                    parquet_metadata_cache,
+                );
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

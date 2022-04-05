@@ -25,11 +25,13 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -43,11 +45,9 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
-use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, LruParquetMetadataCache};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
-use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -519,7 +519,9 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
-    fn max_cached_metadata(&self) -> usize { self.max_cached_metadata }
+    fn max_cached_metadata(&self) -> usize {
+        self.max_cached_metadata
+    }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
@@ -1034,12 +1036,15 @@ impl Config {
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 CubestoreParquetMetadataCacheImpl::new(
-                    match i.get_service_typed::<dyn ConfigObj>()
-                    .await
-                    .max_cached_metadata() {
+                    match i
+                        .get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .max_cached_metadata()
+                    {
                         0 => NoopParquetMetadataCache::new(),
                         max_cached_metadata => LruParquetMetadataCache::new(max_cached_metadata),
-                })
+                    },
+                )
             })
             .await;
 

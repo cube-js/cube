@@ -22,6 +22,7 @@ use datafusion::logical_plan::{
     Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
     PlanVisitor,
 };
+use datafusion::physical_plan::parquet::ParquetMetadataCache;
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
@@ -29,7 +30,6 @@ use sqlparser::ast::RollingOffset;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use datafusion::physical_plan::parquet::ParquetMetadataCache;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
