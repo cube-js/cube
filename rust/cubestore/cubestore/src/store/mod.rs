@@ -812,10 +812,7 @@ impl ChunkStore {
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(
-                    index.get_row().clone(),
-                    ROW_GROUP_SIZE,
-                );
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

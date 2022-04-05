@@ -5,6 +5,8 @@ use cubestore::config::CubeServices;
 use cubestore::metastore::job::JobType;
 use cubestore::metastore::{MetaStoreTable, RowKey, TableId};
 use cubestore::table::TableValue;
+use cubestore::util::strings::path_to_string;
+use cubestore::CubeError;
 use flate2::read::GzDecoder;
 use futures::future::join_all;
 use std::io::Cursor;
@@ -12,8 +14,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tar::Archive;
 use tokio::time::timeout;
-use cubestore::CubeError;
-use cubestore::util::strings::path_to_string;
 
 pub trait BenchState: Send + Sync {}
 
@@ -21,7 +21,11 @@ pub trait BenchState: Send + Sync {}
 pub trait Bench: Send + Sync {
     fn name(self: &Self) -> &'static str;
     async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<dyn BenchState>, CubeError>;
-    async fn bench(self: &Self, services: &CubeServices, state: Arc<dyn BenchState>) -> Result<(), CubeError>;
+    async fn bench(
+        self: &Self,
+        services: &CubeServices,
+        state: Arc<dyn BenchState>,
+    ) -> Result<(), CubeError>;
 }
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
@@ -59,7 +63,11 @@ impl Bench for ParquetMetadataCacheBench {
         Ok(state)
     }
 
-    async fn bench(self: &Self, services: &CubeServices, _state: Arc<dyn BenchState>) -> Result<(), CubeError> {
+    async fn bench(
+        self: &Self,
+        services: &CubeServices,
+        _state: Arc<dyn BenchState>,
+    ) -> Result<(), CubeError> {
         let repo = "2degrees/twod.wsgi";
         let r = services
             .sql_service
@@ -92,20 +100,16 @@ async fn download_and_unzip(url: &str, filename: &str) -> Result<String, CubeErr
 }
 
 async fn compact_partitions(services: &CubeServices) -> Result<(), CubeError> {
-    let partitions = services
-        .meta_store
-        .partition_table()
-        .all_rows()
-        .await?;
+    let partitions = services.meta_store.partition_table().all_rows().await?;
     let scheduler = services.scheduler.clone();
     join_all(
         partitions
             .iter()
             .map(|p| scheduler.schedule_partition_to_compact(&p)),
     )
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
     let jobs = partitions
         .iter()
         .map(|p| {
@@ -116,7 +120,6 @@ async fn compact_partitions(services: &CubeServices) -> Result<(), CubeError> {
         })
         .collect::<Vec<_>>();
     let listener = services.cluster.job_result_listener();
-    timeout(Duration::from_secs(10), listener.wait_for_job_results(jobs))
-        .await??;
+    timeout(Duration::from_secs(10), listener.wait_for_job_results(jobs)).await??;
     Ok(())
 }

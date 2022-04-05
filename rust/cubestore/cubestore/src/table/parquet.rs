@@ -53,10 +53,7 @@ impl ParquetTableStore {
 }
 
 impl ParquetTableStore {
-    pub fn new(
-        table: Index,
-        row_group_size: usize,
-    ) -> ParquetTableStore {
+    pub fn new(table: Index, row_group_size: usize) -> ParquetTableStore {
         ParquetTableStore {
             table,
             row_group_size,
@@ -301,10 +298,7 @@ mod tests {
         let count_min = compaction::write_to_files(
             to_stream(to_split_batch).await,
             to_split.len(),
-            ParquetTableStore::new(
-                store.table.clone(),
-                store.row_group_size,
-            ),
+            ParquetTableStore::new(store.table.clone(), store.row_group_size),
             vec![split_1.to_string(), split_2.to_string()],
         )
         .await
@@ -355,8 +349,7 @@ mod tests {
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
-            let store =
-                ParquetTableStore::new(index.clone(), NUM_ROWS);
+            let store = ParquetTableStore::new(index.clone(), NUM_ROWS);
             store
                 .write_data(
                     tmp_file.path().to_str().unwrap(),

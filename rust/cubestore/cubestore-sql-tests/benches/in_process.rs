@@ -1,9 +1,9 @@
-use std::fs;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rocksdb::{DB, Options};
-use tokio::runtime::Builder;
-use cubestore::config::{Config, env_parse};
+use cubestore::config::{env_parse, Config};
 use cubestore_sql_tests::cubestore_benches;
+use rocksdb::{Options, DB};
+use std::fs;
+use tokio::runtime::Builder;
 
 fn inline_bench(criterion: &mut Criterion) {
     let benches = cubestore_benches();

@@ -181,10 +181,7 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        let store = ParquetTableStore::new(
-            index.get_row().clone(),
-            ROW_GROUP_SIZE,
-        );
+        let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
         let old_partition_remote = match &new_chunk {
             Some(_) => None,
             None => partition.get_row().get_full_name(partition.get_id()),
