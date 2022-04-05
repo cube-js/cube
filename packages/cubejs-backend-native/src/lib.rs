@@ -64,19 +64,16 @@ fn set_log_level(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
     let check_auth = options
-        .get(&mut cx, "checkAuth")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
         .root(&mut cx);
     let transport_load = options
-        .get(&mut cx, "load")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "load")?
         .root(&mut cx);
     let transport_meta = options
-        .get(&mut cx, "meta")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
 
-    let nonce_handle = options.get(&mut cx, "nonce")?;
+    let nonce_handle = options.get_value(&mut cx, "nonce")?;
     let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
         let value = nonce_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
         Some(value.value(&mut cx))
@@ -84,7 +81,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         None
     };
 
-    let port_handle = options.get(&mut cx, "port")?;
+    let port_handle = options.get_value(&mut cx, "port")?;
     let port = if port_handle.is_a::<JsNumber, _>(&mut cx) {
         let value = port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
 
@@ -116,7 +113,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
             let mut loops = services.spawn_processing_loops().await.unwrap();
             loops.push(tokio::spawn(async move {
-                channel.settle_with(deferred, move |cx| {
+                deferred.settle_with(&channel, move |mut cx| {
                     Ok(cx.boxed(SQLInterface::new(services_arc)))
                 });
 
@@ -145,7 +142,7 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     // @todo How to stop tokio runtime?
 
-    channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
+    deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
 
     Ok(promise)
 }
