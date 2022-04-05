@@ -1,3 +1,4 @@
+use std::any::Any;
 use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
@@ -15,27 +16,59 @@ use std::time::Duration;
 use tar::Archive;
 use tokio::time::timeout;
 
-pub trait BenchState: Send + Sync {}
+pub type BenchState = dyn Any + Send + Sync;
 
 #[async_trait]
 pub trait Bench: Send + Sync {
     fn name(self: &Self) -> &'static str;
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<dyn BenchState>, CubeError>;
+    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
     async fn bench(
         self: &Self,
         services: &CubeServices,
-        state: Arc<dyn BenchState>,
+        state: Arc<BenchState>,
     ) -> Result<(), CubeError>;
 }
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
-    return vec![Arc::new(ParquetMetadataCacheBench {})];
+    return vec![
+        // Arc::new(SimpleBench {}),
+        Arc::new(ParquetMetadataCacheBench {}),
+    ];
 }
 
-#[derive(Debug)]
-pub struct EmptyBenchState {}
-impl BenchState for EmptyBenchState {}
+pub struct SimpleBenchState {
+    query: String
+}
+pub struct SimpleBench;
+#[async_trait]
+impl Bench for SimpleBench {
+    fn name(self: &Self) -> &'static str {
+        "simple_bench"
+    }
 
+    async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+        Ok(Arc::new(SimpleBenchState { query: "SELECT 23".to_string() }))
+    }
+
+    async fn bench(
+        self: &Self,
+        services: &CubeServices,
+        state: Arc<BenchState>,
+    ) -> Result<(), CubeError> {
+        let state = state.downcast_ref::<SimpleBenchState>().ok_or(CubeError::internal("bad state".to_string()))?;
+        let r = services
+            .sql_service
+            .exec_query(state.query.as_str())
+            .await?;
+        let rows = to_rows(&r);
+        assert_eq!(rows, vec![vec![TableValue::Int(23)]]);
+        Ok(())
+    }
+}
+
+// To compare, bench without / with bench enabled.
+// CUBESTORE_MAX_CACHED_METADATA=0 cargo bench parquet_metadata_cache
+// CUBESTORE_MAX_CACHED_METADATA=100 cargo bench parquet_metadata_cache
 pub struct ParquetMetadataCacheBench;
 #[async_trait]
 impl Bench for ParquetMetadataCacheBench {
@@ -43,19 +76,21 @@ impl Bench for ParquetMetadataCacheBench {
         "parquet_metadata_cache"
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<dyn BenchState>, CubeError> {
+    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         let path = download_and_unzip("https://media.githubusercontent.com/media/cube-js/testing-fixtures/master/github-commits-000.tar.gz", "github-commits-000.csv").await?;
+
         let _ = services
             .sql_service
             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
             .await?;
+
         let _ = services.sql_service
             .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
             .await?;
 
         compact_partitions(&services).await?;
 
-        let state = Arc::new(EmptyBenchState {});
+        let state = Arc::new(());
 
         // warmup metadata cache
         self.bench(services, state.clone()).await?;
@@ -66,7 +101,7 @@ impl Bench for ParquetMetadataCacheBench {
     async fn bench(
         self: &Self,
         services: &CubeServices,
-        _state: Arc<dyn BenchState>,
+        _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
         let repo = "2degrees/twod.wsgi";
         let r = services
