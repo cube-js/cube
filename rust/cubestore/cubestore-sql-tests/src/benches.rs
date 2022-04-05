@@ -31,7 +31,7 @@ pub trait Bench: Send + Sync {
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
     return vec![
-        // Arc::new(SimpleBench {}),
+        Arc::new(SimpleBench {}),
         Arc::new(ParquetMetadataCacheBench {}),
     ];
 }
@@ -43,7 +43,7 @@ pub struct SimpleBench;
 #[async_trait]
 impl Bench for SimpleBench {
     fn name(self: &Self) -> &'static str {
-        "simple_bench"
+        "simple"
     }
 
     async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
