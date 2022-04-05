@@ -46,7 +46,6 @@ export default class Stream extends Readable {
           types: { getTypeParser: this.typeParser }
         })
         .then(({ rows }) => {
-          console.log("some rows: ", rows);
           /**
            * Process data
            */

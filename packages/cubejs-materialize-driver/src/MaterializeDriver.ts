@@ -9,19 +9,13 @@ export class MaterializeDriver extends PostgresDriver {
   }
 
   protected async prepareConnection(
-    conn: PoolClient,
-    options: { executionTimeout: number } = {
-      executionTimeout: this.config.executionTimeout ? <number>this.config.executionTimeout * 1000 : 600000,
-    }
+    conn: PoolClient
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // Support for statement_timeout is still pending. https://github.com/MaterializeInc/materialize/issues/10390
-    // await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
-
-    await this.loadUserDefinedTypes(conn);
   }
 
-  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+  protected async loadUserDefinedTypes(): Promise<void> {
     // Support for typcategory field still pending: https://github.com/MaterializeInc/materialize/issues/2157
   }
 
