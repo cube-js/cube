@@ -13,10 +13,13 @@ Alert conditions are checked **once per minute** for configured
 condition is triggered, an email notification will be sent to configured
 [recipients](#recipients).
 
-<InfoBox>
-
 Cube Cloud only sends an outage email **once** per configured alert; when the
 issue resolves, a resolution email is also sent.
+
+<InfoBox>
+
+This feature is not available on the free plan.
+See [pricing plans](https://cube.dev/pricing/) for details.
 
 </InfoBox>
 
@@ -26,7 +29,7 @@ Cube Cloud has three different types of alerts:
 
 - **API outages.** These are triggered if the deployment's API becomes
   unavailable by monitoring the [`/livez` endpoint][ref-rest-api-livez].
-- **API/Database response timeouts.** These are triggered if either the APIs or
+- **Database timeouts.** These are triggered if either the APIs or
   the database are taking longer than expected to respond.
 - **Pre-aggregation build failures.** These are triggered if any pre-aggregation
   fails to build.
@@ -106,12 +109,12 @@ toggling the **Specific users** option and selecting them:
 </div>
 
 Optionally, you can also add additional email addresses that should receive
-email notifications by entering the email address in the **Arbitrary email**
+email notifications by entering the email address in the **Custom email**
 field:
 
 <div style="text-align: center">
   <img
-    alt="Setting an arbitrary email for an alert on Cube Cloud"
+    alt="Setting an custom email for an alert on Cube Cloud"
     src="./alerts-6.png"
     style="border: none"
     width="100%"
