@@ -83,7 +83,7 @@ impl MultiProcTest for ClusterSqlTest {
 }
 
 #[derive(Default)]
-pub struct WorkerFn;
+struct WorkerFn;
 #[async_trait]
 impl WorkerProc<WorkerArgs> for WorkerFn {
     async fn run(
