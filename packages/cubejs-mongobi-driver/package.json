@@ -28,7 +28,7 @@
     "@cubejs-backend/query-orchestrator": "^0.29.37",
     "@types/node": "^10.17.60",
     "generic-pool": "^3.6.0",
-    "moment": "^2.29.1",
+    "moment": "^2.29.2",
     "mysql2": "^2.2.5"
   },
   "license": "Apache-2.0",
