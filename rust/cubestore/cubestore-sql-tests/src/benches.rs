@@ -96,7 +96,11 @@ impl Bench for ParquetMetadataCacheBench {
     }
 
     async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
-        let dataset_path = download_and_unzip("https://github.com/cube-js/testing-fixtures/raw/master/github-commits.tar.gz", "github-commits").await?;
+        let dataset_path = download_and_unzip(
+            "https://github.com/cube-js/testing-fixtures/raw/master/github-commits.tar.gz",
+            "github-commits",
+        )
+        .await?;
         let path = dataset_path.join("github-commits-000.csv");
 
         let _ = services
