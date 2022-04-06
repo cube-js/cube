@@ -11,6 +11,7 @@ use flate2::read::GzDecoder;
 use futures::future::join_all;
 use std::any::Any;
 use std::io::Cursor;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tar::Archive;
@@ -95,7 +96,8 @@ impl Bench for ParquetMetadataCacheBench {
     }
 
     async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
-        let path = download_and_unzip("https://media.githubusercontent.com/media/cube-js/testing-fixtures/master/github-commits-000.tar.gz", "github-commits-000.csv").await?;
+        let dataset_path = download_and_unzip("https://github.com/cube-js/testing-fixtures/raw/master/github-commits.tar.gz", "github-commits").await?;
+        let path = dataset_path.join("github-commits-000.csv");
 
         let _ = services
             .sql_service
@@ -103,7 +105,7 @@ impl Bench for ParquetMetadataCacheBench {
             .await?;
 
         let _ = services.sql_service
-            .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+            .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path_to_string(path)?).as_str())
             .await?;
 
         compact_partitions(&services).await?;
@@ -138,18 +140,19 @@ impl Bench for ParquetMetadataCacheBench {
     }
 }
 
-async fn download_and_unzip(url: &str, filename: &str) -> Result<String, CubeError> {
-    let dir = std::env::current_dir()?.join("data");
-    let path = dir.join(filename);
-    if !path.exists() {
-        println!("Downloading {}", filename);
+async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeError> {
+    let root = std::env::current_dir()?.join("data");
+    let dataset_path = root.join(dataset);
+    if !dataset_path.exists() {
+        println!("Downloading {}", dataset);
         let response = reqwest::get(url).await?;
         let content = Cursor::new(response.bytes().await?);
         let tarfile = GzDecoder::new(content);
         let mut archive = Archive::new(tarfile);
-        archive.unpack(dir)?;
+        archive.unpack(root)?;
     }
-    path_to_string(path)
+    assert!(dataset_path.exists());
+    Ok(dataset_path.into_boxed_path())
 }
 
 async fn compact_partitions(services: &CubeServices) -> Result<(), CubeError> {
