@@ -48,11 +48,11 @@ tokio = { version = "1.0", features = ["full", "rt"] }
 futures-timer = "3.0.2"
 indoc = "1.0"
 tempfile = "3.2.0"
-rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
 tar = "0.4.38"
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["async_tokio"] }
+rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
 
 [[bench]]
 name = "in_process"

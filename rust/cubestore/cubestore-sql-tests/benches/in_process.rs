@@ -1,23 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubestore::config::{env_parse, Config};
 use cubestore_sql_tests::cubestore_benches;
 use rocksdb::{Options, DB};
 use std::fs;
 use tokio::runtime::Builder;
 
-fn bench_main(criterion: &mut Criterion) {
+fn in_process_bench(criterion: &mut Criterion) {
     let benches = cubestore_benches();
     for bench in benches.iter() {
         let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-        let name = format!("in-process::{}", bench.name());
-        let config = Config::test(name.as_str()).update_config(|mut c| {
-            c.partition_split_threshold = 10_000_000;
-            c.max_partition_split_threshold = 10_000_000;
-            c.max_cached_queries = 0;
-            c.max_cached_metadata = env_parse("CUBESTORE_MAX_CACHED_METADATA", 0);
-            c
-        });
+        let (name, config) = bench.config("in_process");
 
         let _ = fs::remove_dir_all(config.local_dir().clone());
 
@@ -50,5 +42,5 @@ fn bench_main(criterion: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, bench_main);
+criterion_group!(benches, in_process_bench);
 criterion_main!(benches);

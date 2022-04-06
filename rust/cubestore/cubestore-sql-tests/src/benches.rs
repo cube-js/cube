@@ -2,7 +2,7 @@ use std::any::Any;
 use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
-use cubestore::config::CubeServices;
+use cubestore::config::{Config, CubeServices, env_parse};
 use cubestore::metastore::job::JobType;
 use cubestore::metastore::{MetaStoreTable, RowKey, TableId};
 use cubestore::table::TableValue;
@@ -20,13 +20,17 @@ pub type BenchState = dyn Any + Send + Sync;
 
 #[async_trait]
 pub trait Bench: Send + Sync {
-    fn name(self: &Self) -> &'static str;
+    fn config(self: &Self, prefix: &str) -> (String, Config);
     async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
     async fn bench(
         self: &Self,
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError>;
+}
+
+fn config_name(prefix: &str, name: &str) -> String {
+    format!("{}::{}", prefix, name)
 }
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
@@ -42,8 +46,10 @@ pub struct SimpleBenchState {
 pub struct SimpleBench;
 #[async_trait]
 impl Bench for SimpleBench {
-    fn name(self: &Self) -> &'static str {
-        "simple"
+    fn config(self: &Self, prefix: &str) -> (String, Config) {
+        let name = config_name(prefix, "simple");
+        let config = Config::test(name.as_str());
+        (name, config)
     }
 
     async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
@@ -72,8 +78,16 @@ impl Bench for SimpleBench {
 pub struct ParquetMetadataCacheBench;
 #[async_trait]
 impl Bench for ParquetMetadataCacheBench {
-    fn name(self: &Self) -> &'static str {
-        "parquet_metadata_cache"
+    fn config(self: &Self, prefix: &str) -> (String, Config) {
+        let name = config_name(prefix, "parquet_metadata_cache");
+        let config = Config::test(name.as_str()).update_config(|mut c| {
+            c.partition_split_threshold = 10_000_000;
+            c.max_partition_split_threshold = 10_000_000;
+            c.max_cached_queries = 0;
+            c.max_cached_metadata = env_parse("CUBESTORE_MAX_CACHED_METADATA", 0);
+            c
+        });
+        (name, config)
     }
 
     async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
