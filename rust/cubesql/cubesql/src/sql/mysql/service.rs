@@ -469,6 +469,8 @@ impl ProcessingLoop for MySqlServer {
             let (socket, _) = tokio::select! {
                 res = stop_receiver.changed() => {
                     if res.is_err() || *stop_receiver.borrow() {
+                        trace!("[mysql] Stopping processing_loop via channel");
+
                         return Ok(());
                     } else {
                         continue;

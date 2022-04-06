@@ -447,6 +447,7 @@ dependencies = [
  "cubesql",
  "log",
  "neon",
+ "once_cell",
  "serde",
  "serde_derive",
  "serde_json",
