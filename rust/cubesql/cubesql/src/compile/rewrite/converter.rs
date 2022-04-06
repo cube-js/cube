@@ -26,6 +26,7 @@ use crate::compile::rewrite::LimitN;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
+use crate::compile::rewrite::MemberErrorError;
 use crate::compile::rewrite::OrderAsc;
 use crate::compile::rewrite::OrderMember;
 use crate::compile::rewrite::ProjectionAlias;
@@ -1049,6 +1050,11 @@ impl LanguageToLogicalPlanConverter {
                                         false,
                                     ));
                                     member_fields.push(dimension);
+                                }
+                                LogicalPlanLanguage::MemberError(params) => {
+                                    let error =
+                                        match_data_node!(node_by_id, params[0], MemberErrorError);
+                                    return Err(CubeError::user(error.to_string()));
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }

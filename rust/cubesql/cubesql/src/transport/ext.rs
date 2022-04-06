@@ -5,7 +5,7 @@ use crate::sql::ColumnType;
 pub trait V1CubeMetaMeasureExt {
     fn get_real_name(&self) -> String;
 
-    fn is_same_agg_type(&self, expect_agg_type: &String) -> bool;
+    fn is_same_agg_type(&self, expect_agg_type: &str) -> bool;
 
     fn get_sql_type(&self) -> ColumnType;
 }
@@ -17,7 +17,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
         dimension_name.to_string()
     }
 
-    fn is_same_agg_type(&self, expect_agg_type: &String) -> bool {
+    fn is_same_agg_type(&self, expect_agg_type: &str) -> bool {
         if self.agg_type.is_some() {
             if expect_agg_type.eq(&"countDistinct".to_string()) {
                 let agg_type = self.agg_type.as_ref().unwrap();

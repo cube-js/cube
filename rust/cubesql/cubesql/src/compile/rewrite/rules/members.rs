@@ -1,6 +1,5 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::cube_scan_order_empty_tail;
 use crate::compile::rewrite::rewriter::RewriteRules;
 use crate::compile::rewrite::table_scan;
 use crate::compile::rewrite::AggregateFunctionExprDistinct;
@@ -15,6 +14,7 @@ use crate::compile::rewrite::LimitN;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
+use crate::compile::rewrite::MemberErrorError;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TimeDimensionDateRange;
 use crate::compile::rewrite::TimeDimensionGranularity;
@@ -33,12 +33,14 @@ use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
     time_dimension_expr,
 };
+use crate::compile::rewrite::{cube_scan_order_empty_tail, transforming_chain_rewrite};
+use crate::transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt};
 use crate::var_iter;
 use crate::{var, CubeError};
 use datafusion::logical_plan::{Column, DFSchema};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Id, Rewrite, Subst};
 use std::ops::Index;
 use std::sync::Arc;
 
@@ -83,69 +85,24 @@ impl RewriteRules for MemberRules {
                 member_replacer(projection_expr_empty_tail(), "?source_table_name"),
                 cube_scan_members_empty_tail(),
             ),
-            transforming_rewrite(
-                "simple-count",
-                member_replacer(
-                    aggr_aggr_expr(
-                        agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
-                        "?tail_aggr_expr",
-                    ),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    measure_expr(
-                        "?measure_name",
-                        agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
-                    ),
-                    member_replacer("?tail_aggr_expr", "?source_table_name"),
-                ),
-                self.transform_measure(
-                    "?source_table_name",
-                    None,
-                    Some("?distinct"),
-                    Some("?aggr_fun"),
-                ),
+            self.measure_rewrite(
+                agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
+                None,
+                Some("?distinct"),
+                Some("?aggr_fun"),
             ),
-            transforming_rewrite(
-                "named-aggr",
-                member_replacer(
-                    aggr_aggr_expr(
-                        agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
-                        "?tail_aggr_expr",
-                    ),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    measure_expr(
-                        "?measure_name",
-                        agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
-                    ),
-                    member_replacer("?tail_aggr_expr", "?source_table_name"),
-                ),
-                self.transform_measure(
-                    "?source_table_name",
-                    Some("?column"),
-                    Some("?distinct"),
-                    Some("?aggr_fun"),
-                ),
+            self.measure_rewrite(
+                agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
+                Some("?column"),
+                Some("?distinct"),
+                Some("?aggr_fun"),
             ),
-            transforming_rewrite(
-                "measure-fun-aggr",
-                member_replacer(
-                    aggr_aggr_expr(
-                        udaf_expr("?aggr_fun", vec![column_expr("?column")]),
-                        "?tail_aggr_expr",
-                    ),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    measure_expr(
-                        "?measure_name",
-                        udaf_expr("?aggr_fun", vec![column_expr("?column")]),
-                    ),
-                    member_replacer("?tail_aggr_expr", "?source_table_name"),
-                ),
-                self.transform_measure("?source_table_name", Some("?column"), None, None),
+            self.measure_rewrite(
+                // TODO use MEASURE function
+                udaf_expr("?aggr_fun", vec![column_expr("?column")]),
+                Some("?column"),
+                None,
+                None,
             ),
             transforming_rewrite(
                 "projection-columns-with-alias",
@@ -188,17 +145,23 @@ impl RewriteRules for MemberRules {
                 member_replacer("?tail_group_expr", "?source_table_name"),
                 self.transform_segment("?source_table_name", "?column"),
             ),
-            transforming_rewrite(
+            transforming_chain_rewrite(
                 "member-replacer-dimension",
                 member_replacer(
-                    aggr_group_expr(column_expr("?column"), "?tail_group_expr"),
+                    aggr_group_expr("?aggr_expr", "?tail_group_expr"),
                     "?source_table_name",
                 ),
+                vec![("?aggr_expr", column_expr("?column"))],
                 cube_scan_members(
-                    dimension_expr("?dimension_name", column_expr("?column")),
+                    "?dimension",
                     member_replacer("?tail_group_expr", "?source_table_name"),
                 ),
-                self.transform_dimension("?source_table_name", "?column", "?dimension_name"),
+                self.transform_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?aggr_expr",
+                    "?dimension",
+                ),
             ),
             transforming_rewrite(
                 "date-trunc",
@@ -846,11 +809,13 @@ impl MemberRules {
         &self,
         cube_var: &'static str,
         column_var: &'static str,
-        dimension_name_var: &'static str,
+        aggr_expr_var: &'static str,
+        dimension_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let column_var = var!(column_var);
-        let dimension_name_var = var!(dimension_name_var);
+        let aggr_expr_var = var!(aggr_expr_var);
+        let dimension_var = var!(dimension_var);
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for dimension_name in
@@ -864,11 +829,35 @@ impl MemberRules {
                             .iter()
                             .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
                         {
+                            let dimension_name = egraph.add(LogicalPlanLanguage::DimensionName(
+                                DimensionName(dimension.name.to_string()),
+                            ));
+
                             subst.insert(
-                                dimension_name_var,
-                                egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
-                                    dimension.name.to_string(),
-                                ))),
+                                dimension_var,
+                                egraph.add(LogicalPlanLanguage::Dimension([
+                                    dimension_name,
+                                    subst[aggr_expr_var],
+                                ])),
+                            );
+
+                            return true;
+                        }
+
+                        if let Some(s) = cube
+                            .segments
+                            .iter()
+                            .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
+                        {
+                            subst.insert(
+                                dimension_var,
+                                add_member_error(
+                                    egraph,
+                                    format!(
+                                        "Unable to use segment '{}' in GROUP BY",
+                                        s.get_real_name()
+                                    ),
+                                ),
                             );
 
                             return true;
@@ -953,18 +942,50 @@ impl MemberRules {
         }
     }
 
+    fn measure_rewrite(
+        &self,
+        aggr_expr: String,
+        measure_var: Option<&'static str>,
+        distinct_var: Option<&'static str>,
+        fun_var: Option<&'static str>,
+    ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+        transforming_chain_rewrite(
+            "measure-fun-aggr",
+            member_replacer(
+                aggr_aggr_expr("?aggr_expr", "?tail_aggr_expr"),
+                "?source_table_name",
+            ),
+            vec![("?aggr_expr", aggr_expr)],
+            cube_scan_members(
+                "?measure",
+                member_replacer("?tail_aggr_expr", "?source_table_name"),
+            ),
+            self.transform_measure(
+                "?source_table_name",
+                measure_var,
+                distinct_var,
+                fun_var,
+                "?aggr_expr",
+                "?measure",
+            ),
+        )
+    }
+
     fn transform_measure(
         &self,
         cube_var: &'static str,
         measure_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
+        aggr_expr_var: &'static str,
+        measure_out_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let var = cube_var.parse().unwrap();
         let distinct_var = distinct_var.map(|var| var.parse().unwrap());
         let fun_var = fun_var.map(|var| var.parse().unwrap());
         let measure_var = measure_var.map(|var| var.parse().unwrap());
-        let measure_name_var = "?measure_name".parse().unwrap();
+        let aggr_expr_var = aggr_expr_var.parse().unwrap();
+        let measure_out_var = measure_out_var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for measure_name in measure_var
@@ -1000,39 +1021,74 @@ impl MemberRules {
                                 })
                                 .unwrap_or(vec![None])
                             {
-                                let measure_name = format!("{}.{}", cube_name, measure_name);
-                                if let Some(measure) = cube.measures.iter().find(|m| {
-                                    measure_name.eq_ignore_ascii_case(&m.name) && {
-                                        if let Some(agg_type) = &m.agg_type {
-                                            match fun {
-                                                Some(AggregateFunction::Count) => {
-                                                    if distinct {
-                                                        agg_type == "countDistinct"
-                                                            || agg_type == "countDistinctApprox"
-                                                    } else {
-                                                        agg_type == "count"
-                                                    }
-                                                }
-                                                Some(AggregateFunction::Sum) => agg_type == "sum",
-                                                Some(AggregateFunction::Min) => agg_type == "min",
-                                                Some(AggregateFunction::Max) => agg_type == "max",
-                                                Some(AggregateFunction::Avg) => agg_type == "avg",
-                                                Some(AggregateFunction::ApproxDistinct) => {
-                                                    agg_type == "countDistinctApprox"
-                                                }
-                                                None => true,
+                                let call_agg_type = {
+                                    fun.map(|fun| match fun {
+                                        AggregateFunction::Count => {
+                                            if distinct {
+                                                "countDistinct"
+                                            } else {
+                                                "count"
                                             }
-                                        } else {
-                                            false
                                         }
+                                        AggregateFunction::Sum => "sum",
+                                        AggregateFunction::Min => "min",
+                                        AggregateFunction::Max => "max",
+                                        AggregateFunction::Avg => "avg",
+                                        AggregateFunction::ApproxDistinct => "countDistinctApprox",
+                                    })
+                                };
+
+                                let measure_name = format!("{}.{}", cube_name, measure_name);
+                                if let Some(measure) = cube
+                                    .measures
+                                    .iter()
+                                    .find(|m| measure_name.eq_ignore_ascii_case(&m.name))
+                                {
+                                    if call_agg_type.is_some()
+                                        && !measure
+                                            .is_same_agg_type(call_agg_type.as_ref().unwrap())
+                                    {
+                                        subst.insert(
+                                            measure_out_var,
+                                            add_member_error(egraph, format!(
+                                                "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
+                                                measure.get_real_name(),
+                                                measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
+                                                call_agg_type.unwrap().to_uppercase(),
+                                            )),
+                                        );
+                                    } else {
+                                        let measure_name =
+                                            egraph.add(LogicalPlanLanguage::MeasureName(
+                                                MeasureName(measure.name.to_string()),
+                                            ));
+
+                                        subst.insert(
+                                            measure_out_var,
+                                            egraph.add(LogicalPlanLanguage::Measure([
+                                                measure_name,
+                                                subst[aggr_expr_var],
+                                            ])),
+                                        );
                                     }
-                                }) {
+
+                                    return true;
+                                }
+
+                                if let Some(dimension) = cube
+                                    .dimensions
+                                    .iter()
+                                    .find(|m| measure_name.eq_ignore_ascii_case(&m.name))
+                                {
                                     subst.insert(
-                                        measure_name_var,
-                                        egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
-                                            measure.name.to_string(),
-                                        ))),
+                                        measure_out_var,
+                                        add_member_error(egraph, format!(
+                                            "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
+                                            dimension.get_real_name(),
+                                            call_agg_type.unwrap().to_uppercase(),
+                                        )),
                                     );
+
                                     return true;
                                 }
                             }
@@ -1043,4 +1099,15 @@ impl MemberRules {
             false
         }
     }
+}
+
+pub fn add_member_error(
+    egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    member_error: String,
+) -> Id {
+    let member_error = egraph.add(LogicalPlanLanguage::MemberErrorError(MemberErrorError(
+        member_error,
+    )));
+
+    egraph.add(LogicalPlanLanguage::MemberError([member_error]))
 }
