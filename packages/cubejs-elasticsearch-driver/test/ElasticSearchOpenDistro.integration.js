@@ -1,4 +1,4 @@
-/* globals describe, afterAll, beforeAll, test, expect, jest, it */
+/* globals describe, afterAll, beforeAll, jest, it */
 const { GenericContainer, Wait } = require('testcontainers');
 const ElasticSearchDriver = require('../driver/ElasticSearchDriver');
 
