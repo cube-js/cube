@@ -19,7 +19,7 @@
     "sasl-plain": "^0.1.0",
     "saslmechanisms": "^0.1.1",
     "sqlstring": "^2.3.1",
-    "thrift": "^0.9.3"
+    "thrift": "^0.11.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
