@@ -28,7 +28,8 @@ fn in_process_bench(criterion: &mut Criterion) {
                     let state = state.clone();
                     async move {
                         bench.bench(&services, state).await.unwrap();
-                    }.await;
+                    }
+                    .await;
                 });
             });
 

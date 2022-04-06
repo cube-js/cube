@@ -1,8 +1,7 @@
-use std::any::Any;
 use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
-use cubestore::config::{Config, CubeServices, env_parse};
+use cubestore::config::{env_parse, Config, CubeServices};
 use cubestore::metastore::job::JobType;
 use cubestore::metastore::{MetaStoreTable, RowKey, TableId};
 use cubestore::table::TableValue;
@@ -10,6 +9,7 @@ use cubestore::util::strings::path_to_string;
 use cubestore::CubeError;
 use flate2::read::GzDecoder;
 use futures::future::join_all;
+use std::any::Any;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,7 +41,7 @@ pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
 }
 
 pub struct SimpleBenchState {
-    query: String
+    query: String,
 }
 pub struct SimpleBench;
 #[async_trait]
@@ -53,7 +53,9 @@ impl Bench for SimpleBench {
     }
 
     async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
-        Ok(Arc::new(SimpleBenchState { query: "SELECT 23".to_string() }))
+        Ok(Arc::new(SimpleBenchState {
+            query: "SELECT 23".to_string(),
+        }))
     }
 
     async fn bench(
@@ -61,7 +63,9 @@ impl Bench for SimpleBench {
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
-        let state = state.downcast_ref::<SimpleBenchState>().ok_or(CubeError::internal("bad state".to_string()))?;
+        let state = state
+            .downcast_ref::<SimpleBenchState>()
+            .ok_or(CubeError::internal("bad state".to_string()))?;
         let r = services
             .sql_service
             .exec_query(state.query.as_str())
