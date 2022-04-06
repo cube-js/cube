@@ -31,7 +31,7 @@
     "@cubejs-backend/shared": "^0.29.37",
     "@types/pg": "^8.6.0",
     "@types/pg-query-stream": "^1.0.3",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "pg": "^8.6.0",
     "pg-query-stream": "^4.1.0"
   },
