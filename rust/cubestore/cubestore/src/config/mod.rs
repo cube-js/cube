@@ -663,7 +663,7 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
-                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 0),
+                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 10_000),
             }),
         }
     }
@@ -795,7 +795,7 @@ impl Config {
             if !*initialized {
                 SimpleLogger::new()
                     .with_level(Level::Error.to_level_filter())
-                    // .with_module_level("cubestore", Level::Trace.to_level_filter())
+                    .with_module_level("cubestore", Level::Trace.to_level_filter())
                     .init()
                     .unwrap();
             }
