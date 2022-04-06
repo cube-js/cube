@@ -10,6 +10,7 @@ use crate::compile::rewrite::BetweenExprNegated;
 use crate::compile::rewrite::BinaryExprOp;
 use crate::compile::rewrite::CastExprDataType;
 use crate::compile::rewrite::ColumnExprColumn;
+use crate::compile::rewrite::CubeScanAliases;
 use crate::compile::rewrite::CubeScanLimit;
 use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::EmptyRelationProduceOneRow;
@@ -1203,6 +1204,24 @@ impl LanguageToLogicalPlanConverter {
                         query.limit =
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| n as i32);
+
+                        let aliases =
+                            match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
+                        if let Some(aliases) = aliases {
+                            let new_fields = aliases
+                                .iter()
+                                .map(|a| fields.iter().find(|f| f.name() == a).unwrap().clone())
+                                .collect();
+                            member_fields = aliases
+                                .iter()
+                                .map(|a| {
+                                    member_fields
+                                        [fields.iter().find_position(|f| f.name() == a).unwrap().0]
+                                        .clone()
+                                })
+                                .collect();
+                            fields = new_fields;
+                        }
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new(fields)?),
                             member_fields,

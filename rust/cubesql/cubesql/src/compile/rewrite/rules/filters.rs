@@ -55,6 +55,7 @@ impl RewriteRules for FilterRules {
                         "?order",
                         "?limit",
                         "?offset",
+                        "?aliases",
                     ),
                 ),
                 cube_scan(
@@ -64,6 +65,7 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
                 ),
                 self.push_down_filter("?source_table_name", "?expr", "?cube"),
             ),
@@ -284,6 +286,7 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -296,6 +299,7 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
                 ),
             ),
             transforming_rewrite(

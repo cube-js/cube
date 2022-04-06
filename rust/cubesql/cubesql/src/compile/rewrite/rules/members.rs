@@ -8,6 +8,7 @@ use crate::compile::rewrite::AliasExprAlias;
 use crate::compile::rewrite::ColumnAliasReplacerAliases;
 use crate::compile::rewrite::ColumnAliasReplacerCube;
 use crate::compile::rewrite::ColumnExprColumn;
+use crate::compile::rewrite::CubeScanAliases;
 use crate::compile::rewrite::CubeScanLimit;
 use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::LimitN;
@@ -67,6 +68,7 @@ impl RewriteRules for MemberRules {
                     cube_scan_order_empty_tail(),
                     "CubeScanLimit:None",
                     "CubeScanOffset:None",
+                    "CubeScanAliases:None",
                 ),
                 self.is_cube_table("?source_table_name"),
             ),
@@ -267,6 +269,7 @@ impl RewriteRules for MemberRules {
                         "?orders",
                         "?limit",
                         "?offset",
+                        "?aliases",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -281,6 +284,7 @@ impl RewriteRules for MemberRules {
                     "?orders",
                     "?limit",
                     "?offset",
+                    "?aliases",
                 ),
             ),
             rewrite(
@@ -294,6 +298,7 @@ impl RewriteRules for MemberRules {
                         "?orders",
                         "?limit",
                         "?offset",
+                        "?aliases",
                     ),
                     "?alias",
                 ),
@@ -304,6 +309,7 @@ impl RewriteRules for MemberRules {
                     "?orders",
                     "?limit",
                     "?offset",
+                    "?aliases",
                 ),
             ),
             transforming_rewrite(
@@ -317,6 +323,7 @@ impl RewriteRules for MemberRules {
                         "?orders",
                         "?limit",
                         "?offset",
+                        "?cube_aliases",
                     ),
                     "?alias",
                 ),
@@ -327,6 +334,7 @@ impl RewriteRules for MemberRules {
                     "?orders",
                     "?limit",
                     "?offset",
+                    "?cube_aliases",
                 ),
                 self.push_down_projection(
                     "?source_table_name",
@@ -334,6 +342,7 @@ impl RewriteRules for MemberRules {
                     "?members",
                     "?aliases",
                     "?cube",
+                    "?cube_aliases",
                 ),
             ),
             transforming_rewrite(
@@ -347,6 +356,7 @@ impl RewriteRules for MemberRules {
                         "?orders",
                         "?cube_limit",
                         "?offset",
+                        "?aliases",
                     ),
                 ),
                 cube_scan(
@@ -356,6 +366,7 @@ impl RewriteRules for MemberRules {
                     "?orders",
                     "?new_limit",
                     "?offset",
+                    "?aliases",
                 ),
                 self.push_down_limit("?limit", "?new_limit"),
             ),
@@ -569,12 +580,14 @@ impl MemberRules {
         members_var: &'static str,
         aliases_var: &'static str,
         cube_var: &'static str,
+        cube_aliases_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let table_name_var = table_name_var.parse().unwrap();
-        let projection_expr_var = projection_expr_var.parse().unwrap();
-        let members_var = members_var.parse().unwrap();
-        let aliases_var = aliases_var.parse().unwrap();
-        let cube_var = cube_var.parse().unwrap();
+        let table_name_var = var!(table_name_var);
+        let projection_expr_var = var!(projection_expr_var);
+        let members_var = var!(members_var);
+        let aliases_var = var!(aliases_var);
+        let cube_var = var!(cube_var);
+        let cube_aliases_var = var!(cube_aliases_var);
         move |egraph, subst| {
             for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
                 if let Some(expr_to_alias) =
@@ -604,6 +617,16 @@ impl MemberRules {
                                     ColumnAliasReplacerAliases(column_name_to_alias.clone()),
                                 ));
                             subst.insert(aliases_var, aliases);
+
+                            let cube_aliases = egraph.add(LogicalPlanLanguage::CubeScanAliases(
+                                CubeScanAliases(Some(
+                                    column_name_to_alias
+                                        .iter()
+                                        .map(|(_, alias)| alias.to_string())
+                                        .collect::<Vec<_>>(),
+                                )),
+                            ));
+                            subst.insert(cube_aliases_var, cube_aliases);
 
                             let cube = egraph.add(LogicalPlanLanguage::ColumnAliasReplacerCube(
                                 ColumnAliasReplacerCube(Some(table_name)),
