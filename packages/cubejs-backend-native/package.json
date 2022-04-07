@@ -50,7 +50,8 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "verbose": true
+    "verbose": true,
+    "roots": ["<rootDir>/js/", "<rootDir>/test/"]
   },
   "license": "Apache-2.0",
   "publishConfig": {
