@@ -669,7 +669,7 @@ impl CubeTable {
     }
 
     pub fn project_to_index_positions(
-        projection_columns: &Vec<Column>,
+        projection_columns: &Vec<String>,
         i: &IdRow<Index>,
     ) -> Vec<Option<usize>> {
         projection_columns
@@ -678,7 +678,7 @@ impl CubeTable {
                 i.get_row()
                     .get_columns()
                     .iter()
-                    .find_position(|c| c.get_name() == pc.get_name())
+                    .find_position(|c| c.get_name() == pc)
                     .map(|(p, _)| p)
             })
             .collect::<Vec<_>>()
