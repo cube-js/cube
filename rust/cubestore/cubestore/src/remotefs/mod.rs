@@ -508,17 +508,12 @@ mod tests {
 
     #[tokio::test]
     async fn aws_s3() {
-        if env::var("TEST_CUBESTORE_AWS_ACCESS_KEY_ID").is_err()
-            || env::var("TEST_CUBESTORE_AWS_SECRET_ACCESS_KEY").is_err()
-        {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
             return;
         }
-        let access_key = env::var("TEST_CUBESTORE_AWS_ACCESS_KEY_ID").ok();
-        let secret_key = env::var("TEST_CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
-        env::set_var("CUBESTORE_AWS_ACCESS_KEY_ID", access_key.unwrap());
-        env::set_var("CUBESTORE_AWS_SECRET_ACCESS_KEY", secret_key.unwrap());
-        let region = env::var("TEST_CUBESTORE_S3_REGION").ok().unwrap();
-        let bucket_name = env::var("TEST_CUBESTORE_S3_BUCKET").ok().unwrap();
+
+        let region = "us-west-2".to_string();
+        let bucket_name = "cube-store-ci-test".to_string();
 
         clear_test_dir("aws_s3");
         let local_path = get_test_local_dir("aws_s3");
@@ -540,7 +535,7 @@ mod tests {
             local_path.clone(),
             region.clone(),
             bucket_name.clone(),
-            Some("subpathdir".to_string()),
+            Some("remotefs_test_subpathdir".to_string()),
         )
         .unwrap();
 
