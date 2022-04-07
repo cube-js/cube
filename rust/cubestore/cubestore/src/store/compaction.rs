@@ -90,7 +90,7 @@ impl CompactionService for CompactionServiceImpl {
             .await?;
 
         if !partition.get_row().is_active() && !multi_part.is_some() {
-            log::warn!(
+            log::trace!(
                 "Cannot compact inactive partition: {:?}",
                 partition.get_row()
             );
