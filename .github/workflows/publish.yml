@@ -61,7 +61,7 @@ jobs:
       PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
       PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
     timeout-minutes: 60
-    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} 
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
     strategy:
       matrix:
         node-version: [12, 14, 16, 17]
@@ -488,7 +488,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2021-07-04
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
@@ -558,4 +558,3 @@ jobs:
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
           overwrite: true
-  
