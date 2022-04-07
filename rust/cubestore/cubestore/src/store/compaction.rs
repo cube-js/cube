@@ -25,7 +25,7 @@ use datafusion::physical_plan::hash_aggregate::{
 };
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetExec};
+use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{
     AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
@@ -255,7 +255,6 @@ impl CompactionService for CompactionServiceImpl {
                 ROW_GROUP_SIZE,
                 1,
                 None,
-                NoopParquetMetadataCache::new(),
             )?),
             None => Arc::new(EmptyExec::new(false, schema.clone())),
         };
@@ -539,7 +538,6 @@ async fn read_files(
             ROW_GROUP_SIZE,
             1,
             None,
-            NoopParquetMetadataCache::new(),
         )?));
     }
     let plan = Arc::new(UnionExec::new(inputs));

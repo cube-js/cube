@@ -5,7 +5,7 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
-use parquet::arrow::{ArrowReader, ArrowWriter};
+use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
 use parquet::file::properties::{WriterProperties, WriterVersion};
 use std::fs::File;
 use std::sync::Arc;
@@ -43,7 +43,9 @@ pub struct ParquetTableStore {
 
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let mut r = NoopParquetMetadataCache::new().arrow_reader(path)?;
+        let mut r = ParquetFileArrowReader::new(Arc::new(
+            NoopParquetMetadataCache::new().file_reader(path)?,
+        ));
         let mut batches = Vec::new();
         for b in r.get_record_reader(self.row_group_size)? {
             batches.push(b?)

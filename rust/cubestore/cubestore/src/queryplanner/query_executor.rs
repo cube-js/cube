@@ -478,7 +478,7 @@ impl CubeTable {
                     .remote_to_local_names
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
-                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
+                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path_with_cache(
                     &local_path,
                     index_projection_or_none_on_schema_match.clone(),
                     predicate.clone(),
@@ -521,7 +521,7 @@ impl CubeTable {
                         .remote_to_local_names
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
-                    Arc::new(ParquetExec::try_from_path(
+                    Arc::new(ParquetExec::try_from_path_with_cache(
                         local_path,
                         index_projection_or_none_on_schema_match.clone(),
                         predicate.clone(),
