@@ -112,7 +112,7 @@ impl Bench for ParquetMetadataCacheBench {
             .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path_to_string(path)?).as_str())
             .await?;
 
-        compact_partitions(&services).await?;
+        wait_for_all_jobs(&services).await?;
 
         let state = Arc::new(());
 
@@ -159,27 +159,11 @@ async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeE
     Ok(dataset_path.into_boxed_path())
 }
 
-async fn compact_partitions(services: &CubeServices) -> Result<(), CubeError> {
-    let partitions = services.meta_store.partition_table().all_rows().await?;
-    let scheduler = services.scheduler.clone();
-    join_all(
-        partitions
-            .iter()
-            .map(|p| scheduler.schedule_partition_to_compact(&p)),
-    )
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-    let jobs = partitions
-        .iter()
-        .map(|p| {
-            (
-                RowKey::Table(TableId::Partitions, p.get_id()),
-                JobType::PartitionCompaction,
-            )
-        })
-        .collect::<Vec<_>>();
+async fn wait_for_all_jobs(services: &CubeServices) -> Result<(), CubeError> {
+    let wait_for = services.meta_store.all_jobs().await?.iter()
+        .map(|j| (j.get_row().row_reference().clone(), j.get_row().job_type().clone()))
+        .collect();
     let listener = services.cluster.job_result_listener();
-    timeout(Duration::from_secs(10), listener.wait_for_job_results(jobs)).await??;
+    timeout(Duration::from_secs(10), listener.wait_for_job_results(wait_for)).await??;
     Ok(())
 }
