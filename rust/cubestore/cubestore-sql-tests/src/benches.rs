@@ -158,10 +158,23 @@ async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeE
 }
 
 async fn wait_for_all_jobs(services: &CubeServices) -> Result<(), CubeError> {
-    let wait_for = services.meta_store.all_jobs().await?.iter()
-        .map(|j| (j.get_row().row_reference().clone(), j.get_row().job_type().clone()))
+    let wait_for = services
+        .meta_store
+        .all_jobs()
+        .await?
+        .iter()
+        .map(|j| {
+            (
+                j.get_row().row_reference().clone(),
+                j.get_row().job_type().clone(),
+            )
+        })
         .collect();
     let listener = services.cluster.job_result_listener();
-    timeout(Duration::from_secs(10), listener.wait_for_job_results(wait_for)).await??;
+    timeout(
+        Duration::from_secs(10),
+        listener.wait_for_job_results(wait_for),
+    )
+    .await??;
     Ok(())
 }
