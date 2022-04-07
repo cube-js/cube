@@ -492,7 +492,6 @@ async fn pick_index(
             expr_to_columns(f, &mut filter_columns)?;
         }
 
-        println!("Sort on: {:?}", sort_on);
         // Skipping default index
         let filtered_by_sort_on = indices.iter().skip(1).filter(|i| {
             if let Some((join_on_columns, _)) = sort_on.as_ref() {
@@ -638,7 +637,6 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
                             .fold_options(0, |a, b| a + b),
                     ),
             );
-            println!("optimal_index_by_score: {:?}", res);
             res
         })
         .min_by_key(|(_, score)| score.clone())
