@@ -2,13 +2,10 @@ use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
 use cubestore::config::{env_parse, Config, CubeServices};
-use cubestore::metastore::job::JobType;
-use cubestore::metastore::{MetaStoreTable, RowKey, TableId};
 use cubestore::table::TableValue;
 use cubestore::util::strings::path_to_string;
 use cubestore::CubeError;
 use flate2::read::GzDecoder;
-use futures::future::join_all;
 use std::any::Any;
 use std::io::Cursor;
 use std::path::Path;
@@ -112,11 +109,12 @@ impl Bench for ParquetMetadataCacheBench {
             .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path_to_string(path)?).as_str())
             .await?;
 
+        // Wait for all pending (compaction) jobs to finish.
         wait_for_all_jobs(&services).await?;
 
         let state = Arc::new(());
 
-        // warmup metadata cache
+        // Warmup metadata cache.
         self.bench(services, state.clone()).await?;
 
         Ok(state)
