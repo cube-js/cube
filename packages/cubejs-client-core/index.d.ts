@@ -722,11 +722,11 @@ declare module '@cubejs-client/core' {
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
   export type LogicalAndFilter = {
-    and: (BinaryFilter | UnaryFilter | LogicalOrFilter)[];
+    and: Filter[];
   };
 
   export type LogicalOrFilter = {
-    or: (BinaryFilter | UnaryFilter | LogicalAndFilter)[];
+    or: Filter[];
   };
 
   export interface BinaryFilter {
