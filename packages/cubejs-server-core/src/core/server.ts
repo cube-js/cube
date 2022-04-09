@@ -345,6 +345,8 @@ export class CubejsServerCore {
       );
     }
 
+    console.log('QQQ', externalDbType, devServer, opts.serverless, definedExtDBVariables);
+
     if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
