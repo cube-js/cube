@@ -77,9 +77,9 @@ export class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
-        console.error((e.stack || e).toString());
-        this.cubejsServer.event('Dev Server Error', { error: (e.stack || e).toString() });
-        res.status(500).json({ error: (e.stack || e).toString() });
+        console.error(((e as Error).stack || e).toString());
+        this.cubejsServer.event('Dev Server Error', { error: ((e as Error).stack || e).toString() });
+        res.status(500).json({ error: ((e as Error).stack || e).toString() });
       }
     };
 
@@ -297,7 +297,7 @@ export class DevServer {
             { cwd: path.resolve('.') }
           );
         } catch (error) {
-          driverError = error;
+          driverError = error as Error;
         } finally {
           driverPromise = null;
         }
@@ -508,7 +508,7 @@ export class DevServer {
       try {
         await schemaConverter.generate();
       } catch (error) {
-        res.status(400).json({ error: error.message || error });
+        res.status(400).json({ error: (error as Error).message || error });
       }
 
       schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
@@ -526,6 +526,6 @@ export class DevServer {
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')
-      .substr(0, 10);
+      .slice(0, 10);
   }
 }

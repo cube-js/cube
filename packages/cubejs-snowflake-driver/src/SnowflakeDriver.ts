@@ -130,6 +130,7 @@ interface SnowflakeDriverOptions {
   authenticator?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
+  privateKey?: string,
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
@@ -148,6 +149,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
     super();
 
+    let privateKey = process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY;
+    if (privateKey && !privateKey.endsWith('\n')) {
+      privateKey += '\n';
+    }
     this.config = {
       account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
       region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
@@ -160,6 +165,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
       privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
       privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      privateKey,
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout'),
@@ -535,7 +541,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         SELECT COLUMNS.COLUMN_NAME as "column_name",
                COLUMNS.TABLE_NAME as "table_name",
                COLUMNS.TABLE_SCHEMA as "table_schema",
-               COLUMNS.DATA_TYPE as "data_type"
+               CASE WHEN COLUMNS.NUMERIC_SCALE = 0 AND COLUMNS.DATA_TYPE = 'NUMBER' THEN 'int' ELSE COLUMNS.DATA_TYPE END as "data_type"
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE COLUMNS.TABLE_SCHEMA NOT IN ('INFORMATION_SCHEMA')
      `;
@@ -558,7 +564,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
       `SELECT COLUMNS.COLUMN_NAME,
-             COLUMNS.DATA_TYPE
+             CASE WHEN COLUMNS.NUMERIC_SCALE = 0 AND COLUMNS.DATA_TYPE = 'NUMBER' THEN 'int' ELSE COLUMNS.DATA_TYPE END as DATA_TYPE
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_NAME = ${this.param(0)} AND TABLE_SCHEMA = ${this.param(1)}
       ORDER BY ORDINAL_POSITION`,

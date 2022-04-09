@@ -18,6 +18,7 @@ export function getBinaryPath() {
 
 async function fetchRelease(version: string) {
   const client = new Octokit({
+    auth: process.env.CUBEJS_GH_API_TOKEN,
     request: {
       agent: await getHttpAgentForProxySettings(),
     }
@@ -40,7 +41,7 @@ function parseInfoFromAssetName(assetName: string): { target: string, type: stri
 
     if (targetAndType.endsWith('-shared')) {
       return {
-        target: targetAndType.substr(0, targetAndType.length - '-shared'.length),
+        target: targetAndType.slice(0, -'-shared'.length),
         format,
         type: 'shared'
       };

@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4690
+expression: "execute_query(\"show tables like '%ban%';\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++---------------------------+
+| Tables_in_db              |
++---------------------------+
+| KibanaSampleDataEcommerce |
++---------------------------+

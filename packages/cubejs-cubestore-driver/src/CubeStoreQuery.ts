@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { BaseFilter, BaseQuery, UserError, BaseMeasure } from '@cubejs-backend/schema-compiler';
+import { BaseFilter, BaseQuery, BaseMeasure } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -110,7 +110,7 @@ export class CubeStoreQuery extends BaseQuery {
     if (!cumulativeMeasures.length) {
       return super.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
     }
-    const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([multiplied, measure]) => measure);
+    const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([_, measure]) => measure);
     const allMeasures = regularMeasures.concat(multipliedMeasures).concat(
       cumulativeMeasuresWithoutMultiplied
     );

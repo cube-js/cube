@@ -39,6 +39,7 @@ use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
@@ -304,6 +305,12 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    fn meta_store_snapshot_interval(&self) -> u64;
+
+    fn meta_store_log_upload_interval(&self) -> u64;
+
+    fn gc_loop_interval(&self) -> u64;
+
     fn stale_stream_timeout(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
@@ -335,6 +342,8 @@ pub trait ConfigObj: DIService {
     fn malloc_trim_every_secs(&self) -> u64;
 
     fn max_cached_queries(&self) -> usize;
+
+    fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
 #[derive(Debug, Clone)]
@@ -345,6 +354,7 @@ pub struct ConfigObjImpl {
     pub compaction_chunks_count_threshold: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
+    pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
@@ -355,6 +365,9 @@ pub struct ConfigObjImpl {
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub meta_store_log_upload_interval: u64,
+    pub meta_store_snapshot_interval: u64,
+    pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -428,6 +441,18 @@ impl ConfigObj for ConfigObjImpl {
         self.import_job_timeout
     }
 
+    fn meta_store_snapshot_interval(&self) -> u64 {
+        self.meta_store_snapshot_interval
+    }
+
+    fn meta_store_log_upload_interval(&self) -> u64 {
+        self.meta_store_log_upload_interval
+    }
+
+    fn gc_loop_interval(&self) -> u64 {
+        self.gc_loop_interval
+    }
+
     fn stale_stream_timeout(&self) -> u64 {
         self.stale_stream_timeout
     }
@@ -489,11 +514,10 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
-}
 
-lazy_static! {
-    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> =
-        std::sync::RwLock::new(None);
+    fn dump_dir(&self) -> &Option<PathBuf> {
+        &self.dump_dir
+    }
 }
 
 lazy_static! {
@@ -544,6 +568,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
+                dump_dir: env::var("CUBESTORE_DUMP_DIR")
+                    .ok()
+                    .map(|v| PathBuf::from(v)),
                 partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
@@ -599,6 +626,9 @@ impl Config {
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
                 stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
@@ -637,6 +667,7 @@ impl Config {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
+                dump_dir: None,
                 partition_split_threshold: 20,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
@@ -672,6 +703,9 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
             }),
         }
     }
@@ -691,22 +725,60 @@ impl Config {
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(true, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            true,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(false, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            false,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
-    pub async fn start_test_with_options<T>(
+    pub async fn start_with_injector_override<T1, T2>(
+        &self,
+        configure_injector: impl FnOnce(Arc<Injector>) -> T1,
+        test_fn: impl FnOnce(CubeServices) -> T2,
+    ) where
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+    {
+        self.start_test_with_options(true, Some(configure_injector), test_fn)
+            .await
+    }
+
+    pub async fn start_test_with_options<T1, T2, I, F>(
         &self,
         clean_remote: bool,
-        test_fn: impl FnOnce(CubeServices) -> T,
+        configure_injector: Option<I>,
+        test_fn: F,
     ) where
-        T: Future<Output = ()> + Send,
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+        I: FnOnce(Arc<Injector>) -> T1,
+        F: FnOnce(CubeServices) -> T2,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -731,7 +803,11 @@ impl Config {
             }
         }
         {
-            let services = self.configure().await;
+            self.configure_injector().await;
+            if let Some(configure_injector) = configure_injector {
+                configure_injector(self.injector.clone()).await;
+            }
+            let services = self.cube_services().await;
             services.start_processing_loops().await.unwrap();
 
             // Should be long enough even for CI.
@@ -896,14 +972,23 @@ impl Config {
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
-                        let meta_store = RocksMetaStore::load_from_remote(
-                            &path,
-                            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            i.get_service("original_remote_fs").await,
-                            i.get_service_typed::<dyn ConfigObj>().await,
-                        )
-                        .await
-                        .unwrap();
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            RocksMetaStore::load_from_dump(
+                                &path,
+                                dump_dir,
+                                original_remote_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            RocksMetaStore::load_from_remote(&path, original_remote_fs, config)
+                                .await
+                                .unwrap()
+                        };
                         meta_store.add_listener(event_sender).await;
                         meta_store
                     },
@@ -1103,20 +1188,15 @@ impl Config {
         }
     }
 
+    pub async fn worker_services(&self) -> WorkerServices {
+        WorkerServices {
+            query_executor: self.injector.get_service_typed().await,
+        }
+    }
+
     pub async fn configure(&self) -> CubeServices {
         self.configure_injector().await;
         self.cube_services().await
-    }
-
-    pub fn configure_worker_services() {
-        let mut services = WORKER_SERVICES.write().unwrap();
-        *services = Some(WorkerServices {
-            query_executor: Arc::new(QueryExecutorImpl),
-        })
-    }
-
-    pub fn current_worker_services() -> WorkerServices {
-        WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
 }
 

@@ -339,6 +339,12 @@ export class CubejsServerCore {
       );
     }
 
+    if (devServer && externalDbType !== 'cubestore') {
+      displayCLIWarning(
+        `Using ${externalDbType} as an external database is deprecated. Please use Cube Store instead: https://cube.dev/docs/caching/running-in-production`
+      );
+    }
+
     if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
@@ -601,7 +607,8 @@ export class CubejsServerCore {
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context,
-          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema
+          allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
+          allowNodeRequire: this.options.allowNodeRequire,
         }
       );
 
@@ -745,13 +752,16 @@ export class CubejsServerCore {
       logger: this.logger,
       externalDbType: options.externalDbType,
       preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey: this.options.allowUngroupedWithoutPrimaryKey,
+      allowUngroupedWithoutPrimaryKey:
+          this.options.allowUngroupedWithoutPrimaryKey ||
+          getEnv("allowUngroupedWithoutPrimaryKey"),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
-      standalone: this.standalone
+      standalone: this.standalone,
+      allowNodeRequire: options.allowNodeRequire,
     });
   }
 

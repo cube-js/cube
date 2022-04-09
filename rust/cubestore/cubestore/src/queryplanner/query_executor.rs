@@ -7,6 +7,7 @@ use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::get_worker_plan;
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue, TimestampValue};
@@ -80,6 +81,13 @@ pub trait QueryExecutor: DIService + Send + Sync {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
+
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError>;
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -100,7 +108,10 @@ impl QueryExecutor for QueryExecutorImpl {
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
-        trace!("Router Query Physical Plan: {:#?}", &split_plan);
+        trace!(
+            "Router Query Physical Plan: {}",
+            pp_phys_plan(split_plan.as_ref())
+        );
 
         let execution_time = SystemTime::now();
 
@@ -109,17 +120,27 @@ impl QueryExecutor for QueryExecutorImpl {
         debug!("Query data processing time: {:?}", execution_time,);
         app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         if execution_time.as_millis() > 200 {
-            warn!("Slow Query ({:?}):\n{:#?}", execution_time, logical_plan);
+            warn!(
+                "Slow Query ({:?}):\n{}",
+                execution_time,
+                pp_plan(&logical_plan)
+            );
             debug!(
-                "Slow Query Physical Plan ({:?}): {:#?}",
-                execution_time, &split_plan
+                "Slow Query Physical Plan ({:?}): {}",
+                execution_time,
+                pp_phys_plan(split_plan.as_ref())
             );
         }
         if results.is_err() {
-            error!("Error Query ({:?}):\n{:#?}", execution_time, logical_plan);
             error!(
-                "Error Query Physical Plan ({:?}): {:#?}",
-                execution_time, &split_plan
+                "Error Query ({:?}):\n{}",
+                execution_time,
+                pp_plan(&logical_plan)
+            );
+            error!(
+                "Error Query Physical Plan ({:?}): {}",
+                execution_time,
+                pp_phys_plan(split_plan.as_ref())
             );
         }
         Ok((split_plan.schema(), results?))
@@ -148,7 +169,10 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        trace!("Partition Query Physical Plan: {:#?}", &worker_plan);
+        trace!(
+            "Partition Query Physical Plan: {}",
+            pp_phys_plan(worker_plan.as_ref())
+        );
 
         let execution_time = SystemTime::now();
         let results = collect(worker_plan.clone())
@@ -163,26 +187,26 @@ impl QueryExecutor for QueryExecutorImpl {
         );
         if execution_time.elapsed()?.as_millis() > 200 || results.is_err() {
             warn!(
-                "Slow Partition Query ({:?}):\n{:#?}",
+                "Slow Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                logical_plan
+                pp_plan(&logical_plan)
             );
             debug!(
-                "Slow Partition Query Physical Plan ({:?}): {:#?}",
+                "Slow Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                &worker_plan
+                pp_phys_plan(worker_plan.as_ref())
             );
         }
         if results.is_err() {
             error!(
-                "Error Partition Query ({:?}):\n{:#?}",
+                "Error Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                logical_plan
+                pp_plan(&logical_plan)
             );
             error!(
-                "Error Partition Query Physical Plan ({:?}): {:#?}",
+                "Error Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                &worker_plan
+                pp_phys_plan(worker_plan.as_ref())
             );
         }
         // TODO: stream results as they become available.
@@ -218,6 +242,28 @@ impl QueryExecutor for QueryExecutorImpl {
             plan_ctx.create_physical_plan(&plan_to_move.clone())?,
             plan_to_move,
         ))
+    }
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError> {
+        let (physical_plan, _) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
+
+        let worker_plan;
+        if let Some((p, _)) = get_worker_plan(&physical_plan) {
+            worker_plan = p;
+        } else {
+            error!("No worker marker in physical plan: {:?}", physical_plan);
+            return Err(CubeError::internal(
+                "Invalid physical plan on worker".to_string(),
+            ));
+        }
+
+        Ok(pp_phys_plan(worker_plan.as_ref()))
     }
 }
 
@@ -278,6 +324,9 @@ impl CubeTable {
         worker_partition_ids: Vec<(u64, RowFilter)>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
+            // Tables are always exposed only using table columns order instead of index one because
+            // index isn't selected until logical optimization plan is done.
+            // Projection indices would refer to these table columns
             index_snapshot
                 .table_path
                 .table
@@ -317,7 +366,7 @@ impl CubeTable {
 
     fn async_scan(
         &self,
-        projection: &Option<Vec<usize>>,
+        table_projection: &Option<Vec<usize>>,
         batch_size: usize,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
@@ -326,27 +375,45 @@ impl CubeTable {
         let mut partition_execs = Vec::<Arc<dyn ExecutionPlan>>::new();
         let table_cols = self.index_snapshot.table().get_row().get_columns();
         let index_cols = self.index_snapshot.index().get_row().get_columns();
-        let projection_with_seq_column = projection.as_ref().map(|p| {
+
+        // We always introduce projection because index and table columns do not match in general
+        // case so we can use simpler code without branching to handle it.
+        let table_projection = table_projection
+            .clone()
+            .unwrap_or((0..self.schema.fields().len()).collect::<Vec<_>>());
+
+        // Prepare projection
+        // If it's non last row query just return projection itself
+        // If it's last row query re-project it as (key1, key2, __seq, col3, col4)
+        let table_projection_with_seq_column = {
             let table = self.index_snapshot.table_path.table.get_row();
             if let Some(mut key_columns) = table.unique_key_columns() {
                 key_columns.push(table.seq_column().expect(&format!(
                     "Seq column is undefined for table: {}",
                     table.get_table_name()
                 )));
-                let mut with_seq = p.clone();
+                let mut with_seq = Vec::new();
                 for column in key_columns {
                     if !with_seq.iter().any(|s| *s == column.get_index()) {
                         with_seq.push(column.get_index());
                     }
                 }
+                for original_projection_index in &table_projection {
+                    if !with_seq.iter().any(|s| *s == *original_projection_index) {
+                        with_seq.push(*original_projection_index);
+                    }
+                }
                 with_seq
             } else {
-                p.clone()
+                table_projection.clone()
             }
-        });
-        let partition_projection = projection_with_seq_column.as_ref().map(|p| {
-            let mut partition_projection = Vec::with_capacity(p.len());
-            for table_col_i in p {
+        };
+
+        // Remap table column indices to index ones
+        let index_projection = {
+            let mut partition_projection =
+                Vec::with_capacity(table_projection_with_seq_column.len());
+            for table_col_i in &table_projection_with_seq_column {
                 let name = table_cols[*table_col_i].get_name();
                 let (part_col_i, _) = index_cols
                     .iter()
@@ -358,42 +425,41 @@ impl CubeTable {
             // this is fixed, we have to handle this ourselves.
             partition_projection.sort();
             partition_projection
-        });
+        };
 
-        let partition_projection_in_memory = projection_with_seq_column.as_ref().map(|p| {
-            let table = self.index_snapshot.table_path.table.get_row();
-            if let Some(mut key_columns) = table.unique_key_columns() {
-                key_columns.push(table.seq_column().expect(&format!(
-                    "Seq column is undefined for table: {}",
-                    table.get_table_name()
-                )));
-                let mut partition_projection_in_memory = Vec::with_capacity(p.len());
-                for column in key_columns {
-                    partition_projection_in_memory.push(column.get_index());
-                }
-                for index in p {
-                    if !partition_projection_in_memory
-                        .iter()
-                        .any(|s| *s == index.clone())
-                    {
-                        partition_projection_in_memory.push(index.clone());
-                    }
-                }
+        // All persisted and in memory data should be stored using this schema
+        let index_schema = Arc::new(Schema::new(
+            index_cols
+                .iter()
+                .map(|i| {
+                    self.schema
+                        .field(
+                            table_cols
+                                .iter()
+                                .find_position(|c| c.get_name() == i.get_name())
+                                .unwrap()
+                                .0,
+                        )
+                        .clone()
+                })
+                .collect(),
+        ));
 
-                partition_projection_in_memory
-            } else {
-                p.clone()
-            }
-        });
+        let index_projection_schema = {
+            Arc::new(Schema::new(
+                index_projection
+                    .iter()
+                    .map(|i| index_schema.field(*i).clone())
+                    .collect(),
+            ))
+        };
 
-        let partition_projected_in_memory_schema =
-            if let Some(p) = partition_projection_in_memory.as_ref() {
-                Arc::new(Schema::new(
-                    p.iter().map(|i| self.schema.field(*i).clone()).collect(),
-                ))
-            } else {
-                self.schema.clone()
-            };
+        // Save some cycles inside scan nodes on projection if schema matches
+        let index_projection_or_none_on_schema_match = if index_projection_schema != index_schema {
+            Some(index_projection.clone())
+        } else {
+            None
+        };
 
         let predicate = combine_filters(filters);
         for partition_snapshot in partition_snapshots {
@@ -415,7 +481,7 @@ impl CubeTable {
                     .expect(format!("Missing remote path {}", remote_path).as_str());
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path(
                     &local_path,
-                    partition_projection.clone(),
+                    index_projection_or_none_on_schema_match.clone(),
                     predicate.clone(),
                     batch_size,
                     1,
@@ -435,10 +501,19 @@ impl CubeTable {
                             "Record batch for in memory chunk {:?} is not provided",
                             chunk
                         )))?;
+                    if let Some(batch) = record_batches.iter().next() {
+                        if batch.schema() != index_schema {
+                            return Err(CubeError::internal(format!(
+                                "Index schema {:?} and in memory chunk schema {:?} mismatch",
+                                index_schema,
+                                record_batches[0].schema()
+                            )));
+                        }
+                    }
                     Arc::new(MemoryExec::try_new(
                         &[record_batches.clone()],
-                        partition_projected_in_memory_schema.clone(),
-                        partition_projection.clone(),
+                        index_projection_schema.clone(),
+                        index_projection_or_none_on_schema_match.clone(),
                     )?)
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
@@ -448,7 +523,7 @@ impl CubeTable {
                         .expect(format!("Missing remote path {}", remote_path).as_str());
                     Arc::new(ParquetExec::try_from_path(
                         local_path,
-                        partition_projection.clone(),
+                        index_projection_or_none_on_schema_match.clone(),
                         predicate.clone(),
                         batch_size,
                         1,
@@ -461,47 +536,51 @@ impl CubeTable {
             }
         }
 
-        // We might need extra projection to re-order data.
-        if let Some(projection) = projection_with_seq_column.as_ref() {
-            let partition_projection = partition_projection.unwrap();
-            let mut final_reorder = Vec::with_capacity(projection.len());
-            for table_col_i in projection {
-                let name = table_cols[*table_col_i].get_name();
-                let index_col_i = index_cols
+        // We might need extra projection to re-order data because we used sorted indices projection version to workaround parquet bug.
+        // Please note for consistency reasons in memory chunks are also re-projected the same way even if it's not required to.
+        let mut final_reorder = Vec::with_capacity(table_projection_with_seq_column.len());
+        for table_col_i in &table_projection_with_seq_column {
+            let name = table_cols[*table_col_i].get_name();
+            let index_col_i = index_cols
+                .iter()
+                .find_position(|c| c.get_name() == name)
+                .unwrap()
+                .0;
+            let batch_col_i = index_projection
+                .iter()
+                .find_position(|c| **c == index_col_i)
+                .unwrap()
+                .0;
+            final_reorder.push(batch_col_i);
+        }
+        if !final_reorder
+            .iter()
+            .cloned()
+            .eq(0..table_projection_with_seq_column.len())
+        {
+            for p in &mut partition_execs {
+                let s = p.schema();
+                let proj_exprs = final_reorder
                     .iter()
-                    .find_position(|c| c.get_name() == name)
-                    .unwrap()
-                    .0;
-                let batch_col_i = partition_projection
-                    .iter()
-                    .find_position(|c| **c == index_col_i)
-                    .unwrap()
-                    .0;
-                final_reorder.push(batch_col_i);
-            }
-            if !final_reorder.iter().cloned().eq(0..projection.len()) {
-                for p in &mut partition_execs {
-                    let s = p.schema();
-                    let proj_exprs = final_reorder
-                        .iter()
-                        .map(|c| {
-                            let name = s.field(*c).name();
-                            let col = datafusion::physical_plan::expressions::Column::new(name, *c);
-                            let col: Arc<dyn PhysicalExpr> = Arc::new(col);
-                            (col, name.clone())
-                        })
-                        .collect_vec();
-                    *p = Arc::new(ProjectionExec::try_new(proj_exprs, p.clone()).unwrap())
-                }
+                    .map(|c| {
+                        let name = s.field(*c).name();
+                        let col = datafusion::physical_plan::expressions::Column::new(name, *c);
+                        let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                        (col, name.clone())
+                    })
+                    .collect_vec();
+                *p = Arc::new(ProjectionExec::try_new(proj_exprs, p.clone()).unwrap())
             }
         }
 
-        let projected_schema = if let Some(p) = projection_with_seq_column.as_ref() {
+        // Schema for scan output and input to MergeSort and LastRowByUniqueKey
+        let table_projected_schema = {
             Arc::new(Schema::new(
-                p.iter().map(|i| self.schema.field(*i).clone()).collect(),
+                table_projection_with_seq_column
+                    .iter()
+                    .map(|i| self.schema.field(*i).clone())
+                    .collect(),
             ))
-        } else {
-            self.schema.clone()
         };
         // TODO: 'nullable' modifiers differ, fix this and re-enable assertion.
         // for p in &partition_execs {
@@ -509,10 +588,13 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(false, projected_schema.clone())));
+            partition_execs.push(Arc::new(EmptyExec::new(
+                false,
+                table_projected_schema.clone(),
+            )));
         }
 
-        let schema = projected_schema;
+        let schema = table_projected_schema;
         let read_data = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
@@ -555,23 +637,22 @@ impl CubeTable {
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             )?);
-            if let Some(projection) = projection.as_ref() {
-                let s = exec.schema();
-                let proj_exprs = projection
-                    .iter()
-                    .map(|c| {
-                        let name = table_cols[*c].get_name();
-                        let col = datafusion::physical_plan::expressions::Column::new(
-                            name,
-                            s.index_of(name)?,
-                        );
-                        let col: Arc<dyn PhysicalExpr> = Arc::new(col);
-                        Ok((col, name.clone()))
-                    })
-                    .collect::<Result<Vec<_>, CubeError>>()?;
-                exec = Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
-            }
-            exec
+
+            // At this point data is projected for last row query and we need to re-project it to what actually queried
+            let s = exec.schema();
+            let proj_exprs = table_projection
+                .iter()
+                .map(|c| {
+                    let name = table_cols[*c].get_name();
+                    let col = datafusion::physical_plan::expressions::Column::new(
+                        name,
+                        s.index_of(name)?,
+                    );
+                    let col: Arc<dyn PhysicalExpr> = Arc::new(col);
+                    Ok((col, name.clone()))
+                })
+                .collect::<Result<Vec<_>, CubeError>>()?;
+            Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
         } else if let Some(join_columns) = self.index_snapshot.sort_on() {
             let join_columns = join_columns
                 .iter()
@@ -588,7 +669,7 @@ impl CubeTable {
     }
 
     pub fn project_to_index_positions(
-        projection_columns: &Vec<Column>,
+        projection_columns: &Vec<String>,
         i: &IdRow<Index>,
     ) -> Vec<Option<usize>> {
         projection_columns
@@ -597,7 +678,7 @@ impl CubeTable {
                 i.get_row()
                     .get_columns()
                     .iter()
-                    .find_position(|c| c.get_name() == pc.get_name())
+                    .find_position(|c| c.get_name() == pc)
                     .map(|(p, _)| p)
             })
             .collect::<Vec<_>>()
@@ -887,6 +968,28 @@ impl ClusterSendExec {
             use_streaming: self.use_streaming,
         }
     }
+
+    pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
+        let mut res = Vec::new();
+        for (node_name, partitions) in self.partitions.iter() {
+            res.push((
+                node_name.clone(),
+                self.serialized_plan_for_partitions(partitions),
+            ));
+        }
+        res
+    }
+
+    fn serialized_plan_for_partitions(&self, partitions: &Vec<(u64, RowRange)>) -> SerializedPlan {
+        let mut ps = HashMap::<_, RowFilter>::new();
+        for (id, range) in partitions {
+            ps.entry(*id).or_default().append_or(range.clone())
+        }
+        let mut ps = ps.into_iter().collect_vec();
+        ps.sort_unstable_by_key(|(id, _)| *id);
+
+        self.serialized_plan.with_partition_id_to_execute(ps)
+    }
 }
 
 #[async_trait]
@@ -936,14 +1039,8 @@ impl ExecutionPlan for ClusterSendExec {
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
-        let mut ps = HashMap::<_, RowFilter>::new();
-        for (id, range) in partitions {
-            ps.entry(*id).or_default().append_or(range.clone())
-        }
-        let mut ps = ps.into_iter().collect_vec();
-        ps.sort_unstable_by_key(|(id, _)| *id);
+        let plan = self.serialized_plan_for_partitions(partitions);
 
-        let plan = self.serialized_plan.with_partition_id_to_execute(ps);
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)
         } else {

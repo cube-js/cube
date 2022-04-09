@@ -1,3 +1,4 @@
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
@@ -7,6 +8,8 @@ use cubestore::sql::timestamp_from_string;
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
+use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -30,6 +33,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("insert", insert),
         t("select_test", select_test),
         t("negative_numbers", negative_numbers),
+        t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
@@ -55,6 +59,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("date_trunc", date_trunc),
         t("coalesce", coalesce),
         t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
@@ -75,6 +80,19 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "create_table_with_location_messed_order",
             create_table_with_location_messed_order,
+        ),
+        t(
+            "create_table_with_location_invalid_digit",
+            create_table_with_location_invalid_digit,
+        ),
+        t("create_table_with_csv", create_table_with_csv),
+        t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
+        t(
+            "create_table_with_csv_no_header",
+            create_table_with_csv_no_header,
         ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
@@ -142,6 +160,17 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
         ),
+        t(
+            "unique_key_and_multi_measures_for_stream_table",
+            unique_key_and_multi_measures_for_stream_table,
+        ),
+        t("divide_by_zero", divide_by_zero),
+        t(
+            "filter_multiple_in_for_decimal",
+            filter_multiple_in_for_decimal,
+        ),
+        t("panic_worker", panic_worker),
+        t("filter_index_selection", filter_index_selection),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -249,6 +278,33 @@ async fn negative_numbers(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
+}
+
+async fn negative_decimal(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.values (decimal_value decimal)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.values (decimal_value) VALUES (-0.12345)")
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * from foo.values")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        match &result.get_rows()[0].values()[0] {
+            TableValue::Decimal(d) => d.to_string(5),
+            x => panic!("Expected decimal but found: {:?}", x),
+        },
+        "-0.12345"
+    );
 }
 
 async fn custom_types(service: Box<dyn SqlClient>) {
@@ -1141,6 +1197,56 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn date_trunc(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.timestamps (t) VALUES \
+            ('2020-01-01T00:00:00.000Z'), \
+            ('2020-03-01T00:00:00.000Z'), \
+            ('2020-04-01T00:00:00.000Z'), \
+            ('2020-07-01T00:00:00.000Z'), \
+            ('2020-09-01T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "SELECT date_trunc('quarter', `t`) `quarter` \
+            FROM foo.timestamps `timestamp`",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1585699200000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),])
+        ]
+    );
+}
+
 async fn ilike(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -1621,6 +1727,128 @@ async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+}
+
+async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("invalid_digit.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c1,c3\n".as_bytes()).unwrap();
+        file.write_all("foo,1a23\n".as_bytes()).unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let res = service
+        .exec_query(&format!(
+            "CREATE TABLE test.main (`c1` text, `c3` decimal)  LOCATION {}",
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await;
+
+    println!("Res: {:?}", res);
+
+    assert!(
+        res.is_err(),
+        "Expected invalid digit error but got {:?}",
+        res
+    );
+}
+
+async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
@@ -2109,20 +2337,21 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
            \n          Empty"
     );
 
+    // TODO
     // Removing single value columns should keep the sort order of the rest.
-    let p = service
-        .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
-        .await
-        .unwrap();
-    assert_eq!(
-        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker, sort_order: [0]\
-           \n  Projection, [id3], sort_order: [0]\
-           \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n      Merge, sort_order: [0, 1, 2]\
-           \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-           \n          Empty"
-    );
+    // let p = service
+    //     .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+    //     .await
+    //     .unwrap();
+    // assert_eq!(
+    //     pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+    //     "Worker, sort_order: [0]\
+    //        \n  Projection, [id3], sort_order: [0]\
+    //        \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+    //        \n      Merge, sort_order: [0, 1, 2]\
+    //        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+    //        \n          Empty"
+    // );
     let p = service
         .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
         .await
@@ -2563,6 +2792,64 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn filter_index_selection(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, d int, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX cb ON s.Orders(c, b)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX bcd ON s.Orders(d, b, c)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalInplaceAggregate\
+           \n    Worker\
+           \n      PartialInplaceAggregate\
+           \n        Filter\
+           \n          MergeSort\
+           \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c in (5, 6) GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalHashAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalHashAggregate\
+           \n    Worker\
+           \n      PartialHashAggregate\
+           \n        Filter\
+           \n          Merge\
+           \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
+           \n              Empty"
+    );
+}
+
 async fn planning_joins(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2650,6 +2937,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     service
+        .exec_query("CREATE INDEX by_product_customer ON s.Orders(product_id, customer_id)")
+        .await
+        .unwrap();
+    service
         .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
         .await
         .unwrap();
@@ -2669,7 +2960,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 3, 4]]"
+        "ClusterSend, partitions: [[2, 4, 5]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
@@ -2682,10 +2973,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
            \n              Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      MergeSort\
-           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n        Scan, index: default:5:[5]:sort_on[product_id], fields: *\
            \n          Empty",
         );
 
@@ -2712,14 +3003,14 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
            \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
+           \n              Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      Filter, predicate: product_id@0 = 125\
            \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
 }
@@ -4274,6 +4565,74 @@ async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
+}
+
+async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int, measure2 text) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, measure2, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, '{}', {})", i, j, "text_value", i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT bar_id, measure1, measure2 FROM test.events_by_type as `events` LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
+}
+
+async fn divide_by_zero(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i int, z int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT i / z FROM s.t")
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+    );
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[(2)]));
+}
+
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
 fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

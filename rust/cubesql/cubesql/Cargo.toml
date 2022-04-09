@@ -9,15 +9,16 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "023722b00b0c1e0c40ef6a8507bcbf2bbdaa5d6c", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1e2bae4d4446dd8a7306c1e76e2dbcbf2642cef5", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "bc46a8a2449413375ff7957af65d7bb799dd37bb" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "f09758d47277e535f8d09e17b4e1773203cc36e7" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
 serde = { version = "^1.0", features = ["derive"] }
+itertools = "0.10.2"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 bytes = "0.5.4"
@@ -43,6 +44,19 @@ nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 mysql_common = "0.26.0"
 comfy-table = "4.1.1"
+bitflags = "1.3.2"
+egg = "0.7.1"
+paste = "1.0.6"
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
+insta = "1.12"
+mysql_async = "0.29"
+portpicker = "0.1.1"
+tokio-postgres = "0.7.5"
+hex = "0.4.3"
+
+[[test]]
+name = "e2e"
+path = "e2e/main.rs"
+harness = false

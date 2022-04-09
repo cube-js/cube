@@ -214,15 +214,30 @@ export class PreAggregations {
 
   static transformQueryToCanUseForm(query) {
     const sortedDimensions = this.squashDimensions(query);
-    const measures = (query.measures.concat(query.measureFilters));
+    const measures = query.measures.concat(query.measureFilters);
     const measurePaths = R.uniq(measures.map(m => m.measure));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     const dimensionsList = query.dimensions.map(dim => dim.dimension);
     const segmentsList = query.segments.map(s => s.segment);
+    
+    const measureToLeafMeasures = {};
 
     const leafMeasurePaths =
       R.pipe(
-        R.map(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')),
+        R.map(m => {
+          const leafMeasures = query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures');
+          measureToLeafMeasures[m.measure] = leafMeasures.map((measure) => {
+            const baseMeasure = query.newMeasure(measure);
+            
+            return {
+              measure,
+              additive: baseMeasure.isAdditive(),
+              type: baseMeasure.definition().type
+            };
+          });
+          
+          return leafMeasures;
+        }),
         R.unnest,
         R.uniq
       )(measures);
@@ -284,6 +299,7 @@ export class PreAggregations {
       measures: measurePaths,
       leafMeasureAdditive,
       leafMeasures: leafMeasurePaths,
+      measureToLeafMeasures,
       hasNoTimeDimensionsWithoutGranularity,
       allFiltersWithinSelectedDimensions,
       isAdditive,
@@ -346,6 +362,13 @@ export class PreAggregations {
   }
 
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    const filterDimensionsSingleValueEqual =
+      transformedQuery.filterDimensionsSingleValueEqual instanceof Set
+        ? transformedQuery.filterDimensionsSingleValueEqual
+        : new Set(
+          Object.keys(transformedQuery.filterDimensionsSingleValueEqual || {})
+        );
+      
     function sortTimeDimensions(timeDimensions) {
       return timeDimensions && R.sortBy(
         d => d.join('.'),
@@ -379,8 +402,8 @@ export class PreAggregations {
       const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
       return transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
       (
-        references.dimensions.length === transformedQuery.filterDimensionsSingleValueEqual.size &&
-        R.all(d => transformedQuery.filterDimensionsSingleValueEqual.has(d), references.dimensions)
+        references.dimensions.length === filterDimensionsSingleValueEqual.size &&
+        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions)
       ) &&
       (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||

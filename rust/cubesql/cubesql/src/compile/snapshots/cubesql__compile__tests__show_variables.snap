@@ -1,0 +1,34 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4592
+expression: "execute_query(\"show variables;\".to_string(), DatabaseProtocol::MySQL).await?"
+---
++---------------------------------+-----------------------------------------------------------------------------------------------------------------------+
+| Variable_name                   | Value                                                                                                                 |
++---------------------------------+-----------------------------------------------------------------------------------------------------------------------+
+| wait_timeout                    | 28800                                                                                                                 |
+| version_comment                 | mysql                                                                                                                 |
+| tx_read_only                    | false                                                                                                                 |
+| tx_isolation                    | REPEATABLE-READ                                                                                                       |
+| transaction_read_only           | false                                                                                                                 |
+| transaction_isolation           | REPEATABLE-READ                                                                                                       |
+| time_zone                       | SYSTEM                                                                                                                |
+| system_time_zone                | UTC                                                                                                                   |
+| sql_mode                        | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION |
+| sessiontransaction_isolation    | REPEATABLE-READ                                                                                                       |
+| sessionauto_increment_increment | 1                                                                                                                     |
+| net_write_timeout               | 600                                                                                                                   |
+| net_buffer_length               | 16384                                                                                                                 |
+| max_allowed_packet              | 67108864                                                                                                              |
+| lower_case_table_names          | 0                                                                                                                     |
+| license                         | Apache 2                                                                                                              |
+| interactive_timeout             | 28800                                                                                                                 |
+| init_connect                    |                                                                                                                       |
+| collation_server                | utf8mb4_0900_ai_ci                                                                                                    |
+| collation_connection            | utf8mb4_general_ci                                                                                                    |
+| character_set_server            | utf8mb4                                                                                                               |
+| character_set_results           | utf8mb4                                                                                                               |
+| character_set_connection        | utf8mb4                                                                                                               |
+| character_set_client            | utf8mb4                                                                                                               |
+| auto_increment_increment        | 1                                                                                                                     |
++---------------------------------+-----------------------------------------------------------------------------------------------------------------------+

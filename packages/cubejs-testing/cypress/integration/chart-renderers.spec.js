@@ -7,13 +7,11 @@ context('Playground: Chart Renderers', () => {
   });
 
   describe('Chart Renderers', () => {
-    const chartTypeByQuery = [
-      [countWithTimedimenionQuery, ['line', 'area', 'bar']],
-      [tableQuery, ['pie', 'table', 'number']],
-    ];
     // const chartTypeByQuery = [
-    //   [countWithTimedimenionQuery, ['line', 'area']],
+    //   [countWithTimedimenionQuery, ['line', 'area', 'bar']],
+    //   [tableQuery, ['pie', 'table', 'number']],
     // ];
+    const chartTypeByQuery = [];
 
     const uiFrameworks = [
       {
@@ -35,10 +33,10 @@ context('Playground: Chart Renderers', () => {
     });
 
     chartTypeByQuery.forEach(([query, chartTypes]) => {
-      const queryHash = crypto.createHash('md5').update(JSON.stringify(query)).digest('hex').substr(0, 5);
+      const queryHash = crypto.createHash('md5').update(JSON.stringify(query)).digest('hex').slice(0, 5);
 
       it(`opens the explore page: query hash ${queryHash}`, () => {
-        cy.log(`QUERY: ${JSON.stringify(query)}`)
+        cy.log(`QUERY: ${JSON.stringify(query)}`);
         cy.setQuery(query);
       });
 

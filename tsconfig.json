@@ -26,6 +26,9 @@
       "path": "packages/cubejs-schema-compiler"
     },
     {
+      "path": "packages/cubejs-testing-shared"
+    },
+    {
       "path": "packages/cubejs-testing"
     },
     {
@@ -38,6 +41,9 @@
       "path": "packages/cubejs-postgres-driver"
     },
     {
+      "path": "packages/cubejs-questdb-driver"
+    },
+    {
       "path": "packages/cubejs-mongobi-driver"
     },
     {
@@ -45,6 +51,9 @@
     },
     {
       "path": "packages/cubejs-redshift-driver"
+    },
+    {
+      "path": "packages/cubejs-athena-driver"
     },
     {
       "path": "packages/cubejs-bigquery-driver"
@@ -75,6 +84,9 @@
     },
     {
       "path": "packages/cubejs-cli"
+    },
+    {
+      "path": "packages/cubejs-dbt-schema-extension"
     }
   ]
 }

@@ -18,12 +18,14 @@
 // trace_macros!(true);
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
 use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
+use datafusion::cube_ext::catch_unwind::PanicError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
@@ -61,7 +63,7 @@ pub mod util;
 pub use datafusion::cube_ext::spawn;
 pub use datafusion::cube_ext::spawn_blocking;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CubeError {
     pub message: String,
     pub backtrace: String,
@@ -70,10 +72,12 @@ pub struct CubeError {
 
 impl std::error::Error for CubeError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CubeErrorCauseType {
     User,
     Internal,
+    CorruptData,
+    Panic,
 }
 
 impl CubeError {
@@ -92,6 +96,14 @@ impl CubeError {
         WithBt(self)
     }
 
+    pub fn elide_backtrace(&self) -> CubeError {
+        CubeError {
+            message: self.message.clone(),
+            backtrace: String::new(),
+            cause: self.cause.clone(),
+        }
+    }
+
     pub fn user(message: String) -> CubeError {
         CubeError {
             message,
@@ -105,6 +117,29 @@ impl CubeError {
             message,
             backtrace: String::new(),
             cause: CubeErrorCauseType::Internal,
+        }
+    }
+
+    pub fn corrupt_data(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::CorruptData,
+        }
+    }
+
+    pub fn panic(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::Panic,
+        }
+    }
+
+    pub fn is_corrupt_data(&self) -> bool {
+        match self.cause {
+            CubeErrorCauseType::CorruptData => true,
+            _ => false,
         }
     }
 
@@ -196,7 +231,17 @@ impl From<Elapsed> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::from_error(v)
+        match v {
+            datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            v => CubeError::from_error(v),
+        }
+    }
+}
+
+impl From<PanicError> for CubeError {
+    fn from(v: PanicError) -> Self {
+        let PanicError { msg } = v;
+        CubeError::panic(msg)
     }
 }
 

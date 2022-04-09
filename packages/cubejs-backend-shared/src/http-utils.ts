@@ -1,5 +1,5 @@
 import decompress from 'decompress';
-import fetch, { Headers, Request, RequestInit, Response } from 'node-fetch';
+import fetch, { Headers, Request, Response } from 'node-fetch';
 import bytes from 'bytes';
 import { throttle } from 'throttle-debounce';
 import { SingleBar } from 'cli-progress';
@@ -8,6 +8,7 @@ import fs from 'fs';
 import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
+import { gunzipSync } from 'zlib';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
@@ -107,4 +108,11 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   }
 
   bar.stop();
+}
+
+export async function downloadAndGunzip(url: string): Promise<string> {
+  const response = await fetch(url);
+  const gz = await response.arrayBuffer();
+  const buffer = await gunzipSync(gz);
+  return buffer.toString();
 }

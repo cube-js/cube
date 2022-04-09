@@ -113,6 +113,17 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new("file_size", DataType::UInt64, true),
+                Box::new(|chunks| {
+                    Arc::new(UInt64Array::from(
+                        chunks
+                            .iter()
+                            .map(|row| row.get_row().file_size())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

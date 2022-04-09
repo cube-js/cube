@@ -9,6 +9,7 @@ const { Link } = Typography;
 
 type RollupDesignerModalProps = {
   apiUrl: string;
+  token?: string;
   onAfterClose: () => void;
 };
 
@@ -51,6 +52,7 @@ export function RollupDesignerModal({
       <div data-testid="rd-modal">
         <RollupDesigner
           apiUrl={props.apiUrl}
+          token={props.token}
           memberTypeCubeMap={memberTypeCubeMap}
         />
       </div>

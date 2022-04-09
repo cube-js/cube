@@ -52,7 +52,7 @@ impl ImportFormat {
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
         match self {
-            ImportFormat::CSV => {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
                     if location.contains(".gz") {
                         let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
@@ -62,7 +62,17 @@ impl ImportFormat {
                         Box::pin(CsvLineStream::new(reader))
                     };
 
-                let mut header_mapping = None;
+                let mut header_mapping = match self {
+                    ImportFormat::CSV => None,
+                    ImportFormat::CSVNoHeader => Some(
+                        columns
+                            .iter()
+                            .enumerate()
+                            .map(|(i, c)| (i, c.clone()))
+                            .collect(),
+                    ),
+                };
+
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
@@ -101,42 +111,25 @@ impl ImportFormat {
                         if value == "" || value == "\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
-                            row[*insert_pos] = match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value_buf.take_string()),
-                                ColumnType::Int => value
-                                    .parse()
-                                    .map(|v| TableValue::Int(v))
-                                    .unwrap_or(TableValue::Null),
-                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
-                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
-                                ),
-                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                    let hll = HllSketch::read_snowflake(value)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                                    let data = base64::decode(value)?;
-                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(
-                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
-                                ) => {
-                                    let data = base64::decode(value)?;
-                                    is_valid_plain_binary_hll(&data, *f)?;
-                                    TableValue::Bytes(data)
-                                }
-                                ColumnType::Timestamp => {
-                                    TableValue::Timestamp(timestamp_from_string(value)?)
-                                }
-                                ColumnType::Float => {
-                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                }
-                                ColumnType::Boolean => {
-                                    TableValue::Boolean(value.to_lowercase() == "true")
-                                }
-                            };
+                            let mut value_buf_opt = Some(value_buf);
+                            row[*insert_pos] =
+                                ImportFormat::parse_column_value(column, &mut value_buf_opt)
+                                    .map_err(|e| {
+                                        if let Some(value_buf) = value_buf_opt {
+                                            CubeError::user(format!(
+                                                "Can't parse '{}' column value for '{}' column: {}",
+                                                value_buf.as_ref(),
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        } else {
+                                            CubeError::user(format!(
+                                                "Can't parse column value for '{}' column: {}",
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        }
+                                    })?;
                         }
 
                         parser.advance()?;
@@ -146,6 +139,42 @@ impl ImportFormat {
                 Ok(rows.boxed())
             }
         }
+    }
+
+    fn parse_column_value(
+        column: &Column,
+        value_buf: &mut Option<MaybeOwnedStr>,
+    ) -> Result<TableValue, CubeError> {
+        let value = value_buf.as_ref().unwrap().as_ref();
+        Ok(match column.get_column_type() {
+            ColumnType::String => TableValue::String(value_buf.take().unwrap().take_string()),
+            ColumnType::Int => value
+                .parse()
+                .map(|v| TableValue::Int(v))
+                .unwrap_or(TableValue::Null),
+            t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                let hll = HllSketch::read_snowflake(value)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                let data = base64::decode(value)?;
+                let hll = HllSketch::read_hll_storage_spec(&data)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
+                let data = base64::decode(value)?;
+                is_valid_plain_binary_hll(&data, *f)?;
+                TableValue::Bytes(data)
+            }
+            ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
+            ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
+            ColumnType::Boolean => TableValue::Boolean(value.to_lowercase() == "true"),
+        })
     }
 }
 
@@ -413,7 +442,8 @@ impl ImportServiceImpl {
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
         let to_download = ImportServiceImpl::temp_uploads_path(location);
-        let local_file = self.remote_fs.download_file(&to_download).await?;
+        // TODO check file size
+        let local_file = self.remote_fs.download_file(&to_download, None).await?;
         Ok(File::open(local_file).await?)
     }
 
@@ -634,10 +664,13 @@ impl Ingestion {
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.
             // Time to wait to chunks to upload and activate them.
-            let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
+            let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
                 .await
                 .into_iter()
-                .map(|c| Ok(c??.get_id()))
+                .map(|c| {
+                    let (c, file_size) = c??;
+                    Ok((c.get_id(), file_size))
+                })
                 .collect();
             meta_store.activate_chunks(table_id, new_chunk_ids?).await
         }));
@@ -651,5 +684,32 @@ impl Ingestion {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use crate::import::parse_decimal;
+
+    #[test]
+    fn parse_decimal_test() {
+        assert_eq!(
+            parse_decimal("-0.12345", 5).unwrap().to_string(5),
+            "-0.12345",
+        );
+        assert_eq!(
+            parse_decimal("-0.002694881400", 5).unwrap().to_string(5),
+            "-0.00269",
+        );
+        assert_eq!(parse_decimal("-0.01", 5).unwrap().to_string(5), "-0.01",);
+        assert_eq!(parse_decimal("200", 5).unwrap().to_string(5), "200",);
+        assert_eq!(parse_decimal("200.35", 5).unwrap().to_string(5), "200.35",);
+        assert_eq!(parse_decimal("-200.4", 5).unwrap().to_string(5), "-200.4",);
+        assert_eq!(
+            parse_decimal("-200.040000", 5).unwrap().to_string(5),
+            "-200.04",
+        );
     }
 }

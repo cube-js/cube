@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use cubesql::{
     config::{Config, CubeServices},
-    mysql::SqlAuthService,
-    schema::SchemaService,
+    sql::SqlAuthService,
+    transport::TransportService,
 };
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ impl NodeConfig {
         self.config.configure_injector().await;
 
         injector
-            .register_typed::<dyn SchemaService, _, _, _>(async move |_| transport)
+            .register_typed::<dyn TransportService, _, _, _>(async move |_| transport)
             .await;
 
         injector

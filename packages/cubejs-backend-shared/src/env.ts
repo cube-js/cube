@@ -19,7 +19,7 @@ export function convertTimeStrToMs(
 
   if (input.length > 1) {
     // eslint-disable-next-line default-case
-    switch (input.substr(-1).toLowerCase()) {
+    switch (input.slice(-1).toLowerCase()) {
       case 'h':
         return parseInt(input.slice(0, -1), 10) * 60 * 60;
       case 'm':
@@ -196,6 +196,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1000')
     .asInt(),
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default('false')
     .asBoolStrict(),
   redisPassword: () => {

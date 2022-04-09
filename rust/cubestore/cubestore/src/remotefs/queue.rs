@@ -12,6 +12,7 @@ use log::error;
 use smallvec::alloc::fmt::Formatter;
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::fs::Metadata;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{broadcast, watch, RwLock};
@@ -46,12 +47,12 @@ pub enum RemoteFsOp {
         remote_path: String,
     },
     Delete(String),
-    Download(String),
+    Download(String, Option<u64>),
 }
 
 #[derive(Debug, Clone)]
 pub enum RemoteFsOpResult {
-    Upload(String, Result<(), CubeError>),
+    Upload(String, Result<u64, CubeError>),
     Delete(String, Result<(), CubeError>),
     Download(String, Result<String, CubeError>),
 }
@@ -153,10 +154,37 @@ impl QueueRemoteFs {
                     .await?
                     .contains(remote_path.as_str())
                 {
-                    let res = self
+                    let mut res = self
                         .remote_fs
                         .upload_file(&temp_upload_path, &remote_path)
                         .await;
+                    if let Ok(size) = res {
+                        match self.remote_fs.list_with_metadata(&remote_path).await {
+                            Ok(list) => {
+                                let list_res = list.iter().next().ok_or(CubeError::internal(
+                                    format!("File {} can't be listed after upload", remote_path),
+                                ));
+                                match list_res {
+                                    Ok(file) => {
+                                        if file.file_size != size {
+                                            res = Err(CubeError::internal(format!(
+                                                "File sizes for {} doesn't match after upload. Expected to be {} but {} uploaded",
+                                                remote_path,
+                                                size,
+                                                file.file_size
+                                            )));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        res = Err(e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                res = Err(e);
+                            }
+                        }
+                    }
                     self.result_sender
                         .send(RemoteFsOpResult::Upload(remote_path, res))?;
                 }
@@ -174,8 +202,11 @@ impl QueueRemoteFs {
 
     async fn download_loop(&self, to_process: RemoteFsOp) -> Result<(), CubeError> {
         match to_process {
-            RemoteFsOp::Download(file) => {
-                let result = self.remote_fs.download_file(file.as_str()).await;
+            RemoteFsOp::Download(file, expected_file_size) => {
+                let result = self
+                    .remote_fs
+                    .download_file(file.as_str(), expected_file_size)
+                    .await;
                 let mut downloading =
                     acquire_lock("download loop downloading", self.downloading.write()).await?;
                 self.result_sender
@@ -292,10 +323,10 @@ impl RemoteFs for QueueRemoteFs {
         &self,
         local_upload_path: &str,
         remote_path: &str,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
         if !self.config.upload_to_remote() {
             log::info!("Skipping upload {}", remote_path);
-            return Ok(());
+            return Ok(tokio::fs::metadata(local_upload_path).await?.len());
         }
         let mut receiver = self.result_sender.subscribe();
         self.upload_queue.push(RemoteFsOp::Upload {
@@ -312,10 +343,25 @@ impl RemoteFs for QueueRemoteFs {
         }
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError> {
         // We might be lucky and the file has already been downloaded.
         if let Ok(local_path) = self.local_file(remote_path).await {
-            if tokio::fs::metadata(&local_path).await.is_ok() {
+            let metadata = tokio::fs::metadata(&local_path).await;
+            if metadata.is_ok() {
+                if let Err(e) = QueueRemoteFs::check_file_size(
+                    remote_path,
+                    expected_file_size,
+                    &local_path,
+                    metadata.unwrap(),
+                )
+                .await
+                {
+                    return Err(e);
+                }
                 return Ok(local_path);
             }
         }
@@ -324,8 +370,10 @@ impl RemoteFs for QueueRemoteFs {
             let mut downloading =
                 acquire_lock("download file downloading", self.downloading.write()).await?;
             if !downloading.contains(remote_path) {
-                self.download_queue
-                    .push(RemoteFsOp::Download(remote_path.to_string()));
+                self.download_queue.push(RemoteFsOp::Download(
+                    remote_path.to_string(),
+                    expected_file_size,
+                ));
                 downloading.insert(remote_path.to_string());
             }
         }
@@ -333,6 +381,18 @@ impl RemoteFs for QueueRemoteFs {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Download(file, result) = res {
                 if &file == remote_path {
+                    let local_path = self.local_file(remote_path).await?;
+                    let metadata = tokio::fs::metadata(&local_path).await?;
+                    if let Err(e) = QueueRemoteFs::check_file_size(
+                        remote_path,
+                        expected_file_size,
+                        &local_path,
+                        metadata,
+                    )
+                    .await
+                    {
+                        return Err(e);
+                    }
                     return result;
                 }
             }
@@ -371,5 +431,26 @@ impl RemoteFs for QueueRemoteFs {
 
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
         self.remote_fs.local_file(remote_path).await
+    }
+}
+
+impl QueueRemoteFs {
+    async fn check_file_size(
+        remote_path: &str,
+        expected_file_size: Option<u64>,
+        local_path: &str,
+        metadata: Metadata,
+    ) -> Result<(), CubeError> {
+        if let Some(expected_file_size) = expected_file_size {
+            let actual_size = metadata.len();
+            if actual_size != expected_file_size {
+                tokio::fs::remove_file(local_path).await?;
+                return Err(CubeError::corrupt_data(format!(
+                    "Expected file size for '{}' is {} but {} received",
+                    remote_path, expected_file_size, actual_size
+                )));
+            }
+        }
+        Ok(())
     }
 }

@@ -59,7 +59,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -109,7 +109,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -151,7 +151,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -211,7 +211,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -285,7 +285,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -428,6 +428,7 @@ jobs:
           yarn run dataset:minimal
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
+          yarn run birdbox:questdb
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}

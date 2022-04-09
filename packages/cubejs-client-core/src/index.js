@@ -10,6 +10,14 @@ let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
+/**
+ * Query result dataset formats enum.
+ */
+const ResultType = {
+  DEFAULT: 'default',
+  COMPACT: 'compact'
+};
+
 function mutexPromise(promise) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -24,7 +32,7 @@ function mutexPromise(promise) {
 
 class CubejsApi {
   constructor(apiToken, options) {
-    if (typeof apiToken === 'object') {
+    if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
       apiToken = undefined;
     }
@@ -53,7 +61,10 @@ class CubejsApi {
   }
 
   request(method, params) {
-    return this.transport.request(method, { baseRequestId: uuidv4(), ...params });
+    return this.transport.request(method, {
+      baseRequestId: uuidv4(),
+      ...params
+    });
   }
 
   loadMethod(request, toResult, options, callback) {
@@ -70,7 +81,9 @@ class CubejsApi {
       options.mutexObj[mutexKey] = mutexValue;
     }
 
-    const requestPromise = this.updateTransportAuthorization().then(() => request());
+    const requestPromise = this
+      .updateTransportAuthorization()
+      .then(() => request());
 
     let skipAuthorizationUpdate = true;
     let unsubscribed = false;
@@ -78,7 +91,10 @@ class CubejsApi {
     const checkMutex = async () => {
       const requestInstance = await requestPromise;
 
-      if (options.mutexObj && options.mutexObj[mutexKey] !== mutexValue) {
+      if (
+        options.mutexObj &&
+        options.mutexObj[mutexKey] !== mutexValue
+      ) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
@@ -213,14 +229,109 @@ class CubejsApi {
     }
   }
 
-  load(query, options, callback) {
+  /**
+   * Add system properties to a query object.
+   * @param {Query} query
+   * @param {string} responseFormat
+   * @returns {void}
+   * @private
+   */
+  patchQueryInternal(query, responseFormat) {
+    if (
+      responseFormat === ResultType.COMPACT &&
+      query.responseFormat !== ResultType.COMPACT
+    ) {
+      query.responseFormat = ResultType.COMPACT;
+    }
+  }
+
+  /**
+   * Process result fetched from the gateway#load method according
+   * to the network protocol.
+   * @param {*} response
+   * @returns ResultSet
+   * @private
+   */
+  loadResponseInternal(response) {
+    if (
+      response.results.length &&
+      response.results[0].query.responseFormat &&
+      response.results[0].query.responseFormat === ResultType.COMPACT
+    ) {
+      response.results.forEach((result, j) => {
+        const data = [];
+        result.data.dataset.forEach((r) => {
+          const row = {};
+          result.data.members.forEach((m, i) => {
+            row[m] = r[i];
+          });
+          data.push(row);
+        });
+        response.results[j].data = data;
+      });
+    }
+    return new ResultSet(response, {
+      parseDateMeasures: this.parseDateMeasures
+    });
+  }
+
+  /**
+   * Fetch data for the passed `query`. Operates with the
+   * `ApiGateway#load` method to fetch the data.
+   * @param {Query | Query[]} query
+   * @param {LoadMethodOptions | undefined} options
+   * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @param {string} responseFormat
+   * @returns {undefined | Promise<ResultSet>}
+   */
+  load(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    if (responseFormat === ResultType.COMPACT) {
+      if (Array.isArray(query)) {
+        query.forEach((q) => {
+          this.patchQueryInternal(q, ResultType.COMPACT);
+        });
+      } else {
+        this.patchQueryInternal(query, ResultType.COMPACT);
+      }
+    }
     return this.loadMethod(
       () => this.request('load', {
         query,
-        queryType: 'multi'
+        queryType: 'multi',
       }),
-      (response) => new ResultSet(response, { parseDateMeasures: this.parseDateMeasures }),
+      this.loadResponseInternal.bind(this),
       options,
+      callback
+    );
+  }
+
+  /**
+   * Allows you to fetch data and receive updates over time. Operates
+   * with the `ApiGateway#load` method to fetch the data.
+   * @link real-time-data-fetch
+   * @param {Query | Query[]} query
+   * @param {LoadMethodOptions | null} options
+   * @param {LoadMethodCallback<ResultSet> | undefined} callback
+   * @param {string} responseFormat
+   * @returns {void}
+   */
+  subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    if (responseFormat === ResultType.COMPACT) {
+      if (Array.isArray(query)) {
+        query.forEach((q) => {
+          this.patchQueryInternal(q, ResultType.COMPACT);
+        });
+      } else {
+        this.patchQueryInternal(query, ResultType.COMPACT);
+      }
+    }
+    return this.loadMethod(
+      () => this.request('subscribe', {
+        query,
+        queryType: 'multi',
+      }),
+      this.loadResponseInternal.bind(this),
+      { ...options, subscribe: true },
       callback
     );
   }
@@ -248,18 +359,6 @@ class CubejsApi {
       () => this.request('dry-run', { query }),
       (response) => response,
       options,
-      callback
-    );
-  }
-
-  subscribe(query, options, callback) {
-    return this.loadMethod(
-      () => this.request('subscribe', {
-        query,
-        queryType: 'multi'
-      }),
-      (body) => new ResultSet(body, { parseDateMeasures: this.parseDateMeasures }),
-      { ...options, subscribe: true },
       callback
     );
   }

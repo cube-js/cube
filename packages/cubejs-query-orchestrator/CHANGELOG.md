@@ -3,6 +3,100 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.29.35](https://github.com/cube-js/cube.js/compare/v0.29.34...v0.29.35) (2022-03-24)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Pin es5-ext version ([#4257](https://github.com/cube-js/cube.js/issues/4257)) ([4a17e9c](https://github.com/cube-js/cube.js/commit/4a17e9c1f18a2c1f0fa826caa8d196a45bb323f5))
+
+
+
+
+
+## [0.29.33](https://github.com/cube-js/cube.js/compare/v0.29.32...v0.29.33) (2022-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.29.31](https://github.com/cube-js/cube.js/compare/v0.29.30...v0.29.31) (2022-03-09)
+
+
+### Bug Fixes
+
+* **athena:** Fixes export bucket location. Fixes column order. ([#4183](https://github.com/cube-js/cube.js/issues/4183)) ([abd40a7](https://github.com/cube-js/cube.js/commit/abd40a79e360cd9a9eceeb56a450102bd782f3d9))
+
+
+
+
+
+## [0.29.29](https://github.com/cube-js/cube.js/compare/v0.29.28...v0.29.29) (2022-03-03)
+
+
+### Features
+
+* **packages:** add QuestDB driver ([#4096](https://github.com/cube-js/cube.js/issues/4096)) ([de8823b](https://github.com/cube-js/cube.js/commit/de8823b524d372dd1d9b661e643d9d4664260b58))
+
+
+
+
+
+## [0.29.28](https://github.com/cube-js/cube.js/compare/v0.29.27...v0.29.28) (2022-02-10)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/athena-driver:** Batching and export support ([#4039](https://github.com/cube-js/cube.js/issues/4039)) ([108f42a](https://github.com/cube-js/cube.js/commit/108f42afdd58ae0027b1b81730f7ca9e72ab9122))
+
+
+
+
+
+## [0.29.25](https://github.com/cube-js/cube.js/compare/v0.29.24...v0.29.25) (2022-02-03)
+
+
+### Bug Fixes
+
+* Out of memory in case of empty table has been used to build partitioned pre-aggregation ([#4021](https://github.com/cube-js/cube.js/issues/4021)) ([314cc3c](https://github.com/cube-js/cube.js/commit/314cc3c3f47d6ba9282a1bb969c2e27bdfb58a57))
+
+
+
+
+
+## [0.29.24](https://github.com/cube-js/cube.js/compare/v0.29.23...v0.29.24) (2022-02-01)
+
+
+### Bug Fixes
+
+* Correct error message on missing partitions ([e953296](https://github.com/cube-js/cube.js/commit/e953296ff4258023a601ea5d5ab91dc8cda4ff14))
+* Remove orphaned tables on error while pre-aggregation creation ([#3996](https://github.com/cube-js/cube.js/issues/3996)) ([0548435](https://github.com/cube-js/cube.js/commit/054843533b2421d87874fa25adf3a94892f24bd4))
+
+
+
+
+
+## [0.29.23](https://github.com/cube-js/cube.js/compare/v0.29.22...v0.29.23) (2022-01-26)
+
+
+### Bug Fixes
+
+* Cannot read property ‘last_updated_at’ of undefined ([#3980](https://github.com/cube-js/cube.js/issues/3980)) ([74d75e7](https://github.com/cube-js/cube.js/commit/74d75e743eb0549eea443e84d7278e7b8f78e6af))
+
+
+
+
+
 ## [0.29.21](https://github.com/cube-js/cube.js/compare/v0.29.20...v0.29.21) (2022-01-17)
 
 

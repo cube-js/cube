@@ -142,6 +142,7 @@ const schemaOptions = Joi.object().keys({
   sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
+  allowNodeRequire: Joi.boolean(),
 });
 
 export default (options: any) => {

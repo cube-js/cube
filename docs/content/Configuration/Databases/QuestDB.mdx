@@ -1,0 +1,33 @@
+---
+title: QuestDB
+permalink: /config/databases/questdb
+---
+
+## Prerequisites
+
+- The hostname for the [QuestDB][questdb] database server
+
+## Setup
+
+### <--{"id" : "Setup"}--> Manual
+
+Add the following to a `.env` file in your Cube.js project:
+
+```bash
+CUBEJS_DB_TYPE=questdb
+CUBEJS_DB_HOST=my.questdb.host
+CUBEJS_DB_PORT=8812
+CUBEJS_DB_NAME=qdb
+CUBEJS_DB_USER=admin
+CUBEJS_DB_PASS=quest
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                             | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                             | A valid database host URL |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                    | A valid port number       |    ✅    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                  | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                            | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |

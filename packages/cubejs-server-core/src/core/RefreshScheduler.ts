@@ -137,8 +137,8 @@ export class RefreshScheduler {
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
     const context: RequestContext = {
       authInfo: null,
-      securityContext: {},
       ...ctx,
+      securityContext: ctx?.securityContext ? ctx.securityContext : {},
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 

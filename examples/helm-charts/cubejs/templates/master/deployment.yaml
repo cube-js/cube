@@ -33,6 +33,11 @@ spec:
             - name: http
               containerPort: {{ .Values.config.apiPort }}
               protocol: TCP
+            {{- if .Values.config.sqlPort }}
+            - name: sql
+              containerPort: {{ .Values.config.sqlPort }}
+              protocol: TCP
+            {{- end }}
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
           {{- if .Values.master.livenessProbe.enabled }}

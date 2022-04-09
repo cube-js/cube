@@ -1,11 +1,12 @@
 #![feature(async_closure)]
-#![feature(raw)]
 
 mod auth;
 mod channel;
 mod config;
 mod transport;
 mod utils;
+
+use once_cell::sync::OnceCell;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -18,7 +19,7 @@ use cubesql::{
 use log::Level;
 use neon::prelude::*;
 use simple_logger::SimpleLogger;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
 
 struct SQLInterface {
@@ -31,6 +32,17 @@ impl SQLInterface {
     pub fn new(services: Arc<CubeServices>) -> Self {
         Self { services }
     }
+}
+
+fn runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
+    static RUNTIME: OnceCell<Runtime> = OnceCell::new();
+
+    RUNTIME.get_or_try_init(|| {
+        Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .or_else(|err| cx.throw_error(err.to_string()))
+    })
 }
 
 fn init_logger(log_level: Level) {
@@ -65,19 +77,16 @@ fn set_log_level(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
     let check_auth = options
-        .get(&mut cx, "checkAuth")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
         .root(&mut cx);
     let transport_load = options
-        .get(&mut cx, "load")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "load")?
         .root(&mut cx);
     let transport_meta = options
-        .get(&mut cx, "meta")?
-        .downcast_or_throw::<JsFunction, _>(&mut cx)?
+        .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
 
-    let nonce_handle = options.get(&mut cx, "nonce")?;
+    let nonce_handle = options.get_value(&mut cx, "nonce")?;
     let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
         let value = nonce_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
         Some(value.value(&mut cx))
@@ -85,7 +94,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         None
     };
 
-    let port_handle = options.get(&mut cx, "port")?;
+    let port_handle = options.get_value(&mut cx, "port")?;
     let port = if port_handle.is_a::<JsNumber, _>(&mut cx) {
         let value = port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
 
@@ -97,12 +106,12 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
+    let runtime = runtime(&mut cx)?;
     let transport_service = NodeBridgeTransport::new(cx.channel(), transport_load, transport_meta);
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
         let config = NodeConfig::new(port, nonce);
-        let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
             let services = Arc::new(
@@ -112,14 +121,13 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
             );
 
             let services_arc = services.clone();
+            let interface = SQLInterface::new(services_arc);
 
             track_event("Cube SQL Start".to_string(), HashMap::new()).await;
 
             let mut loops = services.spawn_processing_loops().await.unwrap();
             loops.push(tokio::spawn(async move {
-                channel.settle_with(deferred, move |cx| {
-                    Ok(cx.boxed(SQLInterface::new(services_arc)))
-                });
+                deferred.settle_with(&channel, move |mut cx| Ok(cx.boxed(interface)));
 
                 Ok(())
             }));
@@ -138,15 +146,15 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let channel = cx.channel();
 
     let services = interface.services.clone();
-    // @todo Await without runtime?
-    #[allow(unused_must_use)]
-    {
-        services.stop_processing_loops();
-    }
+    let runtime = runtime(&mut cx)?;
 
-    // @todo How to stop tokio runtime?
-
-    channel.settle_with(deferred, move |cx| Ok(cx.undefined()));
+    runtime.block_on(async move {
+        let _ = services
+            .stop_processing_loops()
+            .await
+            .or_else(|err| cx.throw_error(err.to_string()));
+    });
+    deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
 
     Ok(promise)
 }

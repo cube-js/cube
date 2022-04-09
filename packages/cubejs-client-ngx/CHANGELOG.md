@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.26](https://github.com/cube-js/cube.js/compare/v0.29.25...v0.29.26) (2022-02-07)
+
+
+### Bug Fixes
+
+* **@cubejs-client/ngx:** cubejs.watch() not producing errors ([#3974](https://github.com/cube-js/cube.js/issues/3974)) Thanks @PieterVanZyl-Dev! ([1ee6740](https://github.com/cube-js/cube.js/commit/1ee6740abb51b84296ae65ee565114269b621b65)), closes [#3961](https://github.com/cube-js/cube.js/issues/3961)
+
+
+
+
+
 # [0.29.0](https://github.com/cube-js/cube.js/compare/v0.28.67...v0.29.0) (2021-12-14)
 
 
