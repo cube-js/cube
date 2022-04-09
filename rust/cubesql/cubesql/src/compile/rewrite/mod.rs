@@ -184,6 +184,7 @@ crate::plan_to_language! {
             limit: Option<usize>,
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
+            table_name: String,
         },
         Measure {
             name: String,
@@ -242,7 +243,7 @@ crate::plan_to_language! {
         ColumnAliasReplacer {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
-            cube: Option<String>,
+            table_name: Option<String>,
         },
     }
 }
@@ -632,10 +633,11 @@ fn cube_scan(
     limit: impl Display,
     offset: impl Display,
     aliases: impl Display,
+    table_name: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset, aliases
+        "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
+        source_table_name, members, filters, orders, limit, offset, aliases, table_name
     )
 }
 
