@@ -736,10 +736,6 @@ impl MemberRules {
                     egraph[subst[column_name_to_alias]],
                     ColumnAliasReplacerAliases
                 ) {
-                    println!(
-                        "column_name: {}, column_name_to_alias: {:?}",
-                        column_name, column_name_to_alias
-                    );
                     if let Some((_, new_alias)) =
                         column_name_to_alias.iter().find(|(c, _)| c == &column_name)
                     {

@@ -201,18 +201,18 @@ impl AsyncTestSuite for MySqlIntegrationTestSuite {
         self.test_use().await?;
         self.test_prepared().await?;
         self.test_prepared_reset().await?;
-        self.test_execute_query("SELECT COUNT(*), status GROUP BY status FROM Orders".to_string())
+        self.test_execute_query("SELECT COUNT(*), status FROM Orders GROUP BY status".to_string())
             .await?;
         self.test_execute_query(
             "SELECT COUNT(*), status, createdAt FROM Orders GROUP BY status, createdAt ORDER BY createdAt".to_string(),
         )
         .await?;
         self.test_execute_query(
-            "SELECT COUNT(*), status, DATE_TRUNC('month', createdAt) FROM Orders GROUP BY status, DATE_TRUNC('month', createdAt) ORDER BY createdAt".to_string(),
+            "SELECT COUNT(*), status, DATE_TRUNC('month', createdAt) FROM Orders GROUP BY status, DATE_TRUNC('month', createdAt) ORDER BY DATE_TRUNC('month', createdAt)".to_string(),
         )
         .await?;
         self.test_execute_query(
-            "SELECT COUNT(*), status, DATE_TRUNC('quarter', createdAt) FROM Orders GROUP BY status, DATE_TRUNC('quarter', createdAt) ORDER BY createdAt".to_string(),
+            "SELECT COUNT(*), status, DATE_TRUNC('quarter', createdAt) FROM Orders GROUP BY status, DATE_TRUNC('quarter', createdAt) ORDER BY DATE_TRUNC('quarter', createdAt)".to_string(),
         )
         .await?;
 
