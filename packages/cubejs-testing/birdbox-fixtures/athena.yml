@@ -27,6 +27,13 @@ services:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
       - ./postgresql/schema/Orders.js:/cube/conf/schema/Orders.js
       - ./postgresql/schema/OrdersPA.js:/cube/conf/schema/OrdersPA.js
+      - ./postgresql/schema/CAST.js:/cube/conf/schema/CAST.js
+      - ./postgresql/schema/Customers.js:/cube/conf/schema/Customers.js
+      - ./postgresql/schema/Customers.sql.js:/cube/conf/schema/Customers.sql.js
+      - ./postgresql/schema/ECommerce.js:/cube/conf/schema/ECommerce.js
+      - ./postgresql/schema/ECommerce.sql.js:/cube/conf/schema/ECommerce.sql.js
+      - ./postgresql/schema/Products.js:/cube/conf/schema/Products.js
+      - ./postgresql/schema/Products.sql.js:/cube/conf/schema/Products.sql.js
     ports:
       - "4000:4000"
     restart: always
