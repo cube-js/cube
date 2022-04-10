@@ -983,11 +983,19 @@ impl LanguageToLogicalPlanConverter {
                                     );
                                     let expr = self.to_expr(measure_params[1])?;
                                     query_measures.push(measure.to_string());
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(measure.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find measure '{}'",
+                                            measure
+                                        )))?;
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        DataType::Int64,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
@@ -1036,13 +1044,20 @@ impl LanguageToLogicalPlanConverter {
                                     let dimension =
                                         match_data_node!(node_by_id, params[0], DimensionName);
                                     let expr = self.to_expr(params[1])?;
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(dimension.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find dimension '{}'",
+                                            dimension
+                                        )))?;
                                     query_dimensions.push(dimension.to_string());
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        // TODO
-                                        DataType::Utf8,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
