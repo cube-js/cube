@@ -74,6 +74,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -87,6 +88,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
         }
       );
       test(
@@ -104,6 +108,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
         },
       );
       
@@ -156,6 +164,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -175,6 +184,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(28);
         }
       );
       test(
@@ -195,6 +207,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(28);
         },
       );
       
@@ -270,6 +286,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -294,6 +311,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
         }
       );
       test(
@@ -322,6 +342,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
         }
       );
       test(
@@ -344,7 +368,7 @@ export function executeTestSuiteFor(type: string) {
       );
       test.skip(
         'querying ECommerce: total quantity, avg discount, total sales, ' +
-        'total profit by product + order + total',
+        'total profit by product + order + total -- rounding in athena',
         async () => {
           const response = await client.load({
             dimensions: [
@@ -454,6 +478,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -467,6 +492,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
         }
       );
       test(
@@ -484,6 +512,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
         },
       );
       
@@ -536,6 +568,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -555,6 +588,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(28);
         }
       );
       test(
@@ -575,6 +611,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(28);
         },
       );
       
@@ -650,6 +690,7 @@ export function executeTestSuiteFor(type: string) {
             limit: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
         }
       );
       test(
@@ -674,6 +715,9 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
         }
       );
       test(
@@ -702,6 +746,10 @@ export function executeTestSuiteFor(type: string) {
             total: true
           });
           expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
         }
       );
       test(
@@ -722,7 +770,7 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
-      test.skip(
+      test(
         'querying ECommerce: total quantity, avg discount, total sales, ' +
         'total profit by product + order + total',
         async () => {
