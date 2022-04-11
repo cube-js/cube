@@ -5083,7 +5083,7 @@ mod tests {
         insta::assert_snapshot!(
             "pgcatalog_pgtype_postgres",
             execute_query(
-                "SELECT * FROM pg_catalog.pg_type".to_string(),
+                "SELECT * FROM pg_catalog.pg_type ORDER BY oid ASC".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
