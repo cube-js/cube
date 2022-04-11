@@ -452,7 +452,7 @@ jobs:
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
-          yarn run driver:bigquery --log=ignore --mode=container
+          yarn run driver:bigquery --log=ignore --mode=docker
       - name: Testing PostgreSQL driver (container mode) via BirdBox
         env:
           CUBEJS_DB_TYPE: postgres
@@ -463,7 +463,7 @@ jobs:
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
-          yarn run driver:postgres --log=ignore --mode=container
+          yarn run driver:postgres --log=ignore --mode=docker
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
