@@ -17,7 +17,14 @@ pub enum ColumnType {
 
 impl ColumnType {
     pub fn to_mysql(&self) -> MysqlColumnType {
-        MysqlColumnType::MYSQL_TYPE_BLOB
+        match self {
+            ColumnType::String => MysqlColumnType::MYSQL_TYPE_STRING,
+            ColumnType::VarStr => MysqlColumnType::MYSQL_TYPE_VAR_STRING,
+            ColumnType::Double => MysqlColumnType::MYSQL_TYPE_DOUBLE,
+            ColumnType::Int8 | ColumnType::Int32 => MysqlColumnType::MYSQL_TYPE_LONG,
+            ColumnType::Int64 => MysqlColumnType::MYSQL_TYPE_LONGLONG,
+            _ => MysqlColumnType::MYSQL_TYPE_BLOB,
+        }
     }
 }
 

@@ -3,8 +3,8 @@ source: cubesql/e2e/tests/mysql.rs
 assertion_line: 186
 expression: self.print_query_result(&mut response).await
 ---
-count type: (MYSQL_TYPE_BLOB:1024) flags: (empty)
-status type: (MYSQL_TYPE_BLOB:1024) flags: (empty)
+count type: (MYSQL_TYPE_LONGLONG:1024) flags: (empty)
+status type: (MYSQL_TYPE_STRING:1024) flags: (empty)
 +-------+------------+
 | count | status     |
 +-------+------------+
