@@ -342,7 +342,7 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
-      test(
+      test.skip(
         'querying ECommerce: total quantity, avg discount, total sales, ' +
         'total profit by product + order + total',
         async () => {
@@ -722,7 +722,7 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
-      test(
+      test.skip(
         'querying ECommerce: total quantity, avg discount, total sales, ' +
         'total profit by product + order + total',
         async () => {
