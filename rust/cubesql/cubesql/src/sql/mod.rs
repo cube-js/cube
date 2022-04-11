@@ -11,8 +11,8 @@ pub(crate) mod statement;
 pub(crate) mod types;
 
 pub use auth_service::{AuthContext, AuthenticateResponse, SqlAuthDefaultImpl, SqlAuthService};
-pub use mysql::MySqlServer;
-pub use postgres::PostgresServer;
+pub use mysql::*;
+pub use postgres::*;
 pub use server_manager::ServerManager;
 pub use service::*;
 pub use session::{Session, SessionProcessList, SessionProperties, SessionState};

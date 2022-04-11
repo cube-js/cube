@@ -5,6 +5,7 @@ use std::{
     io::{Cursor, Error},
 };
 
+use crate::sql::postgres::pg_type::PgType;
 use async_trait::async_trait;
 use tokio::io::AsyncReadExt;
 
@@ -222,13 +223,13 @@ pub struct RowDescriptionField {
 }
 
 impl RowDescriptionField {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, typ: &PgType) -> Self {
         Self {
             name,
             table_oid: 0,
             attribute_number: 0,
-            data_type_oid: 25,
-            data_type_size: -1,
+            data_type_oid: typ.oid as i32,
+            data_type_size: typ.typlen,
             type_modifier: -1,
             format_code: 0,
         }
