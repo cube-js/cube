@@ -83,7 +83,12 @@ impl CubeError {
 
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+        match self.cause {
+            CubeErrorCauseType::User => f.write_fmt(format_args!("{}", self.message)),
+            CubeErrorCauseType::Internal => {
+                f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+            }
+        }
     }
 }
 

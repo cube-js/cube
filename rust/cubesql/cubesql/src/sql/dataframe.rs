@@ -1,6 +1,9 @@
 use std::fmt::{self, Debug, Formatter};
 
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
+use chrono::format::Pad::Zero;
+use chrono::format::{Fixed, Item};
+use chrono::{TimeZone, Utc};
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
@@ -170,7 +173,24 @@ impl Debug for TimestampValue {
 impl ToString for TimestampValue {
     fn to_string(&self) -> String {
         Utc.timestamp_nanos(self.unix_nano)
-            .to_rfc3339_opts(SecondsFormat::Millis, true)
+            .format_with_items(
+                [
+                    Item::Numeric(Year, Zero),
+                    Item::Literal("-"),
+                    Item::Numeric(Month, Zero),
+                    Item::Literal("-"),
+                    Item::Numeric(Day, Zero),
+                    Item::Literal("T"),
+                    Item::Numeric(Hour, Zero),
+                    Item::Literal(":"),
+                    Item::Numeric(Minute, Zero),
+                    Item::Literal(":"),
+                    Item::Numeric(Second, Zero),
+                    Item::Fixed(Fixed::Nanosecond3),
+                ]
+                .iter(),
+            )
+            .to_string()
     }
 }
 

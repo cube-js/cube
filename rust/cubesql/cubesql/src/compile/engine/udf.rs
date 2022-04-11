@@ -1,11 +1,13 @@
 use std::any::type_name;
 use std::sync::Arc;
 
+use chrono::{Duration, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
             Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringArray,
+            StringBuilder, TimestampNanosecondArray, UInt32Builder,
         },
         compute::cast,
         datatypes::{
@@ -13,12 +15,17 @@ use datafusion::{
             TimestampNanosecondType, UInt64Type,
         },
     },
-    error::DataFusionError,
-    logical_plan::create_udf,
+    error::{DataFusionError, Result},
+    logical_plan::{create_udaf, create_udf},
     physical_plan::{
-        functions::{make_scalar_function, ReturnTypeFunction, Signature, Volatility},
+        functions::{
+            datetime_expressions::date_trunc, make_scalar_function, Signature, Volatility,
+        },
+        udaf::AggregateUDF,
         udf::ScalarUDF,
+        ColumnarValue,
     },
+    scalar::ScalarValue,
 };
 
 use crate::{
@@ -28,13 +35,8 @@ use crate::{
     },
     sql::SessionState,
 };
-use chrono::{Duration, NaiveDateTime};
-use datafusion::arrow::array::{IntervalDayTimeArray, StringArray, TimestampNanosecondArray};
-use datafusion::logical_plan::create_udaf;
-use datafusion::physical_plan::datetime_expressions::date_trunc;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::ColumnarValue;
-use datafusion::scalar::ScalarValue;
+
+pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 
 pub fn create_version_udf() -> ScalarUDF {
     let version = make_scalar_function(|_args: &[ArrayRef]| {
@@ -502,10 +504,13 @@ pub fn create_convert_tz_udf() -> ScalarUDF {
             )));
         }
 
-        if input_tz.is_some() {
-            return Err(DataFusionError::NotImplemented(format!(
-                "convert_tz is not implemented, it's stub"
-            )));
+        if let Some(tz) = input_tz {
+            if tz != &"UTC" {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "convert_tz does not non UTC timezone as input, actual {}",
+                    tz
+                )));
+            };
         };
 
         Ok(input_dt.clone())
@@ -650,9 +655,10 @@ pub fn create_time_format_udf() -> ScalarUDF {
 pub fn create_date_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
+
         let mut args = args
             .into_iter()
-            .map(|i| -> Result<ColumnarValue, DataFusionError> {
+            .map(|i| -> Result<ColumnarValue> {
                 if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
                     let mut builder = TimestampNanosecondArray::builder(strings.len());
                     for i in 0..strings.len() {
@@ -671,11 +677,12 @@ pub fn create_date_udf() -> ScalarUDF {
                     Ok(ColumnarValue::Array(i.clone()))
                 }
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
         args.insert(
             0,
             ColumnarValue::Scalar(ScalarValue::Utf8(Some("day".to_string()))),
         );
+
         let res = date_trunc(args.as_slice())?;
         match res {
             ColumnarValue::Array(a) => Ok(a),
@@ -916,7 +923,7 @@ pub fn create_date_add_udf() -> ScalarUDF {
 }
 
 pub fn create_str_to_date() -> ScalarUDF {
-    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> + Send + Sync> =
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |args: &[ColumnarValue]| {
             let timestamp = match &args[0] {
                 ColumnarValue::Scalar(ScalarValue::Utf8(Some(value))) => value,
@@ -953,8 +960,10 @@ pub fn create_str_to_date() -> ScalarUDF {
                     e.to_string()
                 ))
             })?;
+
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
                 Some(res.timestamp_nanos()),
+                None,
             )))
         });
 
@@ -996,6 +1005,56 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
         )))),
         Volatility::Immutable,
         current_schemas,
+    )
+}
+
+pub fn create_format_type_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let oid = downcast_primitive_arg!(&args[0], "oid", Int64Type).value(0);
+        let mut typemod = if args[1].is_null(0) {
+            None
+        } else {
+            Some(downcast_primitive_arg!(&args[1], "mod", Int64Type).value(0))
+        };
+
+        // character varying returns length lowered by 4
+        if oid == 1043 && typemod.is_some() {
+            typemod = Some(typemod.unwrap() - 4);
+        }
+
+        let mut builder = StringBuilder::new(1);
+
+        let typemod_str = match typemod {
+            None => "".to_string(),
+            Some(typemod) if typemod < 0 => "".to_string(),
+            Some(typemod) => format!("({})", typemod),
+        };
+
+        let type_str = match oid {
+            0 => "-".to_string(),
+            19 => format!("name{}", typemod_str),
+            23 => "integer".to_string(),
+            1043 => format!("character varying{}", typemod_str),
+            1184 => format!("timestamp{} with time zone", typemod_str),
+            13408 => format!("information_schema.character_data{}", typemod_str),
+            13410 => format!("information_schema.sql_identifier{}", typemod_str),
+            _ => "???".to_string(),
+        };
+
+        builder.append_value(type_str).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "format_type",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
     )
 }
 

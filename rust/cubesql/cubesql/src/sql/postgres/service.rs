@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use log::error;
+use log::{error, trace};
 use tokio::{
     net::TcpListener,
     sync::{watch, RwLock},
@@ -38,6 +38,8 @@ impl ProcessingLoop for PostgresServer {
             let (socket, _) = tokio::select! {
                 res = stop_receiver.changed() => {
                     if res.is_err() || *stop_receiver.borrow() {
+                        trace!("[pg] Stopping processing_loop via channel");
+
                         return Ok(());
                     } else {
                         continue;

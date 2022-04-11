@@ -60,6 +60,35 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, Option<Vec<String>>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](Option<Vec<String>>);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        let replaced = s.replace(&prefix, "");
+                        if &replaced == "None" {
+                            return Ok([<$variant $var_field:camel>](None));
+                        } else {
+                            return Ok([<$variant $var_field:camel>](Some(s.split(',').map(|s| s.to_string()).collect::<Vec<_>>())));
+                        }
+                    }
+                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, Option<String>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -173,6 +202,17 @@ macro_rules! variant_field_struct {
                 AggregateFunction::Max => "Max",
                 AggregateFunction::Avg => "Avg",
                 AggregateFunction::ApproxDistinct => "ApproxDistinct",
+                AggregateFunction::ArrayAgg => "ArrayAgg",
+                AggregateFunction::Variance => "Variance",
+                AggregateFunction::VariancePop => "VariancePop",
+                AggregateFunction::Stddev => "Stddev",
+                AggregateFunction::StddevPop => "StddevPop",
+                AggregateFunction::Covariance => "Covariance",
+                AggregateFunction::CovariancePop => "CovariancePop",
+                AggregateFunction::Correlation => "Correlation",
+                AggregateFunction::ApproxPercentileCont => "ApproxPercentileCont",
+                AggregateFunction::ApproxPercentileContWithWeight => "ApproxPercentileContWithWeight",
+                AggregateFunction::ApproxMedian => "ApproxMedian",
             }
         );
     };
@@ -274,6 +314,8 @@ macro_rules! variant_field_struct {
                 Operator::RegexNotIMatch => "!~*",
                 Operator::IsDistinctFrom => "IS_DISTINCT_FROM",
                 Operator::IsNotDistinctFrom => "IS_NOT_DISTINCT_FROM",
+                Operator::BitwiseAnd => "&",
+                Operator::BitwiseOr => "|",
             }
         );
     };

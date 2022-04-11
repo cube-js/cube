@@ -10,6 +10,7 @@ use crate::compile::rewrite::BetweenExprNegated;
 use crate::compile::rewrite::BinaryExprOp;
 use crate::compile::rewrite::CastExprDataType;
 use crate::compile::rewrite::ColumnExprColumn;
+use crate::compile::rewrite::CubeScanAliases;
 use crate::compile::rewrite::CubeScanLimit;
 use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::EmptyRelationProduceOneRow;
@@ -26,11 +27,13 @@ use crate::compile::rewrite::LimitN;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
+use crate::compile::rewrite::MemberErrorError;
 use crate::compile::rewrite::OrderAsc;
 use crate::compile::rewrite::OrderMember;
 use crate::compile::rewrite::ProjectionAlias;
 use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::ScalarUDFExprFun;
+use crate::compile::rewrite::ScalarVariableExprDataType;
 use crate::compile::rewrite::ScalarVariableExprVariable;
 use crate::compile::rewrite::SegmentMemberMember;
 use crate::compile::rewrite::SortExprAsc;
@@ -53,14 +56,22 @@ use cubeclient::models::{
 };
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
+use datafusion::logical_plan::plan::Extension;
+use datafusion::logical_plan::plan::Filter;
+use datafusion::logical_plan::plan::Join;
+use datafusion::logical_plan::plan::Projection;
+use datafusion::logical_plan::plan::Sort;
+use datafusion::logical_plan::plan::{Aggregate, Window};
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     LogicalPlan,
 };
+use datafusion::logical_plan::{CrossJoin, EmptyRelation, Limit, TableScan};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::sql::planner::ContextProvider;
 use egg::{EGraph, Id, RecExpr};
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::ops::Index;
 use std::sync::Arc;
 
@@ -140,10 +151,12 @@ impl LogicalPlanToLanguageConverter {
                 let column = add_data_node!(self, column, ColumnExprColumn);
                 self.graph.add(LogicalPlanLanguage::ColumnExpr([column]))
             }
-            Expr::ScalarVariable(variable) => {
+            Expr::ScalarVariable(data_type, variable) => {
+                let data_type = add_data_node!(self, data_type, ScalarVariableExprDataType);
                 let variable = add_data_node!(self, variable, ScalarVariableExprVariable);
-                self.graph
-                    .add(LogicalPlanLanguage::ScalarVariableExpr([variable]))
+                self.graph.add(LogicalPlanLanguage::ScalarVariableExpr([
+                    data_type, variable,
+                ]))
             }
             Expr::Literal(value) => {
                 let value = add_data_node!(self, value, LiteralExprValue);
@@ -294,76 +307,63 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
             }
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
+            // TODO: Support all
+            _ => unimplemented!("Unsupported node type: {:?}", expr),
         })
     }
 
     pub fn add_logical_plan(&mut self, plan: &LogicalPlan) -> Result<Id, CubeError> {
         Ok(match plan {
-            LogicalPlan::Projection {
-                expr,
-                input,
-                schema: _,
-                alias,
-            } => {
-                let expr = add_expr_list_node!(self, expr, ProjectionExpr);
-                let input = self.add_logical_plan(input.as_ref())?;
-                let alias = add_data_node!(self, alias, ProjectionAlias);
+            LogicalPlan::Projection(node) => {
+                let expr = add_expr_list_node!(self, node.expr, ProjectionExpr);
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                let alias = add_data_node!(self, node.alias, ProjectionAlias);
                 self.graph
                     .add(LogicalPlanLanguage::Projection([expr, input, alias]))
             }
-            LogicalPlan::Filter { predicate, input } => {
-                let predicate = self.add_expr(predicate)?;
-                let input = self.add_logical_plan(input.as_ref())?;
+            LogicalPlan::Filter(node) => {
+                let predicate = self.add_expr(&node.predicate)?;
+                let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph
                     .add(LogicalPlanLanguage::Filter([predicate, input]))
             }
-            LogicalPlan::Window {
-                input,
-                window_expr,
-                schema: _,
-            } => {
-                let input = self.add_logical_plan(input.as_ref())?;
-                let window_expr = add_expr_list_node!(self, window_expr, WindowWindowExpr);
+            LogicalPlan::Window(node) => {
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                let window_expr = add_expr_list_node!(self, node.window_expr, WindowWindowExpr);
                 self.graph
                     .add(LogicalPlanLanguage::Window([input, window_expr]))
             }
-            LogicalPlan::Aggregate {
-                input,
-                group_expr,
-                aggr_expr,
-                schema: _,
-            } => {
-                let input = self.add_logical_plan(input.as_ref())?;
-                let group_expr = add_expr_list_node!(self, group_expr, AggregateGroupExpr);
-                let aggr_expr = add_expr_list_node!(self, aggr_expr, AggregateAggrExpr);
+            LogicalPlan::Aggregate(node) => {
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                let group_expr = add_expr_list_node!(self, node.group_expr, AggregateGroupExpr);
+                let aggr_expr = add_expr_list_node!(self, node.aggr_expr, AggregateAggrExpr);
                 self.graph.add(LogicalPlanLanguage::Aggregate([
                     input, group_expr, aggr_expr,
                 ]))
             }
-            LogicalPlan::Sort { expr, input } => {
-                let expr = add_expr_list_node!(self, expr, SortExp);
-                let input = self.add_logical_plan(input.as_ref())?;
+            LogicalPlan::Sort(node) => {
+                let expr = add_expr_list_node!(self, node.expr, SortExp);
+                let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph.add(LogicalPlanLanguage::Sort([expr, input]))
             }
-            LogicalPlan::Join {
-                left,
-                right,
-                on,
-                join_type,
-                join_constraint,
-                schema: _,
-            } => {
-                let left = self.add_logical_plan(left.as_ref())?;
-                let right = self.add_logical_plan(right.as_ref())?;
-                let left_on = on.iter().map(|(left, _)| left.clone()).collect::<Vec<_>>();
+            LogicalPlan::Join(node) => {
+                let left = self.add_logical_plan(node.left.as_ref())?;
+                let right = self.add_logical_plan(node.right.as_ref())?;
+                let left_on = node
+                    .on
+                    .iter()
+                    .map(|(left, _)| left.clone())
+                    .collect::<Vec<_>>();
                 let left_on = add_data_node!(self, left_on, JoinLeftOn);
-                let right_on = on
+                let right_on = node
+                    .on
                     .iter()
                     .map(|(_, right)| right.clone())
                     .collect::<Vec<_>>();
                 let right_on = add_data_node!(self, right_on, JoinRightOn);
-                let join_type = add_data_node!(self, join_type, JoinJoinType);
-                let join_constraint = add_data_node!(self, join_constraint, JoinJoinConstraint);
+                let join_type = add_data_node!(self, node.join_type, JoinJoinType);
+                let join_constraint =
+                    add_data_node!(self, node.join_constraint, JoinJoinConstraint);
                 self.graph.add(LogicalPlanLanguage::Join([
                     left,
                     right,
@@ -373,52 +373,34 @@ impl LogicalPlanToLanguageConverter {
                     join_constraint,
                 ]))
             }
-            LogicalPlan::CrossJoin {
-                left,
-                right,
-                schema: _,
-            } => {
-                let left = self.add_logical_plan(left.as_ref())?;
-                let right = self.add_logical_plan(right.as_ref())?;
+            LogicalPlan::CrossJoin(node) => {
+                let left = self.add_logical_plan(node.left.as_ref())?;
+                let right = self.add_logical_plan(node.right.as_ref())?;
                 self.graph
                     .add(LogicalPlanLanguage::CrossJoin([left, right]))
             }
             // TODO
-            LogicalPlan::Repartition {
-                input,
-                partitioning_scheme: _,
-            } => {
-                let input = self.add_logical_plan(input.as_ref())?;
+            LogicalPlan::Repartition(node) => {
+                let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph.add(LogicalPlanLanguage::Repartition([input]))
             }
-            LogicalPlan::Union {
-                inputs,
-                schema: _,
-                alias,
-            } => {
-                let inputs = add_plan_list_node!(self, inputs, UnionInputs);
-                let alias = add_data_node!(self, alias, UnionAlias);
+            LogicalPlan::Union(node) => {
+                let inputs = add_plan_list_node!(self, node.inputs, UnionInputs);
+                let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
-            LogicalPlan::TableScan {
-                table_name,
-                source,
-                projection,
-                projected_schema: _,
-                filters,
-                limit,
-            } => {
+            LogicalPlan::TableScan(node) => {
                 let source_table_name = add_data_node!(
                     self,
                     self.cube_context
-                        .table_name_by_table_provider(source.clone())?,
+                        .table_name_by_table_provider(node.source.clone())?,
                     TableScanSourceTableName
                 );
 
-                let table_name = add_data_node!(self, table_name, TableScanTableName);
-                let projection = add_data_node!(self, projection, TableScanProjection);
-                let filters = add_expr_list_node!(self, filters, TableScanFilters);
-                let limit = add_data_node!(self, limit, TableScanLimit);
+                let table_name = add_data_node!(self, node.table_name, TableScanTableName);
+                let projection = add_data_node!(self, node.projection, TableScanProjection);
+                let filters = add_expr_list_node!(self, node.filters, TableScanFilters);
+                let limit = add_data_node!(self, node.limit, TableScanLimit);
                 self.graph.add(LogicalPlanLanguage::TableScan([
                     source_table_name,
                     table_name,
@@ -427,18 +409,15 @@ impl LogicalPlanToLanguageConverter {
                     limit,
                 ]))
             }
-            LogicalPlan::EmptyRelation {
-                produce_one_row,
-                schema: _,
-            } => {
+            LogicalPlan::EmptyRelation(rel) => {
                 let produce_one_row =
-                    add_data_node!(self, produce_one_row, EmptyRelationProduceOneRow);
+                    add_data_node!(self, rel.produce_one_row, EmptyRelationProduceOneRow);
                 self.graph
                     .add(LogicalPlanLanguage::EmptyRelation([produce_one_row]))
             }
-            LogicalPlan::Limit { n, input } => {
-                let n = add_data_node!(self, n, LimitN);
-                let input = self.add_logical_plan(input.as_ref())?;
+            LogicalPlan::Limit(limit) => {
+                let n = add_data_node!(self, limit.n, LimitN);
+                let input = self.add_logical_plan(limit.input.as_ref())?;
                 self.graph.add(LogicalPlanLanguage::Limit([n, input]))
             }
             LogicalPlan::CreateExternalTable { .. } => {
@@ -454,14 +433,16 @@ impl LogicalPlanToLanguageConverter {
                 panic!("Analyze is not supported");
             }
             // TODO
-            LogicalPlan::Extension { node } => {
-                if let Some(_cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+            LogicalPlan::Extension(ext) => {
+                if let Some(_cube_scan) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
                     todo!("LogicalPlanLanguage::Extension");
                     // self.graph.add(LogicalPlanLanguage::Extension([]))
                 } else {
-                    panic!("Unsupported extension node: {}", node.schema());
+                    panic!("Unsupported extension node: {}", ext.node.schema());
                 }
             }
+            // TODO: Support all
+            _ => unimplemented!("Unsupported node type: {:?}", plan),
         })
     }
 
@@ -597,8 +578,9 @@ pub fn node_to_expr(
             Expr::Column(column)
         }
         LogicalPlanLanguage::ScalarVariableExpr(params) => {
-            let variable = match_data_node!(node_by_id, params[0], ScalarVariableExprVariable);
-            Expr::ScalarVariable(variable)
+            let data_type = match_data_node!(node_by_id, params[0], ScalarVariableExprDataType);
+            let variable = match_data_node!(node_by_id, params[1], ScalarVariableExprVariable);
+            Expr::ScalarVariable(data_type, variable)
         }
         LogicalPlanLanguage::LiteralExpr(params) => {
             let value = match_data_node!(node_by_id, params[0], LiteralExprValue);
@@ -783,22 +765,27 @@ impl LanguageToLogicalPlanConverter {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], ProjectionExpr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
                 let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
-                let input_schema = DFSchema::new(exprlist_to_fields(&expr, input.schema())?)?;
+                let input_schema = DFSchema::new_with_metadata(
+                    exprlist_to_fields(&expr, input.schema())?,
+                    HashMap::new(),
+                )?;
                 let schema = match alias {
                     Some(ref alias) => input_schema.replace_qualifier(alias.as_str()),
                     None => input_schema,
                 };
-                LogicalPlan::Projection {
+
+                LogicalPlan::Projection(Projection {
                     expr,
                     input,
                     alias,
                     schema: DFSchemaRef::new(schema),
-                }
+                })
             }
             LogicalPlanLanguage::Filter(params) => {
                 let predicate = self.to_expr(params[0])?;
                 let input = Arc::new(self.to_logical_plan(params[1])?);
-                LogicalPlan::Filter { predicate, input }
+
+                LogicalPlan::Filter(Filter { predicate, input })
             }
             LogicalPlanLanguage::Window(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
@@ -807,11 +794,12 @@ impl LanguageToLogicalPlanConverter {
                 let mut window_fields: Vec<DFField> =
                     exprlist_to_fields(window_expr.iter(), input.schema())?;
                 window_fields.extend_from_slice(input.schema().fields());
-                LogicalPlan::Window {
+
+                LogicalPlan::Window(Window {
                     input,
                     window_expr,
-                    schema: Arc::new(DFSchema::new(window_fields)?),
-                }
+                    schema: Arc::new(DFSchema::new_with_metadata(window_fields, HashMap::new())?),
+                })
             }
             LogicalPlanLanguage::Aggregate(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
@@ -822,21 +810,23 @@ impl LanguageToLogicalPlanConverter {
                 let group_expr = normalize_cols(group_expr, &input)?;
                 let aggr_expr = normalize_cols(aggr_expr, &input)?;
                 let all_expr = group_expr.iter().chain(aggr_expr.iter());
-                let schema = Arc::new(DFSchema::new(exprlist_to_fields(
-                    all_expr,
-                    input.schema(),
-                )?)?);
-                LogicalPlan::Aggregate {
+                let schema = Arc::new(DFSchema::new_with_metadata(
+                    exprlist_to_fields(all_expr, input.schema())?,
+                    HashMap::new(),
+                )?);
+
+                LogicalPlan::Aggregate(Aggregate {
                     input,
                     group_expr,
                     aggr_expr,
                     schema,
-                }
+                })
             }
             LogicalPlanLanguage::Sort(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], SortExp);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
-                LogicalPlan::Sort { expr, input }
+
+                LogicalPlan::Sort(Sort { expr, input })
             }
             LogicalPlanLanguage::Join(params) => {
                 let left = Arc::new(self.to_logical_plan(params[0])?);
@@ -850,24 +840,28 @@ impl LanguageToLogicalPlanConverter {
                     right.schema(),
                     &join_type,
                 )?);
-                LogicalPlan::Join {
+
+                LogicalPlan::Join(Join {
                     left,
                     right,
                     on: left_on.into_iter().zip_eq(right_on.into_iter()).collect(),
                     join_type,
                     join_constraint,
                     schema,
-                }
+                    // TODO: Pass to Graph
+                    null_equals_null: true,
+                })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
                 let left = Arc::new(self.to_logical_plan(params[0])?);
                 let right = Arc::new(self.to_logical_plan(params[1])?);
                 let schema = Arc::new(left.schema().join(right.schema())?);
-                LogicalPlan::CrossJoin {
+
+                LogicalPlan::CrossJoin(CrossJoin {
                     left,
                     right,
                     schema,
-                }
+                })
             }
             // // TODO
             // LogicalPlan::Repartition { input, partitioning_scheme: _ } => {
@@ -915,36 +909,40 @@ impl LanguageToLogicalPlanConverter {
                 let projected_schema = projection
                     .as_ref()
                     .map(|p| {
-                        DFSchema::new(
+                        DFSchema::new_with_metadata(
                             p.iter()
                                 .map(|i| {
                                     DFField::from_qualified(&table_name, schema.field(*i).clone())
                                 })
                                 .collect(),
+                            HashMap::new(),
                         )
                     })
                     .unwrap_or_else(|| DFSchema::try_from_qualified_schema(&table_name, &schema))?;
-                LogicalPlan::TableScan {
+
+                LogicalPlan::TableScan(TableScan {
                     table_name,
                     source: provider,
                     projection,
                     projected_schema: Arc::new(projected_schema),
                     filters,
                     limit,
-                }
+                })
             }
             LogicalPlanLanguage::EmptyRelation(params) => {
                 let produce_one_row =
                     match_data_node!(node_by_id, params[0], EmptyRelationProduceOneRow);
-                LogicalPlan::EmptyRelation {
+
+                // TODO
+                LogicalPlan::EmptyRelation(EmptyRelation {
                     produce_one_row,
                     schema: Arc::new(DFSchema::empty()),
-                } // TODO
+                })
             }
             LogicalPlanLanguage::Limit(params) => {
                 let n = match_data_node!(node_by_id, params[0], LimitN);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
-                LogicalPlan::Limit { n, input }
+                LogicalPlan::Limit(Limit { n, input })
             }
             // LogicalPlan::CreateExternalTable { .. } => {
             //     panic!("CreateExternalTable is not supported");
@@ -985,11 +983,19 @@ impl LanguageToLogicalPlanConverter {
                                     );
                                     let expr = self.to_expr(measure_params[1])?;
                                     query_measures.push(measure.to_string());
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(measure.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find measure '{}'",
+                                            measure
+                                        )))?;
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        DataType::Int64,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
@@ -1038,17 +1044,29 @@ impl LanguageToLogicalPlanConverter {
                                     let dimension =
                                         match_data_node!(node_by_id, params[0], DimensionName);
                                     let expr = self.to_expr(params[1])?;
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(dimension.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find dimension '{}'",
+                                            dimension
+                                        )))?;
                                     query_dimensions.push(dimension.to_string());
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        // TODO
-                                        DataType::Utf8,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
                                     member_fields.push(dimension);
+                                }
+                                LogicalPlanLanguage::MemberError(params) => {
+                                    let error =
+                                        match_data_node!(node_by_id, params[0], MemberErrorError);
+                                    return Err(CubeError::user(error.to_string()));
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }
@@ -1197,8 +1215,26 @@ impl LanguageToLogicalPlanConverter {
                         query.limit =
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| n as i32);
+
+                        let aliases =
+                            match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
+                        if let Some(aliases) = aliases {
+                            let new_fields = aliases
+                                .iter()
+                                .map(|a| fields.iter().find(|f| f.name() == a).unwrap().clone())
+                                .collect();
+                            member_fields = aliases
+                                .iter()
+                                .map(|a| {
+                                    member_fields
+                                        [fields.iter().find_position(|f| f.name() == a).unwrap().0]
+                                        .clone()
+                                })
+                                .collect();
+                            fields = new_fields;
+                        }
                         Arc::new(CubeScanNode::new(
-                            Arc::new(DFSchema::new(fields)?),
+                            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?),
                             member_fields,
                             query,
                             self.auth_context.clone(),
@@ -1206,7 +1242,8 @@ impl LanguageToLogicalPlanConverter {
                     }
                     x => panic!("Unexpected extension node: {:?}", x),
                 };
-                LogicalPlan::Extension { node }
+
+                LogicalPlan::Extension(Extension { node })
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })

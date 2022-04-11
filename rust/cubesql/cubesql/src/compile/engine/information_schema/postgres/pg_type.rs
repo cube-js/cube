@@ -225,6 +225,22 @@ impl PgCatalogTypeProvider {
             typarray: 0,
         });
         builder.add_type(&PgType {
+            oid: 19,
+            typname: "name".to_string(),
+            typnamespace: 11,
+            typowner: 10,
+            typlen: 64,
+            typbyval: false,
+            typtype: "b",
+            typcategory: "S",
+            typisprefered: false,
+            typisdefined: true,
+            typrelid: 0,
+            typsubscript: "raw_array_subscript_handler",
+            typelem: 0,
+            typarray: 0,
+        });
+        builder.add_type(&PgType {
             oid: 20,
             typname: "int8".to_string(),
             typnamespace: 11,
@@ -282,6 +298,22 @@ impl PgCatalogTypeProvider {
             typtype: "b",
             typcategory: "S",
             typisprefered: true,
+            typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
+        });
+        builder.add_type(&PgType {
+            oid: 1043,
+            typname: "varchar".to_string(),
+            typnamespace: 11,
+            typowner: 10,
+            typlen: -1,
+            typbyval: false,
+            typtype: "b",
+            typcategory: "S",
+            typisprefered: false,
             typisdefined: true,
             typrelid: 0,
             typsubscript: "-",
@@ -784,6 +816,38 @@ impl PgCatalogTypeProvider {
             typelem: 0,
             typarray: 0,
         });
+        builder.add_type(&PgType {
+            oid: 13408,
+            typname: "character_data".to_string(),
+            typnamespace: 13391,
+            typowner: 10,
+            typlen: -1,
+            typbyval: false,
+            typtype: "d",
+            typcategory: "S",
+            typisprefered: false,
+            typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
+        });
+        builder.add_type(&PgType {
+            oid: 13410,
+            typname: "sql_identifier".to_string(),
+            typnamespace: 13391,
+            typowner: 10,
+            typlen: 64,
+            typbyval: false,
+            typtype: "d",
+            typcategory: "S",
+            typisprefered: false,
+            typisdefined: true,
+            typrelid: 0,
+            typsubscript: "-",
+            typelem: 0,
+            typarray: 0,
+        });
 
         for table in tables {
             builder.add_type(&PgType {
@@ -878,7 +942,6 @@ impl TableProvider for PgCatalogTypeProvider {
     async fn scan(
         &self,
         projection: &Option<Vec<usize>>,
-        _batch_size: usize,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {

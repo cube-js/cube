@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use datafusion::{dataframe::DataFrame, execution::dataframe_impl::DataFrameImpl};
+use datafusion::dataframe::DataFrame as DFDataFrame;
 use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -295,7 +295,7 @@ impl AsyncPostgresShim {
                 return Ok(QueryResponse::ResultSet(status, data_frame));
             }
             crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
-                let df = DataFrameImpl::new(ctx.state, &plan);
+                let df = DFDataFrame::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let response = batch_to_dataframe(&batches)?;
 
