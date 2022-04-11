@@ -1,11 +1,13 @@
 use std::any::type_name;
 use std::sync::Arc;
 
+use chrono::{Duration, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
             Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringArray,
+            StringBuilder, TimestampNanosecondArray, UInt32Builder,
         },
         compute::cast,
         datatypes::{
@@ -14,13 +16,16 @@ use datafusion::{
         },
     },
     error::{DataFusionError, Result},
-    logical_plan::create_udf,
+    logical_plan::{create_udaf, create_udf},
     physical_plan::{
         functions::{
             datetime_expressions::date_trunc, make_scalar_function, Signature, Volatility,
         },
+        udaf::AggregateUDF,
         udf::ScalarUDF,
+        ColumnarValue,
     },
+    scalar::ScalarValue,
 };
 
 use crate::{
@@ -29,13 +34,6 @@ use crate::{
         columar::if_then_else,
     },
     sql::SessionState,
-};
-use chrono::{Duration, NaiveDateTime};
-use datafusion::{
-    arrow::array::{IntervalDayTimeArray, StringArray, TimestampNanosecondArray},
-    logical_plan::create_udaf,
-    physical_plan::{udaf::AggregateUDF, ColumnarValue},
-    scalar::ScalarValue,
 };
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
