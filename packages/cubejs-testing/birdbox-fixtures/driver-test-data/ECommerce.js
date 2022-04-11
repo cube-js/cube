@@ -16,13 +16,6 @@ cube(`ECommerce`, {
         CUBE.totalSales,
         CUBE.totalProfit,
       ],
-      indexes: {
-        productIndex: {
-          columns: [
-            CUBE.productName,
-          ],
-        },
-      },
       refreshKey: {
         every: `1 hour`,
       },
