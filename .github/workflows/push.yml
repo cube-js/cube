@@ -419,14 +419,6 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      # - name: Testing CubeJS (local mode) via BirdBox
-      #   run: |
-      #     cd packages/cubejs-testing/
-      #     export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
-      #     export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
-      #     export DEBUG=testcontainers
-      #     yarn run dataset:minimal
-      #     yarn run birdbox:local:postgresql
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
@@ -446,6 +438,8 @@ jobs:
           CUBEJS_DB_EXPORT_BUCKET: s3://cubejs-opensource/testing/export
         run: |
           cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
           yarn run driver:athena --log=ignore --mode=docker
       - name: Testing BigQuery driver (container mode) via BirdBox
@@ -455,6 +449,8 @@ jobs:
           CUBEJS_DB_EXPORT_BUCKET: cube-open-source-export-bucket
         run: |
           cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
           yarn run driver:bigquery --log=ignore --mode=container
       - name: Testing Docker image via Cypress (Chrome)
