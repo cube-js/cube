@@ -160,7 +160,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName][0], cubeName);
+    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ")}`;
     if (distinct) {
       return `uniqExact(${primaryKeySql})`;
     } else {

@@ -1760,7 +1760,7 @@ class BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ");
+    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ")})`;
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 
