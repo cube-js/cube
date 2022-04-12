@@ -335,7 +335,9 @@ export class CubejsServerCore {
 
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
-        'Cube Store is not found. Please follow this documentation to configure Cube Store https://cube.dev/docs/caching/running-in-production'
+        'Cube Store is not found. Please follow this documentation ' +
+        'to configure Cube Store ' +
+        'https://cube.dev/docs/caching/running-in-production'
       );
     }
 

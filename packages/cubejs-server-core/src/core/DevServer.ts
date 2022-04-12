@@ -464,7 +464,6 @@ export class DevServer {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
 
-      // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
