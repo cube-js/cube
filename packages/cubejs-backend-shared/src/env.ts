@@ -338,9 +338,9 @@ const variables: Record<string, (...args: any) => any> = {
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')
     .asBoolStrict(),
-  scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
-    .default('false')
-    .asBoolStrict(),
+  scheduledRefreshDefault: () => get(
+    'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
+  ).default('true').asBoolStrict(),
   previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
