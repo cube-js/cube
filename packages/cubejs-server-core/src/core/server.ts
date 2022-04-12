@@ -465,7 +465,7 @@ export class CubejsServerCore {
     if (!options.devServer || this.isReadyForQueryProcessing()) {
       const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
         'driverFactory',
-        'dbType'
+        // 'dbType'
       ];
 
       if (!options.jwt?.jwkUrl) {
@@ -662,6 +662,7 @@ export class CubejsServerCore {
 
         // eslint-disable-next-line no-return-assign
         return driverPromise[dataSource] = (async () => {
+          console.log('QQQ OOO', dataSource, new Error('QQQ'));
           let driver: BaseDriver | null = null;
 
           try {
@@ -756,7 +757,7 @@ export class CubejsServerCore {
       preAggregationsSchema: options.preAggregationsSchema,
       allowUngroupedWithoutPrimaryKey:
           this.options.allowUngroupedWithoutPrimaryKey ||
-          getEnv("allowUngroupedWithoutPrimaryKey"),
+          getEnv('allowUngroupedWithoutPrimaryKey'),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
@@ -873,6 +874,8 @@ export class CubejsServerCore {
   }
 
   public static driverDependencies(dbType: DatabaseType) {
+    console.log('QQQ DDD', dbType, DriverDependencies[dbType], new Error('QQQ'));
+
     if (DriverDependencies[dbType]) {
       return DriverDependencies[dbType];
     } else if (fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))) {
