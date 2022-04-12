@@ -1475,7 +1475,8 @@ class BaseQuery {
           this.autoPrefixWithCubeName(
             cubeName,
             symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-            this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
+            this.cubeEvaluator.primaryKeys[cubeName].length &&
+              this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ") || '*'
           ),
           symbol,
           cubeName
@@ -1759,7 +1760,7 @@ class BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
+    const primaryKeySql = this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ");
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 
