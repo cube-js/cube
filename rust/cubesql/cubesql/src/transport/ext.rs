@@ -36,6 +36,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
     fn get_sql_type(&self) -> ColumnType {
         let from_type = match &self._type.to_lowercase().as_str() {
             &"number" => ColumnType::Double,
+            &"boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         };
 
@@ -98,7 +99,7 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
         match self._type.to_lowercase().as_str() {
             "time" => ColumnType::Timestamp,
             "number" => ColumnType::Double,
-            "boolean" => ColumnType::Int8,
+            "boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         }
     }
@@ -278,10 +279,10 @@ impl V1CubeMetaExt for V1CubeMeta {
 
 pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
     match column_type {
-        ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+        ColumnType::Int32 | ColumnType::Int64 | ColumnType::Int8 => DataType::Int64,
         ColumnType::String => DataType::Utf8,
         ColumnType::Double => DataType::Float64,
-        ColumnType::Int8 => DataType::Boolean,
+        ColumnType::Boolean => DataType::Boolean,
         ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         _ => panic!("Unimplemented support for {:?}", column_type),
     }

@@ -443,6 +443,7 @@ impl TableProvider for CubeTableProvider {
                         match c.get_column_type() {
                             ColumnType::String => DataType::Utf8,
                             ColumnType::VarStr => DataType::Utf8,
+                            ColumnType::Boolean => DataType::Boolean,
                             ColumnType::Double => DataType::Float64,
                             ColumnType::Int8 => DataType::Int64,
                             ColumnType::Int32 => DataType::Int64,
