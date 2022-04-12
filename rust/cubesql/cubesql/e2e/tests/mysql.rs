@@ -67,10 +67,20 @@ impl MySqlIntegrationTestSuite {
         let mut table = Table::new();
         table.load_preset("||--+-++|    ++++++");
 
-        let mut header = vec![];
+        let mut header = Vec::with_capacity(res.columns_ref().len());
+        let mut description: Vec<String> = Vec::with_capacity(res.columns_ref().len());
+
         for column in res.columns_ref().into_iter() {
             header.push(Cell::new(column.name_str()));
+            description.push(format!(
+                "{} type: ({:?}:{}) flags: {:?}",
+                column.name_str(),
+                column.column_type(),
+                column.column_length(),
+                column.flags(),
+            ));
         }
+
         table.set_header(header);
 
         res.for_each(|row| {
@@ -92,7 +102,7 @@ impl MySqlIntegrationTestSuite {
         .await
         .unwrap();
 
-        table.trim_fmt()
+        description.join("\r\n").to_string() + "\r\n" + &table.trim_fmt()
     }
 
     async fn test_use(&self) -> RunResult {
