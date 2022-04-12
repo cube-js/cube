@@ -96,6 +96,7 @@ impl PgCatalogAttributeBuilder {
         self.atttypid
             .append_value(match column_type {
                 ColumnType::Blob => 17,
+                ColumnType::Boolean => 16,
                 ColumnType::Int64 => 20,
                 ColumnType::Int8 => 21,
                 ColumnType::Int32 => 23,
@@ -110,6 +111,7 @@ impl PgCatalogAttributeBuilder {
                 ColumnType::Blob | ColumnType::String | ColumnType::VarStr | ColumnType::Double => {
                     -1
                 }
+                ColumnType::Boolean => 1,
                 ColumnType::Int64 | ColumnType::Timestamp => 8,
                 ColumnType::Int8 => 2,
                 ColumnType::Int32 => 4,
@@ -127,6 +129,7 @@ impl PgCatalogAttributeBuilder {
                 ColumnType::Int64
                 | ColumnType::Int8
                 | ColumnType::Int32
+                | ColumnType::Boolean
                 | ColumnType::Timestamp => true,
             })
             .unwrap();
@@ -139,6 +142,7 @@ impl PgCatalogAttributeBuilder {
                 | ColumnType::Double => "i",
                 ColumnType::Int64 | ColumnType::Timestamp => "d",
                 ColumnType::Int8 => "s",
+                ColumnType::Boolean => "c",
             })
             .unwrap();
         self.attstorage
@@ -147,6 +151,7 @@ impl PgCatalogAttributeBuilder {
                 ColumnType::Int64
                 | ColumnType::Int8
                 | ColumnType::Int32
+                | ColumnType::Boolean
                 | ColumnType::Timestamp => "p",
                 ColumnType::Double => "m",
             })

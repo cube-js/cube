@@ -36,6 +36,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
     fn get_sql_type(&self) -> ColumnType {
         let from_type = match &self._type.to_lowercase().as_str() {
             &"number" => ColumnType::Double,
+            &"boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         };
 

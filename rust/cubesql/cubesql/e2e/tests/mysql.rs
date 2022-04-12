@@ -227,6 +227,16 @@ impl AsyncTestSuite for MySqlIntegrationTestSuite {
             "SELECT COUNT(*) count, status, DATE_TRUNC('quarter', createdAt) date FROM Orders GROUP BY status, DATE_TRUNC('quarter', createdAt) ORDER BY date".to_string(),
         )
         .await?;
+        self.test_execute_query(
+            r#"SELECT
+                CAST(true as boolean) as bool_true,
+                CAST(false as boolean) as bool_false,
+                1::int as int,
+                'str' as str
+            "#
+            .to_string(),
+        )
+        .await?;
 
         Ok(())
     }
