@@ -51,7 +51,9 @@ export class ClickHouseQuery extends BaseQuery {
       return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     } else {
       const interval = GRANULARITY_TO_INTERVAL[granularity];
-      return `toDateTime(${granularity === 'second' ? 'toDateTime' : `toStartOf${interval}`}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      return `toDateTime(${granularity === 'second' ? 'toDateTime' : `toStartOf${interval}`}(${dimension}, '${
+        this.timezone
+      }'), '${this.timezone}')`;
     }
   }
 
@@ -98,28 +100,22 @@ export class ClickHouseQuery extends BaseQuery {
       return '1 = 1';
     }
     return dimensionAliases
-      .map(alias => `(assumeNotNull(${leftAlias}.${alias}) = assumeNotNull(${rightAlias}.${alias}))`)
+      .map((alias) => `(assumeNotNull(${leftAlias}.${alias}) = assumeNotNull(${rightAlias}.${alias}))`)
       .join(' AND ');
   }
 
   getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) => (
-      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-    );
+    const equalIgnoreCase = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase();
 
     let field;
 
-    field = this.dimensionsForSelect().find(
-      d => equalIgnoreCase(d.dimension, id),
-    );
+    field = this.dimensionsForSelect().find((d) => equalIgnoreCase(d.dimension, id));
 
     if (field) {
       return field.aliasName();
     }
 
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
+    field = this.measures.find((d) => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id));
 
     if (field) {
       return field.aliasName();
@@ -160,7 +156,9 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(', ')}`;
+    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName]
+      .map((pk) => this.primaryKeySql(pk, cubeName))
+      .join(', ')})`;
     if (distinct) {
       return `uniqExact(${primaryKeySql})`;
     } else {
@@ -206,7 +204,9 @@ export class ClickHouseQuery extends BaseQuery {
       datesFrom.push(from);
       datesTo.push(to);
     });
-    return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
+    return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join(
+      '\',\''
+    )}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
   }
 
   concatStringsSql(strings) {
@@ -225,7 +225,12 @@ export class ClickHouseQuery extends BaseQuery {
     }
     const firstIndexName = Object.keys(preAggregation.indexes)[0];
     const indexColumns = this.evaluateIndexColumns(cube, preAggregation.indexes[firstIndexName]);
-    return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [
+      `CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${
+        sqlAndParams[0]
+      }`,
+      sqlAndParams[1],
+    ];
   }
 
   createIndexSql(indexName, tableName, escapedColumns) {
