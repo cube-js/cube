@@ -1125,7 +1125,7 @@ class BaseQuery {
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
     const joinSql = this.joinSql([
-      { sql: `(${this.keysQuery(primaryKeyDimension, filters)})`, alias: this.escapeColumnName('keys') },
+      { sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`, alias: this.escapeColumnName('keys') },
       {
         sql: keyCubeSql,
         alias: keyCubeAlias,
@@ -1177,36 +1177,33 @@ class BaseQuery {
     );
   }
 
-  keysQuery(primaryKeyDimension, filters) {
+  keysQuery(primaryKeyDimensions, filters) {
     const inlineWhereConditions = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
       this.join,
       this.collectFrom(
-        this.keyDimensions(primaryKeyDimension),
+        this.keyDimensions(primaryKeyDimensions),
         this.collectSubQueryDimensionsFor.bind(this),
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
-    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
+    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimensions)} FROM ${
       query
     } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
   }
 
-  keysSelect(primaryKeyDimension) {
+  keysSelect(primaryKeyDimensions) {
     return R.flatten(
-      this.keyDimensions(primaryKeyDimension)
+      this.keyDimensions(primaryKeyDimensions)
         .map(s => s.selectColumns())
     ).filter(s => !!s).join(', ');
   }
 
-  keyDimensions(primaryKeyDimension) {
-    return this.dimensionsForSelect()
-      .concat(
-        R.none(
-          d => d.dimension === primaryKeyDimension.dimension,
-          this.dimensionsForSelect()
-        ) ? [primaryKeyDimension] : []
-      );
+  keyDimensions(primaryKeyDimensions) {
+    return R.uniqBy(
+      (d) => d.dimension, this.dimensionsForSelect()
+      .concat(primaryKeyDimensions)
+      )
   }
 
   cubeSql(cube) {
@@ -1529,7 +1526,6 @@ class BaseQuery {
 
   primaryKeyNames(cubeName) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-    console.log({cubeName, primaryKeys})
     if (!primaryKeys || !primaryKeys.length) {
       throw new UserError(`One or more Primary key is required for '${cubeName}`);
     }
