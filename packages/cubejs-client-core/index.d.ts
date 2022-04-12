@@ -784,6 +784,10 @@ declare module '@cubejs-client/core' {
 
   export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
 
+  type DeeplyReadonly<T> = {
+    readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+  };
+
   export interface Query {
     measures?: string[];
     dimensions?: string[];
@@ -939,7 +943,7 @@ declare module '@cubejs-client/core' {
      * If empty query is provided no filtering is done based on query context and all available members are retrieved.
      * @param query - context query to provide filtering of members available to add to this query
      */
-    membersForQuery(query: Query | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
+    membersForQuery(query: DeeplyReadonly<Query> | null, memberType: MemberType): TCubeMeasure[] | TCubeDimension[] | TCubeMember[];
 
     /**
      * Get meta information for a cube member
@@ -974,7 +978,7 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: Query | Query[], options?: LoadMethodOptions): Promise<ResultSet>;
+    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<ResultSet>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -999,9 +1003,9 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
     load(
-      query: Query | Query[],
+      query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[],
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet>,
       responseFormat?: string
@@ -1031,14 +1035,14 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: Query | Query[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
 
-    sql(query: Query | Query[], options?: LoadMethodOptions): Promise<SqlQuery>;
+    sql(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
@@ -1046,11 +1050,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: Query | Query[], options?: LoadMethodOptions): Promise<DryRunResponse>;
+    dryRun(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: Query | Query[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**
@@ -1112,7 +1116,7 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function isQueryPresent(query: Query | Query[] | null | undefined): boolean;
+  export function isQueryPresent(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[] | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
@@ -1125,7 +1129,7 @@ declare module '@cubejs-client/core' {
    */
   export function moveItemInArray<T = any>(list: T[], sourceIndex: number, destinationIndex: number): T[];
 
-  export function defaultOrder(query: Query): { [key: string]: QueryOrder };
+  export function defaultOrder(query: DeeplyReadonly<Query>): { [key: string]: QueryOrder };
 
   export interface TFlatFilter {
     /**
@@ -1159,9 +1163,9 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function getQueryMembers(query: Query): string[];
+  export function getQueryMembers(query: DeeplyReadonly<Query>): string[];
 
-  export function areQueriesEqual(query1: Query | null, query2: Query | null): boolean;
+  export function areQueriesEqual(query1: DeeplyReadonly<Query> | null, query2: DeeplyReadonly<Query> | null): boolean;
 
   export type ProgressResponse = {
     stage: string;
