@@ -998,8 +998,7 @@ class BaseQuery {
     return {
       sql: `(${sql})`,
       alias: subQueryAlias,
-      on: primaryKeys.map((pk) => 
-        `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`)
+      on: primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`)
     };
   }
 
@@ -1120,7 +1119,8 @@ class BaseQuery {
     const primaryKeyJoinConditions = primaryKeyDimensions.map(
       (pkd) => `${this.escapeColumnName('keys')}.${pkd.aliasName()} = ${shouldBuildJoinForMeasureSelect ?
         `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}` :
-        this.dimensionSql(pkd)}`).join(" AND ")
+        this.dimensionSql(pkd)}`
+    ).join(' AND ');
 
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
@@ -1202,8 +1202,8 @@ class BaseQuery {
   keyDimensions(primaryKeyDimensions) {
     return R.uniqBy(
       (d) => d.dimension, this.dimensionsForSelect()
-      .concat(primaryKeyDimensions)
-      )
+        .concat(primaryKeyDimensions)
+    );
   }
 
   cubeSql(cube) {
@@ -1476,7 +1476,7 @@ class BaseQuery {
             cubeName,
             symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             this.cubeEvaluator.primaryKeys[cubeName].length &&
-              this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ") || '*'
+              this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(', ') || '*'
           ),
           symbol,
           cubeName
@@ -1530,11 +1530,11 @@ class BaseQuery {
     if (!primaryKeys || !primaryKeys.length) {
       throw new UserError(`One or more Primary key is required for '${cubeName}`);
     }
-    return primaryKeys.map((pk) => this.primaryKeyName(cubeName, pk))
+    return primaryKeys.map((pk) => this.primaryKeyName(cubeName, pk));
   }
 
   primaryKeyName(cubeName, primaryKey) {
-    return `${cubeName}.${primaryKey}`
+    return `${cubeName}.${primaryKey}`;
   }
 
   evaluateSql(cubeName, sql, options) {
@@ -1760,7 +1760,7 @@ class BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(", ")})`;
+    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(', ')})`;
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 

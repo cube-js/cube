@@ -40,14 +40,12 @@ export class JoinGraph {
       R.map((join) => {
         const multipliedMeasures = R.compose(
           R.filter(
-            (m) =>
-              (m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)') ||
+            (m) => (m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)') ||
               ['sum', 'avg', 'count', 'number'].indexOf(m.type) !== -1
           ),
           R.values
         );
-        const joinRequired = (v) =>
-          `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+        const joinRequired = (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
         if (
           !this.cubeEvaluator.primaryKeys[join[1].from].length &&
           multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].from)).length > 0

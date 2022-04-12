@@ -119,8 +119,7 @@ export class CubeEvaluator extends CubeSymbols {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
-            (preAggregationName) =>
-              (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
+            (preAggregationName) => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
               (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
           )
           .map((preAggregationName) => {
@@ -213,7 +212,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
 
     if (!path) {
-      throw new Error("Path can't be undefined");
+      throw new Error('Path can\'t be undefined');
     }
 
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
@@ -268,11 +267,11 @@ export class CubeEvaluator extends CubeSymbols {
   evaluatePreAggregationReferences(cube, aggregation) {
     const timeDimensions = aggregation.timeDimensionReference
       ? [
-          {
-            dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
-            granularity: aggregation.granularity,
-          },
-        ]
+        {
+          dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+          granularity: aggregation.granularity,
+        },
+      ]
       : [];
     return {
       dimensions: (
