@@ -978,7 +978,7 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<ResultSet>;
+    load(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<ResultSet>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -1003,9 +1003,9 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
+    load(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
     load(
-      query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[],
+      query: DeeplyReadonly<Query | Query[]>,
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet>,
       responseFormat?: string
@@ -1035,14 +1035,14 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
 
-    sql(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<SqlQuery>;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
@@ -1050,11 +1050,11 @@ declare module '@cubejs-client/core' {
      */
     meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
 
-    dryRun(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<DryRunResponse>;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
   }
 
   /**
@@ -1116,7 +1116,7 @@ declare module '@cubejs-client/core' {
   /**
    * @hidden
    */
-  export function isQueryPresent(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[] | null | undefined): boolean;
+  export function isQueryPresent(query: DeeplyReadonly<Query | Query[]> | null | undefined): boolean;
   export function movePivotItem(
     pivotConfig: PivotConfig,
     sourceIndex: number,
