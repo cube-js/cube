@@ -50,9 +50,9 @@ use self::engine::udf::{
     create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
     create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
     create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
-    create_pg_datetime_precision_udf, create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-    create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
-    create_version_udf,
+    create_pg_datetime_precision_udf, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+    create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
+    create_user_udf, create_version_udf,
 };
 use self::parser::parse_sql_to_statement;
 use crate::compile::engine::udf::{
@@ -2222,6 +2222,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_datetime_precision_udf());
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
+        ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         // udaf
         ctx.register_udaf(create_measure_udaf());
 
@@ -5429,6 +5430,29 @@ mod tests {
                 ORDER BY t.oid ASC;
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_get_userbyid_main",
+            execute_query(
+                "SELECT pg_get_userbyid(10);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_get_userbyid_invalid",
+            execute_query(
+                "SELECT pg_get_userbyid(0);".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
