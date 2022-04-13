@@ -523,7 +523,7 @@ impl Deserialize for Bind {
             statement,
             parameter_formats,
             parameter_values,
-            result_formats: vec![],
+            result_formats,
         })
     }
 }
@@ -780,7 +780,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_bind_variant1() -> Result<(), CubeError> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
@@ -806,6 +806,37 @@ mod tests {
                             Some(vec![116, 114, 117, 101]),
                         ],
                         result_formats: vec![]
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_bind_variant2() -> Result<(), CubeError> {
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 04 74 65 73 74 00 01 00 01                  ...test....
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body,
+                    Bind {
+                        portal: "".to_string(),
+                        statement: "s0".to_string(),
+                        parameter_formats: vec![Format::Binary],
+                        parameter_values: vec![Some(vec![116, 101, 115, 116])],
+                        result_formats: vec![Format::Binary]
                     },
                 )
             }
@@ -869,7 +900,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_execute() -> Result<(), CubeError> {
+    async fn test_frontend_message_execute() -> Result<(), CubeError> {
         let buffer = parse_hex_dump(
             r#"
             45 00 00 00 09 00 00 00 00 00                     E.........      
@@ -880,9 +911,9 @@ mod tests {
 
         let message = read_message(&mut cursor).await?;
         match message {
-            FrontendMessage::Execute(exec) => {
+            FrontendMessage::Execute(body) => {
                 assert_eq!(
-                    exec,
+                    body,
                     Execute {
                         portal: "".to_string(),
                         max_rows: 0
