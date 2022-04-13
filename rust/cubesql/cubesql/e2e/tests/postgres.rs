@@ -135,8 +135,15 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_prepare(&self) -> RunResult {
-        let stmt = self.client.prepare("SELECT $1").await.unwrap();
-        self.client.query(&stmt, &[&"test"]).await.unwrap();
+        let stmt = self
+            .client
+            .prepare("SELECT $1 as t1, $2 as t2")
+            .await
+            .unwrap();
+        self.client
+            .query(&stmt, &[&"test1", &"test2"])
+            .await
+            .unwrap();
 
         // let stmt = self.client.prepare("SELECT $1").await.unwrap();
         // self.client.query(&stmt, &[&true]).await.unwrap();

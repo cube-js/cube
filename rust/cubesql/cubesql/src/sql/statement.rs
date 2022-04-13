@@ -69,6 +69,7 @@ trait Visitor<'ast> {
 
     fn visit_select_item(&mut self, select: &mut ast::SelectItem) {
         match select {
+            ast::SelectItem::ExprWithAlias { expr, .. } => self.visit_expr(expr),
             ast::SelectItem::UnnamedExpr(expr) => self.visit_expr(expr),
             _ => {}
         }
@@ -254,6 +255,15 @@ mod tests {
             "SELECT ?",
             "SELECT 'test'",
             vec![BindValue::String("test".to_string())],
+        )?;
+
+        test_binder(
+            "SELECT ? AS t1, ? AS t2",
+            "SELECT 'test1' AS t1, 'test2' AS t2",
+            vec![
+                BindValue::String("test1".to_string()),
+                BindValue::String("test2".to_string()),
+            ],
         )?;
 
         // binary op
