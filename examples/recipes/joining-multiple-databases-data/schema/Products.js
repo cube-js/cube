@@ -1,7 +1,6 @@
 cube(`Products`, {
   sql: `SELECT * FROM public.products`,
 
-  // start part: productsRollup
   preAggregations: {
     productsRollup: {
       type: `rollup`,
@@ -13,16 +12,13 @@ cube(`Products`, {
         },
       },
     },
-    // end part: productsRollup
-    
-    // start part: combinedRollup
+
     combinedRollup: {
       type: `rollupJoin`,
       dimensions: [Suppliers.email, Suppliers.company, CUBE.name],
       rollups: [Suppliers.suppliersRollup, CUBE.productsRollup],
       external: true,
     },
-    // end part: combinedRollup
   },
 
   joins: {
