@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT pg_get_userbyid(10);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------+
+| pg_get_userbyid(Int64(10)) |
++----------------------------+
+| ovr                        |
++----------------------------+

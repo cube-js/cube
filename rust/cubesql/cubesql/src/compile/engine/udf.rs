@@ -1186,6 +1186,33 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let role_oids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = StringBuilder::new(role_oids.len());
+        for i in 0..role_oids.len() {
+            let role_oid = role_oids.value(i);
+
+            let user = match role_oid {
+                10 => state.user().unwrap_or("postgres".to_string()),
+                _ => format!("unknown (OID={})", role_oid),
+            };
+
+            builder.append_value(user).unwrap();
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "pg_get_userbyid",
+        vec![DataType::Int64],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
 pub fn create_measure_udaf() -> AggregateUDF {
     create_udaf(
         "measure",
