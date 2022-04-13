@@ -38,10 +38,10 @@ use crate::{
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 
-pub fn create_version_udf() -> ScalarUDF {
-    let version = make_scalar_function(|_args: &[ArrayRef]| {
+pub fn create_version_udf(v: String) -> ScalarUDF {
+    let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
-        builder.append_value("8.0.25").unwrap();
+        builder.append_value(v.to_string()).unwrap();
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });

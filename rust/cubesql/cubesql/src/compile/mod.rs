@@ -15,6 +15,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use datafusion::variable::VarType;
 use datafusion::{logical_plan::LogicalPlan, prelude::*};
+use itertools::Itertools;
 use log::{debug, trace, warn};
 use serde::Serialize;
 use serde_json::json;
@@ -1633,6 +1634,10 @@ impl QueryPlanner {
                 // TODO: Real support
                 Ok(QueryPlan::MetaOk(StatusFlags::empty()))
             }
+            (ast::Statement::Rollback { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -1643,6 +1648,11 @@ impl QueryPlanner {
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
         let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
+            let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
+            let full_variable = match full_variable.as_str() {
+                "transaction_isolation_level" => "transaction_isolation",
+                x => x,
+            };
             let stmt = if name.eq_ignore_ascii_case("all") {
                 parse_sql_to_statement(
                     &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
@@ -1654,7 +1664,7 @@ impl QueryPlanner {
                     // TODO: column name might be expected to match variable name
                     &format!(
                         "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                        escape_single_quote_string(&name.to_lowercase()),
+                        escape_single_quote_string(full_variable),
                     ),
                     self.state.protocol.clone(),
                 )?
@@ -2170,7 +2180,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
         }
 
         // udf
-        ctx.register_udf(create_version_udf());
+        if self.state.protocol == DatabaseProtocol::MySQL {
+            ctx.register_udf(create_version_udf("8.0.25".to_string()));
+        } else if self.state.protocol == DatabaseProtocol::PostgreSQL {
+            ctx.register_udf(create_version_udf(
+                "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
+            ));
+        }
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
         ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
