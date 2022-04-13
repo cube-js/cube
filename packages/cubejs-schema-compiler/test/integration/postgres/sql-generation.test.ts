@@ -1880,11 +1880,6 @@ describe('SQL Generation', () => {
     {
       measures: ['compound.count'],
       timeDimensions: [
-        // {
-        //   dimension: 'visitors.created_at',
-        //   granularity: 'day',
-        //   dateRange: ['2017-01-01', '2017-01-30'],
-        // },
       ],
       timezone: 'America/Los_Angeles',
       filters: [
