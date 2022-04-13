@@ -766,8 +766,8 @@ declare module '@cubejs-client/core' {
 
   export type DateRange = string | [string, string];
 
-  export interface TimeDimensionBase {
-    dimension: string;
+  export interface TimeDimensionBase<Members extends string = string> {
+    dimension: Members;
     granularity?: TimeDimensionGranularity;
   }
 
@@ -775,24 +775,28 @@ declare module '@cubejs-client/core' {
     compareDateRange: Array<DateRange>;
     dateRange?: never;
   };
-  export type TimeDimensionComparison = TimeDimensionBase & TimeDimensionComparisonFields;
+  export type TimeDimensionComparison<Members extends string = string> = TimeDimensionBase<Members> & TimeDimensionComparisonFields;
 
   type TimeDimensionRangedFields = {
     dateRange?: DateRange;
   };
-  export type TimeDimensionRanged = TimeDimensionBase & TimeDimensionRangedFields;
+  export type TimeDimensionRanged<Members extends string = string> = TimeDimensionBase<Members> & TimeDimensionRangedFields;
 
-  export type TimeDimension = TimeDimensionComparison | TimeDimensionRanged;
+  export type TimeDimension<Members extends string = string> = TimeDimensionComparison<Members> | TimeDimensionRanged<Members>;
 
   type DeeplyReadonly<T> = {
     readonly [K in keyof T]: DeeplyReadonly<T[K]>;
   };
 
-  export interface Query {
-    measures?: string[];
-    dimensions?: string[];
+  type DeeplyMutable<T> = {
+    -readonly [K in keyof T]: DeeplyMutable<T[K]>;
+  };
+
+  export interface Query<Members extends string = string> {
+    measures?: Members[];
+    dimensions?: Members[];
     filters?: Filter[];
-    timeDimensions?: TimeDimension[];
+    timeDimensions?: TimeDimension<Members>[];
     segments?: string[];
     limit?: number;
     offset?: number;
@@ -802,6 +806,22 @@ declare module '@cubejs-client/core' {
     ungrouped?: boolean;
     responseFormat?: 'compact' | 'default';
   }
+
+  // Use {} & to make the type "transparent" to LSP for better tooltips.
+  // See https://stackoverflow.com/questions/58852195/disable-displaying-the-aliased-name-for-a-type-in-typescript
+  type CubeRecord<Members extends string> = {} & {
+    [key in Members]: string;
+  };
+
+  export type QueryResultType<T extends DeeplyReadonly<Query | Query[]>> =
+    DeeplyMutable<T> extends Query<infer Members> ? CubeRecord<Members> :
+    DeeplyMutable<T> extends Array<unknown> ? QueryArrayResultType<DeeplyMutable<T>> :
+    never;
+
+  type QueryArrayResultType<T> =
+    T extends [Query<infer Members>, ...(infer V)]
+      ? CubeRecord<Members> | QueryArrayResultType<V>
+      : never
 
   export class ProgressResult {
     stage(): string;
@@ -978,7 +998,10 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<ResultSet>;
+    load<T extends DeeplyReadonly<Query | Query[]>>(
+      query: T,
+      options?: LoadMethodOptions,
+    ): Promise<ResultSet<QueryResultType<T>>>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -1003,13 +1026,17 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    load(
-      query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[],
+    load<T extends DeeplyReadonly<Query | Query[]>>(
+      query: T,
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet>,
+    ): void;
+    load<T extends DeeplyReadonly<Query | Query[]>>(
+      query: T,
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet<QueryResultType<T>>>,
       responseFormat?: string
-    ): Promise<ResultSet>;
+    ): Promise<ResultSet<QueryResultType<T>>>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
@@ -1035,7 +1062,11 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe<T extends DeeplyReadonly<Query | Query[]>>(
+      query: T,
+      options: LoadMethodOptions | null,
+      callback: LoadMethodCallback<ResultSet<QueryResultType<T>>>,
+    ): void;
 
     sql(query: DeeplyReadonly<Query> | DeeplyReadonly<Query>[], options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
