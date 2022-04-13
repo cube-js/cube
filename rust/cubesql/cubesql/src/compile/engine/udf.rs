@@ -5,9 +5,9 @@ use chrono::{Duration, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder, PrimitiveArray, StringArray,
-            StringBuilder, TimestampNanosecondArray, UInt32Builder,
+            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int64Array,
+            Int64Builder, IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder,
+            PrimitiveArray, StringArray, StringBuilder, TimestampNanosecondArray, UInt32Builder,
         },
         compute::cast,
         datatypes::{
@@ -1055,6 +1055,54 @@ pub fn create_format_type_udf(name: &str) -> ScalarUDF {
         &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
+    )
+}
+
+pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = Int64Builder::new(typids.len());
+        for i in 0..typids.len() {
+            let typid = typids.value(i);
+            let typmod = typmods.value(i);
+
+            // https://github.com/postgres/postgres/blob/REL_14_2/src/backend/catalog/information_schema.sql#L155
+            let precision = match typid {
+                1082 => Some(0),
+                1083 | 1114 | 1184 | 1266 => {
+                    if typmod < 0 {
+                        Some(6)
+                    } else {
+                        Some(typmod)
+                    }
+                }
+                1186 => {
+                    if typmod < 0 || ((typmod & 65535) == 65535) {
+                        Some(6)
+                    } else {
+                        Some(typmod & 65535)
+                    }
+                }
+                _ => None,
+            };
+
+            if precision.is_some() {
+                builder.append_value(precision.unwrap()).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "information_schema._pg_datetime_precision",
+        vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
     )
 }
 
