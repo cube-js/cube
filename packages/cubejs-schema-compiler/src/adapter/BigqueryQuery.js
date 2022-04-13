@@ -9,7 +9,7 @@ const GRANULARITY_TO_INTERVAL = {
   second: 'SECOND',
   month: 'MONTH',
   quarter: 'QUARTER',
-  year: 'YEAR'
+  year: 'YEAR',
 };
 
 class BigqueryFilter extends BaseFilter {
@@ -25,6 +25,10 @@ class BigqueryFilter extends BaseFilter {
       return 'CAST(? AS FLOAT64)';
     }
     return '?';
+  }
+
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
   }
 }
 
@@ -58,21 +62,26 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   seriesSql(timeDimension) {
-    const values = timeDimension.timeSeries().map(
-      ([from, to]) => `select '${from}' f, '${to}' t`
-    ).join(' UNION ALL ');
-    return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
+    const values = timeDimension
+      .timeSeries()
+      .map(([from, to]) => `select '${from}' f, '${to}' t`)
+      .join(' UNION ALL ');
+    return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast(
+      'dates.t'
+    )} date_to FROM (${values}) AS dates`;
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     const outerSeriesAlias = this.cubeAlias('outer_series');
     const outerBase = this.cubeAlias('outer_base');
-    const timeDimensionAlias = this.timeDimensions.map(d => d.aliasName()).filter(d => !!d)[0];
-    const aliasesForSelect = this.timeDimensions.map(d => d.dateSeriesSelectColumn(outerSeriesAlias)).concat(
-      this.dimensions.concat(cumulativeMeasures).map(s => s.aliasName())
-    ).filter(c => !!c).join(', ');
-    const dateSeriesAlias = this.timeDimensions.map(d => `${d.dateSeriesAliasName()}`).filter(c => !!c)[0];
+    const timeDimensionAlias = this.timeDimensions.map((d) => d.aliasName()).filter((d) => !!d)[0];
+    const aliasesForSelect = this.timeDimensions
+      .map((d) => d.dateSeriesSelectColumn(outerSeriesAlias))
+      .concat(this.dimensions.concat(cumulativeMeasures).map((s) => s.aliasName()))
+      .filter((c) => !!c)
+      .join(', ');
+    const dateSeriesAlias = this.timeDimensions.map((d) => `${d.dateSeriesAliasName()}`).filter((c) => !!c)[0];
     return `
     WITH ${dateSeriesSql} SELECT ${aliasesForSelect} FROM
     ${dateSeriesAlias} ${outerSeriesAlias}
@@ -135,7 +144,7 @@ export class BigqueryQuery extends BaseQuery {
 
   defaultEveryRefreshKey() {
     return {
-      every: '2 minutes'
+      every: '2 minutes',
     };
   }
 }
