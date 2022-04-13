@@ -1469,14 +1469,18 @@ class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
+      const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
       const result = this.renderSqlMeasure(
         name,
         this.applyMeasureFilters(
           this.autoPrefixWithCubeName(
             cubeName,
             symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-            this.cubeEvaluator.primaryKeys[cubeName].length &&
-              this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(', ') || '*'
+            primaryKeys.length && (
+              primaryKeys.length > 1 ?
+                primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))) 
+                : this.primaryKeySql(primaryKeys[0], cubeName)
+              ) || '*'
           ),
           symbol,
           cubeName
@@ -1755,12 +1759,19 @@ class BaseQuery {
     return this.hllMerge(sql);
   }
 
+  castToString(sql) {
+    return `CAST(${sql} as TEXT)`;
+  }
+
   countDistinctApprox(sql) {
     throw new UserError('Approximate distinct count is not supported by this DB');
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = `CONCAT(${this.cubeEvaluator.primaryKeys[cubeName].map((pk) => this.primaryKeySql(pk, cubeName)).join(', ')})`;
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+    const primaryKeySql = primaryKeys.length > 1 ? 
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) : 
+      this.primaryKeySql(primaryKeys[0], cubeName)
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 
