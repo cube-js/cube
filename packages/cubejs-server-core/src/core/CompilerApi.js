@@ -47,12 +47,13 @@ export class CompilerApi {
         requestId
       });
       // TODO check if saving this promise can produce memory leak?
-      this.compilers = compile(this.repository, {
+      this.compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone
       });
+      this.compilers.compilerApi = this;
       this.compilerVersion = compilerVersion;
     }
 

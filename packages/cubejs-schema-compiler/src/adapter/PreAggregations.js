@@ -1,12 +1,11 @@
 import R from 'ramda';
 
-import { UserError } from '../compiler/UserError';
+import { UserError } from '../compiler';
 
 export class PreAggregations {
   constructor(query, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;
-    this.cubeLatticeCache = cubeLatticeCache;
     this.cubeLattices = {};
   }
 
@@ -680,14 +679,17 @@ export class PreAggregations {
 
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
-    return this.query.newSubQuery({
-      rowLimit: null,
-      measures: references.measures,
-      dimensions: references.dimensions,
-      timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
-      preAggregationQuery: true,
-      useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-    });
+    return this.query.newSubQuery2(
+      cube,
+      {
+        rowLimit: null,
+        measures: references.measures,
+        dimensions: references.dimensions,
+        timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
+        preAggregationQuery: true,
+        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+      }
+    );
   }
 
   autoRollupPreAggregationQuery(cube, aggregation) {

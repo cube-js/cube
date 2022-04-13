@@ -1861,7 +1861,7 @@ class BaseQuery {
   }
 
   newSubQuery(options) {
-    const QueryClass = this.constructor;
+    const QueryClass = options.dialectClass ?? this.constructor;
     return new QueryClass(
       this.compilers,
       Object.assign({
@@ -1876,6 +1876,10 @@ class BaseQuery {
         externalQueryClass: this.options.externalQueryClass,
       }, options)
     );
+  }
+
+  newSubQuery2(cube, options) {
+    return this.compilers.compilerApi.createQueryByDataSource(this.compilers, options, cube);
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries
