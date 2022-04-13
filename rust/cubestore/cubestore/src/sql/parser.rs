@@ -34,12 +34,20 @@ pub struct PartitionedIndexRef {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AggregateIndexRef {
+    pub name: ObjectName,
+    pub columns: Vec<Ident>,
+    pub aggregates: Vec<(Ident, Ident)>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Statement(SQLStatement),
     CreateTable {
         create_table: SQLStatement,
         partitioned_index: Option<PartitionedIndexRef>,
         indexes: Vec<SQLStatement>,
+        aggregate_indexes: Vec<AggregateIndexRef>,
         locations: Option<Vec<String>>,
         unique_key: Option<Vec<Ident>>,
     },
@@ -193,9 +201,17 @@ impl<'a> CubeStoreParser<'a> {
             };
 
             let mut indexes = Vec::new();
+            let mut aggregate_indexes = Vec::new();
 
-            while self.parser.parse_keyword(Keyword::INDEX) {
-                indexes.push(self.parse_with_index(name.clone())?);
+            loop {
+                if self.parse_custom_token("aggregate") {
+                    self.parser.expect_keyword(Keyword::INDEX)?;
+                    aggregate_indexes.push(self.parse_aggregate_index()?);
+                } else if self.parser.parse_keyword(Keyword::INDEX) {
+                    indexes.push(self.parse_with_index(name.clone())?);
+                } else {
+                    break;
+                }
             }
 
             let partitioned_index = if self.parser.parse_keywords(&[
@@ -244,6 +260,7 @@ impl<'a> CubeStoreParser<'a> {
                     like,
                 },
                 indexes,
+                aggregate_indexes,
                 partitioned_index,
                 locations,
                 unique_key,
@@ -272,6 +289,38 @@ impl<'a> CubeStoreParser<'a> {
         })
     }
 
+    pub fn parse_aggregate_index(&mut self) -> Result<AggregateIndexRef, ParserError> {
+        let index_name = self.parser.parse_object_name()?;
+
+        let mut columns = Vec::new();
+        let mut aggregates = Vec::new();
+
+        self.parser.expect_token(&Token::LParen)?;
+
+        loop {
+            let name = self.parser.parse_identifier()?;
+            if self.parser.consume_token(&Token::LParen) {
+                let column = self.parser.parse_identifier()?;
+                self.parser.expect_token(&Token::RParen)?;
+                aggregates.push((name, column));
+            } else {
+                columns.push(name);
+            }
+
+            if !self.parser.consume_token(&Token::Comma) {
+                break;
+            }
+        }
+
+        self.parser.expect_token(&Token::RParen)?;
+
+        Ok(AggregateIndexRef {
+            name: index_name,
+            columns,
+            aggregates,
+        })
+    }
+
     fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
         let if_not_exists =
             self.parser
@@ -295,5 +344,49 @@ impl<'a> CubeStoreParser<'a> {
             credentials,
             source_type,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn parse_aggregate_index() {
+        let query = "CREATE TABLE foo.Orders (
+            id int,
+            platform varchar(255),
+            age int,
+            gender varchar(2),
+            count int,
+            max_id int
+            )
+            INDEX index1 (platform, age)
+            AGGREGATE INDEX aggr_index (platform, age, sum(count), max(max_id))
+            INDEX index2 (age, platform )
+            ;";
+        let mut parser = CubeStoreParser::new(&query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::CreateTable {
+                indexes,
+                aggregate_indexes,
+                ..
+            } => {
+                assert_eq!(indexes.len(), 2);
+                assert_eq!(aggregate_indexes.len(), 1);
+                let ind = &aggregate_indexes[0];
+                assert_eq!(ind.columns.len(), 2);
+                assert_eq!(ind.aggregates.len(), 2);
+                assert_eq!(ind.columns[0].value, "platform".to_string());
+                assert_eq!(ind.columns[1].value, "age".to_string());
+                assert_eq!(ind.aggregates[0].0.value, "sum".to_string());
+                assert_eq!(ind.aggregates[0].1.value, "count".to_string());
+                assert_eq!(ind.aggregates[1].0.value, "max".to_string());
+                assert_eq!(ind.aggregates[1].1.value, "max_id".to_string());
+            }
+            _ => {}
+        }
     }
 }

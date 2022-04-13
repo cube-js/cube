@@ -1,3 +1,4 @@
+pub mod aggregate_index;
 pub mod chunks;
 pub mod index;
 pub mod job;
@@ -43,6 +44,7 @@ use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::time_span::warn_long;
 use crate::util::WorkerLoop;
 use crate::CubeError;
+use aggregate_index::{AggregateIndexIndexKey, AggregateIndexRocksIndex, AggregateIndexRocksTable};
 use arrow::datatypes::TimeUnit::Microsecond;
 use arrow::datatypes::{DataType, Field};
 use chrono::{DateTime, Utc};
@@ -319,6 +321,12 @@ impl DataFrameValue<String> for Option<Row> {
     }
 }
 
+impl DataFrameValue<String> for Vec<AggregateIndexFun> {
+    fn value(v: &Self) -> String {
+        v.iter().map(|v| format!("{}", v)).join(", ")
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
@@ -529,10 +537,63 @@ pub struct Index {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub enum AggregateIndexFun {
+    SUM,
+    MAX,
+}
+
+impl FromStr for AggregateIndexFun {
+    type Err = CubeError;
+
+    fn from_str(s: &str) -> Result<AggregateIndexFun, Self::Err> {
+        match s.to_uppercase().as_ref() {
+            "SUM" => Ok(AggregateIndexFun::SUM),
+            "MAX" => Ok(AggregateIndexFun::MAX),
+            _ => Err(CubeError::user(format!(
+                "Function {} can't be used in aggregate index",
+                s
+            ))),
+        }
+    }
+}
+
+impl fmt::Display for AggregateIndexFun {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let res = match self {
+            AggregateIndexFun::SUM => "SUM",
+            AggregateIndexFun::MAX => "MAX",
+        };
+
+        f.write_fmt(format_args!("{}", res))
+    }
+}
+
+data_frame_from! {
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub struct AggregateIndex {
+    name: String,
+    table_id: u64,
+    columns: Vec<Column>,
+    aggregate_columns: Vec<Column>,
+    aggregate_functions: Vec<AggregateIndexFun>,
+    #[serde(default)]
+    partition_split_key_size: Option<u64>
+}
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct IndexDef {
     pub name: String,
     pub columns: Vec<String>,
     pub multi_index: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub struct AggregateIndexDef {
+    pub name: String,
+    pub columns: Vec<String>,
+    pub aggregate_columns: Vec<String>,
+    pub aggregate_functions: Vec<String>,
 }
 
 data_frame_from! {
@@ -758,6 +819,7 @@ pub trait MetaStore: DIService + Send + Sync {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
+        aggr_indexes: Vec<AggregateIndexDef>,
         is_ready: bool,
         unique_key_column_names: Option<Vec<String>>,
         partition_split_threshold: Option<u64>,
@@ -845,11 +907,16 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+    async fn get_table_aggregate_indexes(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<AggregateIndex>>, CubeError>;
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
+    async fn get_aggregate_index(&self, index_id: u64) -> Result<IdRow<AggregateIndex>, CubeError>;
 
     async fn create_partitioned_index(
         &self,
@@ -1022,6 +1089,9 @@ pub enum MetaStoreEvent {
 
     UpdateMultiPartition(IdRow<MultiPartition>, IdRow<MultiPartition>),
     DeleteMultiPartition(IdRow<MultiPartition>),
+
+    UpdateAggregateIndex(IdRow<AggregateIndex>, IdRow<AggregateIndex>),
+    DeleteAggregateIndex(IdRow<AggregateIndex>),
 }
 
 type SecondaryKey = Vec<u8>;
@@ -1145,7 +1215,8 @@ enum_from_primitive! {
         Jobs = 0x0700,
         Sources = 0x0800,
         MultiIndexes = 0x0900,
-        MultiPartitions = 0x0A00
+        MultiPartitions = 0x0A00,
+        AggregateIndexes = 0x0B00
     }
 }
 
@@ -2670,7 +2741,7 @@ impl RocksMetaStore {
 
             if !taken[i] {
                 taken[i] = true;
-                index_columns.push(seq_column.clone().replace_index(index_columns.len()));
+                index_columns.push(seq_column.replace_index(index_columns.len()));
             }
         }
 
@@ -2681,7 +2752,7 @@ impl RocksMetaStore {
                 continue;
             }
 
-            index_columns.push(table_cols[i].clone().replace_index(index_columns.len()));
+            index_columns.push(table_cols[i].replace_index(index_columns.len()));
         }
         assert_eq!(index_columns.len(), table_cols.len());
 
@@ -2734,6 +2805,108 @@ impl RocksMetaStore {
                 )?;
             }
         }
+        Ok(index_id)
+    }
+
+    fn add_aggregate_index(
+        batch_pipe: &mut BatchPipe,
+        rocks_index: &AggregateIndexRocksTable,
+        _rocks_partition: &PartitionRocksTable,
+        table_cols: &Vec<Column>,
+        table_id: &IdRow<Table>,
+        index_def: AggregateIndexDef,
+    ) -> Result<IdRow<AggregateIndex>, CubeError> {
+        if let Some(not_found) = index_def
+            .columns
+            .iter()
+            .chain(index_def.aggregate_columns.iter())
+            .find(|dc| table_cols.iter().all(|c| c.name.as_str() != dc.as_str()))
+        {
+            return Err(CubeError::user(format!(
+                "Column '{}' in aggregate index '{}' is not found in table '{}'",
+                not_found,
+                index_def.name,
+                table_id.get_row().get_table_name()
+            )));
+        }
+
+        let unique_key_columns = table_id.get_row().unique_key_columns();
+        if let Some(unique_key) = &unique_key_columns {
+            if let Some(not_found) = index_def
+                .columns
+                .iter()
+                .find(|dc| unique_key.iter().all(|c| c.name.as_str() != dc.as_str()))
+            {
+                return Err(CubeError::user(format!(
+                    "Column '{}' in aggregate index '{}' is out of unique key {:?} for table '{}'. Index columns outside of unique key are not supported.",
+                    not_found,
+                    index_def.name,
+                    unique_key
+                        .iter()
+                        .map(|c| c.name.to_string())
+                        .collect::<Vec<String>>(),
+                    table_id.get_row().get_table_name()
+                )));
+            }
+        }
+
+        // First put the columns from the sort key.
+        let mut taken = vec![false; table_cols.len()];
+        let mut index_columns = Vec::with_capacity(index_def.columns.len());
+        for c in index_def.columns {
+            let i = table_cols.iter().position(|tc| tc.name == c).unwrap();
+            if taken[i] {
+                continue; // ignore duplicate columns inside the index.
+            }
+            taken[i] = true;
+            index_columns.push(table_cols[i].clone().replace_index(index_columns.len()));
+        }
+
+        let mut aggregate_columns = Vec::with_capacity(index_def.aggregate_columns.len());
+        let mut aggregate_functions = Vec::with_capacity(index_def.aggregate_columns.len());
+        let mut taken: Vec<Option<AggregateIndexFun>> = vec![None; table_cols.len()];
+
+        for (c, fun) in index_def
+            .aggregate_columns
+            .into_iter()
+            .zip(index_def.aggregate_functions.into_iter())
+        {
+            let i = table_cols.iter().position(|tc| tc.name == c).unwrap();
+            let f = fun.parse::<AggregateIndexFun>()?;
+
+            if let Some(taken_f) = &taken[i] {
+                if taken_f == &f {
+                    continue;
+                } else {
+                    return Err(CubeError::user(
+                            format!(
+                                "Can't use different aggregate functions {} and {} for single column {} in aggregate index {}",
+                                taken_f, f, c, index_def.name
+                                ),
+
+                            )
+                        );
+                }
+            }
+
+            aggregate_columns.push(
+                table_cols[i]
+                    .clone()
+                    .replace_index(index_columns.len() + aggregate_columns.len()),
+            );
+            aggregate_functions.push(f.clone());
+            taken[i] = Some(f);
+        }
+
+        let index = AggregateIndex::try_new(
+            index_def.name,
+            table_id.get_id(),
+            index_columns,
+            aggregate_columns,
+            aggregate_functions,
+            None,
+        )?;
+        let index_id = rocks_index.insert(index, batch_pipe)?;
         Ok(index_id)
     }
 
@@ -2956,6 +3129,7 @@ impl MetaStore for RocksMetaStore {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
+        aggr_indexes: Vec<AggregateIndexDef>,
         is_ready: bool,
         unique_key_column_names: Option<Vec<String>>,
         partition_split_threshold: Option<u64>,
@@ -2964,6 +3138,7 @@ impl MetaStore for RocksMetaStore {
             batch_pipe.invalidate_tables_cache();
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
+            let rocks_aggr_index = AggregateIndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
             let rocks_partition = PartitionRocksTable::new(db_ref.clone());
             let rocks_multi_index = MultiIndexRocksTable::new(db_ref.clone());
@@ -3040,6 +3215,16 @@ impl MetaStore for RocksMetaStore {
                     multi_index.as_ref(),
                     &multi_partitions,
                     index_def,
+                )?;
+            }
+            for aggr_def in aggr_indexes.into_iter() {
+                RocksMetaStore::add_aggregate_index(
+                    batch_pipe,
+                    &rocks_aggr_index,
+                    &rocks_partition,
+                    &table_columns,
+                    &table_id,
+                    aggr_def,
                 )?;
             }
             let def_index_columns = table_id
@@ -3762,6 +3947,20 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn get_table_aggregate_indexes(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<AggregateIndex>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let index_table = AggregateIndexRocksTable::new(db_ref);
+            Ok(index_table.get_rows_by_index(
+                &AggregateIndexIndexKey::TableId(table_id),
+                &AggregateIndexRocksIndex::TableID,
+            )?)
+        })
+        .await
+    }
+
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
@@ -3784,6 +3983,13 @@ impl MetaStore for RocksMetaStore {
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError> {
         self.read_operation(move |db_ref| {
             IndexRocksTable::new(db_ref).get_row_or_not_found(index_id)
+        })
+        .await
+    }
+
+    async fn get_aggregate_index(&self, index_id: u64) -> Result<IdRow<AggregateIndex>, CubeError> {
+        self.read_operation(move |db_ref| {
+            AggregateIndexRocksTable::new(db_ref).get_row_or_not_found(index_id)
         })
         .await
     }
@@ -5229,6 +5435,7 @@ mod tests {
                     None,
                     None,
                     vec![],
+                    vec![],
                     true,
                     None,
                     None,
@@ -5245,6 +5452,7 @@ mod tests {
                     columns.clone(),
                     None,
                     None,
+                    vec![],
                     vec![],
                     true,
                     None,
@@ -5272,6 +5480,102 @@ mod tests {
             .unwrap();
             let expected_res = vec![IdRow::new(1, expected_index)];
             assert_eq!(meta_store.get_table_indexes(1).await.unwrap(), expected_res);
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn table_with_aggregate_index_test() {
+        let config = Config::test("table_with_aggregate_index_test");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test-table-aggregate-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test-table-aggregate-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let mut columns = Vec::new();
+            columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
+            columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
+            columns.push(Column::new("col3".to_string(), ColumnType::Int, 2));
+            columns.push(Column::new("aggr_col1".to_string(), ColumnType::Int, 3));
+            columns.push(Column::new("aggr_col2".to_string(), ColumnType::Int, 4));
+
+            let aggr_index_def = AggregateIndexDef {
+                name: "aggr_index".to_string(),
+                columns: vec!["col2".to_string(), "col1".to_string()],
+                aggregate_columns: vec!["aggr_col1".to_string(), "aggr_col2".to_string()],
+                aggregate_functions: vec!["sum".to_string(), "max".to_string()],
+            };
+
+            let table1 = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "boo".to_string(),
+                    columns.clone(),
+                    None,
+                    None,
+                    vec![],
+                    vec![aggr_index_def.clone()],
+                    true,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+
+            let all_indexes = meta_store
+                .read_operation(move |db_ref| {
+                    let table = AggregateIndexRocksTable::new(db_ref);
+                    Ok(table.all_rows())
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(all_indexes.len(), 1);
+            let ind = &all_indexes[0];
+            let index_id = ind.id;
+
+            let index = ind.get_row();
+            assert_eq!(
+                index.columns,
+                vec![columns[1].replace_index(0), columns[0].replace_index(1)]
+            );
+            assert_eq!(
+                index.aggregate_columns,
+                vec![columns[3].replace_index(2), columns[4].replace_index(3)]
+            );
+            assert_eq!(
+                index.aggregate_functions,
+                vec![AggregateIndexFun::SUM, AggregateIndexFun::MAX]
+            );
+
+            assert_eq!(
+                &meta_store.get_aggregate_index(index_id).await.unwrap(),
+                ind
+            );
+            assert_eq!(
+                meta_store
+                    .get_table_aggregate_indexes(table1.id)
+                    .await
+                    .unwrap(),
+                all_indexes
+            );
+
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
