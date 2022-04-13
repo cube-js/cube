@@ -1106,6 +1106,48 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = Int64Builder::new(typids.len());
+        for i in 0..typids.len() {
+            let typid = typids.value(i);
+            let typmod = typmods.value(i);
+
+            // https://github.com/postgres/postgres/blob/REL_14_2/src/backend/catalog/information_schema.sql#L109
+            let precision = match typid {
+                20 => Some(64),
+                21 => Some(16),
+                23 => Some(32),
+                700 => Some(24),
+                701 => Some(53),
+                1700 => match typmod {
+                    -1 => None,
+                    _ => Some(((typmod - 4) >> 16) & 65535),
+                },
+                _ => None,
+            };
+
+            if precision.is_some() {
+                builder.append_value(precision.unwrap()).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "information_schema._pg_numeric_precision",
+        vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
 pub fn create_measure_udaf() -> AggregateUDF {
     create_udaf(
         "measure",
