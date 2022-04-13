@@ -347,3 +347,208 @@ impl LocalDirRemoteFs {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::s3::S3RemoteFs;
+    use super::*;
+    use std::io::prelude::*;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use std::{env, fs};
+    use uuid::Uuid;
+
+    #[derive(Clone)]
+    struct NameMaker {
+        prefix: String,
+    }
+
+    impl NameMaker {
+        pub fn new(prefix: String) -> Self {
+            Self { prefix }
+        }
+        pub fn name(&self, name: &str) -> String {
+            format!("{}{}", self.prefix, name)
+        }
+    }
+
+    fn get_test_local_dir(fs_name: &str) -> PathBuf {
+        env::current_dir()
+            .unwrap()
+            .join(".cubestore")
+            .join("fs-test")
+            .join(fs_name)
+    }
+
+    fn clear_test_dir(fs_name: &str) {
+        let _ = fs::remove_dir_all(get_test_local_dir(fs_name));
+    }
+
+    async fn create_and_upload_file(
+        remote_fs: &Arc<dyn RemoteFs>,
+        remote_file: &str,
+    ) -> Result<String, CubeError> {
+        let temp_upload_path = remote_fs.temp_upload_path(remote_file).await?;
+        let mut file = fs::File::create(&temp_upload_path).unwrap();
+        file.write_all(b"test").unwrap();
+        remote_fs
+            .upload_file(&temp_upload_path, remote_file)
+            .await?;
+
+        Ok(temp_upload_path)
+    }
+
+    async fn test_remote_filesystem(
+        remote_fs: Arc<dyn RemoteFs>,
+        local_dir: &Path,
+        name_maker: NameMaker,
+        download_test: bool,
+    ) {
+        assert_eq!(remote_fs.local_path().await, local_dir.to_str().unwrap());
+
+        let local_file = remote_fs.local_file("test.tst").await.ok().unwrap();
+        assert_eq!(local_file, local_dir.join("test.tst").to_str().unwrap());
+
+        let local_file_path = Path::new("test_dir")
+            .join("test.tst")
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let local_file = remote_fs
+            .local_file(local_file_path.as_ref())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            local_file,
+            local_dir.join(local_file_path).to_str().unwrap()
+        );
+
+        assert!(local_dir.join("test_dir").is_dir());
+
+        let root_files = vec![name_maker.name("test-1.txt"), name_maker.name("test-2.txt")];
+        let subdir_files = vec![
+            name_maker.name("subdir/test-1.txt"),
+            name_maker.name("subdir/test-2.txt"),
+        ];
+
+        for filename in root_files.iter().chain(subdir_files.iter()) {
+            let temp_upload_path = create_and_upload_file(&remote_fs, filename).await.unwrap();
+
+            assert!(!Path::new(&temp_upload_path).is_file());
+            assert!(local_dir.join(filename).is_file());
+        }
+
+        remote_fs
+            .list(&name_maker.name("test-"))
+            .await
+            .unwrap()
+            .iter()
+            .zip(root_files.iter())
+            .for_each(|(list_name, origin_name)| {
+                assert_eq!(list_name, origin_name);
+            });
+        remote_fs
+            .list(&name_maker.name("subdir/"))
+            .await
+            .unwrap()
+            .iter()
+            .zip(subdir_files.iter())
+            .for_each(|(list_name, origin_name)| {
+                assert_eq!(list_name, origin_name);
+            });
+
+        remote_fs
+            .list_with_metadata(&name_maker.name("test"))
+            .await
+            .unwrap()
+            .iter()
+            .zip(root_files.iter())
+            .for_each(|(list_file, origin_name)| {
+                assert_eq!(&list_file.remote_path, origin_name);
+            });
+
+        if download_test {
+            root_files.iter().for_each(|filename| {
+                fs::remove_file(local_dir.join(filename)).unwrap();
+            });
+            fs::remove_dir_all(local_dir.join(name_maker.name("subdir"))).unwrap();
+
+            for filename in root_files.iter().chain(subdir_files.iter()) {
+                assert!(!local_dir.join(filename).is_file());
+                remote_fs.download_file(filename, None).await.unwrap();
+                assert!(local_dir.join(filename).is_file());
+            }
+        }
+
+        for filename in root_files.iter().chain(subdir_files.iter()) {
+            assert!(local_dir.join(filename).is_file());
+            assert_eq!(&remote_fs.list(filename).await.unwrap()[0], filename);
+
+            remote_fs.delete_file(filename).await.unwrap();
+
+            assert!(!local_dir.join(filename).is_file());
+            assert!(&remote_fs.list(filename).await.unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn local_dir() {
+        clear_test_dir("local");
+        let local_path = get_test_local_dir("local");
+        let remote_fs = LocalDirRemoteFs::new(None, local_path.clone());
+
+        let name_maker = NameMaker::new("".to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), false).await;
+
+        let local_upstream = get_test_local_dir("local-upstream");
+
+        clear_test_dir("local");
+        clear_test_dir("local-upstream");
+
+        let remote_fs = LocalDirRemoteFs::new(Some(local_upstream.clone()), local_path.clone());
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("local");
+        clear_test_dir("local-upstream");
+    }
+
+    #[tokio::test]
+    async fn aws_s3() {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+            return;
+        }
+
+        let region = "us-west-2".to_string();
+        let bucket_name = "cube-store-ci-test".to_string();
+
+        clear_test_dir("aws_s3");
+        let local_path = get_test_local_dir("aws_s3");
+
+        let remote_fs = S3RemoteFs::new(
+            local_path.clone(),
+            region.clone(),
+            bucket_name.clone(),
+            None,
+        )
+        .unwrap();
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+
+        let remote_fs = S3RemoteFs::new(
+            local_path.clone(),
+            region.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+    }
+}
