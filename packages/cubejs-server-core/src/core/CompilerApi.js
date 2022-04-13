@@ -84,7 +84,6 @@ export class CompilerApi {
     }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    console.log('QQQ DDD', dataSource, this.getDbType(dataSource), new Error('QQQ'));
 
     if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
       // TODO consider more efficient way than instantiating query

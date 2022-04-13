@@ -345,8 +345,6 @@ export class CubejsServerCore {
       );
     }
 
-    console.log('QQQ', externalDbType, devServer, opts.serverless, definedExtDBVariables);
-
     if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         const cubeStorePackage = this.requireCubeStoreDriver();
@@ -662,7 +660,6 @@ export class CubejsServerCore {
 
         // eslint-disable-next-line no-return-assign
         return driverPromise[dataSource] = (async () => {
-          console.log('QQQ OOO', dataSource, new Error('QQQ'));
           let driver: BaseDriver | null = null;
 
           try {
@@ -874,8 +871,6 @@ export class CubejsServerCore {
   }
 
   public static driverDependencies(dbType: DatabaseType) {
-    console.log('QQQ DDD', dbType, DriverDependencies[dbType], new Error('QQQ'));
-
     if (DriverDependencies[dbType]) {
       return DriverDependencies[dbType];
     } else if (fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))) {

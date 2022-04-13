@@ -1,0 +1,11 @@
+{
+  "order": {
+    "Products.name": "asc"
+  },
+  "dimensions": [
+    "Products.name",
+    "Suppliers.company",
+    "Suppliers.email"
+  ],
+  "limit": 3
+}
