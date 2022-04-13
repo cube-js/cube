@@ -1480,7 +1480,7 @@ class BaseQuery {
               primaryKeys.length > 1 ?
                 this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
-              ) || '*'
+            ) || '*'
           ),
           symbol,
           cubeName
@@ -1769,9 +1769,9 @@ class BaseQuery {
 
   primaryKeyCount(cubeName, distinct) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-    const primaryKeySql = primaryKeys.length > 1 ? 
-      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) : 
-      this.primaryKeySql(primaryKeys[0], cubeName)
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 

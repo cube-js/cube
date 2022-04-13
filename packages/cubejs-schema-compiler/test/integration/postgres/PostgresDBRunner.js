@@ -120,7 +120,6 @@ export class PostgresDBRunner extends BaseDbRunner {
         (2, 3, 4, 5, 2);
       `)
     ]);
-      
   }
 
   async containerLazyInit() {
