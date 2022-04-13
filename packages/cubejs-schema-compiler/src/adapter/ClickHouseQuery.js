@@ -170,6 +170,10 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
+  }
+
   seriesSql(timeDimension) {
     /*
     postgres uses :
