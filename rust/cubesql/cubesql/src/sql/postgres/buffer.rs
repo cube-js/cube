@@ -22,6 +22,7 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
         b'B' => FrontendMessage::Bind(protocol::Bind::deserialize(cursor).await?),
         b'D' => FrontendMessage::Describe(protocol::Describe::deserialize(cursor).await?),
         b'E' => FrontendMessage::Execute(protocol::Execute::deserialize(cursor).await?),
+        b'C' => FrontendMessage::Close(protocol::Close::deserialize(cursor).await?),
         b'p' => {
             FrontendMessage::PasswordMessage(protocol::PasswordMessage::deserialize(cursor).await?)
         }

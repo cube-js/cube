@@ -177,6 +177,23 @@ impl Serialize for BindComplete {
     }
 }
 
+pub struct CloseComplete {}
+
+impl CloseComplete {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for CloseComplete {
+    const CODE: u8 = b'3';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        // Use empty vec as workaround to write length
+        Some(vec![])
+    }
+}
+
 pub struct ParseComplete {}
 
 impl ParseComplete {
@@ -406,6 +423,42 @@ impl Deserialize for Execute {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum CloseType {
+    Statement,
+    Portal,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Close {
+    pub typ: CloseType,
+    // The name of the prepared statement or portal to close (an empty string selects the unnamed prepared statement or portal).
+    pub name: String,
+}
+
+#[async_trait]
+impl Deserialize for Close {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let typ = match buffer.read_u8().await? {
+            b'S' => CloseType::Statement,
+            b'P' => CloseType::Portal,
+            t => {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Unknown describe code: {}", t),
+                ));
+            }
+        };
+
+        let name = buffer::read_string(&mut buffer).await?;
+
+        Ok(Self { typ, name })
+    }
+}
+
 /// This command is used for prepared statement creation on the server side
 #[derive(Debug, PartialEq)]
 pub struct Bind {
@@ -552,6 +605,7 @@ pub enum FrontendMessage {
     Bind(Bind),
     Describe(Describe),
     Execute(Execute),
+    Close(Close),
     /// Close connection
     Terminate,
     /// Finish

@@ -103,6 +103,7 @@ impl AsyncPostgresShim {
                 FrontendMessage::Parse(body) => self.parse(body).await?,
                 FrontendMessage::Bind(body) => self.bind(body).await?,
                 FrontendMessage::Execute(body) => self.execute(body).await?,
+                FrontendMessage::Close(body) => self.close(body).await?,
                 FrontendMessage::Describe(body) => self.describe(body).await?,
                 FrontendMessage::Sync => self.sync().await?,
                 FrontendMessage::Terminate => return Ok(()),
@@ -272,6 +273,21 @@ impl AsyncPostgresShim {
 
         self.write(parameters).await?;
         self.write(description).await?;
+
+        Ok(())
+    }
+
+    pub async fn close(&mut self, body: protocol::Close) -> Result<(), Error> {
+        match body.typ {
+            protocol::CloseType::Statement => {
+                self.statements.remove(&body.name);
+            }
+            protocol::CloseType::Portal => {
+                self.portals.remove(&body.name);
+            }
+        };
+
+        self.write(protocol::CloseComplete::new()).await?;
 
         Ok(())
     }

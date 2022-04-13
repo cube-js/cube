@@ -38,6 +38,7 @@ impl PostgresIntegrationTestSuite {
         };
 
         let random_port = pick_unused_port().expect("No ports free");
+        // let random_port = 5555;
 
         tokio::spawn(async move {
             println!("[PostgresIntegrationTestSuite] Running SQL API");
@@ -154,8 +155,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_prepare().await?;
         // self.test_execute_query(
         //     "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
-        // )
-        //     .await?;
+        // ).await?;
 
         Ok(())
     }
