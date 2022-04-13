@@ -61,6 +61,8 @@ pub struct PgType<'a> {
     pub typsubscript: &'static str,
     pub typelem: u32,
     pub typarray: u32,
+    pub typalign: &'static str,
+    pub typstorage: &'static str,
 }
 
 impl<'a> PgType<'a> {
@@ -174,6 +176,8 @@ const PG_TYPE_UNSPECIFIED: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "-",
+    typstorage: "-",
 };
 
 const PG_TYPE_BOOL: &PgType = &PgType {
@@ -191,6 +195,8 @@ const PG_TYPE_BOOL: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "c",
+    typstorage: "p",
 };
 
 const PG_TYPE_INT8: &PgType = &PgType {
@@ -208,6 +214,8 @@ const PG_TYPE_INT8: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_BYTEA: &PgType = &PgType {
@@ -225,6 +233,8 @@ const PG_TYPE_BYTEA: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_INT2: &PgType = &PgType {
@@ -242,6 +252,8 @@ const PG_TYPE_INT2: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "s",
+    typstorage: "p",
 };
 
 const PG_TYPE_INT4: &PgType = &PgType {
@@ -259,6 +271,8 @@ const PG_TYPE_INT4: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_TEXT: &PgType = &PgType {
@@ -276,6 +290,8 @@ const PG_TYPE_TEXT: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_DATE: &PgType = &PgType {
@@ -293,6 +309,8 @@ const PG_TYPE_DATE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_TIMESTAMP: &PgType = &PgType {
@@ -310,6 +328,8 @@ const PG_TYPE_TIMESTAMP: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_TIMESTAMPTZ: &PgType = &PgType {
@@ -327,6 +347,8 @@ const PG_TYPE_TIMESTAMPTZ: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_NUMERIC: &PgType = &PgType {
@@ -344,6 +366,8 @@ const PG_TYPE_NUMERIC: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "m",
 };
 
 const PG_TYPE_INT4RANGE: &PgType = &PgType {
@@ -361,6 +385,8 @@ const PG_TYPE_INT4RANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_NUMRANGE: &PgType = &PgType {
@@ -378,6 +404,8 @@ const PG_TYPE_NUMRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_TSRANGE: &PgType = &PgType {
@@ -395,6 +423,8 @@ const PG_TYPE_TSRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_TSTZRANGE: &PgType = &PgType {
@@ -412,6 +442,8 @@ const PG_TYPE_TSTZRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_DATERANGE: &PgType = &PgType {
@@ -429,6 +461,8 @@ const PG_TYPE_DATERANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_INT8RANGE: &PgType = &PgType {
@@ -446,6 +480,8 @@ const PG_TYPE_INT8RANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_INT4MULTIRANGE: &PgType = &PgType {
@@ -463,6 +499,8 @@ const PG_TYPE_INT4MULTIRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_NUMMULTIRANGE: &PgType = &PgType {
@@ -480,6 +518,8 @@ const PG_TYPE_NUMMULTIRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_TSMULTIRANGE: &PgType = &PgType {
@@ -497,6 +537,8 @@ const PG_TYPE_TSMULTIRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_DATEMULTIRANGE: &PgType = &PgType {
@@ -514,6 +556,8 @@ const PG_TYPE_DATEMULTIRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_INT8MULTIRANGE: &PgType = &PgType {
@@ -531,6 +575,8 @@ const PG_TYPE_INT8MULTIRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_OID: &PgType = &PgType {
@@ -548,6 +594,8 @@ const PG_TYPE_OID: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1028,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_TID: &PgType = &PgType {
@@ -565,6 +613,8 @@ const PG_TYPE_TID: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1010,
+    typalign: "s",
+    typstorage: "p",
 };
 
 const PG_TYPE_FLOAT4: &PgType = &PgType {
@@ -582,6 +632,8 @@ const PG_TYPE_FLOAT4: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1021,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_FLOAT8: &PgType = &PgType {
@@ -599,6 +651,8 @@ const PG_TYPE_FLOAT8: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1022,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_MONEY: &PgType = &PgType {
@@ -616,6 +670,8 @@ const PG_TYPE_MONEY: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 791,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_INET: &PgType = &PgType {
@@ -633,6 +689,8 @@ const PG_TYPE_INET: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1041,
+    typalign: "i",
+    typstorage: "m",
 };
 
 const PG_TYPE_BPCHAR: &PgType = &PgType {
@@ -650,6 +708,8 @@ const PG_TYPE_BPCHAR: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1014,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_TIME: &PgType = &PgType {
@@ -667,6 +727,8 @@ const PG_TYPE_TIME: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1183,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_INTERVAL: &PgType = &PgType {
@@ -684,6 +746,8 @@ const PG_TYPE_INTERVAL: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1187,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_TIMETZ: &PgType = &PgType {
@@ -701,6 +765,8 @@ const PG_TYPE_TIMETZ: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 1270,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_PGLSN: &PgType = &PgType {
@@ -718,6 +784,8 @@ const PG_TYPE_PGLSN: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 3221,
+    typalign: "d",
+    typstorage: "p",
 };
 
 const PG_TYPE_RECORD: &PgType = &PgType {
@@ -735,6 +803,8 @@ const PG_TYPE_RECORD: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 2287,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_ANYARRAY: &PgType = &PgType {
@@ -752,6 +822,8 @@ const PG_TYPE_ANYARRAY: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_ANYELEMENT: &PgType = &PgType {
@@ -769,6 +841,8 @@ const PG_TYPE_ANYELEMENT: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_ANYENUM: &PgType = &PgType {
@@ -786,6 +860,8 @@ const PG_TYPE_ANYENUM: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "p",
 };
 
 const PG_TYPE_ANYRANGE: &PgType = &PgType {
@@ -803,6 +879,8 @@ const PG_TYPE_ANYRANGE: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };
 
 const PG_TYPE_NAME: &PgType = &PgType {
@@ -820,6 +898,8 @@ const PG_TYPE_NAME: &PgType = &PgType {
     typsubscript: "raw_array_subscript_handler",
     typelem: 0,
     typarray: 0,
+    typalign: "c",
+    typstorage: "p",
 };
 
 const PG_TYPE_VARCHAR: &PgType = &PgType {
@@ -837,6 +917,8 @@ const PG_TYPE_VARCHAR: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_CHARACTER_DATA: &PgType = &PgType {
@@ -854,6 +936,8 @@ const PG_TYPE_CHARACTER_DATA: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "i",
+    typstorage: "x",
 };
 
 const PG_TYPE_SQL_IDENTIFIER: &PgType = &PgType {
@@ -871,4 +955,6 @@ const PG_TYPE_SQL_IDENTIFIER: &PgType = &PgType {
     typsubscript: "-",
     typelem: 0,
     typarray: 0,
+    typalign: "c",
+    typstorage: "p",
 };

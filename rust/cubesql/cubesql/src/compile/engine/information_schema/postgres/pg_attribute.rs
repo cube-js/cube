@@ -16,7 +16,10 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::{sql::ColumnType, transport::CubeMetaTable};
+use crate::{
+    sql::{ColumnType, PgType},
+    transport::CubeMetaTable,
+};
 
 struct PgCatalogAttributeBuilder {
     attrelid: UInt32Builder,
@@ -90,72 +93,21 @@ impl PgCatalogAttributeBuilder {
         is_array: bool,
         attnotnull: bool,
     ) {
+        let pg_typ = PgType::get_by_tid(column_type.to_pg_tid());
+
         // TODO: get data from pg_type description
         self.attrelid.append_value(attrelid).unwrap();
         self.attname.append_value(attname.as_ref()).unwrap();
-        self.atttypid
-            .append_value(match column_type {
-                ColumnType::Blob => 17,
-                ColumnType::Boolean => 16,
-                ColumnType::Int64 => 20,
-                ColumnType::Int8 => 21,
-                ColumnType::Int32 => 23,
-                ColumnType::String | ColumnType::VarStr => 25,
-                ColumnType::Timestamp => 1114,
-                ColumnType::Double => 1700,
-            })
-            .unwrap();
+        self.atttypid.append_value(pg_typ.oid).unwrap();
         self.attstattarget.append_value(0).unwrap();
-        self.attlen
-            .append_value(match column_type {
-                ColumnType::Blob | ColumnType::String | ColumnType::VarStr | ColumnType::Double => {
-                    -1
-                }
-                ColumnType::Boolean => 1,
-                ColumnType::Int64 | ColumnType::Timestamp => 8,
-                ColumnType::Int8 => 2,
-                ColumnType::Int32 => 4,
-            })
-            .unwrap();
+        self.attlen.append_value(pg_typ.typlen).unwrap();
         self.attnum.append_value(attnum).unwrap();
         self.attndims.append_value(is_array as u32).unwrap();
         self.attcacheoff.append_value(-1).unwrap();
         self.atttypmod.append_value(-1).unwrap();
-        self.attbyval
-            .append_value(match column_type {
-                ColumnType::Blob | ColumnType::String | ColumnType::VarStr | ColumnType::Double => {
-                    false
-                }
-                ColumnType::Int64
-                | ColumnType::Int8
-                | ColumnType::Int32
-                | ColumnType::Boolean
-                | ColumnType::Timestamp => true,
-            })
-            .unwrap();
-        self.attalign
-            .append_value(match column_type {
-                ColumnType::Blob
-                | ColumnType::Int32
-                | ColumnType::String
-                | ColumnType::VarStr
-                | ColumnType::Double => "i",
-                ColumnType::Int64 | ColumnType::Timestamp => "d",
-                ColumnType::Int8 => "s",
-                ColumnType::Boolean => "c",
-            })
-            .unwrap();
-        self.attstorage
-            .append_value(match column_type {
-                ColumnType::Blob | ColumnType::String | ColumnType::VarStr => "x",
-                ColumnType::Int64
-                | ColumnType::Int8
-                | ColumnType::Int32
-                | ColumnType::Boolean
-                | ColumnType::Timestamp => "p",
-                ColumnType::Double => "m",
-            })
-            .unwrap();
+        self.attbyval.append_value(pg_typ.typbyval).unwrap();
+        self.attalign.append_value(pg_typ.typalign).unwrap();
+        self.attstorage.append_value(pg_typ.typstorage).unwrap();
         self.attcompression.append_value("\0").unwrap();
         self.attnotnull.append_value(attnotnull).unwrap();
         self.atthasdef.append_value(false).unwrap();

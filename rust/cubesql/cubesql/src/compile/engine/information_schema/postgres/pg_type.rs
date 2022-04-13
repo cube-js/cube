@@ -117,8 +117,8 @@ impl PgCatalogTypeBuilder {
         self.typmodin.append_null().unwrap();
         self.typmodout.append_null().unwrap();
         self.typanalyze.append_null().unwrap();
-        self.typalign.append_null().unwrap();
-        self.typstorage.append_null().unwrap();
+        self.typalign.append_value(typ.typalign).unwrap();
+        self.typstorage.append_value(typ.typstorage).unwrap();
         self.typnotnull.append_null().unwrap();
         self.typbasetype.append_null().unwrap();
         self.typtypmod.append_null().unwrap();
@@ -196,6 +196,9 @@ impl PgCatalogTypeProvider {
                 typsubscript: "-",
                 typelem: 0,
                 typarray: table.array_handler_oid,
+                // TODO Verify
+                typalign: "i",
+                typstorage: "x",
             });
 
             builder.add_type(&PgType {
@@ -213,6 +216,9 @@ impl PgCatalogTypeProvider {
                 typsubscript: "array_subscript_handler",
                 typelem: table.record_oid,
                 typarray: 0,
+                // TODO Verify
+                typalign: "d",
+                typstorage: "x",
             });
         }
 
