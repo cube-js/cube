@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 use bytes::BufMut;
 
-use tokio::io::{AsyncReadExt};
+use tokio::io::AsyncReadExt;
 
 use super::{buffer, PgType, PgTypeId};
 

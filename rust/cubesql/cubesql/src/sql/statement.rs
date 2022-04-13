@@ -1,8 +1,6 @@
 use msql_srv::{Column, ColumnFlags, ColumnType};
 use sqlparser::ast;
 
-
-
 #[derive(Debug)]
 pub enum BindValue {
     String(String),
