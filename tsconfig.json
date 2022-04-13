@@ -41,6 +41,9 @@
       "path": "packages/cubejs-questdb-driver"
     },
     {
+      "path": "packages/cubejs-materialize-driver"
+    },
+    {
       "path": "packages/cubejs-mongobi-driver"
     },
     {

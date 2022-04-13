@@ -1,11 +1,22 @@
 import { MaterializeDBRunner } from '@cubejs-backend/testing';
 
+import { streamToArray } from '@cubejs-backend/shared';
+
 import { StartedTestContainer } from 'testcontainers';
 
 import { MaterializeDriver } from '../src';
 
-const streamToArray = require('stream-to-array');
-
+/**
+ * Pre-requisite:
+ * Docker up and running
+ *
+ * MaterializeDBRunner will use a Materialize container to do the tests.
+ * In case the container is not present, it will pull a an image.
+ * These three variables can define the pulled image version:
+ *    - Environment variables: TEST_MZSQL_VERSION
+ *    - Parameter: options.version in startContainer method
+ *    - Static version: defined inside MaterializeDBRunner
+ */
 describe('MaterializeDriver', () => {
   let container: StartedTestContainer;
   let driver: MaterializeDriver;
@@ -52,8 +63,7 @@ describe('MaterializeDriver', () => {
         // converted to utc
         timestamptz: '2019-12-31T22:00:00.000',
         // Numerics as string
-        // This value should be: 1.00
-        decimal: '1',
+        decimal: '1.00',
       }
     ]);
   });

@@ -1,7 +1,14 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
-import { PoolClient } from 'pg';
-import Stream from './Stream';
+import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
+import { PoolClient, QueryResult } from 'pg';
+import { Readable } from 'stream';
+
+export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
+  /**
+   * Compatibility with streamToArray method from '@cubejs-backend/shared'
+   */
+  rowStream: Readable;
+};
 
 export class MaterializeDriver extends PostgresDriver {
   public constructor(options: PostgresDriverConfiguration) {
@@ -24,13 +31,13 @@ export class MaterializeDriver extends PostgresDriver {
    * @return {Promise<Array<unknown>>}
    */
   public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
-    return this.query(
+    const schemas = await this.query(
       `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
-    ).then((schemas) => {
-      if (schemas.length === 0) {
-        return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
-      } else return [];
-    });
+    );
+    if (schemas.length === 0) {
+      this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+    }
+    return [];
   }
 
   public async uploadTableWithIndexes(
@@ -39,29 +46,28 @@ export class MaterializeDriver extends PostgresDriver {
     tableData: DownloadTableMemoryData,
     indexesSql: IndexesSQL
   ) {
-    if (!tableData.rows) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
-    }
+    BaseDriver.prototype.uploadTableWithIndexes.apply(this, [table, columns, tableData, indexesSql, [], null]);
+  }
 
-    await this.createTable(table, columns);
+  protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
+    const timeout = `${this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000} milliseconds`;
+    const queryParams = {
+      text: `FETCH 1000 ${cursorId} WITH (TIMEOUT='${timeout}');`,
+      values: [],
+      types: { getTypeParser: this.getTypeParser }
+    };
 
-    try {
-      for (let i = 0; i < tableData.rows.length; i++) {
-        await this.query(
-          `INSERT INTO ${table}
-        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
-        VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
-          columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
-        );
+    for (
+      let results: QueryResult<any> | undefined = await conn.query(queryParams);
+      results;
+      results = results.rowCount === 0
+        ? (await conn.query(queryParams))
+        : undefined) {
+      const { rows } = results;
+
+      for (const row of rows) {
+        yield row;
       }
-
-      for (let i = 0; i < indexesSql.length; i++) {
-        const [query, p] = indexesSql[i].sql;
-        await this.query(query, p);
-      }
-    } catch (e) {
-      await this.dropTable(table);
-      throw e;
     }
   }
 
@@ -69,9 +75,8 @@ export class MaterializeDriver extends PostgresDriver {
     query: string,
     values: unknown[],
     { highWaterMark }: StreamOptions
-  ): Promise<StreamTableDataWithTypes> {
+  ): Promise<ReadableStreamTableDataWithTypes> {
     const conn = await this.pool.connect();
-
     try {
       const cursorId = 'mz_cursor';
       await this.prepareConnection(conn);
@@ -84,7 +89,7 @@ export class MaterializeDriver extends PostgresDriver {
           getTypeParser: this.getTypeParser,
         },
       });
-      const rowStream = new Stream(conn, cursorId, highWaterMark, this.getTypeParser);
+      const rowStream = Readable.from(this.asyncFetcher(conn, cursorId), { highWaterMark });
 
       return {
         rowStream,

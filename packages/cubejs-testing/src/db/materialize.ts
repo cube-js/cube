@@ -8,7 +8,10 @@ type MaterializeStartOptions = DBRunnerContainerOptions & {
 
 export class MaterializeDBRunner extends DbRunnerAbstract {
   public static startContainer(options: MaterializeStartOptions) {
-    const version = process.env.TEST_MZSQL_VERSION || options.version || 'v0.24.0';
+    /**
+     * Version v0.26.0 is latest Materialize release with Long Term Support
+     */
+    const version = process.env.TEST_MZSQL_VERSION || options.version || 'v0.26.0';
 
     const container = new GenericContainer(`materialize/materialized:${version}`)
       .withExposedPorts(6875)
