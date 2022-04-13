@@ -2,9 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
-import Wrapper from "cube-example-wrapper"
-
-const root = document.getElementById('root')
+import createExampleWrapper from "cube-example-wrapper"
 
 const exampleDescription = {
   title: "Data Blending",
@@ -13,12 +11,11 @@ const exampleDescription = {
   tutorialSrc: "https://cube.dev/blog/introducing-data-blending-api/",
   sourceCodeSrc: "https://github.com/cube-js/cube.js/tree/master/examples/data-blending",
 };
-const cubeExampleWrapper = new Wrapper(exampleDescription)
-cubeExampleWrapper.render(root);
+createExampleWrapper(exampleDescription)
 
 ReactDOM.render(
   <React.StrictMode>
     <App></App>
   </React.StrictMode>,
-  root
+  document.getElementById('root')
 );
