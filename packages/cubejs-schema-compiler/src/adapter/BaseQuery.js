@@ -1478,7 +1478,7 @@ class BaseQuery {
             symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             primaryKeys.length && (
               primaryKeys.length > 1 ?
-                primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))) 
+                this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
               ) || '*'
           ),
