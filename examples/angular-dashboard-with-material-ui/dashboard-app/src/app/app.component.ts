@@ -3,9 +3,7 @@ import { Component, ViewEncapsulation } from '@angular/core';
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss',
-'../../node_modules/cube-example-wrapper/public/style.css'],
-  encapsulation: ViewEncapsulation.None
+  styleUrls: ['./app.component.scss'],
 })
 export class AppComponent {
   public links = [
