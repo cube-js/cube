@@ -11,8 +11,8 @@ pub struct PreparedStatement {
 }
 
 impl PreparedStatement {
-    pub fn bind(&self, _values: Vec<BindValue>) -> ast::Statement {
-        let binder = StatementParamsBinder::new(vec![]);
+    pub fn bind(&self, values: Vec<BindValue>) -> ast::Statement {
+        let binder = StatementParamsBinder::new(values);
         let mut statement = self.query.clone();
         binder.bind(&mut statement);
 

@@ -9,6 +9,7 @@ pub enum BindValue {
     UInt64(u64),
     Float64(f64),
     Bool(bool),
+    Null,
 }
 
 trait Visitor<'ast> {
@@ -137,8 +138,8 @@ impl StatementParamsFinder {
         Self { parameters: vec![] }
     }
 
-    pub fn prepare(mut self, stmt: &mut ast::Statement) -> Vec<FoundParameter> {
-        self.visit_statement(stmt);
+    pub fn prepare(mut self, stmt: &ast::Statement) -> Vec<FoundParameter> {
+        self.visit_statement(&mut stmt.clone());
 
         self.parameters
     }
@@ -198,6 +199,9 @@ impl<'ast> Visitor<'ast> for StatementParamsBinder {
                     BindValue::Float64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_f64);
                     }
+                    BindValue::Null => {
+                        *value = ast::Value::Null;
+                    }
                 }
             }
             _ => {}
@@ -213,10 +217,12 @@ impl StatementPlaceholderReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &mut ast::Statement) -> &mut ast::Statement {
-        self.visit_statement(stmt);
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
 
-        stmt
+        self.visit_statement(&mut result);
+
+        result
     }
 }
 

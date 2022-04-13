@@ -9,6 +9,7 @@ use async_trait::async_trait;
 
 use bytes::BufMut;
 
+use crate::sql::statement::BindValue;
 use tokio::io::AsyncReadExt;
 
 use super::{buffer, PgType, PgTypeId};
@@ -472,6 +473,26 @@ pub struct Bind {
     pub parameter_values: Vec<Option<Vec<u8>>>,
     /// Format for results
     pub result_formats: Vec<Format>,
+}
+
+impl Bind {
+    pub(crate) fn to_bind_values(&self) -> Vec<BindValue> {
+        let mut values = vec![];
+
+        for param_value in &self.parameter_values {
+            values.push(match param_value {
+                None => BindValue::Null,
+                Some(raw_value) => {
+                    let decoded = String::from_utf8(raw_value.clone())
+                        .expect("Unable to unpack raw parameter to string");
+
+                    BindValue::String(decoded)
+                }
+            })
+        }
+
+        values
+    }
 }
 
 #[async_trait]

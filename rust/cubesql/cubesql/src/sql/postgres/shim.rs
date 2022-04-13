@@ -328,13 +328,13 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn bind(&mut self, bind: protocol::Bind) -> Result<(), Error> {
+    pub async fn bind(&mut self, body: protocol::Bind) -> Result<(), Error> {
         let source_statement = self
             .statements
-            .get(&bind.statement)
+            .get(&body.statement)
             .ok_or_else(|| Error::new(ErrorKind::Other, "Unknown statement"))?;
 
-        let prepared_statement = source_statement.bind(vec![]);
+        let prepared_statement = source_statement.bind(body.to_bind_values());
 
         let meta = self
             .session
@@ -349,7 +349,7 @@ impl AsyncPostgresShim {
 
         let portal = Portal { plan };
 
-        self.portals.insert(bind.portal, portal);
+        self.portals.insert(body.portal, portal);
 
         self.write(protocol::BindComplete::new()).await?;
 
@@ -357,11 +357,11 @@ impl AsyncPostgresShim {
     }
 
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), Error> {
-        let mut query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
+        let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
 
         let stmt_finder = StatementParamsFinder::new();
         let parameters: Vec<PgTypeId> = stmt_finder
-            .prepare(&mut query)
+            .prepare(&query)
             .into_iter()
             .map(|_p| PgTypeId::TEXT)
             .collect();
@@ -375,7 +375,7 @@ impl AsyncPostgresShim {
             .unwrap();
 
         let stmt_replacer = StatementPlaceholderReplacer::new();
-        let hacked_query = stmt_replacer.replace(&mut query);
+        let hacked_query = stmt_replacer.replace(&query);
 
         let plan =
             convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
