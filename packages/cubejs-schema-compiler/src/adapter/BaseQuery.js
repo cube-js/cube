@@ -1861,7 +1861,7 @@ class BaseQuery {
   }
 
   newSubQuery(options) {
-    const QueryClass = options.dialectClass ?? this.constructor;
+    const QueryClass = this.constructor;
     return new QueryClass(
       this.compilers,
       Object.assign({

@@ -6,6 +6,7 @@ export class PreAggregations {
   constructor(query, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;
+    this.cubeLatticeCache = cubeLatticeCache;
     this.cubeLattices = {};
   }
 
