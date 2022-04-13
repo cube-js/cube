@@ -99,9 +99,9 @@ export class QuestQuery extends BaseQuery {
 
   public primaryKeyCount(cubeName: string, distinct: boolean): string {
     const primaryKeys: string[] = this.cubeEvaluator.primaryKeys[cubeName];
-    const primaryKeySql = primaryKeys.length > 1 ? 
-      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) : 
-      this.primaryKeySql(primaryKeys[0], cubeName)
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     if (distinct) {
       return `count_distinct(${primaryKeySql})`;
     } else {
