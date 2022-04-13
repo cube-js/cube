@@ -826,7 +826,7 @@ mod tests {
                             Some(vec![116, 101, 115, 116]),
                             Some(vec![116, 114, 117, 101]),
                         ],
-                        result_formats: vec![]
+                        result_formats: vec![Format::Text]
                     },
                 )
             }

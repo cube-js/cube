@@ -265,11 +265,8 @@ mod tests {
 
         test_binder(
             "SELECT ? AS t1, ? AS t2",
-            "SELECT 'test1' AS t1, 'test2' AS t2",
-            vec![
-                BindValue::String("test1".to_string()),
-                BindValue::String("test2".to_string()),
-            ],
+            "SELECT 'test1' AS t1, NULL AS t2",
+            vec![BindValue::String("test1".to_string()), BindValue::Null],
         )?;
 
         // binary op
@@ -357,10 +354,9 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let binder = StatementPlaceholderReplacer::new();
-        let mut input = stmts[0].clone();
-        binder.replace(&mut input);
+        let result = binder.replace(&stmts[0]);
 
-        assert_eq!(input.to_string(), output);
+        assert_eq!(result.to_string(), output);
 
         Ok(())
     }
