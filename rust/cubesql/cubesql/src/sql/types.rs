@@ -1,3 +1,4 @@
+use crate::sql::PgTypeId;
 use bitflags::bitflags;
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
@@ -26,6 +27,19 @@ impl ColumnType {
             ColumnType::Int8 | ColumnType::Int32 => MysqlColumnType::MYSQL_TYPE_LONG,
             ColumnType::Int64 => MysqlColumnType::MYSQL_TYPE_LONGLONG,
             _ => MysqlColumnType::MYSQL_TYPE_BLOB,
+        }
+    }
+
+    pub fn to_pg_tid(&self) -> PgTypeId {
+        match self {
+            ColumnType::Blob => PgTypeId::BYTEA,
+            ColumnType::Boolean => PgTypeId::BOOL,
+            ColumnType::Int64 => PgTypeId::INT8,
+            ColumnType::Int8 => PgTypeId::INT2,
+            ColumnType::Int32 => PgTypeId::INT4,
+            ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
+            ColumnType::Timestamp => PgTypeId::TIMESTAMP,
+            ColumnType::Double => PgTypeId::NUMERIC,
         }
     }
 }
