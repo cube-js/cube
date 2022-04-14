@@ -221,7 +221,7 @@ impl QueryExecutor for QueryExecutorImpl {
         let plan_to_move = plan.logical_plan(
             HashMap::new(),
             HashMap::new(),
-            self.parquet_metadata_cache.cache().clone(),
+            NoopParquetMetadataCache::new(),
         )?;
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
