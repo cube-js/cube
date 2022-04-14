@@ -297,6 +297,8 @@ impl AsyncPostgresShim {
         match portal {
             Some(portal) => {
                 if execute.max_rows == 0 {
+                    // TODO: I will rewrite this code later, it's just a prototype
+                    #[allow(mutable_borrow_reservation_conflict)]
                     match self.execute_plan(portal.plan.clone(), false).await {
                         Err(e) => {
                             self.write(protocol::ErrorResponse::new(
