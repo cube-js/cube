@@ -781,7 +781,6 @@ mod tests {
     use futures::StreamExt;
     use itertools::Itertools;
 
-    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use std::iter::FromIterator;
     use std::sync::Arc;
 
@@ -1141,7 +1140,6 @@ mod tests {
             aggregate_functions: Default::default(),
             config: ExecutionConfig::new(),
             execution_props: ExecutionProps::new(),
-            parquet_metadata_cache: NoopParquetMetadataCache::new(),
         };
         let agg_exprs = aggs
             .iter()
