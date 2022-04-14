@@ -7405,6 +7405,11 @@
   resolved "https://registry.yarnpkg.com/@ungap/promise-all-settled/-/promise-all-settled-1.1.2.tgz#aa58042711d6e3275dd37dc597e5d31e8c290a44"
   integrity sha512-sL/cEvJWAnClXw0wHk85/2L0G6Sj8UB0Ctc1TEMbKSsmpRosqhwj9gWgFRZSrBr2f9tiXISwNhCPmlfqUqyb9Q==
 
+"@ungap/structured-clone@^0.3.4":
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-0.3.4.tgz#f6d804e185591373992781361e4aa5bb81ffba35"
+  integrity sha512-TSVh8CpnwNAsPC5wXcIyh92Bv1gq6E9cNDeeLu7Z4h8V4/qWtXJp7y42qljRkqcpmsve1iozwv1wr+3BNdILCg==
+
 "@vendia/serverless-express@^3.4.0":
   version "3.4.0"
   resolved "https://registry.yarnpkg.com/@vendia/serverless-express/-/serverless-express-3.4.0.tgz#156f47d364b067ae6fa678a914c51887f494321a"
