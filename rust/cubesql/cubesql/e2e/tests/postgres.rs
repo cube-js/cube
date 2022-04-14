@@ -5,6 +5,8 @@ use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use portpicker::pick_unused_port;
 use tokio::time::sleep;
+
+use super::utils::escape_snapshot_name;
 use tokio_postgres::{NoTls, Row};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
@@ -94,12 +96,29 @@ impl PostgresIntegrationTestSuite {
 
         table.set_header(header);
 
-        for (idx, row) in res.into_iter().enumerate() {
-            let mut values = Vec::new();
+        for row in res.into_iter() {
+            let mut values: Vec<String> = Vec::new();
 
-            for _column in row.columns() {
-                let value: String = row.get(idx);
-                values.push(value);
+            for (idx, column) in row.columns().into_iter().enumerate() {
+                match column.type_().oid() {
+                    20 => {
+                        let value: i64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    25 => {
+                        let value: String = row.get(idx);
+                        values.push(value);
+                    }
+                    16 => {
+                        let value: bool = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    701 => {
+                        let value: f64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    oid => unimplemented!("Unsupported pg_type: {}", oid),
+                }
             }
 
             table.add_row(values);
@@ -108,16 +127,9 @@ impl PostgresIntegrationTestSuite {
         table.trim_fmt()
     }
 
-    fn escape_snapshot_name(&self, name: String) -> String {
-        name.to_lowercase()
-            // @todo Real escape?
-            .replace(" ", "_")
-            .replace("*", "asterisk")
-    }
-
     async fn assert_query(&self, res: Vec<Row>, query: String) {
         insta::assert_snapshot!(
-            self.escape_snapshot_name(query),
+            escape_snapshot_name(query),
             self.print_query_result(res).await
         );
     }
@@ -160,9 +172,21 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
 
     async fn run(&mut self) -> RunResult {
         self.test_prepare().await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
-        // ).await?;
+        self.test_execute_query(
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+        )
+        .await?;
+        self.test_execute_query(
+            r#"SELECT
+                true as bool_true,
+                false as bool_false,
+                'test',
+                1.0,
+                1
+            "#
+            .to_string(),
+        )
+        .await?;
 
         Ok(())
     }

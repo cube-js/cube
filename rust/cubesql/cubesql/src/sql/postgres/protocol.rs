@@ -320,37 +320,6 @@ impl RowDescriptionField {
     }
 }
 
-pub struct DataRow {
-    values: Vec<Option<String>>,
-}
-
-impl DataRow {
-    pub fn new(values: Vec<Option<String>>) -> Self {
-        Self { values }
-    }
-}
-
-impl Serialize for DataRow {
-    const CODE: u8 = b'D';
-
-    fn serialize(&self) -> Option<Vec<u8>> {
-        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        let size = u16::try_from(self.values.len()).unwrap();
-        buffer.extend_from_slice(&size.to_be_bytes());
-        for value in self.values.iter() {
-            match value {
-                None => buffer.extend_from_slice(&(-1_i32).to_be_bytes()),
-                Some(value) => {
-                    let size = u32::try_from(value.len()).unwrap();
-                    buffer.extend_from_slice(&size.to_be_bytes());
-                    buffer.extend_from_slice(value.as_bytes());
-                }
-            };
-        }
-        Some(buffer)
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct PasswordMessage {
     pub password: String,
@@ -600,7 +569,8 @@ impl Deserialize for Query {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(u8)]
 pub enum Format {
     Text,
     Binary,
@@ -635,7 +605,7 @@ pub enum FrontendMessage {
 
 /// https://www.postgresql.org/docs/14/errcodes-appendix.html
 pub enum ErrorCode {
-    // 0A — Feature Not Supported
+    // 0A — Feature Not Supported
     FeatureNotSupported,
     // 28 - Invalid Authorization Specification
     InvalidAuthorizationSpecification,

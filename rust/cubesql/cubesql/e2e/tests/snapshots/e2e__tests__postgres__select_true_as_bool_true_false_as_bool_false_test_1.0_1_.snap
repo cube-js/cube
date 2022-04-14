@@ -1,0 +1,10 @@
+---
+source: cubesql/e2e/tests/postgres.rs
+assertion_line: 131
+expression: self.print_query_result(res).await
+---
++-----------+------------+--------------+------------+----------+
+| bool_true | bool_false | Utf8("test") | Float64(1) | Int64(1) |
++-----------+------------+--------------+------------+----------+
+| true      | false      | test         | 1          | 1        |
++-----------+------------+--------------+------------+----------+

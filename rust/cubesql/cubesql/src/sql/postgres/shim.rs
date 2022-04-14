@@ -1,5 +1,7 @@
+use datafusion::arrow::datatypes::DataType;
 use std::{
     collections::HashMap,
+    io,
     io::{Error, ErrorKind},
     sync::Arc,
 };
@@ -9,7 +11,9 @@ use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::sql::dataframe::DataFrame;
+use crate::sql::protocol::Format;
 use crate::sql::statement::StatementPlaceholderReplacer;
+use crate::sql::writer::BatchWriter;
 use crate::{
     compile::{
         convert_sql_to_cube_query, convert_statement_to_cube_query, parser::parse_sql_to_statement,
@@ -32,6 +36,7 @@ use super::{
 
 pub struct Portal {
     plan: QueryPlan,
+    format: Format,
 }
 
 pub struct AsyncPostgresShim {
@@ -299,7 +304,10 @@ impl AsyncPostgresShim {
                 if execute.max_rows == 0 {
                     // TODO: I will rewrite this code later, it's just a prototype
                     #[allow(mutable_borrow_reservation_conflict)]
-                    match self.execute_plan(portal.plan.clone(), false).await {
+                    match self
+                        .execute_plan(portal.plan.clone(), false, portal.format)
+                        .await
+                    {
                         Err(e) => {
                             self.write(protocol::ErrorResponse::new(
                                 protocol::ErrorSeverity::Error,
@@ -308,7 +316,13 @@ impl AsyncPostgresShim {
                             ))
                             .await?;
                         }
-                        Ok(_) => {}
+                        Ok(_) => {
+                            self.write(protocol::CommandComplete::new(
+                                protocol::CommandCompleteTag::Select,
+                                0,
+                            ))
+                            .await?;
+                        }
                     }
                 } else {
                     self.write(protocol::ErrorResponse::new(
@@ -349,7 +363,13 @@ impl AsyncPostgresShim {
         let plan = convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
             .unwrap();
 
-        let portal = Portal { plan };
+        let format = body
+            .result_formats
+            .first()
+            .clone()
+            .unwrap_or(&Format::Text)
+            .clone();
+        let portal = Portal { plan, format };
 
         self.portals.insert(body.portal, portal);
 
@@ -363,7 +383,7 @@ impl AsyncPostgresShim {
 
         let stmt_finder = StatementParamsFinder::new();
         let parameters: Vec<PgTypeId> = stmt_finder
-            .prepare(&query)
+            .find(&query)
             .into_iter()
             .map(|_p| PgTypeId::TEXT)
             .collect();
@@ -387,9 +407,9 @@ impl AsyncPostgresShim {
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
-                for _field in frame.get_columns() {
+                for field in frame.get_columns() {
                     result.push(RowDescriptionField::new(
-                        "?column?".to_string(),
+                        field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
                     ));
                 }
@@ -399,10 +419,33 @@ impl AsyncPostgresShim {
             QueryPlan::DataFusionSelect(_, logical_plan, _) => {
                 let mut result = vec![];
 
-                for _field in logical_plan.schema().fields() {
+                for field in logical_plan.schema().fields() {
                     result.push(RowDescriptionField::new(
-                        "?column?".to_string(),
-                        PgType::get_by_tid(PgTypeId::TEXT),
+                        field.name().clone(),
+                        match field.data_type() {
+                            DataType::Boolean => PgType::get_by_tid(PgTypeId::BOOL),
+                            DataType::Int16 => PgType::get_by_tid(PgTypeId::INT2),
+                            DataType::Int32 => PgType::get_by_tid(PgTypeId::INT4),
+                            DataType::Int64 => PgType::get_by_tid(PgTypeId::INT8),
+                            DataType::Float32 => PgType::get_by_tid(PgTypeId::FLOAT4),
+                            DataType::Float64 => PgType::get_by_tid(PgTypeId::FLOAT8),
+                            DataType::Utf8 => PgType::get_by_tid(PgTypeId::TEXT),
+                            DataType::LargeUtf8 => PgType::get_by_tid(PgTypeId::TEXT),
+                            DataType::Null => PgType::get_by_tid(PgTypeId::BOOL),
+                            data_type => {
+                                let message =
+                                    format!("Unsupported data type for pg-wire: {:?}", data_type);
+
+                                self.write(protocol::ErrorResponse::new(
+                                    protocol::ErrorSeverity::Error,
+                                    protocol::ErrorCode::InternalError,
+                                    message.clone(),
+                                ))
+                                .await?;
+
+                                return Err(io::Error::new(io::ErrorKind::Other, message));
+                            }
+                        },
                     ));
                 }
 
@@ -428,6 +471,7 @@ impl AsyncPostgresShim {
         &mut self,
         frame: Arc<DataFrame>,
         description: bool,
+        format: Format,
     ) -> Result<(), CubeError> {
         if description {
             let mut fields = Vec::new();
@@ -442,33 +486,35 @@ impl AsyncPostgresShim {
             self.write(protocol::RowDescription::new(fields)).await?;
         }
 
-        for row in frame.get_rows().iter() {
-            let mut values = Vec::new();
-            for value in row.values().iter() {
-                let value = match value {
-                    TableValue::Null => None,
-                    TableValue::String(v) => Some(v.clone()),
-                    TableValue::Int64(v) => Some(format!("{}", v)),
-                    TableValue::Boolean(v) => Some((if *v { "t" } else { "v" }).to_string()),
-                    TableValue::Float64(v) => Some(format!("{}", v)),
-                    TableValue::Timestamp(v) => Some(v.to_string()),
+        let mut batch_writer = BatchWriter::new(format);
+
+        for row in frame.get_rows() {
+            for value in row.values() {
+                match value {
+                    TableValue::Null => batch_writer.write_value::<Option<bool>>(None)?,
+                    TableValue::String(v) => batch_writer.write_value(v.clone())?,
+                    TableValue::Int64(v) => batch_writer.write_value(*v)?,
+                    TableValue::Boolean(v) => batch_writer.write_value(*v)?,
+                    TableValue::Float64(v) => batch_writer.write_value(*v)?,
+                    // @todo Support value
+                    TableValue::Timestamp(v) => batch_writer.write_value(v.to_string())?,
                 };
-                values.push(value);
             }
 
-            self.write(protocol::DataRow::new(values)).await?;
+            batch_writer.end_row()?;
         }
 
-        self.write(protocol::CommandComplete::new(
-            protocol::CommandCompleteTag::Select,
-            0,
-        ))
-        .await?;
+        buffer::write_direct(&mut self.socket, batch_writer).await?;
 
         Ok(())
     }
 
-    async fn execute_plan(&mut self, plan: QueryPlan, description: bool) -> Result<(), CubeError> {
+    async fn execute_plan(
+        &mut self,
+        plan: QueryPlan,
+        description: bool,
+        format: Format,
+    ) -> Result<(), CubeError> {
         match plan {
             QueryPlan::MetaOk(_) => {
                 self.write(protocol::CommandComplete::new(
@@ -478,14 +524,15 @@ impl AsyncPostgresShim {
                 .await?;
             }
             QueryPlan::MetaTabular(_, data_frame) => {
-                self.write_batch(data_frame, description).await?;
+                self.write_batch(data_frame, description, format).await?;
             }
             QueryPlan::DataFusionSelect(_, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let data_frame = batch_to_dataframe(&batches)?;
 
-                self.write_batch(Arc::new(data_frame), description).await?;
+                self.write_batch(Arc::new(data_frame), description, format)
+                    .await?;
             }
         };
 
@@ -501,7 +548,7 @@ impl AsyncPostgresShim {
             .await?;
 
         let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
-        self.execute_plan(plan, true).await
+        self.execute_plan(plan, true, Format::Text).await
     }
 
     pub async fn process_query(&mut self, query: String) -> Result<(), Error> {

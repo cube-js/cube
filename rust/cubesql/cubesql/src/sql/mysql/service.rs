@@ -268,7 +268,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
 
         let stmt_prepare = StatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
-            .prepare(&mut statement)
+            .find(&mut statement)
             .into_iter()
             .map(|p| p.into())
             .collect();

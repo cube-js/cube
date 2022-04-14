@@ -223,7 +223,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Timestamp(_, _) => Ok(ColumnType::String),
         DataType::Interval(_) => Ok(ColumnType::String),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Double),
-        DataType::Boolean => Ok(ColumnType::Int8),
+        DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
