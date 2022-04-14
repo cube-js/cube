@@ -4,6 +4,7 @@ pub(crate) mod protocol;
 pub(crate) mod service;
 pub(crate) mod shim;
 pub(crate) mod statement;
+pub(crate) mod writer;
 
 pub use pg_type::*;
 pub use service::*;

@@ -1,5 +1,6 @@
 use msql_srv::{Column, ColumnFlags, ColumnType};
 use sqlparser::ast;
+use sqlparser::ast::Value;
 
 #[derive(Debug)]
 pub enum BindValue {
@@ -114,7 +115,7 @@ trait Visitor<'ast> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FoundParameter {}
 
 impl Into<Column> for FoundParameter {
@@ -138,7 +139,7 @@ impl StatementParamsFinder {
         Self { parameters: vec![] }
     }
 
-    pub fn prepare(mut self, stmt: &ast::Statement) -> Vec<FoundParameter> {
+    pub fn find(mut self, stmt: &ast::Statement) -> Vec<FoundParameter> {
         self.visit_statement(&mut stmt.clone());
 
         self.parameters
@@ -146,8 +147,11 @@ impl StatementParamsFinder {
 }
 
 impl<'ast> Visitor<'ast> for StatementParamsFinder {
-    fn visit_value(&mut self, _: &mut ast::Value) {
-        self.parameters.push(FoundParameter {})
+    fn visit_value(&mut self, v: &mut ast::Value) {
+        match v {
+            Value::Placeholder(_) => self.parameters.push(FoundParameter {}),
+            _ => {}
+        }
     }
 }
 
@@ -346,6 +350,25 @@ mod tests {
             "SELECT * FROM (SELECT * FROM testdata WHERE fieldA = 'test1')",
             vec![BindValue::String("test1".to_string())],
         )?;
+
+        Ok(())
+    }
+
+    fn assert_params_finder(input: &str, expected: Vec<FoundParameter>) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let finder = StatementParamsFinder::new();
+        let result = finder.find(&stmts[0]);
+
+        assert_eq!(result, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_placeholder_find() -> Result<(), CubeError> {
+        assert_params_finder("SELECT $1", vec![FoundParameter {}])?;
+        assert_params_finder("SELECT true as true_bool, false as false_bool", vec![])?;
 
         Ok(())
     }

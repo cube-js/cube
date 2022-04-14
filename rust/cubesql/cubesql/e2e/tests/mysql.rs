@@ -1,5 +1,6 @@
 use std::env;
 
+use super::utils::escape_snapshot_name;
 use async_trait::async_trait;
 use comfy_table::{Cell, Table};
 use cubesql::config::Config;
@@ -174,39 +175,10 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
-    fn escape_snapshot_name(&self, name: String) -> String {
-        let mut name = name
-            .to_lowercase()
-            // @todo Real escape?
-            .replace("\r", "")
-            .replace("\n", "")
-            .replace("\t", "")
-            .replace(">", "")
-            .replace("<", "")
-            .replace("'", "")
-            .replace("::", "_")
-            .replace(":", "")
-            .replace(" ", "_")
-            .replace("*", "asterisk")
-            // shorter variant
-            .replace(",_", "_");
-
-        for _ in 0..32 {
-            name = name.replace("__", "_");
-        }
-
-        // Windows limit
-        if name.len() > 200 {
-            name.chars().into_iter().take(200).collect()
-        } else {
-            name
-        }
-    }
-
     async fn assert_query(&self, conn: &mut Conn, query: String) {
         let mut response = conn.query_iter(query.clone()).await.unwrap();
         insta::assert_snapshot!(
-            self.escape_snapshot_name(query),
+            escape_snapshot_name(query),
             self.print_query_result(&mut response).await
         );
     }

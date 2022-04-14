@@ -123,6 +123,21 @@ pub async fn read_format<Reader: AsyncReadExt + Unpin>(
     Ok(format)
 }
 
+pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    writer: &mut Writer,
+    message: Message,
+) -> Result<(), Error> {
+    match message.serialize() {
+        Some(buffer) => {
+            writer.write_all(&buffer).await?;
+            writer.flush().await?;
+        }
+        _ => {}
+    };
+
+    Ok(())
+}
+
 pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,

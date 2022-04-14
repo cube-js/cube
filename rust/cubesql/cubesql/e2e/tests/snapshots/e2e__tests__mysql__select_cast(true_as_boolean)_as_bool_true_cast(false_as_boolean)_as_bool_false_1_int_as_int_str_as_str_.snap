@@ -1,10 +1,10 @@
 ---
 source: cubesql/e2e/tests/mysql.rs
-assertion_line: 208
+assertion_line: 180
 expression: self.print_query_result(&mut response).await
 ---
-bool_true type: (MYSQL_TYPE_LONG:1024) flags: (empty)
-bool_false type: (MYSQL_TYPE_LONG:1024) flags: (empty)
+bool_true type: (MYSQL_TYPE_TINY:1024) flags: (empty)
+bool_false type: (MYSQL_TYPE_TINY:1024) flags: (empty)
 int type: (MYSQL_TYPE_LONGLONG:1024) flags: (empty)
 str type: (MYSQL_TYPE_STRING:1024) flags: (empty)
 +-----------+------------+-----+-----+
