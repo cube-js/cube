@@ -39,7 +39,7 @@ use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, Ingestion};
+use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
@@ -1213,22 +1213,6 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRe
     Ok(arrays)
 }
 
-fn decode_byte(s: &str) -> Option<u8> {
-    let v = s.as_bytes();
-    if v.len() != 2 {
-        return None;
-    }
-    let decode_char = |c| match c {
-        b'a'..=b'f' => Some(10 + c - b'a'),
-        b'A'..=b'F' => Some(10 + c - b'A'),
-        b'0'..=b'9' => Some(c - b'0'),
-        _ => None,
-    };
-    let v0 = decode_char(v[0])?;
-    let v1 = decode_char(v[1])?;
-    return Some(v0 * 16 + v1);
-}
-
 fn parse_hyper_log_log<'a>(
     buffer: &'a mut Vec<u8>,
     v: &'a Value,
@@ -1269,7 +1253,8 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
         Value::SingleQuotedString(s) => {
-            *buffer = s
+            parse_space_separated_binstring(buffer, s.as_ref())
+            /*buffer = s
                 .split(' ')
                 .filter(|b| !b.is_empty())
                 .map(|s| {
@@ -1278,7 +1263,7 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
                     })
                 })
                 .try_collect()?;
-            Ok(buffer.as_slice())
+            Ok(buffer.as_slice())*/
         }
         // TODO: allocate directly on arena.
         Value::HexStringLiteral(s) => {
