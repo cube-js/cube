@@ -1252,19 +1252,7 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
         // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
-        Value::SingleQuotedString(s) => {
-            parse_space_separated_binstring(buffer, s.as_ref())
-            /*buffer = s
-                .split(' ')
-                .filter(|b| !b.is_empty())
-                .map(|s| {
-                    decode_byte(s).ok_or_else(|| {
-                        CubeError::user(format!("cannot convert value to binary string: {}", v))
-                    })
-                })
-                .try_collect()?;
-            Ok(buffer.as_slice())*/
-        }
+        Value::SingleQuotedString(s) => parse_space_separated_binstring(buffer, s.as_ref()),
         // TODO: allocate directly on arena.
         Value::HexStringLiteral(s) => {
             *buffer = Vec::from_hex(s.as_bytes())?;
