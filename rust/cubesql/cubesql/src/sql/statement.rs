@@ -9,6 +9,7 @@ pub enum BindValue {
     UInt64(u64),
     Float64(f64),
     Bool(bool),
+    Null,
 }
 
 trait Visitor<'ast> {
@@ -69,6 +70,7 @@ trait Visitor<'ast> {
 
     fn visit_select_item(&mut self, select: &mut ast::SelectItem) {
         match select {
+            ast::SelectItem::ExprWithAlias { expr, .. } => self.visit_expr(expr),
             ast::SelectItem::UnnamedExpr(expr) => self.visit_expr(expr),
             _ => {}
         }
@@ -113,40 +115,49 @@ trait Visitor<'ast> {
 }
 
 #[derive(Debug)]
-pub struct StatementPrepare {
-    parameters: Vec<Column>,
-}
+pub struct FoundParameter {}
 
-impl StatementPrepare {
-    pub fn new() -> Self {
-        Self { parameters: vec![] }
-    }
-
-    pub fn prepare(&mut self, stmt: &mut ast::Statement) -> &Vec<Column> {
-        self.visit_statement(stmt);
-
-        &self.parameters
-    }
-}
-
-impl<'ast> Visitor<'ast> for StatementPrepare {
-    fn visit_value(&mut self, _: &mut ast::Value) {
-        self.parameters.push(Column {
+impl Into<Column> for FoundParameter {
+    fn into(self) -> Column {
+        Column {
             table: String::new(),
             column: "not implemented".to_owned(),
             coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
             colflags: ColumnFlags::empty(),
-        })
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct StatementBinder {
+pub struct StatementParamsFinder {
+    parameters: Vec<FoundParameter>,
+}
+
+impl StatementParamsFinder {
+    pub fn new() -> Self {
+        Self { parameters: vec![] }
+    }
+
+    pub fn prepare(mut self, stmt: &ast::Statement) -> Vec<FoundParameter> {
+        self.visit_statement(&mut stmt.clone());
+
+        self.parameters
+    }
+}
+
+impl<'ast> Visitor<'ast> for StatementParamsFinder {
+    fn visit_value(&mut self, _: &mut ast::Value) {
+        self.parameters.push(FoundParameter {})
+    }
+}
+
+#[derive(Debug)]
+pub struct StatementParamsBinder {
     position: usize,
     values: Vec<BindValue>,
 }
 
-impl StatementBinder {
+impl StatementParamsBinder {
     pub fn new(values: Vec<BindValue>) -> Self {
         Self {
             position: 0,
@@ -154,12 +165,12 @@ impl StatementBinder {
         }
     }
 
-    pub fn bind(&mut self, stmt: &mut ast::Statement) {
+    pub fn bind(mut self, stmt: &mut ast::Statement) {
         self.visit_statement(stmt);
     }
 }
 
-impl<'ast> Visitor<'ast> for StatementBinder {
+impl<'ast> Visitor<'ast> for StatementParamsBinder {
     fn visit_value(&mut self, value: &mut ast::Value) {
         match &value {
             ast::Value::Placeholder(_) => {
@@ -188,7 +199,38 @@ impl<'ast> Visitor<'ast> for StatementBinder {
                     BindValue::Float64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_f64);
                     }
+                    BindValue::Null => {
+                        *value = ast::Value::Null;
+                    }
                 }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StatementPlaceholderReplacer {}
+
+impl StatementPlaceholderReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast> for StatementPlaceholderReplacer {
+    fn visit_value(&mut self, value: &mut ast::Value) {
+        match &value {
+            ast::Value::Placeholder(_) => {
+                *value = ast::Value::SingleQuotedString("replaced_placeholder".to_string());
             }
             _ => {}
         }
@@ -204,7 +246,7 @@ mod tests {
     fn test_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let mut binder = StatementBinder::new(values);
+        let binder = StatementParamsBinder::new(values);
         let mut input = stmts[0].clone();
         binder.bind(&mut input);
 
@@ -219,6 +261,12 @@ mod tests {
             "SELECT ?",
             "SELECT 'test'",
             vec![BindValue::String("test".to_string())],
+        )?;
+
+        test_binder(
+            "SELECT ? AS t1, ? AS t2",
+            "SELECT 'test1' AS t1, NULL AS t2",
+            vec![BindValue::String("test1".to_string()), BindValue::Null],
         )?;
 
         // binary op
@@ -298,6 +346,24 @@ mod tests {
             "SELECT * FROM (SELECT * FROM testdata WHERE fieldA = 'test1')",
             vec![BindValue::String("test1".to_string())],
         )?;
+
+        Ok(())
+    }
+
+    fn assert_placeholder_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let binder = StatementPlaceholderReplacer::new();
+        let result = binder.replace(&stmts[0]);
+
+        assert_eq!(result.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_placeholder_replacer() -> Result<(), CubeError> {
+        assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
 
         Ok(())
     }
