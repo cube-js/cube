@@ -5,7 +5,12 @@ const GenericTypeToMSSql = {
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
   timestamp: 'datetime2',
+  uuid: 'uniqueidentifier'
 };
+
+const MSSqlToGenericType = {
+  uniqueidentifier: 'uuid'
+}
 
 class MSSqlDriver extends BaseDriver {
   constructor(config) {
@@ -129,6 +134,10 @@ class MSSqlDriver extends BaseDriver {
 
   fromGenericType(columnType) {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
+  }
+
+  toGenericType(columnType){
+    return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
   }
 
   readOnly() {
