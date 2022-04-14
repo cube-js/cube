@@ -6,7 +6,6 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
-use datafusion::execution::dataframe_impl::DataFrameImpl;
 use datafusion::prelude::DataFrame as DFDataFrame;
 
 use log::debug;
@@ -113,7 +112,9 @@ impl MySqlConnection {
                         match value {
                             dataframe::TableValue::String(s) => rw.write_col(s)?,
                             dataframe::TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
-                            dataframe::TableValue::Boolean(s) => rw.write_col(s.to_string())?,
+                            dataframe::TableValue::Boolean(s) => {
+                                rw.write_col(if *s == true { 1_u8 } else { 0_u8 })?
+                            }
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
@@ -207,7 +208,7 @@ impl MySqlConnection {
                     return Ok(QueryResponse::ResultSet(status, data_frame));
                 },
                 crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
-                    let df = DataFrameImpl::new(
+                    let df = DFDataFrame::new(
                         ctx.state,
                         &plan,
                     );
@@ -469,6 +470,8 @@ impl ProcessingLoop for MySqlServer {
             let (socket, _) = tokio::select! {
                 res = stop_receiver.changed() => {
                     if res.is_err() || *stop_receiver.borrow() {
+                        trace!("[mysql] Stopping processing_loop via channel");
+
                         return Ok(());
                     } else {
                         continue;

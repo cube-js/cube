@@ -4,10 +4,11 @@ use std::{
     sync::Arc,
 };
 
-use datafusion::{dataframe::DataFrame, execution::dataframe_impl::DataFrameImpl};
+use datafusion::dataframe::DataFrame as DFDataFrame;
 use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+use crate::sql::postgres::pg_type::{PgType, PgTypeId};
 use crate::{
     compile::convert_sql_to_cube_query,
     sql::{
@@ -240,7 +241,10 @@ impl AsyncPostgresShim {
             Ok(QueryResponse::ResultSet(_, frame)) => {
                 let mut fields = Vec::new();
                 for column in frame.get_columns().iter() {
-                    fields.push(protocol::RowDescriptionField::new(column.get_name()))
+                    fields.push(protocol::RowDescriptionField::new(
+                        column.get_name(),
+                        PgType::get_by_tid(PgTypeId::TEXT),
+                    ))
                 }
 
                 self.write(protocol::RowDescription::new(fields)).await?;
@@ -295,7 +299,7 @@ impl AsyncPostgresShim {
                 return Ok(QueryResponse::ResultSet(status, data_frame));
             }
             crate::compile::QueryPlan::DataFusionSelect(status, plan, ctx) => {
-                let df = DataFrameImpl::new(ctx.state, &plan);
+                let df = DFDataFrame::new(ctx.state, &plan);
                 let batches = df.collect().await?;
                 let response = batch_to_dataframe(&batches)?;
 

@@ -85,6 +85,13 @@ pub trait QueryExecutor: DIService + Send + Sync {
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
+
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError>;
 }
 
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
@@ -249,6 +256,28 @@ impl QueryExecutor for QueryExecutorImpl {
             plan_ctx.create_physical_plan(&plan_to_move.clone())?,
             plan_to_move,
         ))
+    }
+    async fn pp_worker_plan(
+        &self,
+        plan: SerializedPlan,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    ) -> Result<String, CubeError> {
+        let (physical_plan, _) = self
+            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .await?;
+
+        let worker_plan;
+        if let Some((p, _)) = get_worker_plan(&physical_plan) {
+            worker_plan = p;
+        } else {
+            error!("No worker marker in physical plan: {:?}", physical_plan);
+            return Err(CubeError::internal(
+                "Invalid physical plan on worker".to_string(),
+            ));
+        }
+
+        Ok(pp_phys_plan(worker_plan.as_ref()))
     }
 }
 
@@ -669,7 +698,7 @@ impl CubeTable {
     }
 
     pub fn project_to_index_positions(
-        projection_columns: &Vec<Column>,
+        projection_columns: &Vec<String>,
         i: &IdRow<Index>,
     ) -> Vec<Option<usize>> {
         projection_columns
@@ -678,7 +707,7 @@ impl CubeTable {
                 i.get_row()
                     .get_columns()
                     .iter()
-                    .find_position(|c| c.get_name() == pc.get_name())
+                    .find_position(|c| c.get_name() == pc)
                     .map(|(p, _)| p)
             })
             .collect::<Vec<_>>()
@@ -968,6 +997,28 @@ impl ClusterSendExec {
             use_streaming: self.use_streaming,
         }
     }
+
+    pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
+        let mut res = Vec::new();
+        for (node_name, partitions) in self.partitions.iter() {
+            res.push((
+                node_name.clone(),
+                self.serialized_plan_for_partitions(partitions),
+            ));
+        }
+        res
+    }
+
+    fn serialized_plan_for_partitions(&self, partitions: &Vec<(u64, RowRange)>) -> SerializedPlan {
+        let mut ps = HashMap::<_, RowFilter>::new();
+        for (id, range) in partitions {
+            ps.entry(*id).or_default().append_or(range.clone())
+        }
+        let mut ps = ps.into_iter().collect_vec();
+        ps.sort_unstable_by_key(|(id, _)| *id);
+
+        self.serialized_plan.with_partition_id_to_execute(ps)
+    }
 }
 
 #[async_trait]
@@ -1017,14 +1068,8 @@ impl ExecutionPlan for ClusterSendExec {
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
-        let mut ps = HashMap::<_, RowFilter>::new();
-        for (id, range) in partitions {
-            ps.entry(*id).or_default().append_or(range.clone())
-        }
-        let mut ps = ps.into_iter().collect_vec();
-        ps.sort_unstable_by_key(|(id, _)| *id);
+        let plan = self.serialized_plan_for_partitions(partitions);
 
-        let plan = self.serialized_plan.with_partition_id_to_execute(ps);
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)
         } else {

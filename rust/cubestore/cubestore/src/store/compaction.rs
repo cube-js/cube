@@ -88,6 +88,14 @@ impl CompactionService for CompactionServiceImpl {
             .meta_store
             .get_partition_for_compaction(partition_id)
             .await?;
+
+        if !partition.get_row().is_active() && !multi_part.is_some() {
+            log::trace!(
+                "Cannot compact inactive partition: {:?}",
+                partition.get_row()
+            );
+            return Ok(());
+        }
         if let Some(mp) = &multi_part {
             if mp.get_row().prepared_for_split() {
                 log::debug!(

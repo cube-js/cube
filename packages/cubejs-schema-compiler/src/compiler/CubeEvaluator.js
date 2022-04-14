@@ -20,13 +20,16 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
-    this.primaryKeys = R.fromPairs(validCubes.map((v) => {
-      const primaryKeyNameToSymbol = R.compose(R.find(d => d[1].primaryKey), R.toPairs)(v.dimensions || {});
-      return [
-        v.name,
-        primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
-      ];
-    }));
+    this.primaryKeys = R.fromPairs(
+      validCubes.map((v) => {
+        const primaryKeyNamesToSymbols = R.compose(
+          R.map((d) => d[0]),
+          R.filter((d) => d[1].primaryKey),
+          R.toPairs
+        )(v.dimensions || {});
+        return [v.name, primaryKeyNamesToSymbols];
+      })
+    );
   }
 
   /**

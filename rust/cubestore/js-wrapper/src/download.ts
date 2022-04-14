@@ -18,6 +18,7 @@ export function getBinaryPath() {
 
 async function fetchRelease(version: string) {
   const client = new Octokit({
+    auth: process.env.CUBEJS_GH_API_TOKEN,
     request: {
       agent: await getHttpAgentForProxySettings(),
     }

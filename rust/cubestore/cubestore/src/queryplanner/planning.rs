@@ -24,7 +24,7 @@ use arrow::datatypes::{Field, SchemaRef};
 use async_trait::async_trait;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::planner::ExtensionPlanner;
 use datafusion::physical_plan::{
@@ -37,7 +37,7 @@ use itertools::Itertools;
 use crate::cluster::Cluster;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{Chunk, IdRow, Index, MetaStore, Partition, Schema};
+use crate::metastore::{Chunk, Column, IdRow, Index, MetaStore, Partition, Schema};
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
@@ -46,6 +46,8 @@ use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, Ser
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
+use datafusion::logical_plan;
+use datafusion::optimizer::utils::expr_to_columns;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
@@ -278,7 +280,7 @@ impl PlanRewriter for CollectConstraints {
     fn enter_node(
         &mut self,
         n: &LogicalPlan,
-        _: &Option<SortColumns>,
+        current_sort_on: &Option<SortColumns>,
     ) -> Option<Option<SortColumns>> {
         fn column_name(expr: &Expr) -> Option<String> {
             match expr {
@@ -297,6 +299,32 @@ impl PlanRewriter for CollectConstraints {
                     }))
                 } else {
                     Some(None)
+                }
+            }
+            LogicalPlan::Filter { predicate, .. } => {
+                let mut sort_on = Vec::new();
+                if single_value_filter_columns(predicate, &mut sort_on) {
+                    if !sort_on.is_empty() {
+                        Some(Some(SortColumns {
+                            sort_on: sort_on
+                                .into_iter()
+                                .map(|c| c.name.to_string())
+                                .chain(
+                                    current_sort_on
+                                        .as_ref()
+                                        .map(|c| c.sort_on.clone())
+                                        .unwrap_or_else(|| Vec::new())
+                                        .into_iter(),
+                                )
+                                .unique()
+                                .collect(),
+                            required: false,
+                        }))
+                    } else {
+                        Some(current_sort_on.clone())
+                    }
+                } else {
+                    None
                 }
             }
             _ => None,
@@ -335,6 +363,31 @@ impl PlanRewriter for CollectConstraints {
             sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
             required: true,
         }))
+    }
+}
+
+fn single_value_filter_columns<'a>(
+    expr: &'a Expr,
+    columns: &mut Vec<&'a logical_plan::Column>,
+) -> bool {
+    match expr {
+        Expr::Column(c) => {
+            columns.push(c);
+            true
+        }
+        Expr::Literal(_) => true,
+        Expr::BinaryExpr { left, op, right } => match op {
+            Operator::Eq => {
+                single_value_filter_columns(left, columns)
+                    && single_value_filter_columns(right, columns)
+            }
+            Operator::And => {
+                single_value_filter_columns(left, columns)
+                    && single_value_filter_columns(right, columns)
+            }
+            _ => false,
+        },
+        _ => false,
     }
 }
 
@@ -430,16 +483,19 @@ async fn pick_index(
 ) -> Result<IndexCandidate, DataFusionError> {
     let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
 
-    let mut indices = indices.into_iter();
-    let default_index = indices.next().expect("no default index");
+    let default_index = indices.iter().next().expect("no default index");
     let (index, mut partitioned_index, sort_on) = if let Some(projection_column_indices) =
         &c.projection
     {
         let projection_columns = CubeTable::project_to_table(&table, &projection_column_indices);
-        let mut partitioned_index = None;
-        let mut ordinary_index = None;
-        let mut ordinary_score = usize::MAX;
-        for i in indices {
+
+        let mut filter_columns = HashSet::new();
+        for f in c.filters.iter() {
+            expr_to_columns(f, &mut filter_columns)?;
+        }
+
+        // Skipping default index
+        let filtered_by_sort_on = indices.iter().skip(1).filter(|i| {
             if let Some((join_on_columns, _)) = sort_on.as_ref() {
                 // TODO: join_on_columns may be larger than sort_key_size of the index.
                 let join_columns_in_index = join_on_columns
@@ -453,39 +509,41 @@ async fn pick_index(
                     })
                     .collect::<Option<Vec<_>>>();
                 let join_columns_in_index = match join_columns_in_index {
-                    None => continue,
+                    None => return false,
                     Some(c) => c,
                 };
-                let join_columns_indices =
-                    CubeTable::project_to_index_positions(&join_columns_in_index, &i);
+                let join_columns_indices = CubeTable::project_to_index_positions(
+                    &join_columns_in_index
+                        .iter()
+                        .map(|c| c.get_name().to_string())
+                        .collect(),
+                    &i,
+                );
 
                 let matches = join_columns_indices
                     .iter()
                     .enumerate()
                     .all(|(i, col_i)| Some(i) == *col_i);
-                if !matches {
-                    continue;
-                }
+                matches
+            } else {
+                true
             }
-            let projected_index_positions =
-                CubeTable::project_to_index_positions(&projection_columns, &i);
-            let score = projected_index_positions
-                .into_iter()
-                .fold_options(0, |a, b| a + b);
-            if let Some(score) = score {
-                if i.get_row().multi_index_id().is_some() {
-                    debug_assert!(partitioned_index.is_none());
-                    partitioned_index = Some(i);
-                    continue;
-                }
-                if score < ordinary_score {
-                    ordinary_index = Some(i);
-                    ordinary_score = score;
-                }
-            }
-        }
-        if let Some(index) = ordinary_index {
-            (Ok(index), partitioned_index, sort_on)
+        });
+        let optimal_with_partitioned_index = optimal_index_by_score(
+            filtered_by_sort_on
+                .clone()
+                .filter(|i| i.get_row().multi_index_id().is_some()),
+            &projection_columns,
+            &filter_columns,
+        );
+        let optimal =
+            optimal_index_by_score(filtered_by_sort_on, &projection_columns, &filter_columns);
+        if let Some(index) = optimal_with_partitioned_index.or(optimal) {
+            (
+                Ok(index),
+                index.get_row().multi_index_id().map(|_| index),
+                sort_on,
+            )
         } else {
             if let Some((join_on_columns, true)) = sort_on.as_ref() {
                 let table_name = c.table.table_name();
@@ -498,9 +556,21 @@ async fn pick_index(
                     table_name,
                     join_on_columns.join(", ")
                 )));
-                (err, partitioned_index, sort_on)
+                (err, None, sort_on)
             } else {
-                (Ok(default_index), partitioned_index, None)
+                let optimal = optimal_index_by_score(
+                    // Skipping default index
+                    indices.iter().skip(1),
+                    &projection_columns,
+                    &filter_columns,
+                );
+
+                let index = optimal.unwrap_or(default_index);
+                (
+                    Ok(index),
+                    index.get_row().multi_index_id().map(|_| index),
+                    None,
+                )
             }
         }
     } else {
@@ -524,9 +594,9 @@ async fn pick_index(
     }
 
     let schema = Arc::new(schema);
-    let create_snapshot = |index| {
+    let create_snapshot = |index: &IdRow<Index>| {
         IndexSnapshot {
-            index,
+            index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
             table_path: TablePath {
                 table: table.clone(),
@@ -539,6 +609,40 @@ async fn pick_index(
         ordinary_index: index.map(create_snapshot),
         partitioned_index: partitioned_index.map(create_snapshot),
     })
+}
+
+fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
+    indexes: T,
+    projection_columns: &Vec<Column>,
+    filter_columns: &HashSet<logical_plan::Column>,
+) -> Option<&'a IdRow<Index>> {
+    indexes
+        .filter_map(|i| {
+            let filter_index_positions = CubeTable::project_to_index_positions(
+                &filter_columns.iter().map(|c| c.name.to_string()).collect(),
+                &i,
+            );
+            let projected_index_positions = CubeTable::project_to_index_positions(
+                &projection_columns
+                    .iter()
+                    .map(|c| c.get_name().to_string())
+                    .collect(),
+                &i,
+            );
+            let res = Some(i).zip(
+                filter_index_positions
+                    .into_iter()
+                    .fold_options(0, |a, b| a + b)
+                    .zip(
+                        projected_index_positions
+                            .into_iter()
+                            .fold_options(0, |a, b| a + b),
+                    ),
+            );
+            res
+        })
+        .min_by_key(|(_, score)| score.clone())
+        .map(|(index, _)| index)
 }
 
 fn pick_partitions(
@@ -922,7 +1026,7 @@ pub mod tests {
             "ClusterSend, indices: [[0]]\
            \n  Projection, [s.Customers.customer_id, s.Customers.customer_name, s.Customers.customer_city, s.Customers.customer_registered_date]\
            \n    Filter\
-           \n      Scan s.Customers, source: CubeTable(index: default:0:[]), fields: *"
+           \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
         );
 
         // Should prefer a non-default index for joins.
@@ -970,7 +1074,7 @@ pub mod tests {
                                   \n      Join on: [#s.Orders.order_customer = #c1.customer_id]\
                                   \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
                                   \n        Filter\
-                                  \n          Scan c1, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+                                  \n          Scan c1, source: CubeTable(index: default:0:[]), fields: [customer_id, customer_name]\
                                   \n      Scan c2, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]");
     }
 

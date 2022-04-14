@@ -26,6 +26,10 @@ class BigqueryFilter extends BaseFilter {
     }
     return '?';
   }
+
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
+  }
 }
 
 export class BigqueryQuery extends BaseQuery {

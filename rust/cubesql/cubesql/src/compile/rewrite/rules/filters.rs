@@ -55,6 +55,8 @@ impl RewriteRules for FilterRules {
                         "?order",
                         "?limit",
                         "?offset",
+                        "?aliases",
+                        "?table_name",
                     ),
                 ),
                 cube_scan(
@@ -64,6 +66,8 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
+                    "?table_name",
                 ),
                 self.push_down_filter("?source_table_name", "?expr", "?cube"),
             ),
@@ -284,6 +288,8 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
+                    "?table_name",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -296,6 +302,8 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
+                    "?aliases",
+                    "?table_name",
                 ),
             ),
             transforming_rewrite(
@@ -504,7 +512,7 @@ impl FilterRules {
                                         ScalarValue::Int64(Some(value)) => value.to_string(),
                                         ScalarValue::Boolean(Some(value)) => value.to_string(),
                                         ScalarValue::Float64(Some(value)) => value.to_string(),
-                                        ScalarValue::TimestampNanosecond(Some(value)) => {
+                                        ScalarValue::TimestampNanosecond(Some(value), _) => {
                                             let minus_one = Utc
                                                 .timestamp_nanos(*value - 1000)
                                                 .to_rfc3339_opts(SecondsFormat::Millis, true);

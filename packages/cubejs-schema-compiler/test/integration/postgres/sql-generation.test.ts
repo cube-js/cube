@@ -351,6 +351,41 @@ describe('SQL Generation', () => {
         }
       }
     });
+    
+    cube('compound', {
+      sql: \`
+        select * from compound_key_cards
+      \`, 
+      
+      joins: {
+        visitors: {
+          relationship: 'belongsTo',
+          sql: \`\${visitors}.id = \${CUBE}.visitor_id\`
+        },
+      },
+
+      measures: {
+        count: {
+          type: 'count'
+        },
+        rank_avg: {
+          type: 'avg',
+          sql: 'visit_rank'
+        }
+      },
+      dimensions: {
+        id_a: {
+          type: 'number',
+          sql: 'id_a',
+          primaryKey: true
+        },
+        id_b: {
+          type: 'number',
+          sql: 'id_b',
+          primaryKey: true
+        },
+      }
+    });
     `);
 
   it('simple join', async () => {
@@ -1840,4 +1875,46 @@ describe('SQL Generation', () => {
       expect(sqlBuild[1][1]).toEqual(granularityTest.to);
     });
   }
+
+  it('compound key count', async () => runQueryTest(
+    {
+      measures: ['compound.count'],
+      timeDimensions: [
+      ],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          dimension: 'visitor_checkins.revenue_per_checkin',
+          operator: 'gte',
+          values: ['10'],
+        },
+      ],
+    },
+    [{ compound__count: '4' }]
+  ));
+
+  it('compound key self join', async () => runQueryTest(
+    {
+      measures: ['compound.rank_avg'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          dimension: 'visitor_checkins.revenue_per_checkin',
+          operator: 'gte',
+          values: ['10'],
+        },
+      ],
+    },
+    [
+      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+    ]
+  ));
 });

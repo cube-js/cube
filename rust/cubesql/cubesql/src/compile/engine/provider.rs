@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use datafusion::{
     datasource,
-    execution::context::ExecutionContextState,
+    execution::context::SessionState as DFSessionState,
     physical_plan::{udaf::AggregateUDF, udf::ScalarUDF},
     sql::planner::ContextProvider,
 };
@@ -52,7 +52,7 @@ use std::any::Any;
 #[derive(Clone)]
 pub struct CubeContext {
     /// Internal state for the context (default)
-    pub state: Arc<ExecutionContextState>,
+    pub state: Arc<DFSessionState>,
     /// References
     pub meta: Arc<MetaContext>,
     pub sessions: Arc<SessionManager>,
@@ -61,7 +61,7 @@ pub struct CubeContext {
 
 impl CubeContext {
     pub fn new(
-        state: Arc<ExecutionContextState>,
+        state: Arc<DFSessionState>,
         meta: Arc<MetaContext>,
         sessions: Arc<SessionManager>,
         session_state: Arc<SessionState>,
@@ -102,7 +102,13 @@ impl ContextProvider for CubeContext {
                 schema,
                 table,
             } => Some(format!("{}.{}.{}", catalog, schema, table)),
-            datafusion::catalog::TableReference::Bare { table } => Some(table.to_string()),
+            datafusion::catalog::TableReference::Bare { table } => {
+                if table.starts_with("pg_") {
+                    Some(format!("pg_catalog.{}", table))
+                } else {
+                    Some(table.to_string())
+                }
+            }
         };
 
         if let Some(tp) = table_path {
@@ -113,11 +119,23 @@ impl ContextProvider for CubeContext {
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        self.state.scalar_functions.get(name).cloned()
+        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
+        self.state
+            .scalar_functions
+            .get(&name.to_ascii_lowercase())
+            .cloned()
     }
 
     fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
-        self.state.aggregate_functions.get(name).cloned()
+        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
+        self.state
+            .aggregate_functions
+            .get(&name.to_ascii_lowercase())
+            .cloned()
+    }
+
+    fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
+        Some(DataType::Utf8)
     }
 }
 
@@ -253,52 +271,50 @@ impl DatabaseProtocol {
         table_provider: Arc<dyn datasource::TableProvider>,
     ) -> Result<String, CubeError> {
         let any = table_provider.as_any();
-        Ok(
-            if let Some(_) = any.downcast_ref::<PostgresSchemaColumnsProvider>() {
-                "information_schema.columns".to_string()
-            } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableProvider>() {
-                "information_schema.tables".to_string()
-            } else if let Some(_) = any.downcast_ref::<PostgresSchemaCharacterSetsProvider>() {
-                "information_schema.character_sets".to_string()
-            } else if let Some(_) = any.downcast_ref::<PostgresSchemaKeyColumnUsageProvider>() {
-                "information_schema.key_column_usage".to_string()
-            } else if let Some(_) =
-                any.downcast_ref::<PostgresSchemaReferentialConstraintsProvider>()
-            {
-                "information_schema.referential_constraints".to_string()
-            } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
-                "information_schema.table_constraints".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
-                "pg_catalog.pg_tables".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
-                "pg_catalog.pg_type".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogNamespaceProvider>() {
-                "pg_catalog.pg_namespace".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogRangeProvider>() {
-                "pg_catalog.pg_range".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogAttrdefProvider>() {
-                "pg_catalog.pg_attrdef".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogAttributeProvider>() {
-                "pg_catalog.pg_attribute".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogIndexProvider>() {
-                "pg_catalog.pg_index".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
-                "pg_catalog.pg_class".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
-                "pg_catalog.pg_proc".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
-                "pg_catalog.pg_settings".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogDescriptionProvider>() {
-                "pg_catalog.pg_description".to_string()
-            } else if let Some(_) = any.downcast_ref::<PgCatalogConstraintProvider>() {
-                "pg_catalog.pg_constraint".to_string()
-            } else {
-                return Err(CubeError::internal(format!(
-                    "Unknown table provider with schema: {:?}",
-                    table_provider.schema()
-                )));
-            },
-        )
+        Ok(if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
+            t.table_name().to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaColumnsProvider>() {
+            "information_schema.columns".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableProvider>() {
+            "information_schema.tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaCharacterSetsProvider>() {
+            "information_schema.character_sets".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaKeyColumnUsageProvider>() {
+            "information_schema.key_column_usage".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaReferentialConstraintsProvider>() {
+            "information_schema.referential_constraints".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
+            "information_schema.table_constraints".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
+            "pg_catalog.pg_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
+            "pg_catalog.pg_type".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogNamespaceProvider>() {
+            "pg_catalog.pg_namespace".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogRangeProvider>() {
+            "pg_catalog.pg_range".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogAttrdefProvider>() {
+            "pg_catalog.pg_attrdef".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogAttributeProvider>() {
+            "pg_catalog.pg_attribute".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogIndexProvider>() {
+            "pg_catalog.pg_index".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
+            "pg_catalog.pg_class".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
+            "pg_catalog.pg_proc".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
+            "pg_catalog.pg_settings".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogDescriptionProvider>() {
+            "pg_catalog.pg_description".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogConstraintProvider>() {
+            "pg_catalog.pg_constraint".to_string()
+        } else {
+            return Err(CubeError::internal(format!(
+                "Unknown table provider with schema: {:?}",
+                table_provider.schema()
+            )));
+        })
     }
 
     fn get_postgres_provider(
@@ -306,6 +322,15 @@ impl DatabaseProtocol {
         context: &CubeContext,
         tp: String,
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
+        if let Some(cube) = context
+            .meta
+            .cubes
+            .iter()
+            .find(|c| c.name.eq_ignore_ascii_case(&tp))
+        {
+            return Some(Arc::new(CubeTableProvider::new(cube.clone()))); // TODO .clone()
+        }
+
         if tp.eq_ignore_ascii_case("information_schema.columns") {
             return Some(Arc::new(PostgresSchemaColumnsProvider::new(
                 &context.meta.cubes,
@@ -431,6 +456,7 @@ impl TableProvider for CubeTableProvider {
                         match c.get_column_type() {
                             ColumnType::String => DataType::Utf8,
                             ColumnType::VarStr => DataType::Utf8,
+                            ColumnType::Boolean => DataType::Boolean,
                             ColumnType::Double => DataType::Float64,
                             ColumnType::Int8 => DataType::Int64,
                             ColumnType::Int32 => DataType::Int64,
@@ -450,7 +476,6 @@ impl TableProvider for CubeTableProvider {
     async fn scan(
         &self,
         _projection: &Option<Vec<usize>>,
-        _batch_size: usize,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {

@@ -48,13 +48,13 @@ export class JoinGraph {
         const joinRequired =
           (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
         if (
-          !this.cubeEvaluator.primaryKeys[join[1].from] &&
+          !this.cubeEvaluator.primaryKeys[join[1].from].length &&
           multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].from)).length > 0
         ) {
           errorReporter.error(joinRequired(join[1].from));
           return null;
         }
-        if (!this.cubeEvaluator.primaryKeys[join[1].to] &&
+        if (!this.cubeEvaluator.primaryKeys[join[1].to].length &&
           multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].to)).length > 0) {
           errorReporter.error(joinRequired(join[1].to));
           return null;

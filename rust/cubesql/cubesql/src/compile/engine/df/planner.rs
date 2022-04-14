@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use datafusion::{
     error::Result,
-    execution::context::{ExecutionContextState, QueryPlanner},
+    execution::context::{QueryPlanner, SessionState},
     logical_plan::LogicalPlan,
     physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan, PhysicalPlanner},
 };
@@ -29,7 +29,7 @@ impl QueryPlanner for CubeQueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        ctx_state: &ExecutionContextState,
+        session_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         // Teach the default physical planner how to plan TopK nodes.
         let physical_planner = DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(
@@ -39,7 +39,7 @@ impl QueryPlanner for CubeQueryPlanner {
         )]);
         // Delegate most work of physical planning to the default physical planner
         physical_planner
-            .create_physical_plan(logical_plan, ctx_state)
+            .create_physical_plan(logical_plan, session_state)
             .await
     }
 }
