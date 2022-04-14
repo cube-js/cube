@@ -2216,7 +2216,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_str_to_date());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
-        ctx.register_udf(create_format_type_udf());
+        ctx.register_udf(create_format_type_udf("format_type"));
+        ctx.register_udf(create_format_type_udf("pg_catalog.format_type"));
         // udaf
         ctx.register_udaf(create_measure_udaf());
 

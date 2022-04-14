@@ -1008,7 +1008,7 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_format_type_udf() -> ScalarUDF {
+pub fn create_format_type_udf(name: &str) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
 
@@ -1051,7 +1051,7 @@ pub fn create_format_type_udf() -> ScalarUDF {
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
 
     ScalarUDF::new(
-        "format_type",
+        name,
         &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
