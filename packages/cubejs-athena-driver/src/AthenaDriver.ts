@@ -57,7 +57,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
     };
     if (this.config.exportBucket) {
-      this.config.exportBucket = AthenaDriver.trimS3Path(this.config.exportBucket);
+      this.config.exportBucket = AthenaDriver.normalizeS3Path(this.config.exportBucket);
     }
 
     this.athena = new Athena(this.config);
@@ -300,8 +300,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return result;
   }
 
-  public static trimS3Path(path: string) {
-    return path.replace(/\/+$/, '');
+  public static normalizeS3Path(path: string): string {
+    // Remove trailing /
+    path = path.replace(/\/+$/, '');
+    // Prepend s3:// prefix to plain bucket
+    if (!path.startsWith('s3://')) {
+      return `s3://${path}`;
+    }
+    return path;
   }
 
   public static splitS3Path(path: string) {
