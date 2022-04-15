@@ -301,7 +301,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public static normalizeS3Path(path: string): string {
+    // Remove trailing /
     path = path.replace(/\/+$/, '');
+    // Prepend s3:// prefix to plain buckets
     if (!path.startsWith('s3://')) {
       return `s3://${path}`;
     }
