@@ -7202,6 +7202,11 @@
   dependencies:
     source-map "^0.6.1"
 
+"@types/ungap__structured-clone@^0.3.0":
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/@types/ungap__structured-clone/-/ungap__structured-clone-0.3.0.tgz#39ef89de1f04bb1920ed99e549b885331295c47d"
+  integrity sha512-eBWREUhVUGPze+bUW22AgUr05k8u+vETzuYdLYSvWqGTUe0KOf+zVnOB1qER5wMcw8V6D9Ar4DfJmVvD1yu0kQ==
+
 "@types/uuid@^8.3.0", "@types/uuid@^8.3.1":
   version "8.3.3"
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.3.tgz#c6a60686d953dbd1b1d45e66f4ecdbd5d471b4d0"

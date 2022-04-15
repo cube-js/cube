@@ -58,6 +58,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     };
     if (this.config.exportBucket) {
       this.config.exportBucket = AthenaDriver.trimS3Path(this.config.exportBucket);
+      if (!this.config.exportBucket.startsWith('s3://')) {
+        this.config.exportBucket = `s3://${this.config.exportBucket}`;
+      }
     }
 
     this.athena = new Athena(this.config);
