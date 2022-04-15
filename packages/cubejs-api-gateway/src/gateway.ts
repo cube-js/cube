@@ -774,7 +774,7 @@ class ApiGateway {
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
       normalizedTotal.totalQuery = true;
-      normalizedTotal.limit = null;
+      normalizedTotal.limit = null;  // type error?
       normalizedTotal.rowLimit = null;
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
