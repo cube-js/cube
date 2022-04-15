@@ -37,6 +37,7 @@ use super::{
 pub struct Portal {
     plan: QueryPlan,
     format: Format,
+    description: protocol::RowDescription,
 }
 
 pub struct AsyncPostgresShim {
@@ -253,33 +254,54 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn describe(&mut self, describe: protocol::Describe) -> Result<(), Error> {
-        let (parameters, description) = match describe.typ {
-            protocol::DescribeType::Statement => {
-                let stmt = self.statements.get(&describe.name);
+    pub async fn describe_portal(&mut self, name: String) -> Result<(), Error> {
+        let stmt = self.portals.get(&name);
 
-                if let Some(s) = stmt {
-                    (s.parameters.clone(), s.description.clone())
-                } else {
-                    self.write(protocol::ErrorResponse::new(
-                        protocol::ErrorSeverity::Error,
-                        protocol::ErrorCode::InvalidSqlStatement,
-                        "missing statement".to_string(),
-                    ))
-                    .await?;
+        let description = if let Some(s) = stmt {
+            s.description.clone()
+        } else {
+            self.write(protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Error,
+                protocol::ErrorCode::InvalidSqlStatement,
+                "missing statement".to_string(),
+            ))
+            .await?;
 
-                    return Ok(());
-                }
-            }
-            protocol::DescribeType::Portal => {
-                unimplemented!("Unable to describe portal");
-            }
+            return Ok(());
+        };
+
+        self.write(description).await?;
+
+        Ok(())
+    }
+
+    pub async fn describe_statement(&mut self, name: String) -> Result<(), Error> {
+        let stmt = self.statements.get(&name);
+
+        let (parameters, description) = if let Some(s) = stmt {
+            (s.parameters.clone(), s.description.clone())
+        } else {
+            self.write(protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Error,
+                protocol::ErrorCode::InvalidSqlStatement,
+                "missing statement".to_string(),
+            ))
+            .await?;
+
+            return Ok(());
         };
 
         self.write(parameters).await?;
         self.write(description).await?;
 
         Ok(())
+    }
+
+    pub async fn describe(&mut self, body: protocol::Describe) -> Result<(), Error> {
+        match body.typ {
+            protocol::DescribeType::Statement => self.describe_statement(body.name).await,
+            protocol::DescribeType::Portal => self.describe_portal(body.name).await,
+        }
     }
 
     pub async fn close(&mut self, body: protocol::Close) -> Result<(), Error> {
@@ -369,7 +391,15 @@ impl AsyncPostgresShim {
             .clone()
             .unwrap_or(&Format::Text)
             .clone();
-        let portal = Portal { plan, format };
+
+        let description =
+            protocol::RowDescription::new(self.query_plan_to_row_description(&plan).await?);
+
+        let portal = Portal {
+            plan,
+            format,
+            description,
+        };
 
         self.portals.insert(body.portal, portal);
 
@@ -378,32 +408,12 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), Error> {
-        let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
-
-        let stmt_finder = StatementParamsFinder::new();
-        let parameters: Vec<PgTypeId> = stmt_finder
-            .find(&query)
-            .into_iter()
-            .map(|_p| PgTypeId::TEXT)
-            .collect();
-
-        let meta = self
-            .session
-            .server
-            .transport
-            .meta(self.auth_context().unwrap())
-            .await
-            .unwrap();
-
-        let stmt_replacer = StatementPlaceholderReplacer::new();
-        let hacked_query = stmt_replacer.replace(&query);
-
-        let plan =
-            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
-
-        let fields: Vec<RowDescriptionField> = match plan {
-            QueryPlan::MetaOk(_) => vec![],
+    async fn query_plan_to_row_description(
+        &mut self,
+        plan: &QueryPlan,
+    ) -> Result<Vec<RowDescriptionField>, Error> {
+        match plan {
+            QueryPlan::MetaOk(_) => Ok(vec![]),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -414,7 +424,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                result
+                Ok(result)
             }
             QueryPlan::DataFusionSelect(_, logical_plan, _) => {
                 let mut result = vec![];
@@ -449,9 +459,35 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                result
+                Ok(result)
             }
-        };
+        }
+    }
+
+    pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), Error> {
+        let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
+
+        let stmt_finder = StatementParamsFinder::new();
+        let parameters: Vec<PgTypeId> = stmt_finder
+            .find(&query)
+            .into_iter()
+            .map(|_p| PgTypeId::TEXT)
+            .collect();
+
+        let meta = self
+            .session
+            .server
+            .transport
+            .meta(self.auth_context().unwrap())
+            .await
+            .unwrap();
+
+        let stmt_replacer = StatementPlaceholderReplacer::new();
+        let hacked_query = stmt_replacer.replace(&query);
+
+        let plan =
+            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
+        let fields: Vec<RowDescriptionField> = self.query_plan_to_row_description(&plan).await?;
 
         self.statements.insert(
             parse.name,

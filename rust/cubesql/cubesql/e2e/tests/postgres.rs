@@ -151,14 +151,12 @@ impl PostgresIntegrationTestSuite {
             .client
             .prepare("SELECT $1 as t1, $2 as t2")
             .await
-            .unwrap();
+            .expect("Unable to prepare statement");
+
         self.client
             .query(&stmt, &[&"test1", &"test2"])
             .await
-            .unwrap();
-
-        // let stmt = self.client.prepare("SELECT $1").await.unwrap();
-        // self.client.query(&stmt, &[&true]).await.unwrap();
+            .expect("Unable to execute query");
 
         Ok(())
     }
