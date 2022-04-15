@@ -162,12 +162,22 @@ impl ImportFormat {
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                let data = base64::decode(value)?;
+                let mut data = Vec::new();
+                if value.contains(' ') {
+                    parse_space_separated_binstring(&mut data, value)?;
+                } else {
+                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+                };
                 let hll = HllSketch::read_hll_storage_spec(&data)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
-                let data = base64::decode(value)?;
+                let mut data = Vec::new();
+                if value.contains(' ') {
+                    parse_space_separated_binstring(&mut data, value)?;
+                } else {
+                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+                };
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
             }
@@ -196,6 +206,38 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+fn decode_byte(s: &str) -> Option<u8> {
+    let v = s.as_bytes();
+    if v.len() != 2 {
+        return None;
+    }
+    let decode_char = |c| match c {
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
+    };
+    let v0 = decode_char(v[0])?;
+    let v1 = decode_char(v[1])?;
+    return Some(v0 * 16 + v1);
+}
+
+pub(crate) fn parse_space_separated_binstring<'a>(
+    buffer: &'a mut Vec<u8>,
+    s: &'a str,
+) -> Result<&'a [u8], CubeError> {
+    *buffer = s
+        .split(' ')
+        .filter(|b| !b.is_empty())
+        .map(|s| {
+            decode_byte(s).ok_or_else(|| {
+                CubeError::user(format!("cannot convert value to binary string: {}", s))
+            })
+        })
+        .try_collect()?;
+    Ok(buffer.as_slice())
 }
 
 struct CsvLineParser<'a> {
