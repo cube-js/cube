@@ -452,7 +452,14 @@ impl ImportServiceImpl {
         if location.starts_with("http") {
             let (file, path) = tempfile::Builder::new()
                 .prefix(&table_id.to_string())
-                .tempfile_in(temp_dir)?
+                .tempfile_in(temp_dir)
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Open tempfile in {}: {}",
+                        temp_dir.to_str().unwrap_or("<invalid>"),
+                        e
+                    ))
+                })?
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
@@ -478,7 +485,12 @@ impl ImportServiceImpl {
                 .await?;
             Ok((temp_file, None))
         } else {
-            Ok((File::open(location.clone()).await?, None))
+            Ok((
+                File::open(location.clone()).await.map_err(|e| {
+                    CubeError::internal(format!("Open location {}: {}", location, e))
+                })?,
+                None,
+            ))
         }
     }
 
@@ -486,7 +498,9 @@ impl ImportServiceImpl {
         let to_download = ImportServiceImpl::temp_uploads_path(location);
         // TODO check file size
         let local_file = self.remote_fs.download_file(&to_download, None).await?;
-        Ok(File::open(local_file).await?)
+        Ok(File::open(local_file.clone())
+            .await
+            .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
     }
 
     fn temp_uploads_path(location: &str) -> String {
@@ -510,7 +524,15 @@ impl ImportServiceImpl {
         location: &str,
     ) -> Result<(), CubeError> {
         let temp_dir = self.config_obj.data_dir().join("tmp");
-        tokio::fs::create_dir_all(temp_dir.clone()).await?;
+        tokio::fs::create_dir_all(temp_dir.clone())
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Create temp_dir {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?;
 
         let (file, tmp_path) = self
             .resolve_location(location.clone(), table.get_id(), &temp_dir)
