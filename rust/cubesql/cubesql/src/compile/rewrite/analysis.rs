@@ -355,7 +355,7 @@ impl LogicalPlanAnalysis {
                             &arrow_schema,
                             &egraph.analysis.cube_context.state,
                         )
-                        .unwrap();
+                        .expect(&format!("Can't evaluate expression: {:?}", expr));
                     let value = physical_expr
                         .evaluate(&RecordBatch::new_empty(arrow_schema))
                         .unwrap();

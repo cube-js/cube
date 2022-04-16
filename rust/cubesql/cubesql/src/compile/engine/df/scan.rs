@@ -270,6 +270,19 @@ impl CubeScanExecutionPlan {
                         match &value {
                             serde_json::Value::Null => builder.append_null()?,
                             serde_json::Value::Bool(v) => builder.append_value(*v)?,
+                            // Cube allows to mark a type as boolean, but it doesn't guarantee that the user will return a boolean type
+                            serde_json::Value::String(v) => match v.as_str() {
+                                "true" | "1" => builder.append_value(true)?,
+                                "false" | "0" => builder.append_value(false)?,
+                                _ => {
+                                    error!(
+                                        "Unable to map value {:?} to DataType::Boolean (returning null)",
+                                        v
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
                             v => {
                                 error!(
                                     "Unable to map value {:?} to DataType::Boolean (returning null)",
@@ -508,7 +521,9 @@ mod tests {
                         "data": [
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null},
                             {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false}
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false"}
                         ]
                     }
                 "#;
@@ -582,9 +597,27 @@ mod tests {
             RecordBatch::try_new(
                 schema.clone(),
                 vec![
-                    Arc::new(StringArray::from(vec![None, Some("5"), Some("5")])) as ArrayRef,
-                    Arc::new(Float64Array::from(vec![None, Some(5.05), Some(5.05)])) as ArrayRef,
-                    Arc::new(BooleanArray::from(vec![None, Some(true), Some(false)])) as ArrayRef,
+                    Arc::new(StringArray::from(vec![
+                        None,
+                        Some("5"),
+                        Some("5"),
+                        None,
+                        None
+                    ])) as ArrayRef,
+                    Arc::new(Float64Array::from(vec![
+                        None,
+                        Some(5.05),
+                        Some(5.05),
+                        None,
+                        None
+                    ])) as ArrayRef,
+                    Arc::new(BooleanArray::from(vec![
+                        None,
+                        Some(true),
+                        Some(false),
+                        Some(true),
+                        Some(false)
+                    ])) as ArrayRef,
                 ],
             )
             .unwrap()

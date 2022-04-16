@@ -56,6 +56,7 @@ impl RewriteRules for FilterRules {
                         "?limit",
                         "?offset",
                         "?aliases",
+                        "?table_name",
                     ),
                 ),
                 cube_scan(
@@ -66,6 +67,7 @@ impl RewriteRules for FilterRules {
                     "?limit",
                     "?offset",
                     "?aliases",
+                    "?table_name",
                 ),
                 self.push_down_filter("?source_table_name", "?expr", "?cube"),
             ),
@@ -287,6 +289,7 @@ impl RewriteRules for FilterRules {
                     "?limit",
                     "?offset",
                     "?aliases",
+                    "?table_name",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -300,6 +303,7 @@ impl RewriteRules for FilterRules {
                     "?limit",
                     "?offset",
                     "?aliases",
+                    "?table_name",
                 ),
             ),
             transforming_rewrite(

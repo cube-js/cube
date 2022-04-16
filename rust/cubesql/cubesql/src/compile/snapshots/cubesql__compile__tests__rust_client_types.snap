@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5140
+expression: "execute_query(r#\"SELECT t.typname, t.typtype, t.typelem, r.rngsubtype, t.typbasetype, n.nspname, t.typrelid\n                FROM pg_catalog.pg_type t\n                LEFT OUTER JOIN pg_catalog.pg_range r ON r.rngtypid = t.oid\n                INNER JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid\n                WHERE t.oid = 25\"#.to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+
+---
++---------+---------+---------+------------+-------------+------------+----------+
+| typname | typtype | typelem | rngsubtype | typbasetype | nspname    | typrelid |
++---------+---------+---------+------------+-------------+------------+----------+
+| text    | b       | 0       | NULL       | NULL        | pg_catalog | 0        |
++---------+---------+---------+------------+-------------+------------+----------+

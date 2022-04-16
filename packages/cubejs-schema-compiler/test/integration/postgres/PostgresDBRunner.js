@@ -45,6 +45,7 @@ export class PostgresDBRunner extends BaseDbRunner {
       tx.query('CREATE TEMPORARY TABLE left_table (id INT, total DOUBLE PRECISION, description character varying) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE right_table (id INT, total DOUBLE PRECISION, description character varying) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE mid_table (id INT, left_id INT, right_id INT) ON COMMIT DROP'),
+      tx.query('CREATE TEMPORARY TABLE compound_key_cards (id_a INT, id_b INT, visitor_id INT, visitor_checkin_id INT, visit_rank INT) ON COMMIT DROP'),
       tx.query(`
         INSERT INTO
         visitors
@@ -108,6 +109,16 @@ export class PostgresDBRunner extends BaseDbRunner {
         (5, 5, 5),
         (6, 6, 6)
       `),
+      tx.query(`
+        INSERT INTO
+        compound_key_cards
+        (id_a, id_b, visitor_id, visitor_checkin_id, visit_rank) VALUES
+        (1, 1, 1, 1, 10),
+        (2, 1, 1, 2, 5),
+        (2, 2, 3, 6, 7),
+        (2, 2, 2, 4, 8),
+        (2, 3, 4, 5, 2);
+      `)
     ]);
   }
 
