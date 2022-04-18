@@ -23,6 +23,7 @@ trait Visitor<'ast> {
             ast::Expr::Value(value) => self.visit_value(value),
             ast::Expr::Identifier(identifier) => self.visit_identifier(identifier),
             ast::Expr::Nested(v) => self.visit_expr(&mut *v),
+            ast::Expr::Cast { expr, .. } => self.visit_expr(&mut *expr),
             ast::Expr::Between {
                 expr,
                 negated: _,

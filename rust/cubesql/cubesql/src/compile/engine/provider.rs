@@ -37,6 +37,7 @@ use super::information_schema::postgres::{
     PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
+use crate::compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider;
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
@@ -311,6 +312,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_constraint".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogDependProvider>() {
             "pg_catalog.pg_depend".to_string()
+        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
+            "information_schema.testing_dataset".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -361,6 +364,11 @@ impl DatabaseProtocol {
 
         if tp.eq_ignore_ascii_case("information_schema.table_constraints") {
             return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()));
+        }
+
+        // Testing
+        if tp.eq_ignore_ascii_case("information_schema.testing_dataset") {
+            return Some(Arc::new(InfoSchemaTestingDatasetProvider::new()));
         }
 
         if tp.eq_ignore_ascii_case("pg_catalog.pg_tables") {

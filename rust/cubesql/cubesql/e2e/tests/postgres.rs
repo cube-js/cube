@@ -3,6 +3,8 @@ use std::{env, time::Duration};
 use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
+use fallible_iterator::FallibleIterator;
+use futures::{pin_mut, StreamExt, TryStreamExt};
 use portpicker::pick_unused_port;
 use tokio::time::sleep;
 
@@ -160,6 +162,51 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    // This test tests paging on the service side which uses stream of RecordBatches to stream this query
+    async fn test_stream_all(&self) -> RunResult {
+        let stmt = self
+            .client
+            .prepare("SELECT * FROM information_schema.testing_dataset WHERE id > CAST($1 as int)")
+            .await
+            .expect("Unable to prepare statement");
+
+        let it = self
+            .client
+            .query_raw(&stmt, &["0"])
+            .await
+            .expect("Unable to execute query");
+
+        pin_mut!(it);
+
+        let mut total = 1;
+
+        while let Some(_) = it.try_next().await.unwrap() {
+            total += 1;
+        }
+
+        assert_eq!(total, 3000);
+
+        Ok(())
+    }
+
+    // This test should return one row
+    // TODO: Find a way how to manage Execute's return_rows to 1 instead of 100
+    async fn test_stream_single(&self) -> RunResult {
+        let stmt = self
+            .client
+            .prepare("SELECT * FROM information_schema.testing_dataset WHERE id = CAST($1 as int)")
+            .await
+            .expect("Unable to prepare statement");
+
+        let _ = self
+            .client
+            .query_one(&stmt, &[&"2000"])
+            .await
+            .expect("Unable to execute query");
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -170,6 +217,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
 
     async fn run(&mut self) -> RunResult {
         self.test_prepare().await?;
+        self.test_stream_all().await?;
+        self.test_stream_single().await?;
         self.test_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
         )

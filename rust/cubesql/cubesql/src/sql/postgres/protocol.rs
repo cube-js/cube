@@ -610,8 +610,12 @@ pub enum ErrorCode {
     // 28 - Invalid Authorization Specification
     InvalidAuthorizationSpecification,
     InvalidPassword,
+    // 22
+    DataException,
     // 26
     InvalidSqlStatement,
+    // 34
+    InvalidCursorName,
     // XX - Internal Error
     InternalError,
 }
@@ -622,7 +626,9 @@ impl Display for ErrorCode {
             Self::FeatureNotSupported => "0A000",
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
+            Self::DataException => "22000",
             Self::InvalidSqlStatement => "26000",
+            Self::InvalidCursorName => "34000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
