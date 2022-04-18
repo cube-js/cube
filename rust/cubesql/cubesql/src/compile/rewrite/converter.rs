@@ -18,6 +18,7 @@ use crate::compile::rewrite::FilterMemberMember;
 use crate::compile::rewrite::FilterMemberOp;
 use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterOpOp;
+use crate::compile::rewrite::GetIndexedFieldExprKey;
 use crate::compile::rewrite::InListExprNegated;
 use crate::compile::rewrite::JoinJoinConstraint;
 use crate::compile::rewrite::JoinJoinType;
@@ -323,6 +324,12 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
             }
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
+            Expr::GetIndexedField { expr, key } => {
+                let expr = self.add_expr(expr)?;
+                let key = add_data_node!(self, key, GetIndexedFieldExprKey);
+                self.graph
+                    .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
+            }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", expr),
         })
@@ -804,6 +811,11 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
+        LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
+            let expr = Box::new(to_expr(params[0]).clone()?);
+            let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
+            Expr::GetIndexedField { expr, key }
+        }
         x => panic!("Unexpected expression node: {:?}", x),
     })
 }
