@@ -5237,6 +5237,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgdepend_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgdepend_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_depend ORDER BY refclassid ASC, refobjid ASC"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_current_schema_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "current_schema_postgres",
