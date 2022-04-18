@@ -7,11 +7,9 @@ redirect_from:
 ---
 
 <InfoBox>
-
-Learn how you can build a modern data Stack during the Building Data Applications with Cube workshop on May 18th at 9-10:30 am PT! 
-  
-You can register for the workshop at [the event page](https://cube.dev/events/building-data-app/). 👈
-
+  Learn how you can build a modern data Stack during the "Building Data Applications with Cube"<br />workshop on May 18th at 9-10:30 am PT! 
+  <br />
+  You can register for the workshop at <a href="https://cube.dev/events/building-data-app/">the event page</a>. 👈
 </InfoBox>
 
 Below you can find tutorials to help you get started with Cube.js.
