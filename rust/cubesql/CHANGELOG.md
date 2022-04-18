@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.50](https://github.com/cube-js/cube.js/compare/v0.29.49...v0.29.50) (2022-04-18)
+
+
+### Features
+
+* **cubesql:** Initial support for Binary format in pg-wire ([a36845c](https://github.com/cube-js/cube.js/commit/a36845c5edcb6bd77172de2cebcd67a700df5224))
+* **cubesql:** Support Describe(Portal) for pg-wire ([34cf111](https://github.com/cube-js/cube.js/commit/34cf111249c3fede986c3633fe8d5f0cade3ed91))
+* **cubesql:** Support pg_depend postgres table ([ceb35d4](https://github.com/cube-js/cube.js/commit/ceb35d4825cd2ac76ad191eef950ab3be126c3de))
+
+
+
+
+
 ## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
 
 

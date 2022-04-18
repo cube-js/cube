@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.50](https://github.com/cube-js/cube.js/compare/v0.29.49...v0.29.50) (2022-04-18)
+
+
+### Bug Fixes
+
+* **playground:** match rollup button ([#4401](https://github.com/cube-js/cube.js/issues/4401)) ([18e90bb](https://github.com/cube-js/cube.js/commit/18e90bbf9c76911fe9a9323a499afa1c429951a3))
+
+
+
+
+
 ## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
 
 **Note:** Version bump only for package @cubejs-client/playground
