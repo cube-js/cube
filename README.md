@@ -38,7 +38,17 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 ## Getting Started 🚀
 
-The fastest way to try Cube locally is using [Docker](https://www.docker.com/). Once Docker is installed, in a new folder for your project, run the following command:
+### Starting with Cube Cloud
+
+The fastest way to try Cube locally is using [Cube Cloud](https://cube.dev/cloud/). It provides managed experience for Cube and has a free tier for development projects and proofs of concept.
+
+You can set up Cube Cloud and connect your Cube project to your database by following our [Getting started guide](https://cube.dev/docs/cloud/getting-started/create).
+
+### Starting with Docker
+
+Alternatively, you can get started with Cube locally or self-host it with [Docker](https://www.docker.com/).
+
+Once Docker is installed, in a new folder for your project, run the following command:
 
 ```bash
 docker run -p 4000:4000 \
@@ -47,14 +57,7 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-
 Then, open http://localhost:4000 in your browser to continue setup. You can learn more by following our [Getting started guide](https://cube.dev/docs/getting-started-docker).
-
-Alternatively, if you have Node.js installed, you can run this command and follow the [Getting started guide](https://cube.dev/docs/getting-started).
-
-```
-$ npx cubejs-cli create hello-world
-```
 
 ## Resources
 
