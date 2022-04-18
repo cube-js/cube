@@ -21,6 +21,7 @@ mod pg_range;
 mod pg_settings;
 mod pg_tables;
 mod pg_type;
+pub mod testing_dataset;
 
 use super::utils;
 pub use pg_attrdef::*;

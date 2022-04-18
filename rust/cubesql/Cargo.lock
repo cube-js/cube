@@ -746,6 +746,7 @@ dependencies = [
  "cubeclient",
  "datafusion",
  "egg",
+ "fallible-iterator",
  "futures",
  "hex",
  "insta",

@@ -7,7 +7,10 @@ use std::{
 };
 
 use datafusion::dataframe::DataFrame as DFDataFrame;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use futures::StreamExt;
 use log::{debug, error, trace};
+
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::sql::dataframe::DataFrame;
@@ -262,8 +265,8 @@ impl AsyncPostgresShim {
         } else {
             self.write(protocol::ErrorResponse::new(
                 protocol::ErrorSeverity::Error,
-                protocol::ErrorCode::InvalidSqlStatement,
-                "missing statement".to_string(),
+                protocol::ErrorCode::InvalidCursorName,
+                "missing cursor".to_string(),
             ))
             .await?;
 
@@ -338,13 +341,7 @@ impl AsyncPostgresShim {
                             ))
                             .await?;
                         }
-                        Ok(_) => {
-                            self.write(protocol::CommandComplete::new(
-                                protocol::CommandCompleteTag::Select,
-                                0,
-                            ))
-                            .await?;
-                        }
+                        Ok(_) => {}
                     }
                 } else {
                     self.write(protocol::ErrorResponse::new(
@@ -437,6 +434,9 @@ impl AsyncPostgresShim {
                             DataType::Int16 => PgType::get_by_tid(PgTypeId::INT2),
                             DataType::Int32 => PgType::get_by_tid(PgTypeId::INT4),
                             DataType::Int64 => PgType::get_by_tid(PgTypeId::INT8),
+                            DataType::UInt16 => PgType::get_by_tid(PgTypeId::INT8),
+                            DataType::UInt32 => PgType::get_by_tid(PgTypeId::INT8),
+                            DataType::UInt64 => PgType::get_by_tid(PgTypeId::INT8),
                             DataType::Float32 => PgType::get_by_tid(PgTypeId::FLOAT4),
                             DataType::Float64 => PgType::get_by_tid(PgTypeId::FLOAT8),
                             DataType::Utf8 => PgType::get_by_tid(PgTypeId::TEXT),
@@ -503,12 +503,12 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    async fn write_batch(
+    async fn write_data_frame(
         &mut self,
         frame: Arc<DataFrame>,
         description: bool,
         format: Format,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u32, CubeError> {
         if description {
             let mut fields = Vec::new();
 
@@ -522,6 +522,7 @@ impl AsyncPostgresShim {
             self.write(protocol::RowDescription::new(fields)).await?;
         }
 
+        let mut total: u32 = 0;
         let mut batch_writer = BatchWriter::new(format);
 
         for row in frame.get_rows() {
@@ -537,12 +538,53 @@ impl AsyncPostgresShim {
                 };
             }
 
+            total += 1;
             batch_writer.end_row()?;
         }
 
         buffer::write_direct(&mut self.socket, batch_writer).await?;
 
-        Ok(())
+        Ok(total)
+    }
+
+    async fn write_stream(
+        &mut self,
+        mut stream: SendableRecordBatchStream,
+        description: bool,
+        format: Format,
+    ) -> Result<u32, CubeError> {
+        let mut total: u32 = 0;
+        let mut first = true;
+
+        loop {
+            match stream.next().await {
+                None => {
+                    return Ok(total);
+                }
+                Some(res) => match res {
+                    Ok(batch) => {
+                        let frame = Arc::new(batch_to_dataframe(&vec![batch])?);
+                        total += self
+                            .write_data_frame(frame, description && first, format)
+                            .await?;
+
+                        first = false;
+                    }
+                    Err(err) => {
+                        error!("Error during processing: {}", err);
+
+                        self.write(protocol::ErrorResponse::new(
+                            protocol::ErrorSeverity::Error,
+                            protocol::ErrorCode::DataException,
+                            err.to_string(),
+                        ))
+                        .await?;
+
+                        return Err(err.into());
+                    }
+                },
+            }
+        }
     }
 
     async fn execute_plan(
@@ -560,15 +602,26 @@ impl AsyncPostgresShim {
                 .await?;
             }
             QueryPlan::MetaTabular(_, data_frame) => {
-                self.write_batch(data_frame, description, format).await?;
+                let total_rows = self
+                    .write_data_frame(data_frame, description, format)
+                    .await?;
+
+                self.write(protocol::CommandComplete::new(
+                    protocol::CommandCompleteTag::Select,
+                    total_rows,
+                ))
+                .await?;
             }
             QueryPlan::DataFusionSelect(_, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let data_frame = batch_to_dataframe(&batches)?;
+                let stream = df.execute_stream().await?;
+                let total_rows = self.write_stream(stream, description, format).await?;
 
-                self.write_batch(Arc::new(data_frame), description, format)
-                    .await?;
+                self.write(protocol::CommandComplete::new(
+                    protocol::CommandCompleteTag::Select,
+                    total_rows,
+                ))
+                .await?;
             }
         };
 
@@ -601,13 +654,7 @@ impl AsyncPostgresShim {
                 ))
                 .await?;
             }
-            Ok(_) => {
-                self.write(protocol::CommandComplete::new(
-                    protocol::CommandCompleteTag::Select,
-                    0,
-                ))
-                .await?;
-            }
+            Ok(_) => {}
         }
 
         self.write(protocol::ReadyForQuery::new(
