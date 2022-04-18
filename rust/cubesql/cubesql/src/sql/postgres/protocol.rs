@@ -234,6 +234,22 @@ impl Serialize for CommandComplete {
     }
 }
 
+pub struct NoData {}
+
+impl NoData {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for NoData {
+    const CODE: u8 = b'n';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParameterDescription {
     parameters: Vec<PgTypeId>,

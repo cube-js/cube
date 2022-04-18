@@ -1,3 +1,5 @@
+use crate::compile::QueryPlan;
+use crate::sql::protocol::Format;
 use sqlparser::ast;
 
 use super::protocol::{ParameterDescription, RowDescription};
@@ -7,7 +9,9 @@ use crate::sql::statement::{BindValue, StatementParamsBinder};
 pub struct PreparedStatement {
     pub query: ast::Statement,
     pub parameters: ParameterDescription,
-    pub description: RowDescription,
+    // Fields which will be returned to the client, It can be None if server doesnt return any field
+    // for example BEGIN
+    pub description: Option<RowDescription>,
 }
 
 impl PreparedStatement {
@@ -18,4 +22,13 @@ impl PreparedStatement {
 
         statement
     }
+}
+
+pub struct Portal {
+    pub plan: QueryPlan,
+    // Format which is used to return data
+    pub format: Format,
+    // Fields which will be returned to the client, It can be None if server doesnt return any field
+    // for example BEGIN
+    pub description: Option<RowDescription>,
 }

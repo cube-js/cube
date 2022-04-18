@@ -14,7 +14,8 @@ use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::sql::dataframe::DataFrame;
-use crate::sql::protocol::Format;
+use crate::sql::extended::Portal;
+use crate::sql::protocol::{Format, RowDescription};
 use crate::sql::statement::StatementPlaceholderReplacer;
 use crate::sql::writer::BatchWriter;
 use crate::{
@@ -33,15 +34,9 @@ use crate::{
 
 use super::{
     buffer,
+    extended::PreparedStatement,
     protocol::{self, FrontendMessage, RowDescriptionField, SSL_REQUEST_PROTOCOL},
-    statement::PreparedStatement,
 };
-
-pub struct Portal {
-    plan: QueryPlan,
-    format: Format,
-    description: protocol::RowDescription,
-}
 
 pub struct AsyncPostgresShim {
     socket: TcpStream,
@@ -273,9 +268,10 @@ impl AsyncPostgresShim {
             return Ok(());
         };
 
-        self.write(description).await?;
-
-        Ok(())
+        match description {
+            None => self.write(protocol::NoData::new()).await,
+            Some(packet) => self.write(packet).await,
+        }
     }
 
     pub async fn describe_statement(&mut self, name: String) -> Result<(), Error> {
@@ -295,7 +291,11 @@ impl AsyncPostgresShim {
         };
 
         self.write(parameters).await?;
-        self.write(description).await?;
+
+        match description {
+            None => self.write(protocol::NoData::new()).await?,
+            Some(packet) => self.write(packet).await?,
+        };
 
         Ok(())
     }
@@ -325,33 +325,43 @@ impl AsyncPostgresShim {
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), Error> {
         let portal = self.portals.get(&execute.portal);
         match portal {
-            Some(portal) => {
-                if execute.max_rows == 0 {
-                    // TODO: I will rewrite this code later, it's just a prototype
-                    #[allow(mutable_borrow_reservation_conflict)]
-                    match self
-                        .execute_plan(portal.plan.clone(), false, portal.format)
-                        .await
-                    {
-                        Err(e) => {
-                            self.write(protocol::ErrorResponse::new(
-                                protocol::ErrorSeverity::Error,
-                                protocol::ErrorCode::InternalError,
-                                e.message,
-                            ))
-                            .await?;
-                        }
-                        Ok(_) => {}
-                    }
-                } else {
-                    self.write(protocol::ErrorResponse::new(
-                        protocol::ErrorSeverity::Error,
-                        protocol::ErrorCode::InternalError,
-                        "Execute with limited rows is not supported".to_string(),
+            Some(portal) => match portal.description {
+                // If query doesnt return any fields, we can return complete without execution
+                None => {
+                    self.write(protocol::CommandComplete::new(
+                        protocol::CommandCompleteTag::Select,
+                        0,
                     ))
                     .await?;
                 }
-            }
+                Some(_) => {
+                    if execute.max_rows == 0 {
+                        // TODO: I will rewrite this code later, it's just a prototype
+                        #[allow(mutable_borrow_reservation_conflict)]
+                        match self
+                            .execute_plan(portal.plan.clone(), false, portal.format)
+                            .await
+                        {
+                            Err(e) => {
+                                self.write(protocol::ErrorResponse::new(
+                                    protocol::ErrorSeverity::Error,
+                                    protocol::ErrorCode::InternalError,
+                                    e.message,
+                                ))
+                                .await?;
+                            }
+                            Ok(_) => {}
+                        }
+                    } else {
+                        self.write(protocol::ErrorResponse::new(
+                            protocol::ErrorSeverity::Error,
+                            protocol::ErrorCode::InternalError,
+                            "Execute with limited rows is not supported".to_string(),
+                        ))
+                        .await?;
+                    }
+                }
+            },
             None => {
                 self.write(protocol::ReadyForQuery::new(
                     protocol::TransactionStatus::Idle,
@@ -389,8 +399,14 @@ impl AsyncPostgresShim {
             .unwrap_or(&Format::Text)
             .clone();
 
-        let description =
-            protocol::RowDescription::new(self.query_plan_to_row_description(&plan).await?);
+        let fields = self.query_plan_to_row_description(&plan).await?;
+        let description = if fields.len() > 0 {
+            Some(protocol::RowDescription::new(
+                self.query_plan_to_row_description(&plan).await?,
+            ))
+        } else {
+            None
+        };
 
         let portal = Portal {
             plan,
@@ -488,13 +504,18 @@ impl AsyncPostgresShim {
         let plan =
             convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
         let fields: Vec<RowDescriptionField> = self.query_plan_to_row_description(&plan).await?;
+        let description = if fields.len() > 0 {
+            Some(protocol::RowDescription::new(fields))
+        } else {
+            None
+        };
 
         self.statements.insert(
             parse.name,
             PreparedStatement {
                 query,
                 parameters: protocol::ParameterDescription::new(parameters),
-                description: protocol::RowDescription::new(fields),
+                description,
             },
         );
 
