@@ -153,12 +153,20 @@ impl PostgresIntegrationTestSuite {
             .client
             .prepare("SELECT $1 as t1, $2 as t2")
             .await
-            .expect("Unable to prepare statement");
+            .unwrap();
 
         self.client
             .query(&stmt, &[&"test1", &"test2"])
             .await
-            .expect("Unable to execute query");
+            .unwrap();
+
+        Ok(())
+    }
+
+    async fn test_prepare_empty_query(&self) -> RunResult {
+        let stmt = self.client.prepare("").await.unwrap();
+
+        self.client.query(&stmt, &[]).await.unwrap();
 
         Ok(())
     }
@@ -169,13 +177,9 @@ impl PostgresIntegrationTestSuite {
             .client
             .prepare("SELECT * FROM information_schema.testing_dataset WHERE id > CAST($1 as int)")
             .await
-            .expect("Unable to prepare statement");
+            .unwrap();
 
-        let it = self
-            .client
-            .query_raw(&stmt, &["0"])
-            .await
-            .expect("Unable to execute query");
+        let it = self.client.query_raw(&stmt, &["0"]).await.unwrap();
 
         pin_mut!(it);
 
@@ -217,6 +221,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
 
     async fn run(&mut self) -> RunResult {
         self.test_prepare().await?;
+        self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
         self.test_execute_query(

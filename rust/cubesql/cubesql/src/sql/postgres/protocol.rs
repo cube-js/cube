@@ -250,6 +250,22 @@ impl Serialize for NoData {
     }
 }
 
+pub struct EmptyQueryResponse {}
+
+impl EmptyQueryResponse {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for EmptyQueryResponse {
+    const CODE: u8 = b'I';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParameterDescription {
     parameters: Vec<PgTypeId>,

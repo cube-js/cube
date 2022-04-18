@@ -15,7 +15,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::sql::dataframe::DataFrame;
 use crate::sql::extended::Portal;
-use crate::sql::protocol::{Format, RowDescription};
+use crate::sql::protocol::Format;
 use crate::sql::statement::StatementPlaceholderReplacer;
 use crate::sql::writer::BatchWriter;
 use crate::{
@@ -42,8 +42,9 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     #[allow(unused)]
     parameters: HashMap<String, String>,
-    statements: HashMap<String, PreparedStatement>,
-    portals: HashMap<String, Portal>,
+    // Extended query
+    statements: HashMap<String, Option<PreparedStatement>>,
+    portals: HashMap<String, Option<Portal>>,
     // Shared
     session: Arc<Session>,
 }
@@ -253,51 +254,65 @@ impl AsyncPostgresShim {
     }
 
     pub async fn describe_portal(&mut self, name: String) -> Result<(), Error> {
-        let stmt = self.portals.get(&name);
+        match self.portals.get(&name) {
+            None => {
+                self.write(protocol::ErrorResponse::new(
+                    protocol::ErrorSeverity::Error,
+                    protocol::ErrorCode::InvalidCursorName,
+                    "missing cursor".to_string(),
+                ))
+                .await?;
 
-        let description = if let Some(s) = stmt {
-            s.description.clone()
-        } else {
-            self.write(protocol::ErrorResponse::new(
-                protocol::ErrorSeverity::Error,
-                protocol::ErrorCode::InvalidCursorName,
-                "missing cursor".to_string(),
-            ))
-            .await?;
-
-            return Ok(());
-        };
-
-        match description {
-            None => self.write(protocol::NoData::new()).await,
-            Some(packet) => self.write(packet).await,
+                return Ok(());
+            }
+            Some(portal) => match portal {
+                // We use None for Portal on empty query
+                None => self.write(protocol::NoData::new()).await,
+                Some(named) => match named.description.clone() {
+                    // If Query doesnt return data, no fields in response.
+                    None => self.write(protocol::NoData::new()).await,
+                    Some(packet) => self.write(packet).await,
+                },
+            },
         }
     }
 
     pub async fn describe_statement(&mut self, name: String) -> Result<(), Error> {
-        let stmt = self.statements.get(&name);
+        match self.statements.get(&name) {
+            None => {
+                self.write(protocol::ErrorResponse::new(
+                    protocol::ErrorSeverity::Error,
+                    protocol::ErrorCode::InvalidSqlStatement,
+                    "missing statement".to_string(),
+                ))
+                .await?;
 
-        let (parameters, description) = if let Some(s) = stmt {
-            (s.parameters.clone(), s.description.clone())
-        } else {
-            self.write(protocol::ErrorResponse::new(
-                protocol::ErrorSeverity::Error,
-                protocol::ErrorCode::InvalidSqlStatement,
-                "missing statement".to_string(),
-            ))
-            .await?;
-
-            return Ok(());
-        };
-
-        self.write(parameters).await?;
-
-        match description {
-            None => self.write(protocol::NoData::new()).await?,
-            Some(packet) => self.write(packet).await?,
-        };
-
-        Ok(())
+                return Ok(());
+            }
+            Some(statement) => match statement {
+                // We use None for Statement on empty query
+                None => {
+                    self.write(protocol::ParameterDescription::new(vec![]))
+                        .await?;
+                    self.write(protocol::NoData::new()).await
+                }
+                Some(named) => {
+                    match named.description.clone() {
+                        // If Query doesnt return data, no fields in response.
+                        None => {
+                            #[allow(mutable_borrow_reservation_conflict)]
+                            self.write(named.parameters.clone()).await?;
+                            self.write(protocol::NoData::new()).await
+                        }
+                        Some(packet) => {
+                            #[allow(mutable_borrow_reservation_conflict)]
+                            self.write(named.parameters.clone()).await?;
+                            self.write(packet).await
+                        }
+                    }
+                }
+            },
+        }
     }
 
     pub async fn describe(&mut self, body: protocol::Describe) -> Result<(), Error> {
@@ -323,44 +338,49 @@ impl AsyncPostgresShim {
     }
 
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), Error> {
-        let portal = self.portals.get(&execute.portal);
-        match portal {
-            Some(portal) => match portal.description {
-                // If query doesnt return any fields, we can return complete without execution
+        match self.portals.get(&execute.portal) {
+            Some(portal) => match portal {
+                // We use None for Statement on empty query
                 None => {
-                    self.write(protocol::CommandComplete::new(
-                        protocol::CommandCompleteTag::Select,
-                        0,
-                    ))
-                    .await?;
+                    self.write(protocol::EmptyQueryResponse::new()).await?;
                 }
-                Some(_) => {
-                    if execute.max_rows == 0 {
-                        // TODO: I will rewrite this code later, it's just a prototype
-                        #[allow(mutable_borrow_reservation_conflict)]
-                        match self
-                            .execute_plan(portal.plan.clone(), false, portal.format)
-                            .await
-                        {
-                            Err(e) => {
-                                self.write(protocol::ErrorResponse::new(
-                                    protocol::ErrorSeverity::Error,
-                                    protocol::ErrorCode::InternalError,
-                                    e.message,
-                                ))
-                                .await?;
-                            }
-                            Ok(_) => {}
-                        }
-                    } else {
-                        self.write(protocol::ErrorResponse::new(
-                            protocol::ErrorSeverity::Error,
-                            protocol::ErrorCode::InternalError,
-                            "Execute with limited rows is not supported".to_string(),
+                Some(portal) => match portal.description {
+                    // If query doesnt return any fields, we can return complete without execution
+                    None => {
+                        self.write(protocol::CommandComplete::new(
+                            protocol::CommandCompleteTag::Select,
+                            0,
                         ))
                         .await?;
                     }
-                }
+                    Some(_) => {
+                        if execute.max_rows == 0 {
+                            // TODO: I will rewrite this code later, it's just a prototype
+                            #[allow(mutable_borrow_reservation_conflict)]
+                            match self
+                                .execute_plan(portal.plan.clone(), false, portal.format)
+                                .await
+                            {
+                                Err(e) => {
+                                    self.write(protocol::ErrorResponse::new(
+                                        protocol::ErrorSeverity::Error,
+                                        protocol::ErrorCode::InternalError,
+                                        e.message,
+                                    ))
+                                    .await?;
+                                }
+                                Ok(_) => {}
+                            }
+                        } else {
+                            self.write(protocol::ErrorResponse::new(
+                                protocol::ErrorSeverity::Error,
+                                protocol::ErrorCode::InternalError,
+                                "Execute with limited rows is not supported".to_string(),
+                            ))
+                            .await?;
+                        }
+                    }
+                },
             },
             None => {
                 self.write(protocol::ReadyForQuery::new(
@@ -379,43 +399,47 @@ impl AsyncPostgresShim {
             .get(&body.statement)
             .ok_or_else(|| Error::new(ErrorKind::Other, "Unknown statement"))?;
 
-        let prepared_statement = source_statement.bind(body.to_bind_values());
+        let portal = if let Some(statement) = source_statement {
+            let prepared_statement = statement.bind(body.to_bind_values());
 
-        let meta = self
-            .session
-            .server
-            .transport
-            .meta(self.auth_context().unwrap())
-            .await
-            .unwrap();
+            let meta = self
+                .session
+                .server
+                .transport
+                .meta(self.auth_context().unwrap())
+                .await
+                .unwrap();
 
-        let plan = convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
-            .unwrap();
+            let plan =
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
+                    .unwrap();
 
-        let format = body
-            .result_formats
-            .first()
-            .clone()
-            .unwrap_or(&Format::Text)
-            .clone();
+            let format = body
+                .result_formats
+                .first()
+                .clone()
+                .unwrap_or(&Format::Text)
+                .clone();
 
-        let fields = self.query_plan_to_row_description(&plan).await?;
-        let description = if fields.len() > 0 {
-            Some(protocol::RowDescription::new(
-                self.query_plan_to_row_description(&plan).await?,
-            ))
+            let fields = self.query_plan_to_row_description(&plan).await?;
+            let description = if fields.len() > 0 {
+                Some(protocol::RowDescription::new(
+                    self.query_plan_to_row_description(&plan).await?,
+                ))
+            } else {
+                None
+            };
+
+            Some(Portal {
+                plan,
+                format,
+                description,
+            })
         } else {
             None
         };
 
-        let portal = Portal {
-            plan,
-            format,
-            description,
-        };
-
         self.portals.insert(body.portal, portal);
-
         self.write(protocol::BindComplete::new()).await?;
 
         Ok(())
@@ -481,43 +505,47 @@ impl AsyncPostgresShim {
     }
 
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), Error> {
-        let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
-
-        let stmt_finder = StatementParamsFinder::new();
-        let parameters: Vec<PgTypeId> = stmt_finder
-            .find(&query)
-            .into_iter()
-            .map(|_p| PgTypeId::TEXT)
-            .collect();
-
-        let meta = self
-            .session
-            .server
-            .transport
-            .meta(self.auth_context().unwrap())
-            .await
-            .unwrap();
-
-        let stmt_replacer = StatementPlaceholderReplacer::new();
-        let hacked_query = stmt_replacer.replace(&query);
-
-        let plan =
-            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
-        let fields: Vec<RowDescriptionField> = self.query_plan_to_row_description(&plan).await?;
-        let description = if fields.len() > 0 {
-            Some(protocol::RowDescription::new(fields))
-        } else {
+        let prepared = if parse.query.trim() == "" {
             None
-        };
+        } else {
+            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
 
-        self.statements.insert(
-            parse.name,
-            PreparedStatement {
+            let stmt_finder = StatementParamsFinder::new();
+            let parameters: Vec<PgTypeId> = stmt_finder
+                .find(&query)
+                .into_iter()
+                .map(|_p| PgTypeId::TEXT)
+                .collect();
+
+            let meta = self
+                .session
+                .server
+                .transport
+                .meta(self.auth_context().unwrap())
+                .await
+                .unwrap();
+
+            let stmt_replacer = StatementPlaceholderReplacer::new();
+            let hacked_query = stmt_replacer.replace(&query);
+
+            let plan =
+                convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
+            let fields: Vec<RowDescriptionField> =
+                self.query_plan_to_row_description(&plan).await?;
+            let description = if fields.len() > 0 {
+                Some(protocol::RowDescription::new(fields))
+            } else {
+                None
+            };
+
+            Some(PreparedStatement {
                 query,
                 parameters: protocol::ParameterDescription::new(parameters),
                 description,
-            },
-        );
+            })
+        };
+
+        self.statements.insert(parse.name, prepared);
 
         self.write(protocol::ParseComplete::new()).await?;
 
