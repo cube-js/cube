@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import Helmet from "react-helmet";
 import urljoin from "url-join";
+import config from "../../../../multi-tenant-analytics/data/SiteConfig";
 
 class SEO extends Component {
   render() {
@@ -75,6 +76,7 @@ class SEO extends Component {
         {/* General tags */}
         <meta name="description" content={description} />
         <meta name="image" content={image} />
+        {config.canonicalUrl && config.canonicalUrl !== 'null' && (<link href={config.canonicalUrl} rel="canonical" />)}
 
         {/* Schema.org tags */}
         <script type="application/ld+json">
