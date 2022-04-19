@@ -42,7 +42,7 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 [Cube Cloud](https://cube.dev/cloud/) is the fastest way to get started with Cube. It provides managed infrastructure as well as an instant and free access for development projects and proofs of concept.
 
-[![Get started now](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png)](https://cubecloud.dev/auth/signup)
+<a href="https://cubecloud.dev/auth/signup?ref=github-readme"><img src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png" alt="Get started now" width="100px"></a>
 
 For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/cloud/getting-started/create).
 
