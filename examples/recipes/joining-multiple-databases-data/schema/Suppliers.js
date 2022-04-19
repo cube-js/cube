@@ -32,5 +32,5 @@ cube(`Suppliers`, {
     },
   },
 
-  dataSource: 'Suppliers',
+  dataSource: 'suppliers',
 });

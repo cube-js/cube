@@ -1987,24 +1987,26 @@ class BaseQuery {
 
   newSubQuery(options) {
     const QueryClass = this.constructor;
-    return new QueryClass(
-      this.compilers,
-      Object.assign({
-        paramAllocator: this.paramAllocator,
-        timezone: this.timezone,
-        preAggregationQuery: this.options.preAggregationQuery,
-        useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-        contextSymbols: this.contextSymbols,
-        preAggregationsSchema: this.preAggregationsSchemaOption,
-        cubeLatticeCache: this.options.cubeLatticeCache,
-        historyQueries: this.options.historyQueries,
-        externalQueryClass: this.options.externalQueryClass,
-      }, options)
-    );
+    return new QueryClass(this.compilers, this.subQueryOptions(options));
   }
 
   newSubQuery2(cube, options) {
-    return this.compilers.compilerApi.createQueryByDataSource(this.compilers, options, cube);
+    return this.compilers.queryFactory.createQuery(cube, this.subQueryOptions(options));
+  }
+
+  subQueryOptions(options) {
+    return {
+      paramAllocator: this.paramAllocator,
+      timezone: this.timezone,
+      preAggregationQuery: this.options.preAggregationQuery,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      contextSymbols: this.contextSymbols,
+      preAggregationsSchema: this.preAggregationsSchemaOption,
+      cubeLatticeCache: this.options.cubeLatticeCache,
+      historyQueries: this.options.historyQueries,
+      externalQueryClass: this.options.externalQueryClass,
+      ...options,
+    }
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries

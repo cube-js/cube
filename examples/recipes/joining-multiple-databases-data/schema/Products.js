@@ -44,5 +44,5 @@ cube(`Products`, {
     },
   },
 
-  dataSource: 'Products',
+  dataSource: 'products',
 });

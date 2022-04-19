@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { createQuery, compile, PreAggregations } from '@cubejs-backend/schema-compiler';
+import {QueryFactory} from "./QueryFactory";
 
 export class CompilerApi {
   constructor(repository, dbType, options) {
@@ -53,7 +54,7 @@ export class CompilerApi {
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone
       });
-      this.compilers.compilerApi = this;
+      this.compilers.queryFactory = await QueryFactory.create(this, this.compilers);
       this.compilerVersion = compilerVersion;
     }
 

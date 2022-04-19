@@ -21,18 +21,21 @@ function postgres() {
 
 module.exports = {
   dbType: ({ dataSource }) => {
+    console.log('QQQ dbType', dataSource)
     switch (dataSource) {
       case 'default': return 'postgres';
-      case 'Suppliers': return 'postgres';
-      case 'Products': return 'bigquery';
-      default: throw new Error('dataSource is undefined');
+      case 'suppliers': return 'postgres';
+      case 'products': return 'bigquery';
+      default: throw new Error('dbType: dataSource is undefined');
     }
   },
+
   driverFactory: ({ dataSource }) => {
+    console.log('QQQ driverFactory', dataSource)
     switch (dataSource) {
-      case 'Suppliers': return postgres();
-      case 'Products': return bigquery();
-      default: throw new Error('dataSource is undefined');
+      case 'suppliers': return postgres();
+      case 'products': return bigquery();
+      default: throw new Error('driverFactory: dataSource is undefined');
     }
   },
 };
