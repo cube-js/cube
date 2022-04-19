@@ -1,8 +1,8 @@
 <p align="center">
-  <a href="https://cube.dev"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
+  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
 </p>
 
-[Website](https://cube.dev) • [Getting Started](https://cube.dev/docs/getting-started) • [Docs](https://cube.dev/docs) • [Examples](https://cube.dev/docs/examples) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Discourse](https://forum.cube.dev/) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [Discourse](https://forum.cube.dev/) • [Twitter](https://twitter.com/thecubejs)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
@@ -17,12 +17,12 @@ __Cube is the headless business intelligence platform.__ It helps data engineers
 />
 
 <p align="center">
-  <i>Learn more about connecting Cube to <a href="https://cube.dev/docs/config/databases" target="_blank">data sources</a> and <a href="https://cube.dev/docs/config/downstream" target="_blank">analytics & visualization tools</a>.</i> 
+  <i>Learn more about connecting Cube to <a href="https://cube.dev/docs/config/databases?ref=github-readme" target="_blank">data sources</a> and <a href="https://cube.dev/docs/config/downstream?ref=github-readme" target="_blank">analytics & visualization tools</a>.</i> 
 </p>
 
 Cube was designed to work with all SQL-enabled data sources, including cloud data warehouses like Snowflake or Google BigQuery, query engines like Presto or Amazon Athena, and application databases like Postgres. Cube has a built-in relational caching engine to provide sub-second latency and high concurrency for API requests.
 
-For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction) page in our documentation. 
+For more details, see the [introduction](https://cube.dev/docs/cubejs-introduction?ref=github-readme) page in our documentation. 
 
 ## Why Cube?
 
@@ -40,11 +40,11 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 ### Cube Cloud
 
-[Cube Cloud](https://cube.dev/cloud/) is the fastest way to get started with Cube. It provides managed infrastructure as well as an instant and free access for development projects and proofs of concept.
+[Cube Cloud](https://cube.dev/cloud?ref=github-readme) is the fastest way to get started with Cube. It provides managed infrastructure as well as an instant and free access for development projects and proofs of concept.
 
 <a href="https://cubecloud.dev/auth/signup?ref=github-readme"><img src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png" alt="Get started now" width="200px"></a>
 
-For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/cloud/getting-started/create).
+For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/cloud/getting-started/create?ref=github-readme).
 
 ### Docker
 
@@ -61,18 +61,18 @@ docker run -p 4000:4000 \
 
 Then, open http://localhost:4000 in your browser to continue setup.
 
-For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting-started-docker).
+For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting-started-docker?ref=github-readme).
 
 ## Resources
 
-- [Documentation](https://cube.dev/docs)
-- [Getting Started](https://cube.dev/docs/getting-started)
-- [Examples & Tutorials](https://cube.dev/docs/examples)
-- [Architecture](https://cube.dev/docs/cubejs-introduction#architecture)
+- [Documentation](https://cube.dev/docs?ref=github-readme)
+- [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme)
+- [Examples & Tutorials](https://cube.dev/docs/examples?ref=github-readme)
+- [Architecture](https://cube.dev/docs/cubejs-introduction?ref=github-readme#architecture)
 
 ## Community
 
-If you have any questions or need help - [please join our Slack community](https://slack.cube.dev) of amazing developers and data engineers.
+If you have any questions or need help - [please join our Slack community](https://slack.cube.dev?ref=github-readme) of amazing developers and data engineers.
 
 You are also welcome to join our **monthly community calls** where we discuss community news, Cube Dev team's plans, backlogs, use cases, etc. If you miss the call, the recordings will also be available after the meeting. 
 * When: Second Wednesday of each month at [9am Pacific Time](https://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29).  
