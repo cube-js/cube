@@ -46,7 +46,7 @@ export class MaterializeDriver extends PostgresDriver {
     tableData: DownloadTableMemoryData,
     indexesSql: IndexesSQL
   ) {
-    BaseDriver.prototype.uploadTableWithIndexes.apply(this, [table, columns, tableData, indexesSql, [], null]);
+    BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null);
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
