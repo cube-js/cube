@@ -69,6 +69,11 @@ crate::plan_to_language! {
         Repartition {
             input: Arc<LogicalPlan>,
         },
+        Subquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         Union {
             inputs: Vec<LogicalPlan>,
             schema: DFSchemaRef,
@@ -105,6 +110,10 @@ crate::plan_to_language! {
             alias: String,
         },
         ColumnExpr {
+            column: Column,
+        },
+        OuterColumnExpr {
+            data_type: DataType,
             column: Column,
         },
         ScalarVariableExpr {

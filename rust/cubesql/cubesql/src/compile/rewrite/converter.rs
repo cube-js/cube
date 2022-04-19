@@ -30,6 +30,8 @@ use crate::compile::rewrite::MeasureName;
 use crate::compile::rewrite::MemberErrorError;
 use crate::compile::rewrite::OrderAsc;
 use crate::compile::rewrite::OrderMember;
+use crate::compile::rewrite::OuterColumnExprColumn;
+use crate::compile::rewrite::OuterColumnExprDataType;
 use crate::compile::rewrite::ProjectionAlias;
 use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::ScalarUDFExprFun;
@@ -64,7 +66,7 @@ use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::plan::{Aggregate, Window};
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
-    LogicalPlan,
+    LogicalPlan, LogicalPlanBuilder,
 };
 use datafusion::logical_plan::{CrossJoin, EmptyRelation, Limit, TableScan};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
@@ -150,6 +152,12 @@ impl LogicalPlanToLanguageConverter {
             Expr::Column(column) => {
                 let column = add_data_node!(self, column, ColumnExprColumn);
                 self.graph.add(LogicalPlanLanguage::ColumnExpr([column]))
+            }
+            Expr::OuterColumn(data_type, column) => {
+                let data_type = add_data_node!(self, data_type, OuterColumnExprDataType);
+                let column = add_data_node!(self, column, OuterColumnExprColumn);
+                self.graph
+                    .add(LogicalPlanLanguage::OuterColumnExpr([data_type, column]))
             }
             Expr::ScalarVariable(data_type, variable) => {
                 let data_type = add_data_node!(self, data_type, ScalarVariableExprDataType);
@@ -389,6 +397,12 @@ impl LogicalPlanToLanguageConverter {
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
+            LogicalPlan::Subquery(node) => {
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                let subqueries = add_plan_list_node!(self, node.subqueries, SubquerySubqueries);
+                self.graph
+                    .add(LogicalPlanLanguage::Subquery([input, subqueries]))
+            }
             LogicalPlan::TableScan(node) => {
                 let source_table_name = add_data_node!(
                     self,
@@ -477,6 +491,31 @@ macro_rules! match_data_node {
     };
 }
 
+macro_rules! match_list_node_ids {
+    ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {{
+        fn match_list(
+            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+            id: Id,
+            result: &mut Vec<Id>,
+        ) -> Result<(), CubeError> {
+            match node_by_id.index(id) {
+                LogicalPlanLanguage::$field_variant(list) => {
+                    for i in list {
+                        match_list(node_by_id, *i, result)?;
+                    }
+                }
+                _ => {
+                    result.push(id);
+                }
+            }
+            Ok(())
+        }
+        let mut result = Vec::new();
+        match_list($node_by_id, $id_expr.clone(), &mut result)?;
+        result
+    }};
+}
+
 macro_rules! match_list_node {
     ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {{
         fn match_list(
@@ -557,6 +596,7 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::AggregateUDFExpr(_) => true,
         LogicalPlanLanguage::InListExpr(_) => true,
         LogicalPlanLanguage::WildcardExpr(_) => true,
+        LogicalPlanLanguage::OuterColumnExpr(_) => true,
         _ => false,
     }
 }
@@ -576,6 +616,11 @@ pub fn node_to_expr(
         LogicalPlanLanguage::ColumnExpr(params) => {
             let column = match_data_node!(node_by_id, params[0], ColumnExprColumn);
             Expr::Column(column)
+        }
+        LogicalPlanLanguage::OuterColumnExpr(params) => {
+            let data_type = match_data_node!(node_by_id, params[0], OuterColumnExprDataType);
+            let column = match_data_node!(node_by_id, params[1], OuterColumnExprColumn);
+            Expr::OuterColumn(data_type, column)
         }
         LogicalPlanLanguage::ScalarVariableExpr(params) => {
             let data_type = match_data_node!(node_by_id, params[0], ScalarVariableExprDataType);
@@ -874,6 +919,16 @@ impl LanguageToLogicalPlanConverter {
             //     let alias = self.graph.add(LogicalPlanLanguage::UnionAlias(UnionAlias(alias.clone())));
             //     self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             // }
+            LogicalPlanLanguage::Subquery(params) => {
+                let input = self.to_logical_plan(params[0])?;
+                let subqueries = match_list_node_ids!(node_by_id, params[1], SubquerySubqueries)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n))
+                    .collect::<Result<Vec<_>, _>>()?;
+                LogicalPlanBuilder::from(input)
+                    .subquery(subqueries)?
+                    .build()?
+            }
             LogicalPlanLanguage::TableScan(params) => {
                 let source_table_name =
                     match_data_node!(node_by_id, params[0], TableScanSourceTableName);
