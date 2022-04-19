@@ -755,6 +755,8 @@ declare module '@cubejs-client/core' {
     | 'notEquals'
     | 'contains'
     | 'notContains'
+    | 'startsWith'
+    | 'endsWith'
     | 'gt'
     | 'gte'
     | 'lt'
@@ -792,7 +794,7 @@ declare module '@cubejs-client/core' {
     filters?: Filter[];
     timeDimensions?: TimeDimension[];
     segments?: string[];
-    limit?: number;
+    limit?: null | number;
     offset?: number;
     order?: TQueryOrderObject | TQueryOrderArray;
     timezone?: string;

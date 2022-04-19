@@ -16,8 +16,14 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ElasticSearchQueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `${not ? ' NOT' : ''} MATCH(${column}, ${this.allocateParam(param)}, 'fuzziness=AUTO:1,5')`;
+  likeIgnoreCase(column, not, param, type) {
+    if (type === 'starts') {
+      return `${not ? ' NOT' : ''} WHERE ${column} LIKE ${this.allocateParam(param)}%`;
+    } else if (type === 'ends') {
+      return `${not ? ' NOT' : ''} WHERE ${column} LIKE %${this.allocateParam(param)}`;
+    } else {
+      return `${not ? ' NOT' : ''} MATCH(${column}, ${this.allocateParam(param)}, 'fuzziness=AUTO:1,5')`;
+    }
   }
 }
 

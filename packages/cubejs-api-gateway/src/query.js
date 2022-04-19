@@ -44,6 +44,8 @@ const operators = [
   'equals',
   'notEquals',
   'contains',
+  'startsWith',
+  'endsWith',
   'notContains',
   'in',
   'notIn',
