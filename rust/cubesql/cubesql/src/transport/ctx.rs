@@ -1,3 +1,4 @@
+use datafusion::arrow::datatypes::DataType;
 use std::ops::RangeFrom;
 
 use cubeclient::models::V1CubeMeta;
@@ -64,6 +65,11 @@ impl MetaContext {
         }
 
         None
+    }
+
+    pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
+        self.find_cube_with_name(member_name.split(".").next()?.to_string())?
+            .df_data_type(member_name.as_str())
     }
 
     pub fn find_cube_table_with_oid(&self, oid: u32) -> Option<CubeMetaTable> {

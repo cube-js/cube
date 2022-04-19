@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.49](https://github.com/cube-js/cube.js/compare/v0.29.48...v0.29.49) (2022-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.29.44](https://github.com/cube-js/cube.js/compare/v0.29.43...v0.29.44) (2022-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.29.43](https://github.com/cube-js/cube.js/compare/v0.29.42...v0.29.43) (2022-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
 ## [0.29.40](https://github.com/cube-js/cube.js/compare/v0.29.39...v0.29.40) (2022-04-03)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

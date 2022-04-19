@@ -2,20 +2,16 @@
     // Clippy bug: https://github.com/rust-lang/rust-clippy/issues/7422
     clippy::nonstandard_macro_braces,
 )]
-#![feature(in_band_lifetimes)]
 #![feature(test)]
 #![feature(backtrace)]
 #![feature(async_closure)]
 #![feature(drain_filter)]
 #![feature(box_patterns)]
 #![feature(slice_internals)]
-#![feature(raw)]
 #![feature(total_cmp)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
-#![feature(arc_new_cyclic)]
-#![feature(bindings_after_at)]
 // #![feature(trace_macros)]
 #![recursion_limit = "512"]
 
@@ -26,6 +22,7 @@ extern crate lazy_static;
 
 use core::fmt;
 use cubeclient::apis::default_api::{LoadV1Error, MetaV1Error};
+use datafusion::arrow;
 use log::SetLoggerError;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
@@ -87,7 +84,12 @@ impl CubeError {
 
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+        match self.cause {
+            CubeErrorCauseType::User => f.write_fmt(format_args!("{}", self.message)),
+            CubeErrorCauseType::Internal => {
+                f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+            }
+        }
     }
 }
 
@@ -174,6 +176,12 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
+        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+    }
+}
+
+impl From<arrow::error::ArrowError> for CubeError {
+    fn from(v: arrow::error::ArrowError) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }

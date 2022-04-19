@@ -165,19 +165,27 @@ impl QueryContext {
         };
 
         let identifier = match argument {
-            ast::Expr::Wildcard => "*".to_string(),
-            ast::Expr::Identifier(i) => i.value.to_string().to_lowercase(),
-            ast::Expr::CompoundIdentifier(i) => {
-                // @todo We need a context with main table rel
-                if i.len() == 2 {
-                    i[1].value.to_string()
-                } else {
-                    return Err(CompilationError::Unsupported(format!(
-                        "Unsupported compound identifier in argument: {:?}",
-                        argument
-                    )));
+            ast::FunctionArgExpr::Wildcard => "*".to_string(),
+            ast::FunctionArgExpr::Expr(expr) => match expr {
+                ast::Expr::Identifier(i) => i.value.to_string().to_lowercase(),
+                ast::Expr::CompoundIdentifier(i) => {
+                    // @todo We need a context with main table rel
+                    if i.len() == 2 {
+                        i[1].value.to_string()
+                    } else {
+                        return Err(CompilationError::Unsupported(format!(
+                            "Unsupported compound identifier in argument: {:?}",
+                            argument
+                        )));
+                    }
                 }
-            }
+                _ => {
+                    return Err(CompilationError::Unsupported(format!(
+                        "type of argument {:?}",
+                        argument
+                    )))
+                }
+            },
             _ => {
                 return Err(CompilationError::Unsupported(format!(
                     "type of argument {:?}",
@@ -216,7 +224,7 @@ impl QueryContext {
         };
 
         let time_dimension_opt = match left_fn {
-            ast::Expr::Function(f) => {
+            ast::FunctionArgExpr::Expr(ast::Expr::Function(f)) => {
                 if !f.name.to_string().to_lowercase().eq("date") {
                     return Err(CompilationError::User(format!(
                         "Unable to detect granularity (left side must be date): {:?}",
@@ -276,7 +284,7 @@ impl QueryContext {
         f: &ast::Function,
     ) -> CompilationResult<Selection> {
         match f.args.as_slice() {
-            [ast::FunctionArg::Unnamed(ast::Expr::Value(ast::Value::SingleQuotedString(granularity))), ast::FunctionArg::Unnamed(ast::Expr::Identifier(column))] => {
+            [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(ast::Expr::Value(ast::Value::SingleQuotedString(granularity)))), ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(ast::Expr::Identifier(column)))] => {
                 let possible_dimension_name = column.value.to_string();
 
                 match granularity.as_str() {
@@ -313,7 +321,9 @@ impl QueryContext {
 
     pub fn find_selection_for_date_fn(&self, f: &ast::Function) -> CompilationResult<Selection> {
         match f.args.as_slice() {
-            [ast::FunctionArg::Unnamed(ast::Expr::Function(date_sub))] => {
+            [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(ast::Expr::Function(
+                date_sub,
+            )))] => {
                 if !date_sub.name.to_string().to_lowercase().eq("date_sub") {
                     return Err(CompilationError::User(format!(
                         "Unable to detect heuristics: {}",
@@ -410,37 +420,45 @@ impl QueryContext {
         };
 
         let measure_name = match argument {
-            ast::Expr::Wildcard => "*".to_string(),
-            ast::Expr::Value(ast::Value::Number(n, is_negative)) => {
-                let prefix = if *is_negative {
-                    "-".to_string()
-                } else {
-                    "".to_string()
-                };
+            ast::FunctionArgExpr::Wildcard => "*".to_string(),
+            ast::FunctionArgExpr::Expr(expr) => match expr {
+                ast::Expr::Value(ast::Value::Number(n, is_negative)) => {
+                    let prefix = if *is_negative {
+                        "-".to_string()
+                    } else {
+                        "".to_string()
+                    };
 
-                let number = prefix + n;
+                    let number = prefix + n;
 
-                if &number != "1" {
-                    return Err(CompilationError::User(format!(
-                        "Unable to use number '{}' as argument to aggregation function",
-                        number
-                    )));
+                    if &number != "1" {
+                        return Err(CompilationError::User(format!(
+                            "Unable to use number '{}' as argument to aggregation function",
+                            number
+                        )));
+                    }
+
+                    "*".to_string()
                 }
-
-                "*".to_string()
-            }
-            ast::Expr::Identifier(i) => i.value.to_string(),
-            ast::Expr::CompoundIdentifier(i) => {
-                // @todo We need a context with main table rel
-                if i.len() == 2 {
-                    i[1].value.to_string()
-                } else {
+                ast::Expr::Identifier(i) => i.value.to_string(),
+                ast::Expr::CompoundIdentifier(i) => {
+                    // @todo We need a context with main table rel
+                    if i.len() == 2 {
+                        i[1].value.to_string()
+                    } else {
+                        return Err(CompilationError::Unsupported(format!(
+                            "Unsupported compound identifier in argument: {:?}",
+                            argument
+                        )));
+                    }
+                }
+                _ => {
                     return Err(CompilationError::Unsupported(format!(
-                        "Unsupported compound identifier in argument: {:?}",
+                        "type of argument {:?}",
                         argument
                     )));
                 }
-            }
+            },
             _ => {
                 return Err(CompilationError::Unsupported(format!(
                     "type of argument {:?}",

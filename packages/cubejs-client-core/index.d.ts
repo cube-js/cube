@@ -169,6 +169,7 @@ declare module '@cubejs-client/core' {
     requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
+    total?: number
   };
 
   export type LoadResponse<T> = {
@@ -465,7 +466,7 @@ declare module '@cubejs-client/core' {
     /**
      * Base method for pivoting [ResultSet](#result-set) data.
      * Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
-     * or (tablePivot)[#table-pivot] should be used instead.
+     * or [tablePivot](#table-pivot) should be used instead.
      *
      * You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
      * ```js
@@ -798,6 +799,7 @@ declare module '@cubejs-client/core' {
     renewQuery?: boolean;
     ungrouped?: boolean;
     responseFormat?: 'compact' | 'default';
+    total?: boolean;
   }
 
   export class ProgressResult {

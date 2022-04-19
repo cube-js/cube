@@ -334,7 +334,7 @@ CUBEJS_REDIS_PASSWORD.
 {{- end }}
 {{- if .Values.database.snowFlake.role }}
 - name: CUBEJS_DB_SNOWFLAKE_ROLE
-  value: {{ .Values.database.snowFlake.urolerl | quote }}
+  value: {{ .Values.database.snowFlake.role | quote }}
 {{- end }}
 {{- if .Values.database.snowFlake.warehouse }}
 - name: CUBEJS_DB_SNOWFLAKE_WAREHOUSE

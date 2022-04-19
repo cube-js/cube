@@ -56,25 +56,44 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Simple        |             ❌             |     ✅      |
-| Batching      |             -              |      -      |
-| Export Bucket |             -              |      -      |
+| Batching      |             ❌             |      ✅     |
+| Export Bucket |             ❌             |      ❌     |
 
-By default, AWS Athena uses a [simple][self-preaggs-simple] strategy to build
+By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to build
 pre-aggregations.
-
-### Simple
-
-No extra configuration is required to configure simple pre-aggregation builds
-for AWS Athena.
 
 ### Batching
 
-AWS Athena does not support batching.
+No extra configuration is required to configure batching for AWS Athena.
 
 ### Export Bucket
 
-AWS Athena does not support export buckets.
+<WarningBox>
+
+AWS Athena **only** supports using AWS S3 for export buckets.
+
+</WarningBox>
+
+#### AWS S3
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube.js with the following environment variables:
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
 
 ## SSL
 
@@ -93,8 +112,9 @@ Athena connections are made over HTTPS.
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [aws-athena-docs-approx-agg-fns]:
   https://prestodb.io/docs/0.217/functions/aggregate.html#approximate-aggregate-functions
+[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
-[self-preaggs-simple]: #simple
+[self-preaggs-batching]: #batching

@@ -1091,6 +1091,7 @@ version = "0.1.0"
 dependencies = [
  "async-compression",
  "async-trait",
+ "base64 0.13.0",
  "cubestore",
  "futures 0.3.16",
  "futures-timer 3.0.2",

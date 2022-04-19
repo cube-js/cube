@@ -3,6 +3,117 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.50](https://github.com/cube-js/cube.js/compare/v0.29.49...v0.29.50) (2022-04-18)
+
+
+### Features
+
+* **cubesql:** Initial support for Binary format in pg-wire ([a36845c](https://github.com/cube-js/cube.js/commit/a36845c5edcb6bd77172de2cebcd67a700df5224))
+* **cubesql:** Support Describe(Portal) for pg-wire ([34cf111](https://github.com/cube-js/cube.js/commit/34cf111249c3fede986c3633fe8d5f0cade3ed91))
+* **cubesql:** Support pg_depend postgres table ([ceb35d4](https://github.com/cube-js/cube.js/commit/ceb35d4825cd2ac76ad191eef950ab3be126c3de))
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+
+### Bug Fixes
+
+* **cubesql:** Support pg_catalog.format_type through fully qualified name ([9eafae0](https://github.com/cube-js/cube.js/commit/9eafae0c4eafc2ad1d8517be9dbf292c1650c64a))
+
+
+### Features
+
+* **cubesql:** Initial support for prepared statements in pg-wire ([#4244](https://github.com/cube-js/cube.js/issues/4244)) ([912b52a](https://github.com/cube-js/cube.js/commit/912b52a5cb8d72820c68843e15a2ef83233b952f))
+* **cubesql:** Postgres Apache Superset connection flow support ([ab256d9](https://github.com/cube-js/cube.js/commit/ab256d9fc31fd4d2bc08c969b374cec449e34bae))
+
+
+
+
+
+## [0.29.47](https://github.com/cube-js/cube.js/compare/v0.29.46...v0.29.47) (2022-04-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct MySQL types in response headers ([#4362](https://github.com/cube-js/cube.js/issues/4362)) ([c507f82](https://github.com/cube-js/cube.js/commit/c507f82fbdd92363d27c4b3c8b41957bd62a3d87))
+* **cubesql:** Special handling for bool as string ([3ba27bf](https://github.com/cube-js/cube.js/commit/3ba27bf7ee91aef69eb75c33580abf18b21bd29e))
+* **cubesql:** Support boolean (ColumnType) for MySQL protocol ([23f8367](https://github.com/cube-js/cube.js/commit/23f8367f6657b8d7f31e4e34a4547d30c3c34c79))
+
+
+
+
+
+## [0.29.46](https://github.com/cube-js/cube.js/compare/v0.29.45...v0.29.46) (2022-04-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrite engine decimal measure support ([8a0fa98](https://github.com/cube-js/cube.js/commit/8a0fa981b87b67281867c6073903fa9bb6826570))
+
+
+### Features
+
+* **cubesql:** Support format_type UDF for Postgres ([#4325](https://github.com/cube-js/cube.js/issues/4325)) ([8b972ca](https://github.com/cube-js/cube.js/commit/8b972ca9bfd46cc8d43a93ce04e696624838fbde))
+
+
+
+
+
+## [0.29.45](https://github.com/cube-js/cube.js/compare/v0.29.44...v0.29.45) (2022-04-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrite engine datafusion after rebase regressions: mismatched to_day_interval signature, projection aliases, order by date. ([8310f7e](https://github.com/cube-js/cube.js/commit/8310f7e1d4b7c2c28b6d2e7f0fb683114c837282))
+
+
+
+
+
+## [0.29.44](https://github.com/cube-js/cube.js/compare/v0.29.43...v0.29.44) (2022-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.29.43](https://github.com/cube-js/cube.js/compare/v0.29.42...v0.29.43) (2022-04-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrites don't respect projection column order ([cfe35a7](https://github.com/cube-js/cube.js/commit/cfe35a7b65390db43f1e7c68ac54c82c2ec8af49))
+
+
+### Features
+
+* **cubesql:** Rewrite engine error handling ([3fba823](https://github.com/cube-js/cube.js/commit/3fba823bc561d7a985c89c4cf437a6595ef88a7c))
+* **cubesql:** Upgrade rust to 1.61.0-nightly (2022-02-22) ([c836065](https://github.com/cube-js/cube.js/commit/c8360658ccb8e5e3e6cfcd62da2d156b44ee8456))
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow quoted variables with SHOW <variable> syntax ([#4313](https://github.com/cube-js/cube.js/issues/4313)) ([3eece0e](https://github.com/cube-js/cube.js/commit/3eece0e70817b2b72406b146a95a5757cdfb994c))
+
+
+### Features
+
+* **cubesql:** Rewrite engine segments support ([48b0767](https://github.com/cube-js/cube.js/commit/48b0767aa880a2373d6a6fa15b2e0a1815bb1865))
+
+
+
+
+
 ## [0.29.40](https://github.com/cube-js/cube.js/compare/v0.29.39...v0.29.40) (2022-04-03)
 
 

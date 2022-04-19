@@ -1,23 +1,60 @@
+use crate::arrow::datatypes::{DataType, Field};
+use crate::sql::PgTypeId;
 use bitflags::bitflags;
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ColumnType {
     String,
     VarStr,
     Double,
+    Boolean,
     Int8,
     Int32,
     Int64,
     Blob,
     Timestamp,
+    List(Box<Field>),
 }
 
 impl ColumnType {
     pub fn to_mysql(&self) -> MysqlColumnType {
-        MysqlColumnType::MYSQL_TYPE_BLOB
+        match self {
+            ColumnType::String => MysqlColumnType::MYSQL_TYPE_STRING,
+            ColumnType::VarStr => MysqlColumnType::MYSQL_TYPE_VAR_STRING,
+            ColumnType::Double => MysqlColumnType::MYSQL_TYPE_DOUBLE,
+            ColumnType::Boolean => MysqlColumnType::MYSQL_TYPE_TINY,
+            ColumnType::Int8 | ColumnType::Int32 => MysqlColumnType::MYSQL_TYPE_LONG,
+            ColumnType::Int64 => MysqlColumnType::MYSQL_TYPE_LONGLONG,
+            _ => MysqlColumnType::MYSQL_TYPE_BLOB,
+        }
+    }
+
+    pub fn to_pg_tid(&self) -> PgTypeId {
+        match self {
+            ColumnType::Blob => PgTypeId::BYTEA,
+            ColumnType::Boolean => PgTypeId::BOOL,
+            ColumnType::Int64 => PgTypeId::INT8,
+            ColumnType::Int8 => PgTypeId::INT2,
+            ColumnType::Int32 => PgTypeId::INT4,
+            ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
+            ColumnType::Timestamp => PgTypeId::TIMESTAMP,
+            ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::List(field) => match field.data_type() {
+                DataType::Binary => PgTypeId::ArrayBytea,
+                DataType::Boolean => PgTypeId::ArrayBool,
+                DataType::Utf8 => PgTypeId::ArrayText,
+                DataType::Int16 => PgTypeId::ArrayInt2,
+                DataType::Int32 => PgTypeId::ArrayInt4,
+                DataType::Int64 => PgTypeId::ArrayInt8,
+                DataType::UInt16 => PgTypeId::ArrayInt2,
+                DataType::UInt32 => PgTypeId::ArrayInt4,
+                DataType::UInt64 => PgTypeId::ArrayInt8,
+                dt => unimplemented!("Unsupported data type for List: {}", dt),
+            },
+        }
     }
 }
 

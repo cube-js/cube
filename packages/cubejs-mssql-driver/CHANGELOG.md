@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.49](https://github.com/cube-js/cube.js/compare/v0.29.48...v0.29.49) (2022-04-15)
+
+
+### Bug Fixes
+
+* **mssql:** Add uniqueidentifier type support -- Custom type 'uniqueidentifier' is not supported ([#4386](https://github.com/cube-js/cube.js/issues/4386)) Thanks [@jdeksup](https://github.com/jdeksup)! ([fb77332](https://github.com/cube-js/cube.js/commit/fb773325a7d2e8fa3c923a8c332e275e178b49c6))
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
 ## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

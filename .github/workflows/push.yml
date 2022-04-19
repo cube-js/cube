@@ -59,7 +59,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -109,7 +109,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -151,7 +151,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -211,7 +211,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -285,7 +285,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -419,7 +419,7 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Testing Docker image via BirdBox
+      - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
@@ -429,6 +429,41 @@ jobs:
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
           yarn run birdbox:questdb
+      # - name: Testing Athena driver (container mode) via BirdBox
+      #   env:
+      #     CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
+      #     CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+      #     CUBEJS_AWS_REGION: us-east-1
+      #     CUBEJS_AWS_S3_OUTPUT_LOCATION: s3://cubejs-opensource/testing/output
+      #     CUBEJS_DB_EXPORT_BUCKET: s3://cubejs-opensource/testing/export
+      #   run: |
+      #     cd packages/cubejs-testing/
+      #     export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+      #     export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+      #     export DEBUG=testcontainers
+      #     yarn run driver:athena --log=ignore --mode=docker
+      # - name: Testing BigQuery driver (container mode) via BirdBox
+      #   env:
+      #     CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
+      #     CUBEJS_DB_BQ_PROJECT_ID: cube-open-source
+      #     CUBEJS_DB_EXPORT_BUCKET: cube-open-source-export-bucket
+      #   run: |
+      #     cd packages/cubejs-testing/
+      #     export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+      #     export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+      #     export DEBUG=testcontainers
+      #     yarn run driver:bigquery --log=ignore --mode=docker
+      - name: Testing PostgreSQL driver (container mode) via BirdBox
+        env:
+          CUBEJS_DB_TYPE: postgres
+          CUBEJS_DB_USER: postgres
+          CUBEJS_DB_PASS: postgres
+        run: |
+          cd packages/cubejs-testing/
+          export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
+          export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
+          export DEBUG=testcontainers
+          yarn run driver:postgres --log=ignore --mode=docker
       - name: Testing Docker image via Cypress (Chrome)
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}

@@ -1,8 +1,7 @@
 ---
-source: cubesql/e2e/tests/mysql.rs
-assertion_line: 129
-expression: self.print_query_result(&mut response).await
-
+source: cubesql/e2e/tests/postgres.rs
+assertion_line: 173
+expression: self.print_query_result(res).await
 ---
 +-------+------------+
 | count | status     |

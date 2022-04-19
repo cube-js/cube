@@ -19,8 +19,15 @@ services:
     links:
       - db
     volumes:
-      - ./questdb/schema:/cube/conf/schema
       - ./postgresql/dbt-project:/cube/conf/dbt-project
+      - ./questdb/schema:/cube/conf/schema
+      - ./postgresql/schema/CAST.js:/cube/conf/schema/CAST.js
+      - ./postgresql/schema/Customers.js:/cube/conf/schema/Customers.js
+      - ./postgresql/schema/Customers.sql.js:/cube/conf/schema/Customers.sql.js
+      - ./postgresql/schema/ECommerce.js:/cube/conf/schema/ECommerce.js
+      - ./postgresql/schema/ECommerce.sql.js:/cube/conf/schema/ECommerce.sql.js
+      - ./postgresql/schema/Products.js:/cube/conf/schema/Products.js
+      - ./postgresql/schema/Products.sql.js:/cube/conf/schema/Products.sql.js
     ports:
       - "4000"
     restart: always

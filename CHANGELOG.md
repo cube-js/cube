@@ -3,6 +3,146 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.50](https://github.com/cube-js/cube.js/compare/v0.29.49...v0.29.50) (2022-04-18)
+
+
+### Bug Fixes
+
+* **playground:** match rollup button ([#4401](https://github.com/cube-js/cube.js/issues/4401)) ([18e90bb](https://github.com/cube-js/cube.js/commit/18e90bbf9c76911fe9a9323a499afa1c429951a3))
+
+
+### Features
+
+* **cubesql:** Initial support for Binary format in pg-wire ([a36845c](https://github.com/cube-js/cube.js/commit/a36845c5edcb6bd77172de2cebcd67a700df5224))
+* **cubesql:** Support Describe(Portal) for pg-wire ([34cf111](https://github.com/cube-js/cube.js/commit/34cf111249c3fede986c3633fe8d5f0cade3ed91))
+* **cubesql:** Support pg_depend postgres table ([ceb35d4](https://github.com/cube-js/cube.js/commit/ceb35d4825cd2ac76ad191eef950ab3be126c3de))
+
+
+
+
+
+## [0.29.49](https://github.com/cube-js/cube.js/compare/v0.29.48...v0.29.49) (2022-04-15)
+
+
+### Bug Fixes
+
+* **athena:** Support plain bucket for CUBEJS_DB_EXPORT_BUCKET ([#4390](https://github.com/cube-js/cube.js/issues/4390)) ([4b4dd60](https://github.com/cube-js/cube.js/commit/4b4dd60256dcbd36d049fb02078459a7873f1ecd))
+* **mssql:** Add uniqueidentifier type support -- Custom type 'uniqueidentifier' is not supported ([#4386](https://github.com/cube-js/cube.js/issues/4386)) Thanks [@jdeksup](https://github.com/jdeksup)! ([fb77332](https://github.com/cube-js/cube.js/commit/fb773325a7d2e8fa3c923a8c332e275e178b49c6))
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+
+### Bug Fixes
+
+* **cubesql:** Support pg_catalog.format_type through fully qualified name ([9eafae0](https://github.com/cube-js/cube.js/commit/9eafae0c4eafc2ad1d8517be9dbf292c1650c64a))
+* **cubestore:** Empty CUBESTORE_S3_SUB_PATH leads to can't list file error ([#4324](https://github.com/cube-js/cube.js/issues/4324)) ([0b35064](https://github.com/cube-js/cube.js/commit/0b350645bd17e1d2ae7ac7a65a30478a2ba53eb1))
+* **cubestore:** Inactive partition compaction: replace error with warn ([#4337](https://github.com/cube-js/cube.js/issues/4337)) ([2ad61ee](https://github.com/cube-js/cube.js/commit/2ad61ee0b956d0d71774b8b304ae24a361c8c5cf))
+* **cubestore:** Support a space separated binary strings for HyperLogLog fields in csv -- Can't parse column value for countDistinctApprox in Athena ([#4383](https://github.com/cube-js/cube.js/issues/4383)) ([8b320b6](https://github.com/cube-js/cube.js/commit/8b320b6fb124d5670677775d413cf71a0d9e6ff5))
+
+
+### Features
+
+* **cubesql:** Initial support for prepared statements in pg-wire ([#4244](https://github.com/cube-js/cube.js/issues/4244)) ([912b52a](https://github.com/cube-js/cube.js/commit/912b52a5cb8d72820c68843e15a2ef83233b952f))
+* **query-language:** "total" flag support ([#4134](https://github.com/cube-js/cube.js/issues/4134)) ([51aef5e](https://github.com/cube-js/cube.js/commit/51aef5ede6e9b0c0e0e8749119e98102f168b8ca))
+* Support Compound Primary Keys ([#4370](https://github.com/cube-js/cube.js/issues/4370)) Thanks [@rccoe](https://github.com/rccoe)! ([0e3983c](https://github.com/cube-js/cube.js/commit/0e3983ccb30a3f6815ba5ee28aa09807e55fd2a3)), closes [#4364](https://github.com/cube-js/cube.js/issues/4364)
+* **cubesql:** Postgres Apache Superset connection flow support ([ab256d9](https://github.com/cube-js/cube.js/commit/ab256d9fc31fd4d2bc08c969b374cec449e34bae))
+
+
+
+
+
+## [0.29.47](https://github.com/cube-js/cube.js/compare/v0.29.46...v0.29.47) (2022-04-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct MySQL types in response headers ([#4362](https://github.com/cube-js/cube.js/issues/4362)) ([c507f82](https://github.com/cube-js/cube.js/commit/c507f82fbdd92363d27c4b3c8b41957bd62a3d87))
+* **cubesql:** Special handling for bool as string ([3ba27bf](https://github.com/cube-js/cube.js/commit/3ba27bf7ee91aef69eb75c33580abf18b21bd29e))
+* **cubesql:** Support boolean (ColumnType) for MySQL protocol ([23f8367](https://github.com/cube-js/cube.js/commit/23f8367f6657b8d7f31e4e34a4547d30c3c34c79))
+
+
+
+
+
+## [0.29.46](https://github.com/cube-js/cube.js/compare/v0.29.45...v0.29.46) (2022-04-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrite engine decimal measure support ([8a0fa98](https://github.com/cube-js/cube.js/commit/8a0fa981b87b67281867c6073903fa9bb6826570))
+
+
+### Features
+
+* **cubesql:** Support format_type UDF for Postgres ([#4325](https://github.com/cube-js/cube.js/issues/4325)) ([8b972ca](https://github.com/cube-js/cube.js/commit/8b972ca9bfd46cc8d43a93ce04e696624838fbde))
+
+
+
+
+
+## [0.29.45](https://github.com/cube-js/cube.js/compare/v0.29.44...v0.29.45) (2022-04-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrite engine datafusion after rebase regressions: mismatched to_day_interval signature, projection aliases, order by date. ([8310f7e](https://github.com/cube-js/cube.js/commit/8310f7e1d4b7c2c28b6d2e7f0fb683114c837282))
+
+
+
+
+
+## [0.29.44](https://github.com/cube-js/cube.js/compare/v0.29.43...v0.29.44) (2022-04-07)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.29.43](https://github.com/cube-js/cube.js/compare/v0.29.42...v0.29.43) (2022-04-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Rewrites don't respect projection column order ([cfe35a7](https://github.com/cube-js/cube.js/commit/cfe35a7b65390db43f1e7c68ac54c82c2ec8af49))
+* **cubestore:** Filters aren't included in index choosing ([c582622](https://github.com/cube-js/cube.js/commit/c5826221f24dbd45cd863263a65fe2c90a45b337))
+
+
+### Features
+
+* **cubesql:** Rewrite engine error handling ([3fba823](https://github.com/cube-js/cube.js/commit/3fba823bc561d7a985c89c4cf437a6595ef88a7c))
+* **cubesql:** Upgrade rust to 1.61.0-nightly (2022-02-22) ([c836065](https://github.com/cube-js/cube.js/commit/c8360658ccb8e5e3e6cfcd62da2d156b44ee8456))
+* **cubestore:** Add CUBEJS_GH_API_TOKEN env var to download script ([#4282](https://github.com/cube-js/cube.js/issues/4282)) Thanks [@icebob](https://github.com/icebob)! ([ac57162](https://github.com/cube-js/cube.js/commit/ac571623ed39bfc02c73d5d6bfc01a7e2fa2fa74))
+* **cubestore:** Explain implementation ([#4303](https://github.com/cube-js/cube.js/issues/4303)) ([53fe3f3](https://github.com/cube-js/cube.js/commit/53fe3f325cc47a6f8c53ad2582a9608f4ae1555d))
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Download numbers with 0 scale as integers in pre-aggregations ([42eb582](https://github.com/cube-js/cube.js/commit/42eb582908080d4e9e2856c09290950957230fcd))
+* **cubesql:** Allow quoted variables with SHOW <variable> syntax ([#4313](https://github.com/cube-js/cube.js/issues/4313)) ([3eece0e](https://github.com/cube-js/cube.js/commit/3eece0e70817b2b72406b146a95a5757cdfb994c))
+* **playground:** adding a query parameter in Playground requires one extra click to type in search field ([#4295](https://github.com/cube-js/cube.js/issues/4295)) ([4abab96](https://github.com/cube-js/cube.js/commit/4abab964ce05afe5583832958205eff75c1417b0))
+* **playground:** rollup designer count distinct warning ([#4309](https://github.com/cube-js/cube.js/issues/4309)) ([add2dd3](https://github.com/cube-js/cube.js/commit/add2dd3106f7fd9deb3ea88fa74467ccd1b9244f))
+* **playground:** transparency under the searchbar in some cases ([#4301](https://github.com/cube-js/cube.js/issues/4301)) ([6cdb20c](https://github.com/cube-js/cube.js/commit/6cdb20cd5a7e36559327f389221b8568c2f68bb0))
+
+
+### Features
+
+* **cubesql:** Rewrite engine segments support ([48b0767](https://github.com/cube-js/cube.js/commit/48b0767aa880a2373d6a6fa15b2e0a1815bb1865))
+
+
+
+
+
 ## [0.29.41](https://github.com/cube-js/cube.js/compare/v0.29.40...v0.29.41) (2022-04-03)
 
 

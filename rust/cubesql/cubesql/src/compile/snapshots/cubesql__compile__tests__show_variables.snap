@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 4592
 expression: "execute_query(\"show variables;\".to_string(), DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------------+-----------------------------------------------------------------------------------------------------------------------+

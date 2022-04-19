@@ -1,5 +1,6 @@
 use std::env;
 
+use super::utils::escape_snapshot_name;
 use async_trait::async_trait;
 use comfy_table::{Cell, Table};
 use cubesql::config::Config;
@@ -67,10 +68,20 @@ impl MySqlIntegrationTestSuite {
         let mut table = Table::new();
         table.load_preset("||--+-++|    ++++++");
 
-        let mut header = vec![];
+        let mut header = Vec::with_capacity(res.columns_ref().len());
+        let mut description: Vec<String> = Vec::with_capacity(res.columns_ref().len());
+
         for column in res.columns_ref().into_iter() {
             header.push(Cell::new(column.name_str()));
+            description.push(format!(
+                "{} type: ({:?}:{}) flags: {:?}",
+                column.name_str(),
+                column.column_type(),
+                column.column_length(),
+                column.flags(),
+            ));
         }
+
         table.set_header(header);
 
         res.for_each(|row| {
@@ -92,7 +103,7 @@ impl MySqlIntegrationTestSuite {
         .await
         .unwrap();
 
-        table.trim_fmt()
+        description.join("\r\n").to_string() + "\r\n" + &table.trim_fmt()
     }
 
     async fn test_use(&self) -> RunResult {
@@ -164,17 +175,10 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
-    fn escape_snapshot_name(&self, name: String) -> String {
-        name.to_lowercase()
-            // @todo Real escape?
-            .replace(" ", "_")
-            .replace("*", "asterisk")
-    }
-
     async fn assert_query(&self, conn: &mut Conn, query: String) {
         let mut response = conn.query_iter(query.clone()).await.unwrap();
         insta::assert_snapshot!(
-            self.escape_snapshot_name(query),
+            escape_snapshot_name(query),
             self.print_query_result(&mut response).await
         );
     }
@@ -201,18 +205,30 @@ impl AsyncTestSuite for MySqlIntegrationTestSuite {
         self.test_use().await?;
         self.test_prepared().await?;
         self.test_prepared_reset().await?;
-        self.test_execute_query("SELECT COUNT(*), status FROM Orders".to_string())
-            .await?;
         self.test_execute_query(
-            "SELECT COUNT(*), status, createdAt FROM Orders ORDER BY createdAt".to_string(),
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
         )
         .await?;
         self.test_execute_query(
-            "SELECT COUNT(*), status, DATE_TRUNC('month', createdAt) FROM Orders ORDER BY createdAt".to_string(),
+            "SELECT COUNT(*) count, status, createdAt FROM Orders GROUP BY status, createdAt ORDER BY createdAt".to_string(),
         )
         .await?;
         self.test_execute_query(
-            "SELECT COUNT(*), status, DATE_TRUNC('quarter', createdAt) FROM Orders ORDER BY createdAt".to_string(),
+            "SELECT COUNT(*) count, status, DATE_TRUNC('month', createdAt) date FROM Orders GROUP BY status, DATE_TRUNC('month', createdAt) ORDER BY date".to_string(),
+        )
+        .await?;
+        self.test_execute_query(
+            "SELECT COUNT(*) count, status, DATE_TRUNC('quarter', createdAt) date FROM Orders GROUP BY status, DATE_TRUNC('quarter', createdAt) ORDER BY date".to_string(),
+        )
+        .await?;
+        self.test_execute_query(
+            r#"SELECT
+                CAST(true as boolean) as bool_true,
+                CAST(false as boolean) as bool_false,
+                1::int as int,
+                'str' as str
+            "#
+            .to_string(),
         )
         .await?;
 

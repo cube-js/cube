@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+
+### Features
+
+* **query-language:** "total" flag support ([#4134](https://github.com/cube-js/cube.js/issues/4134)) ([51aef5e](https://github.com/cube-js/cube.js/commit/51aef5ede6e9b0c0e0e8749119e98102f168b8ca))
+* Support Compound Primary Keys ([#4370](https://github.com/cube-js/cube.js/issues/4370)) Thanks [@rccoe](https://github.com/rccoe)! ([0e3983c](https://github.com/cube-js/cube.js/commit/0e3983ccb30a3f6815ba5ee28aa09807e55fd2a3)), closes [#4364](https://github.com/cube-js/cube.js/issues/4364)
+
+
+
+
+
+## [0.29.42](https://github.com/cube-js/cube.js/compare/v0.29.41...v0.29.42) (2022-04-04)
+
+
+### Bug Fixes
+
+* **playground:** rollup designer count distinct warning ([#4309](https://github.com/cube-js/cube.js/issues/4309)) ([add2dd3](https://github.com/cube-js/cube.js/commit/add2dd3106f7fd9deb3ea88fa74467ccd1b9244f))
+
+
+
+
+
 ## [0.29.37](https://github.com/cube-js/cube.js/compare/v0.29.36...v0.29.37) (2022-03-29)
 
 
