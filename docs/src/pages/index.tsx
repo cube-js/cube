@@ -31,9 +31,9 @@ class IndexPage extends Component<Props> {
         <h1>Documentation</h1>
 
         <InfoBox>
-          Learn how you can build a modern data Stack during the "Building Data Applications with Cube"<br />workshop on May 18th at 9-10:30 am PT! 
-          <br />
-          You can register for the workshop at <a href="https://cube.dev/events/building-data-app/">the event page</a>. 👈
+          <b>Building Data Applications with Cube</b> workshop on May 18, 2022.<br/>
+          Learn all about building a modern data app with Cube.<br />
+          <a href="https://us02web.zoom.us/webinar/register/WN_DUeCHp5fRESAXsV_A1C_eg">Register for the workshop now</a> or see the agenda at the <a href="https://cube.dev/events/building-data-app/">event page</a>. 👈
         </InfoBox>
         
         <Row>
