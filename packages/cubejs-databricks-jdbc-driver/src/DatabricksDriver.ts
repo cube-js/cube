@@ -5,20 +5,13 @@ import fetch, { Headers, Request } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  BaseDriver,
-  DatabaseStructure,
   DownloadTableCSVData,
-  DriverInterface,
-  QueryOptions,
-  StreamOptions,
-  StreamTableData,
-  TableName,
 } from '@cubejs-backend/query-orchestrator';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, pausePromise } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -29,6 +22,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     secretAccessKey?: string,
     region?: string,
     exportBucket?: string,
+    pollMaxInterval?: number,
   };
 
 async function fileExistsOr(
@@ -97,6 +91,9 @@ export class DatabricksDriver extends JDBCDriver {
       configuration?.region || process.env.CUBEJS_AWS_REGION;
     const exportBucket =
       configuration?.exportBucket || getEnv('dbExportBucket');
+    const pollMaxInterval = (
+      configuration?.pollMaxInterval || getEnv('dbPollMaxInterval')
+    );
 
     const config: DatabricksDriverConfiguration = {
       ...configuration,
@@ -111,6 +108,7 @@ export class DatabricksDriver extends JDBCDriver {
       secretAccessKey,
       region,
       exportBucket,
+      pollMaxInterval,
     };
 
     super(config);
@@ -210,65 +208,89 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns databricks base URL.
+   * Returns databricks API base URL.
    */
-  private _getBricksUrl(): string {
-    return this.config.url.split('/')[2].split(':')[0];
-  }
-
-  /**
-   * Returns databricks token.
-   */
-  private _getBricksToken(): string {
-    return this.config.url.split('PWD=')[1];
-  }
-
-  /**
-   * Determines whether S3 bucket mounted to the DBFS or not.
-   */
-  private async _isBucketMount() {
-    const url = `https://${
-      this._getBricksUrl()
-    }/api/2.0/dbfs/list?path=/mnt/cubejs-bucket`;
-
-    const request = new Request(url, {
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this._getBricksToken()}`,
-      }),
-    });
-
-    const response = await fetch(request);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return false;
-      }
-      console.log(response);
-      throw new Error(`unexpected response ${response.statusText}`);
+  private getApiUrl(): string {
+    let res: string;
+    try {
+      // eslint-disable-next-line prefer-destructuring
+      res = this.config.url
+        .split(';')
+        .filter(node => /^jdbc/i.test(node))[0]
+        .split('/')[2]
+        .split(':')[0];
+    } catch (e) {
+      res = '';
     }
-    return true;
+    if (!res.length) {
+      throw new Error(
+        `Error parsing API URL from the CUBEJS_DB_DATABRICKS_URL = ${
+          this.config.url
+        }`
+      );
+    }
+    return res;
   }
 
   /**
-   * Returns IDs of bricks clusters with "Running" status.
+   * Returns databricks API token.
    */
-  private async _getBricksClustersIds(): Promise<string[]> {
+  private getApiToken(): string {
+    let res: string;
+    try {
+      // eslint-disable-next-line prefer-destructuring
+      res = this.config.url
+        .split(';')
+        .filter(node => /^PWD/i.test(node))[0]
+        .split('=')[1];
+    } catch (e) {
+      res = '';
+    }
+    if (!res.length) {
+      throw new Error(
+        'Error parsing API token from the CUBEJS_DB_DATABRICKS_URL' +
+        ` = ${this.config.url}`
+      );
+    }
+    return res;
+  }
+
+  /**
+   * Split bucket URL to bucket and path.
+   */
+  private splitPathname(
+    url: string,
+  ): {bucket: string, prefix: string} {
+    const _url = new URL(url);
+    return {
+      bucket: _url.host,
+      prefix: _url.pathname.slice(1),
+    };
+  }
+
+  /**
+   * Returns IDs of databricks runned clusters.
+   */
+  private async getClustersIds(): Promise<string[]> {
     const url = `https://${
-      this._getBricksUrl()
+      this.getApiUrl()
     }/api/1.2/clusters/list`;
 
     const request = new Request(url, {
       headers: new Headers({
         Accept: '*/*',
-        Authorization: `Bearer ${this._getBricksToken()}`,
+        Authorization: `Bearer ${this.getApiToken()}`,
       }),
     });
 
     const response = await fetch(request);
 
     if (!response.ok) {
-      throw new Error(`unexpected response ${response.statusText}`);
+      throw new Error(`Databricks API call error: ${
+        response.status
+      } - ${
+        response.statusText
+      }`);
     }
 
     const body: {
@@ -282,83 +304,90 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns execution context for spesified cluster.
+   * Returns execution context ("scala" by default) for spesified
+   * cluster.
    */
-  private async _getBricksContextId(
+  private async getContextId(
     clusterId: string,
+    language = 'scala',
   ): Promise<string> {
     const url = `https://${
-      this._getBricksUrl()
+      this.getApiUrl()
     }/api/1.2/contexts/create`;
 
     const request = new Request(url, {
       method: 'POST',
       headers: new Headers({
         Accept: '*/*',
-        Authorization: `Bearer ${this._getBricksToken()}`,
+        Authorization: `Bearer ${this.getApiToken()}`,
       }),
       body: JSON.stringify({
         clusterId,
-        language: 'python',
+        language,
       }),
     });
     const response = await fetch(request);
     if (!response.ok) {
-      throw new Error(`unexpected response ${response.statusText}`);
+      throw new Error(`Databricks API call error: ${
+        response.status
+      } - ${
+        response.statusText
+      }`);
     }
     const body = await response.json();
     return body.id;
   }
 
   /**
-   * Starts mounting flow.
+   * Running specified command.
    */
-  private async _runMountCommand(
+  private async runCommand(
     clusterId: string,
     contextId: string,
+    language: string,
+    command: string,
   ): Promise<string> {
     const url = `https://${
-      this._getBricksUrl()
+      this.getApiUrl()
     }/api/1.2/commands/execute`;
     const request = new Request(url, {
       method: 'POST',
       headers: new Headers({
         Accept: '*/*',
-        Authorization: `Bearer ${this._getBricksToken()}`,
+        Authorization: `Bearer ${this.getApiToken()}`,
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({
         clusterId,
         contextId,
-        language: 'python',
-        command: `
-mount_name = "cubejs-bucket"
-access_key = "${this.config.accessKeyId}"
-secret_key = "${this.config.secretAccessKey}"
-aws_bucket_name = "${this.config.exportBucket}"
-encoded_secret_key = secret_key.replace("/", "%2F")
-dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_name), "/mnt/%s" % mount_name)`,
+        language,
+        command,
       }),
     });
     const response = await fetch(request);
     if (!response.ok) {
-      throw new Error(`unexpected response ${response.statusText}`);
+      throw new Error(`Databricks API call error: ${
+        response.status
+      } - ${
+        response.statusText
+      }`);
     }
     const body = await response.json();
     return body.id;
   }
 
   /**
-   * Waits until mounting command will be executed.
+   * Resolves command result.
+   * TODO: timeout to cancel job?
    */
-  private async _waitForMounting(
+  private async commandResult(
     clusterId: string,
     contextId: string,
     commandId: string,
-  ): Promise<void> {
+  ): Promise<{resultType: string, data: string}> {
     return new Promise((resolve, reject) => {
       const url = `https://${
-        this._getBricksUrl()
+        this.getApiUrl()
       }/api/1.2/commands/status?clusterId=${
         clusterId
       }&contextId=${
@@ -369,27 +398,38 @@ dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_
       const request = new Request(url, {
         headers: new Headers({
           Accept: '*/*',
-          Authorization: `Bearer ${this._getBricksToken()}`,
+          Authorization: `Bearer ${this.getApiToken()}`,
         }),
       });
       fetch(request).then((response) => {
         if (!response.ok) {
           reject();
-          throw new Error(`unexpected response ${
+          throw new Error(`Databricks API call error: ${
+            response.status
+          } - ${
             response.statusText
           }`);
         }
         response.json().then((body) => {
           if (body.status === 'Finished') {
-            resolve();
+            resolve(body.results);
+          } else if (body.status === 'Error') {
+            reject(body.results);
+          } else if (body.status === 'Cancelled') {
+            reject(body.results);
           } else {
-            this._waitForMounting(
-              clusterId,
-              contextId,
-              commandId,
-            ).then(() => {
-              resolve();
-            });
+            pausePromise(this.config.pollMaxInterval as number)
+              .then(() => {
+                this.commandResult(
+                  clusterId,
+                  contextId,
+                  commandId,
+                ).then((res) => {
+                  resolve(res);
+                }).catch((err) => {
+                  reject(err);
+                });
+              });
           }
         });
       });
@@ -399,29 +439,73 @@ dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_
   /**
    * Unload workflow.
    */
-  private async _unload(table: string, columns: string) {
-    const ids = await this._getBricksClustersIds();
-    const promises: Promise<boolean>[] = [];
-    ids.forEach((clusterId) => {
-      promises.push(new Promise((resolve) => {
-        this
-          ._getBricksContextId(clusterId)
-          .then((contextId) => {
-            this
-              ._runMountCommand(clusterId, contextId)
-              .then((commandId) => {
-                this._waitForMounting(
-                  clusterId,
-                  contextId,
-                  commandId,
-                ).then(() => {
-                  resolve(true);
-                });
-              });
-          });
-      }));
+  private async unloadCommand(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<{resultType: string, data: string}> {
+    const clusterId = (await this.getClustersIds())[0];
+    const contextId = await this.getContextId(clusterId);
+    const commandId = await this.runCommand(
+      clusterId,
+      contextId,
+      'scala',
+      `
+        sc.hadoopConfiguration.set(
+          "fs.s3n.awsAccessKeyId", "${this.config.accessKeyId}"
+        )
+        sc.hadoopConfiguration.set(
+          "fs.s3n.awsSecretAccessKey","${this.config.secretAccessKey}"
+        )
+        sqlContext
+          .sql("SELECT ${columns} FROM ${table}")
+          .write
+          .format("com.databricks.spark.csv")
+          .option("header", "false")
+          .save("${pathname}")
+      `,
+    );
+    const result = await this.commandResult(
+      clusterId,
+      contextId,
+      commandId,
+    );
+    return result;
+  }
+
+  /**
+   * Returns signed temporary URLs for table CSV files.
+   */
+  private async getSignedCsvUrls(
+    pathname: string,
+  ): Promise<string[]> {
+    const client = new S3({
+      credentials: {
+        accessKeyId: this.config.accessKeyId as string,
+        secretAccessKey: this.config.secretAccessKey as string,
+      },
+      region: this.config.region,
     });
-    return Promise.all(promises);
+    const { bucket, prefix } = this.splitPathname(pathname);
+    const list = await client.listObjectsV2({
+      Bucket: bucket,
+      Prefix: prefix,
+    });
+    if (list.Contents === undefined) {
+      throw new Error(`No content in specified path: ${pathname}`);
+    }
+    const csvFile = await Promise.all(
+      list.Contents
+        .filter(file => file.Key && /.csv$/i.test(file.Key))
+        .map(async (file) => {
+          const command = new GetObjectCommand({
+            Bucket: bucket,
+            Key: file.Key,
+          });
+          return getSignedUrl(client, command, { expiresIn: 3600 });
+        })
+    );
+    return csvFile;
   }
 
   /**
@@ -433,12 +517,12 @@ dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_
   ): Promise<DownloadTableCSVData> {
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
-    const tablePath = `${this.config.exportBucket}/${tableName}`;
-
-    this._unload(tableName, columns);
-
+    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    await this.unloadCommand(tableName, columns, pathname);
+    const csvFile = await this.getSignedCsvUrls(pathname);
     return {
-      csvFile: [],
+      csvFile,
+      types,
       csvNoHeader: true,
     };
   }
