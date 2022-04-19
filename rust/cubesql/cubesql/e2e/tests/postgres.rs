@@ -3,8 +3,7 @@ use std::{env, time::Duration};
 use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
-use fallible_iterator::FallibleIterator;
-use futures::{pin_mut, StreamExt, TryStreamExt};
+use futures::{pin_mut, TryStreamExt};
 use portpicker::pick_unused_port;
 use tokio::time::sleep;
 
@@ -43,6 +42,7 @@ impl PostgresIntegrationTestSuite {
 
         let random_port = pick_unused_port().expect("No ports free");
         // let random_port = 5555;
+        // let random_port = 5432;
 
         tokio::spawn(async move {
             println!("[PostgresIntegrationTestSuite] Running SQL API");
@@ -119,6 +119,35 @@ impl PostgresIntegrationTestSuite {
                         let value: f64 = row.get(idx);
                         values.push(value.to_string());
                     }
+                    // _int4
+                    1007 => {
+                        let value: Vec<i32> = row.get(idx);
+                        values.push(
+                            value
+                                .into_iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                                .to_string(),
+                        );
+                    }
+                    // _int8
+                    1016 => {
+                        let value: Vec<i64> = row.get(idx);
+                        values.push(
+                            value
+                                .into_iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                                .to_string(),
+                        );
+                    }
+                    // _text
+                    1009 => {
+                        let value: Vec<String> = row.get(idx);
+                        values.push(value.join(",").to_string());
+                    }
                     oid => unimplemented!("Unsupported pg_type: {}", oid),
                 }
             }
@@ -137,11 +166,14 @@ impl PostgresIntegrationTestSuite {
     }
 
     #[allow(unused)]
-    async fn test_execute_query(&self, query: String) -> RunResult {
+    async fn test_execute_query(&self, query: String, snapshot_name: Option<String>) -> RunResult {
         print!("test {} .. ", query);
 
         let res = self.client.query(&query, &[]).await.unwrap();
-        self.assert_query(res, query).await;
+        insta::assert_snapshot!(
+            snapshot_name.unwrap_or(escape_snapshot_name(query)),
+            self.print_query_result(res).await
+        );
 
         println!("ok");
 
@@ -226,6 +258,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_stream_single().await?;
         self.test_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+            None,
         )
         .await?;
         self.test_execute_query(
@@ -234,9 +267,12 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 false as bool_false,
                 'test',
                 1.0,
-                1
+                1,
+                ARRAY['test1', 'test2'] as str_arr,
+                ARRAY[1,2,3] as int8_arr
             "#
             .to_string(),
+            Some("pg_test_types".to_string()),
         )
         .await?;
 

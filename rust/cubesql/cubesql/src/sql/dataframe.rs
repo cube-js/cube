@@ -9,7 +9,7 @@ use datafusion::arrow::{
     array::{
         Array, BooleanArray, Float64Array, Int16Array, Int32Array, Int64Array,
         IntervalDayTimeArray, IntervalYearMonthArray, StringArray, TimestampMicrosecondArray,
-        TimestampNanosecondArray, UInt32Array, UInt64Array,
+        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
@@ -17,6 +17,9 @@ use datafusion::arrow::{
 
 use super::{ColumnFlags, ColumnType};
 
+use crate::arrow::array::{
+    ArrayRef, Float16Array, Float32Array, Int8Array, LargeStringArray, ListArray,
+};
 use crate::{make_string_interval_day_time, make_string_interval_year_month, CubeError};
 
 #[derive(Clone, Debug)]
@@ -40,7 +43,7 @@ impl Column {
     }
 
     pub fn get_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 
     pub fn get_flags(&self) -> ColumnFlags {
@@ -48,7 +51,7 @@ impl Column {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -71,14 +74,65 @@ impl Row {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum TableValue {
     Null,
     String(String),
     Int64(i64),
     Boolean(bool),
+    List(ArrayRef),
     Float64(f64),
     Timestamp(TimestampValue),
+}
+
+impl ToString for TableValue {
+    fn to_string(&self) -> String {
+        match &self {
+            TableValue::Null => "NULL".to_string(),
+            TableValue::String(v) => v.clone(),
+            TableValue::Int64(v) => v.to_string(),
+            TableValue::Boolean(v) => v.to_string(),
+            TableValue::Float64(v) => v.to_string(),
+            TableValue::Timestamp(v) => v.to_string(),
+            TableValue::List(v) => {
+                let mut values: Vec<String> = Vec::with_capacity(v.len());
+
+                macro_rules! write_native_array_as_text {
+                    ($ARRAY:expr, $ARRAY_TYPE: ident) => {{
+                        let arr = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+
+                        for i in 0..$ARRAY.len() {
+                            if arr.is_null(i) {
+                                values.push("NULL".to_string());
+                            } else {
+                                values.push(arr.value(i).to_string());
+                            }
+                        }
+                    }};
+                }
+
+                match v.data_type() {
+                    DataType::Float16 => write_native_array_as_text!(v, Float16Array),
+                    DataType::Float32 => write_native_array_as_text!(v, Float32Array),
+                    DataType::Float64 => write_native_array_as_text!(v, Float64Array),
+                    DataType::Int8 => write_native_array_as_text!(v, Int8Array),
+                    DataType::Int16 => write_native_array_as_text!(v, Int16Array),
+                    DataType::Int32 => write_native_array_as_text!(v, Int32Array),
+                    DataType::Int64 => write_native_array_as_text!(v, Int64Array),
+                    DataType::UInt8 => write_native_array_as_text!(v, UInt8Array),
+                    DataType::UInt16 => write_native_array_as_text!(v, UInt16Array),
+                    DataType::UInt32 => write_native_array_as_text!(v, UInt32Array),
+                    DataType::UInt64 => write_native_array_as_text!(v, UInt64Array),
+                    DataType::Boolean => write_native_array_as_text!(v, BooleanArray),
+                    DataType::Utf8 => write_native_array_as_text!(v, StringArray),
+                    DataType::LargeUtf8 => write_native_array_as_text!(v, LargeStringArray),
+                    dt => unimplemented!("Unable to convert List of {} to string", dt),
+                }
+
+                "{".to_string() + &values.join(",") + "}"
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -125,15 +179,8 @@ impl DataFrame {
         for row in self.get_rows().iter() {
             let mut table_row = vec![];
 
-            for (_i, value) in row.values().iter().enumerate() {
-                match value {
-                    TableValue::Null => table_row.push("NULL".to_string()),
-                    TableValue::String(s) => table_row.push(s.clone()),
-                    TableValue::Int64(n) => table_row.push(n.to_string()),
-                    TableValue::Boolean(b) => table_row.push(b.to_string()),
-                    TableValue::Float64(n) => table_row.push(n.to_string()),
-                    TableValue::Timestamp(t) => table_row.push(t.to_string()),
-                }
+            for value in row.values().iter() {
+                table_row.push(value.to_string());
             }
 
             table.add_row(table_row);
@@ -224,6 +271,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Interval(_) => Ok(ColumnType::String),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
+        DataType::List(field) => Ok(ColumnType::List(field)),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
@@ -341,6 +389,17 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             TableValue::Boolean(a.value(i))
+                        });
+                    }
+                }
+                DataType::List(_) => {
+                    let a = array.as_any().downcast_ref::<ListArray>().unwrap();
+
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::List(a.value(i))
                         });
                     }
                 }

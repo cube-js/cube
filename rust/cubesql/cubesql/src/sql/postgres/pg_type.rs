@@ -1,3 +1,6 @@
+use datafusion::arrow::datatypes::DataType;
+use futures::io;
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum PgTypeId {
@@ -15,6 +18,14 @@ pub enum PgTypeId {
     FLOAT8 = 701,
     MONEY = 790,
     INET = 869,
+    ArrayBool = 1000,
+    ArrayBytea = 1001,
+    ArrayInt2 = 1005,
+    ArrayInt4 = 1007,
+    ArrayText = 1009,
+    ArrayInt8 = 1016,
+    ArrayFloat4 = 1021,
+    ArrayFloat8 = 1022,
     BPCHAR = 1042,
     VARCHAR = 1043,
     DATE = 1082,
@@ -65,6 +76,52 @@ pub struct PgType<'a> {
     pub typstorage: &'static str,
 }
 
+pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
+    match dt {
+        DataType::Boolean => Ok(PgTypeId::BOOL),
+        DataType::Int16 => Ok(PgTypeId::INT2),
+        DataType::Int32 => Ok(PgTypeId::INT4),
+        DataType::Int64 => Ok(PgTypeId::INT8),
+        DataType::UInt16 => Ok(PgTypeId::INT8),
+        DataType::UInt32 => Ok(PgTypeId::INT8),
+        DataType::UInt64 => Ok(PgTypeId::INT8),
+        DataType::Float32 => Ok(PgTypeId::FLOAT4),
+        DataType::Float64 => Ok(PgTypeId::FLOAT8),
+        DataType::Utf8 | DataType::LargeUtf8 => Ok(PgTypeId::TEXT),
+        DataType::Null => Ok(PgTypeId::BOOL),
+        DataType::List(field) => match field.data_type() {
+            DataType::Boolean => Ok(PgTypeId::ArrayBool),
+            DataType::Int8 => Ok(PgTypeId::ArrayInt2),
+            DataType::Int16 => Ok(PgTypeId::ArrayInt2),
+            DataType::Int32 => Ok(PgTypeId::ArrayInt4),
+            DataType::Int64 => Ok(PgTypeId::ArrayInt8),
+            DataType::UInt8 => Ok(PgTypeId::ArrayInt2),
+            DataType::UInt16 => Ok(PgTypeId::ArrayInt2),
+            DataType::UInt32 => Ok(PgTypeId::ArrayInt4),
+            DataType::UInt64 => Ok(PgTypeId::ArrayInt8),
+            DataType::Float16 => Ok(PgTypeId::ArrayFloat4),
+            DataType::Float32 => Ok(PgTypeId::ArrayFloat4),
+            DataType::Float64 => Ok(PgTypeId::ArrayFloat8),
+            DataType::Binary => Ok(PgTypeId::ArrayBytea),
+            DataType::Utf8 => Ok(PgTypeId::ArrayText),
+            dt => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Unsupported data type in List for pg-wire: {:?}", dt),
+            )),
+        },
+        dt => Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Unsupported data type for pg-wire: {:?}", dt),
+        )),
+    }
+}
+
+impl PgTypeId {
+    pub fn to_type(self) -> &'static PgType<'static> {
+        PgType::get_by_tid(self)
+    }
+}
+
 impl<'a> PgType<'a> {
     pub fn get_by_tid(oid: PgTypeId) -> &'static PgType<'static> {
         match oid {
@@ -83,6 +140,14 @@ impl<'a> PgType<'a> {
             PgTypeId::FLOAT8 => PG_TYPE_FLOAT8,
             PgTypeId::MONEY => PG_TYPE_MONEY,
             PgTypeId::INET => PG_TYPE_INET,
+            PgTypeId::ArrayBool => PG_TYPE_ARRAY_BOOL,
+            PgTypeId::ArrayBytea => PG_TYPE_ARRAY_BYTEA,
+            PgTypeId::ArrayInt2 => PG_TYPE_ARRAY_INT2,
+            PgTypeId::ArrayInt4 => PG_TYPE_ARRAY_INT4,
+            PgTypeId::ArrayText => PG_TYPE_ARRAY_TEXT,
+            PgTypeId::ArrayInt8 => PG_TYPE_ARRAY_INT8,
+            PgTypeId::ArrayFloat4 => PG_TYPE_ARRAY_FLOAT4,
+            PgTypeId::ArrayFloat8 => PG_TYPE_ARRAY_FLOAT8,
             PgTypeId::BPCHAR => PG_TYPE_BPCHAR,
             PgTypeId::VARCHAR => PG_TYPE_VARCHAR,
             PgTypeId::DATE => PG_TYPE_DATE,
@@ -129,6 +194,14 @@ impl<'a> PgType<'a> {
             PG_TYPE_FLOAT8,
             PG_TYPE_MONEY,
             PG_TYPE_INET,
+            PG_TYPE_ARRAY_BOOL,
+            PG_TYPE_ARRAY_BYTEA,
+            PG_TYPE_ARRAY_INT2,
+            PG_TYPE_ARRAY_INT4,
+            PG_TYPE_ARRAY_TEXT,
+            PG_TYPE_ARRAY_INT8,
+            PG_TYPE_ARRAY_FLOAT4,
+            PG_TYPE_ARRAY_FLOAT8,
             PG_TYPE_BPCHAR,
             PG_TYPE_VARCHAR,
             PG_TYPE_DATE,
@@ -957,4 +1030,156 @@ const PG_TYPE_SQL_IDENTIFIER: &PgType = &PgType {
     typarray: 0,
     typalign: "c",
     typstorage: "p",
+};
+
+const PG_TYPE_ARRAY_BOOL: &PgType = &PgType {
+    oid: PgTypeId::ArrayBool as u32,
+    typname: "_bool",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 16,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_BYTEA: &PgType = &PgType {
+    oid: PgTypeId::ArrayBytea as u32,
+    typname: "_bytea",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 17,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_INT2: &PgType = &PgType {
+    oid: PgTypeId::ArrayInt2 as u32,
+    typname: "_int2",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 21,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_INT4: &PgType = &PgType {
+    oid: PgTypeId::ArrayInt2 as u32,
+    typname: "_int4",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 23,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_TEXT: &PgType = &PgType {
+    oid: PgTypeId::ArrayText as u32,
+    typname: "_text",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 25,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_INT8: &PgType = &PgType {
+    oid: PgTypeId::ArrayInt8 as u32,
+    typname: "_int8",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 20,
+    typarray: 0,
+    typalign: "d",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_FLOAT4: &PgType = &PgType {
+    oid: PgTypeId::ArrayFloat4 as u32,
+    typname: "_float4",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 700,
+    typarray: 0,
+    typalign: "i",
+    typstorage: "x",
+};
+
+const PG_TYPE_ARRAY_FLOAT8: &PgType = &PgType {
+    oid: PgTypeId::ArrayFloat8 as u32,
+    typname: "_float8",
+    typnamespace: 11,
+    typowner: 10,
+    typlen: -1,
+    typbyval: false,
+    typtype: "b",
+    typcategory: "A",
+    typisprefered: false,
+    typisdefined: true,
+    typrelid: 0,
+    typsubscript: "array_subscript_handler",
+    typelem: 701,
+    typarray: 0,
+    typalign: "d",
+    typstorage: "x",
 };

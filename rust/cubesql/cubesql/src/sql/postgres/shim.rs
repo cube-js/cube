@@ -1,7 +1,5 @@
-use datafusion::arrow::datatypes::DataType;
 use std::{
     collections::HashMap,
-    io,
     io::{Error, ErrorKind},
     sync::Arc,
 };
@@ -14,6 +12,7 @@ use log::{debug, error, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::sql::dataframe::DataFrame;
+use crate::sql::df_type_to_pg_tid;
 use crate::sql::extended::Portal;
 use crate::sql::protocol::Format;
 use crate::sql::statement::StatementPlaceholderReplacer;
@@ -469,33 +468,7 @@ impl AsyncPostgresShim {
                 for field in logical_plan.schema().fields() {
                     result.push(RowDescriptionField::new(
                         field.name().clone(),
-                        match field.data_type() {
-                            DataType::Boolean => PgType::get_by_tid(PgTypeId::BOOL),
-                            DataType::Int16 => PgType::get_by_tid(PgTypeId::INT2),
-                            DataType::Int32 => PgType::get_by_tid(PgTypeId::INT4),
-                            DataType::Int64 => PgType::get_by_tid(PgTypeId::INT8),
-                            DataType::UInt16 => PgType::get_by_tid(PgTypeId::INT8),
-                            DataType::UInt32 => PgType::get_by_tid(PgTypeId::INT8),
-                            DataType::UInt64 => PgType::get_by_tid(PgTypeId::INT8),
-                            DataType::Float32 => PgType::get_by_tid(PgTypeId::FLOAT4),
-                            DataType::Float64 => PgType::get_by_tid(PgTypeId::FLOAT8),
-                            DataType::Utf8 => PgType::get_by_tid(PgTypeId::TEXT),
-                            DataType::LargeUtf8 => PgType::get_by_tid(PgTypeId::TEXT),
-                            DataType::Null => PgType::get_by_tid(PgTypeId::BOOL),
-                            data_type => {
-                                let message =
-                                    format!("Unsupported data type for pg-wire: {:?}", data_type);
-
-                                self.write(protocol::ErrorResponse::new(
-                                    protocol::ErrorSeverity::Error,
-                                    protocol::ErrorCode::InternalError,
-                                    message.clone(),
-                                ))
-                                .await?;
-
-                                return Err(io::Error::new(io::ErrorKind::Other, message));
-                            }
-                        },
+                        df_type_to_pg_tid(field.data_type())?.to_type(),
                     ));
                 }
 
@@ -582,6 +555,7 @@ impl AsyncPostgresShim {
                     TableValue::Int64(v) => batch_writer.write_value(*v)?,
                     TableValue::Boolean(v) => batch_writer.write_value(*v)?,
                     TableValue::Float64(v) => batch_writer.write_value(*v)?,
+                    TableValue::List(v) => batch_writer.write_value(v.clone())?,
                     // @todo Support value
                     TableValue::Timestamp(v) => batch_writer.write_value(v.to_string())?,
                 };
