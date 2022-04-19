@@ -1029,7 +1029,7 @@ declare module '@cubejs-client/core' {
     load<T extends DeeplyReadonly<Query | Query[]>>(
       query: T,
       options?: LoadMethodOptions,
-      callback?: LoadMethodCallback<ResultSet>,
+      callback?: LoadMethodCallback<ResultSet<QueryResultType<T>>>,
     ): void;
     load<T extends DeeplyReadonly<Query | Query[]>>(
       query: T,
