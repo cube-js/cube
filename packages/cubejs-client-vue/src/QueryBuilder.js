@@ -31,16 +31,20 @@ const validateFilters = (filters) =>
       return [...acc, raw];
     }
 
-    const validOperator = operators.reduce((acc, operator) => {
+    const validBooleanFilter = operators.reduce((acc, operator) => {
       const filters = raw[operator];
-      if (filters && Object.keys(acc) == 0) {
-        return { ...acc, [operator]: validateFilters(filters) };
+
+      const booleanFilters = validateFilters(filters || []);
+
+      if (booleanFilters.length) {
+        return { ...acc, [operator]: booleanFilters };
       }
+      
       return acc;
     }, {});
 
-    if (operators.some((operator) => validOperator[operator] && validOperator[operator].length)) {
-      return [...acc, validOperator];
+    if (operators.some((operator) => validBooleanFilter[operator])) {
+      return [...acc, validBooleanFilter];
     }
 
     return acc;
