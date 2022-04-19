@@ -39,7 +39,7 @@ const validateFilters = (filters) =>
       if (booleanFilters.length) {
         return { ...acc, [operator]: booleanFilters };
       }
-      
+
       return acc;
     }, {});
 
@@ -248,9 +248,7 @@ export default {
     }
 
     if (!this.wrapWithQueryRenderer && this.$scopedSlots.builder) {
-      return createElement('div', {}, [
-        this.$scopedSlots.builder(builderProps),
-      ]);
+      return createElement('div', {}, [this.$scopedSlots.builder(builderProps)]);
     }
 
     // Pass parent slots to child QueryRenderer component
