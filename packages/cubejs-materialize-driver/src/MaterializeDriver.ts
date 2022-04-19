@@ -1,5 +1,6 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
+import { checkNonNullable } from '@cubejs-backend/shared';
 import { PoolClient, QueryResult } from 'pg';
 import { Readable } from 'stream';
 
@@ -46,7 +47,7 @@ export class MaterializeDriver extends PostgresDriver {
     tableData: DownloadTableMemoryData,
     indexesSql: IndexesSQL
   ) {
-    BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null);
+    return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null);
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
@@ -56,14 +57,15 @@ export class MaterializeDriver extends PostgresDriver {
       values: [],
       types: { getTypeParser: this.getTypeParser }
     };
+    let finish = false;
 
-    for (
-      let results: QueryResult<any> | undefined = await conn.query(queryParams);
-      results;
-      results = results.rowCount === 0
-        ? (await conn.query(queryParams))
-        : undefined) {
-      const { rows } = results;
+    while (!finish) {
+      const results: QueryResult<any> | undefined = await conn.query(queryParams);
+      const { rows, rowCount } = results;
+
+      if (rowCount === 0) {
+        finish = true;
+      }
 
       for (const row of rows) {
         yield row;
