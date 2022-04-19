@@ -102,14 +102,14 @@ impl AsyncPostgresShim {
         self.ready().await?;
 
         loop {
-            match buffer::read_message(&mut self.socket).await? {
-                FrontendMessage::Query(body) => self.process_query(body.query).await?,
-                FrontendMessage::Parse(body) => self.parse(body).await?,
-                FrontendMessage::Bind(body) => self.bind(body).await?,
-                FrontendMessage::Execute(body) => self.execute(body).await?,
-                FrontendMessage::Close(body) => self.close(body).await?,
-                FrontendMessage::Describe(body) => self.describe(body).await?,
-                FrontendMessage::Sync => self.sync().await?,
+            let result = match buffer::read_message(&mut self.socket).await? {
+                FrontendMessage::Query(body) => self.process_query(body.query).await,
+                FrontendMessage::Parse(body) => self.parse(body).await,
+                FrontendMessage::Bind(body) => self.bind(body).await,
+                FrontendMessage::Execute(body) => self.execute(body).await,
+                FrontendMessage::Close(body) => self.close(body).await,
+                FrontendMessage::Describe(body) => self.describe(body).await,
+                FrontendMessage::Sync => self.sync().await,
                 FrontendMessage::Terminate => return Ok(()),
                 command_id => {
                     return Err(Error::new(
@@ -117,6 +117,14 @@ impl AsyncPostgresShim {
                         format!("Unsupported operation: {:?}", command_id),
                     ))
                 }
+            };
+            if let Err(err) = result {
+                self.write(protocol::ErrorResponse::new(
+                    protocol::ErrorSeverity::Error,
+                    protocol::ErrorCode::InternalError,
+                    err.to_string(),
+                ))
+                .await?;
             }
         }
     }
@@ -343,43 +351,29 @@ impl AsyncPostgresShim {
                 None => {
                     self.write(protocol::EmptyQueryResponse::new()).await?;
                 }
-                Some(portal) => match portal.description {
-                    // If query doesnt return any fields, we can return complete without execution
-                    None => {
-                        self.write(protocol::CommandComplete::new(
-                            protocol::CommandCompleteTag::Select,
-                            0,
-                        ))
-                        .await?;
-                    }
-                    Some(_) => {
-                        if execute.max_rows == 0 {
-                            // TODO: I will rewrite this code later, it's just a prototype
-                            #[allow(mutable_borrow_reservation_conflict)]
-                            match self
-                                .execute_plan(portal.plan.clone(), false, portal.format)
-                                .await
-                            {
-                                Err(e) => {
-                                    self.write(protocol::ErrorResponse::new(
-                                        protocol::ErrorSeverity::Error,
-                                        protocol::ErrorCode::InternalError,
-                                        e.message,
-                                    ))
-                                    .await?;
-                                }
-                                Ok(_) => {}
-                            }
-                        } else {
+                Some(portal) => {
+                    // TODO: I will rewrite this code later, it's just a prototype
+                    #[allow(mutable_borrow_reservation_conflict)]
+                    match self
+                        .execute_plan(
+                            portal.plan.clone(),
+                            false,
+                            portal.format,
+                            execute.max_rows as usize,
+                        )
+                        .await
+                    {
+                        Err(e) => {
                             self.write(protocol::ErrorResponse::new(
                                 protocol::ErrorSeverity::Error,
                                 protocol::ErrorCode::InternalError,
-                                "Execute with limited rows is not supported".to_string(),
+                                e.message,
                             ))
                             .await?;
                         }
+                        Ok(_) => {}
                     }
-                },
+                }
             },
             None => {
                 self.write(protocol::ReadyForQuery::new(
@@ -411,7 +405,7 @@ impl AsyncPostgresShim {
 
             let plan =
                 convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
-                    .unwrap();
+                    .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))?;
 
             let format = body
                 .result_formats
@@ -449,7 +443,7 @@ impl AsyncPostgresShim {
         plan: &QueryPlan,
     ) -> Result<Vec<RowDescriptionField>, Error> {
         match plan {
-            QueryPlan::MetaOk(_) => Ok(vec![]),
+            QueryPlan::MetaOk(_, _) => Ok(vec![]),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -481,7 +475,8 @@ impl AsyncPostgresShim {
         let prepared = if parse.query.trim() == "" {
             None
         } else {
-            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL).unwrap();
+            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)
+                .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))?;
 
             let stmt_finder = StatementParamsFinder::new();
             let parameters: Vec<PgTypeId> = stmt_finder
@@ -501,8 +496,8 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan =
-                convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).unwrap();
+            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())
+                .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))?;
             let fields: Vec<RowDescriptionField> =
                 self.query_plan_to_row_description(&plan).await?;
             let description = if fields.len() > 0 {
@@ -615,36 +610,49 @@ impl AsyncPostgresShim {
         plan: QueryPlan,
         description: bool,
         format: Format,
+        max_rows: usize,
     ) -> Result<(), CubeError> {
         match plan {
-            QueryPlan::MetaOk(_) => {
-                self.write(protocol::CommandComplete::new(
-                    protocol::CommandCompleteTag::Select,
-                    0,
-                ))
-                .await?;
+            QueryPlan::MetaOk(_, completion) => {
+                self.write(completion.to_pg_command()).await?;
             }
             QueryPlan::MetaTabular(_, data_frame) => {
+                if max_rows != 0 && data_frame.len() > max_rows {
+                    self.write(protocol::ErrorResponse::new(
+                        protocol::ErrorSeverity::Error,
+                        protocol::ErrorCode::InternalError,
+                        "Execute with limited rows is not supported".to_string(),
+                    ))
+                    .await?;
+
+                    return Ok(());
+                }
+
                 let total_rows = self
                     .write_data_frame(data_frame, description, format)
                     .await?;
 
-                self.write(protocol::CommandComplete::new(
-                    protocol::CommandCompleteTag::Select,
-                    total_rows,
-                ))
-                .await?;
+                self.write(protocol::CommandComplete::Select(total_rows))
+                    .await?;
             }
             QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                if max_rows != 0 {
+                    self.write(protocol::ErrorResponse::new(
+                        protocol::ErrorSeverity::Error,
+                        protocol::ErrorCode::InternalError,
+                        "Execute with limited rows is not supported".to_string(),
+                    ))
+                    .await?;
+
+                    return Ok(());
+                }
+
                 let df = DFDataFrame::new(ctx.state, &plan);
                 let stream = df.execute_stream().await?;
                 let total_rows = self.write_stream(stream, description, format).await?;
 
-                self.write(protocol::CommandComplete::new(
-                    protocol::CommandCompleteTag::Select,
-                    total_rows,
-                ))
-                .await?;
+                self.write(protocol::CommandComplete::Select(total_rows))
+                    .await?;
             }
         };
 
@@ -660,7 +668,7 @@ impl AsyncPostgresShim {
             .await?;
 
         let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
-        self.execute_plan(plan, true, Format::Text).await
+        self.execute_plan(plan, true, Format::Text, 0).await
     }
 
     pub async fn process_query(&mut self, query: String) -> Result<(), Error> {

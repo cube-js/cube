@@ -9,6 +9,7 @@ use async_trait::async_trait;
 
 use bytes::BufMut;
 
+use crate::sql::protocol::CommandComplete::{Plain, Select};
 use crate::sql::statement::BindValue;
 use tokio::io::AsyncReadExt;
 
@@ -212,24 +213,21 @@ impl Serialize for ParseComplete {
     }
 }
 
-pub struct CommandComplete {
-    tag: CommandCompleteTag,
-    rows: u32,
-}
-
-impl CommandComplete {
-    pub fn new(tag: CommandCompleteTag, rows: u32) -> Self {
-        Self { tag, rows }
-    }
+pub enum CommandComplete {
+    Select(u32),
+    Plain(String),
 }
 
 impl Serialize for CommandComplete {
     const CODE: u8 = b'C';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        let string = format!("{} {}", self.tag, self.rows);
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer::write_string(&mut buffer, &string);
+        match self {
+            Select(rows) => buffer::write_string(&mut buffer, &format!("SELECT {}", rows)),
+            Plain(tag) => buffer::write_string(&mut buffer, &tag),
+        }
+
         Some(buffer)
     }
 }
@@ -698,19 +696,6 @@ impl TransactionStatus {
             // Self::InTransactionBlock => b'T',
             // Self::InFailedTransactionBlock => b'E',
         }
-    }
-}
-
-pub enum CommandCompleteTag {
-    Select,
-}
-
-impl Display for CommandCompleteTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let string = match self {
-            Self::Select => "SELECT",
-        };
-        write!(f, "{}", string)
     }
 }
 
