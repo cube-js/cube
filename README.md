@@ -38,13 +38,15 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 ## Getting Started 🚀
 
-### Starting with Cube Cloud
+### Cube Cloud
 
-The fastest way to try Cube locally is using [Cube Cloud](https://cube.dev/cloud/). It provides managed experience for Cube and has a free tier for development projects and proofs of concept.
+[Cube Cloud](https://cube.dev/cloud/) is the fastest way to get started with Cube. It provides managed infrastructure as well as an instant and free access for development projects and proofs of concept.
 
-You can set up Cube Cloud and connect your Cube project to your database by following our [Getting started guide](https://cube.dev/docs/cloud/getting-started/create).
+[![Get started now](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png)](https://cubecloud.dev/auth/signup)
 
-### Starting with Docker
+For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/cloud/getting-started/create).
+
+### Docker
 
 Alternatively, you can get started with Cube locally or self-host it with [Docker](https://www.docker.com/).
 
@@ -57,7 +59,9 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
-Then, open http://localhost:4000 in your browser to continue setup. You can learn more by following our [Getting started guide](https://cube.dev/docs/getting-started-docker).
+Then, open http://localhost:4000 in your browser to continue setup.
+
+For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting-started-docker).
 
 ## Resources
 
