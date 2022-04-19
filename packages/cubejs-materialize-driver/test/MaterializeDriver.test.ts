@@ -63,7 +63,7 @@ describe('MaterializeDriver', () => {
         // converted to utc
         timestamptz: '2019-12-31T22:00:00.000',
         // Numerics as string
-        decimal: '1.00',
+        decimal: '1',
       }
     ]);
   });

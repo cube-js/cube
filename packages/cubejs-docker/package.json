@@ -29,6 +29,7 @@
     "@cubejs-backend/snowflake-driver": "^0.29.28",
     "@cubejs-backend/sqlite-driver": "^0.29.28",
     "@cubejs-backend/questdb-driver": "^0.29.28",
+    "@cubejs-backend/materialize-driver": "^0.29.28",
     "cubejs-cli": "^0.29.28",
     "typescript": "~4.1.5"
   },
