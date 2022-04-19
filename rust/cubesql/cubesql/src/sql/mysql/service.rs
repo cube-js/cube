@@ -201,7 +201,7 @@ impl MySqlConnection {
 
             let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
             match plan {
-                crate::compile::QueryPlan::MetaOk(status) => {
+                crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
                 },
                 crate::compile::QueryPlan::MetaTabular(status, data_frame) => {

@@ -62,6 +62,7 @@ use crate::compile::engine::udf::{
     create_str_to_date, create_year_udf,
 };
 use crate::compile::rewrite::converter::LogicalPlanToLanguageConverter;
+use crate::sql::types::CommandCompletion;
 
 pub mod builder;
 pub mod context;
@@ -1585,9 +1586,10 @@ impl QueryPlanner {
                     Arc::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
-            (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => {
-                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
-            }
+            (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => Ok(QueryPlan::MetaOk(
+                StatusFlags::empty(),
+                CommandCompletion::Select(0),
+            )),
             // TODO: enable for Postgres after variables are supported
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
@@ -1629,15 +1631,24 @@ impl QueryPlanner {
             }
             (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
-                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Begin,
+                ))
             }
             (ast::Statement::Commit { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
-                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Commit,
+                ))
             }
             (ast::Statement::Rollback { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
-                Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Rollback,
+                ))
             }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
@@ -2017,7 +2028,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
         self.state.set_database(Some(db_name.value.clone()));
 
-        Ok(QueryPlan::MetaOk(StatusFlags::empty()))
+        Ok(QueryPlan::MetaOk(
+            StatusFlags::empty(),
+            CommandCompletion::Use,
+        ))
     }
 
     fn set_variable_to_plan(
@@ -2349,7 +2363,7 @@ impl CompiledQuery {
 pub enum QueryPlan {
     // Meta will not be executed in DF,
     // we already knows how respond to it
-    MetaOk(StatusFlags),
+    MetaOk(StatusFlags, CommandCompletion),
     MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
     DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
@@ -2359,7 +2373,7 @@ impl QueryPlan {
     pub fn as_logical_plan(self) -> LogicalPlan {
         match self {
             QueryPlan::DataFusionSelect(_, plan, _) => plan,
-            QueryPlan::MetaOk(_) | QueryPlan::MetaTabular(_, _) => {
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
             }
         }
@@ -2374,7 +2388,7 @@ impl QueryPlan {
                     Ok(plan.display().to_string())
                 }
             }
-            QueryPlan::MetaOk(_) | QueryPlan::MetaTabular(_, _) => Ok(
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(
                 "This query doesnt have a plan, because it already has values for response"
                     .to_string(),
             ),
@@ -4285,7 +4299,7 @@ mod tests {
             QueryPlan::MetaTabular(flags, frame) => {
                 return Ok((frame.print(), flags));
             }
-            QueryPlan::MetaOk(flags) => {
+            QueryPlan::MetaOk(flags, _) => {
                 return Ok(("".to_string(), flags));
             }
         }
