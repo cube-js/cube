@@ -117,6 +117,7 @@ impl MySqlConnection {
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
+                            dt => unimplemented!("Not supported type for MySQL: {:?}", dt),
                         }
                     }
 

@@ -122,7 +122,7 @@ impl CubeColumn {
     }
 
     pub fn get_column_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 }
 

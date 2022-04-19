@@ -476,6 +476,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Int32 => DataType::Int64,
                             ColumnType::Int64 => DataType::Int64,
                             ColumnType::Blob => DataType::Utf8,
+                            ColumnType::List(field) => DataType::List(field.clone()),
                             ColumnType::Timestamp => {
                                 DataType::Timestamp(TimeUnit::Millisecond, None)
                             }
