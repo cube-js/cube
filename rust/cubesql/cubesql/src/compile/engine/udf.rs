@@ -1000,7 +1000,7 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
         vec![DataType::Boolean],
         Arc::new(DataType::List(Box::new(Field::new(
             "item",
-            DataType::Int32,
+            DataType::Utf8,
             true,
         )))),
         Volatility::Immutable,

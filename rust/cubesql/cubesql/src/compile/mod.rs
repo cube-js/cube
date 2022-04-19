@@ -2307,11 +2307,10 @@ impl CompiledQuery {
         let mut fields: Vec<DFField> = Vec::new();
 
         for meta_field in self.meta.iter() {
-            let column_type = meta_field.column_type;
             fields.push(DFField::new(
                 None,
                 meta_field.column_to.as_str(),
-                df_data_type_by_column_type(column_type),
+                df_data_type_by_column_type(meta_field.column_type.clone()),
                 false,
             ));
         }
@@ -5288,7 +5287,6 @@ mod tests {
         Ok(())
     }
 
-    /* TODO: @ovr
     #[tokio::test]
     async fn test_current_schemas_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
@@ -5311,7 +5309,6 @@ mod tests {
 
         Ok(())
     }
-    */
 
     #[tokio::test]
     async fn test_format_type_postgres() -> Result<(), CubeError> {
