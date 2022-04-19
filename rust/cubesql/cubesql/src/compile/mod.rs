@@ -1402,19 +1402,42 @@ impl QueryPlanner {
             return self.create_df_logical_plan(stmt.clone());
         };
 
-        let (schema_name, table_name) = match &from_table.relation {
+        let (db_name, schema_name, table_name) = match &from_table.relation {
             ast::TableFactor::Table { name, .. } => match name {
                 ast::ObjectName(identifiers) => {
-                    if identifiers.len() == 2 {
+                    match identifiers.len() {
                         // db.`KibanaSampleDataEcommerce`
-                        (identifiers[0].value.clone(), identifiers[1].value.clone())
-                    } else if identifiers.len() == 1 {
+                        2 => match self.state.protocol {
+                            DatabaseProtocol::MySQL => (
+                                identifiers[0].value.clone(),
+                                "public".to_string(),
+                                identifiers[1].value.clone(),
+                            ),
+                            DatabaseProtocol::PostgreSQL => (
+                                "db".to_string(),
+                                identifiers[0].value.clone(),
+                                identifiers[1].value.clone(),
+                            ),
+                        },
                         // `KibanaSampleDataEcommerce`
-                        ("db".to_string(), identifiers[0].value.clone())
-                    } else {
-                        return Err(CompilationError::Unsupported(
-                            "Query with multiple tables in from".to_string(),
-                        ));
+                        1 => match self.state.protocol {
+                            DatabaseProtocol::MySQL => (
+                                "db".to_string(),
+                                "public".to_string(),
+                                identifiers[0].value.clone(),
+                            ),
+                            DatabaseProtocol::PostgreSQL => (
+                                "db".to_string(),
+                                "public".to_string(),
+                                identifiers[0].value.clone(),
+                            ),
+                        },
+                        _ => {
+                            return Err(CompilationError::Unsupported(format!(
+                                "Table identifier: {:?}",
+                                identifiers
+                            )));
+                        }
                     }
                 }
             },
@@ -1426,11 +1449,29 @@ impl QueryPlanner {
             }
         };
 
-        if schema_name.to_lowercase() == "information_schema"
-            || schema_name.to_lowercase() == "performance_schema"
-            || schema_name.to_lowercase() == "pg_catalog"
-        {
-            return self.create_df_logical_plan(stmt.clone());
+        match self.state.protocol {
+            DatabaseProtocol::MySQL => {
+                if db_name.to_lowercase() == "information_schema"
+                    || db_name.to_lowercase() == "performance_schema"
+                {
+                    return self.create_df_logical_plan(stmt.clone());
+                }
+            }
+            DatabaseProtocol::PostgreSQL => {
+                if schema_name.to_lowercase() == "information_schema"
+                    || schema_name.to_lowercase() == "performance_schema"
+                    || schema_name.to_lowercase() == "pg_catalog"
+                {
+                    return self.create_df_logical_plan(stmt.clone());
+                }
+            }
+        };
+
+        if db_name.to_lowercase() != "db" {
+            return Err(CompilationError::Unsupported(format!(
+                "Unable to access database {}",
+                db_name
+            )));
         }
 
         if !select.from[0].joins.is_empty() {
@@ -1461,13 +1502,6 @@ impl QueryPlanner {
             return Err(CompilationError::Unsupported(
                 "Query with HAVING instruction(s)".to_string(),
             ));
-        }
-
-        if schema_name.to_lowercase() != "db" {
-            return Err(CompilationError::Unsupported(format!(
-                "Unable to access schema {}",
-                schema_name
-            )));
         }
 
         // @todo Better solution?
