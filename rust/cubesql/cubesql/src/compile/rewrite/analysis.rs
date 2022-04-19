@@ -75,13 +75,12 @@ impl LogicalPlanAnalysis {
         enode: &LogicalPlanLanguage,
     ) -> Option<Expr> {
         let id_to_expr = |id| {
-            egraph[id]
-                .data
-                .original_expr
-                .clone()
-                .ok_or(CubeError::internal(
-                    "Original expr wasn't prepared".to_string(),
+            egraph[id].data.original_expr.clone().ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Original expr wasn't prepared for {:?}",
+                    egraph[id]
                 ))
+            })
         };
         let original_expr = if is_expr_node(enode) {
             // TODO .unwrap
