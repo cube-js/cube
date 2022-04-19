@@ -254,9 +254,7 @@ export async function startBirdBoxFromContainer(
       target: `http://localhost:${port}`
     }).listen(4000);
     proxyServer.on('error', async (err, req, res) => {
-      if (options.log === Log.PIPE) {
-        process.stderr.write(`[Proxy Server] error: ${err}\n`);
-      }
+      process.stderr.write(`[Proxy Server] error: ${err}\n`);
       if (!res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
@@ -287,15 +285,15 @@ export async function startBirdBoxFromContainer(
     } else {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
-        process.stderr.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
-        );
       }
       await env.down();
+      process.stderr.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished with error: ${
+          exitCode
+        }\n`
+      );
       process.exit(1);
     }
   }
@@ -380,15 +378,15 @@ export async function startBirdBoxFromCli(
     } else {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
-        process.stdout.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
-        );
       }
       await db.stop();
+      process.stderr.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished with error: ${
+          exitCode
+        }\n`
+      );
       process.exit(1);
     }
   }
@@ -533,22 +531,22 @@ export async function getBirdbox(
 
   // extract/assert env variables
   if (REQ_ENV_VARS[type] === undefined) {
-    if (log === Log.PIPE) {
-      process.stderr.write(
-        `List of required environment variables is missing for ${
-          type
-        }\n`
-      );
-    }
+    process.stderr.write(
+      `Error: list of required environment variables is missing for ${
+        type
+      }\n`
+    );
     process.exit(1);
   } else {
     REQ_ENV_VARS[type].forEach((key: string) => {
       if (process.env[key] === undefined) {
-        if (log === Log.PIPE) {
-          process.stderr.write(
-            `${key} is required environment variable for ${type}\n`
-          );
-        }
+        process.stderr.write(
+          `Error: ${
+            key
+          } is required environment variable for ${
+            type
+          }\n`
+        );
         process.exit(1);
       } else {
         // @ts-ignore
@@ -584,19 +582,15 @@ export async function getBirdbox(
         break;
       }
       default: {
-        if (log === Log.PIPE) {
-          process.stderr.write(
-            `Unsupported Birdbox mode: ${mode}\n`
-          );
-        }
+        process.stderr.write(
+          `Error: unsupported Birdbox mode: ${mode}\n`
+        );
         process.exit(1);
       }
     }
   } catch (e) {
-    if (log === Log.PIPE) {
-      process.stderr.write(e as string);
-    }
     clearTestData();
+    process.stderr.write(e as string);
     process.exit(1);
   }
   return birdbox;

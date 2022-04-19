@@ -69,7 +69,10 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
 ];
 
 // eslint-disable-next-line import/prefer-default-export
-export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
+export function createBirdBoxTestCase(
+  name: string,
+  entrypoint: () => Promise<BirdBox>,
+): void {
   describe(name, () => {
     jest.setTimeout(60 * 5 * 1000);
 
