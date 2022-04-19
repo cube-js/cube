@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use datafusion::arrow::datatypes::DataType;
 use datafusion::error::Result;
 use datafusion::variable::VarType;
 use datafusion::{scalar::ScalarValue, variable::VarProvider};
@@ -87,5 +88,9 @@ impl VarProvider for VariablesProvider {
             ('@', _) => return self.get_session_value(identifier, VarType::UserDefined),
             (_, _) => return Ok(ScalarValue::Utf8(None)),
         };
+    }
+
+    fn get_type(&self, _var_names: &[String]) -> Option<DataType> {
+        Some(DataType::Utf8)
     }
 }

@@ -162,12 +162,22 @@ impl ImportFormat {
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                let data = base64::decode(value)?;
+                let mut data = Vec::new();
+                if value.contains(' ') {
+                    parse_space_separated_binstring(&mut data, value)?;
+                } else {
+                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+                };
                 let hll = HllSketch::read_hll_storage_spec(&data)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
-                let data = base64::decode(value)?;
+                let mut data = Vec::new();
+                if value.contains(' ') {
+                    parse_space_separated_binstring(&mut data, value)?;
+                } else {
+                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+                };
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
             }
@@ -196,6 +206,38 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+fn decode_byte(s: &str) -> Option<u8> {
+    let v = s.as_bytes();
+    if v.len() != 2 {
+        return None;
+    }
+    let decode_char = |c| match c {
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
+    };
+    let v0 = decode_char(v[0])?;
+    let v1 = decode_char(v[1])?;
+    return Some(v0 * 16 + v1);
+}
+
+pub(crate) fn parse_space_separated_binstring<'a>(
+    buffer: &'a mut Vec<u8>,
+    s: &'a str,
+) -> Result<&'a [u8], CubeError> {
+    *buffer = s
+        .split(' ')
+        .filter(|b| !b.is_empty())
+        .map(|s| {
+            decode_byte(s).ok_or_else(|| {
+                CubeError::user(format!("cannot convert value to binary string: {}", s))
+            })
+        })
+        .try_collect()?;
+    Ok(buffer.as_slice())
 }
 
 struct CsvLineParser<'a> {
@@ -410,7 +452,14 @@ impl ImportServiceImpl {
         if location.starts_with("http") {
             let (file, path) = tempfile::Builder::new()
                 .prefix(&table_id.to_string())
-                .tempfile_in(temp_dir)?
+                .tempfile_in(temp_dir)
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Open tempfile in {}: {}",
+                        temp_dir.to_str().unwrap_or("<invalid>"),
+                        e
+                    ))
+                })?
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
@@ -436,7 +485,12 @@ impl ImportServiceImpl {
                 .await?;
             Ok((temp_file, None))
         } else {
-            Ok((File::open(location.clone()).await?, None))
+            Ok((
+                File::open(location.clone()).await.map_err(|e| {
+                    CubeError::internal(format!("Open location {}: {}", location, e))
+                })?,
+                None,
+            ))
         }
     }
 
@@ -444,7 +498,9 @@ impl ImportServiceImpl {
         let to_download = ImportServiceImpl::temp_uploads_path(location);
         // TODO check file size
         let local_file = self.remote_fs.download_file(&to_download, None).await?;
-        Ok(File::open(local_file).await?)
+        Ok(File::open(local_file.clone())
+            .await
+            .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
     }
 
     fn temp_uploads_path(location: &str) -> String {
@@ -468,7 +524,15 @@ impl ImportServiceImpl {
         location: &str,
     ) -> Result<(), CubeError> {
         let temp_dir = self.config_obj.data_dir().join("tmp");
-        tokio::fs::create_dir_all(temp_dir.clone()).await?;
+        tokio::fs::create_dir_all(temp_dir.clone())
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Create temp_dir {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?;
 
         let (file, tmp_path) = self
             .resolve_location(location.clone(), table.get_id(), &temp_dir)

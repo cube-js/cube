@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
+use crate::tests::mysql::MySqlIntegrationTestSuite;
 use cubesql::telemetry::ReportingLogger;
 use log::Level;
 use simple_logger::SimpleLogger;
 use tests::{
     basic::{AsyncTestConstructorResult, AsyncTestSuite},
-    mysql::MySqlIntegrationTestSuite,
     postgres::PostgresIntegrationTestSuite,
 };
 

@@ -10,19 +10,20 @@ use crate::CubeError;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::{Column, ExprRewriter};
+use datafusion::logical_plan::{Column, ExprRewritable, ExprRewriter};
 use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::functions::BuiltinScalarFunction;
 use datafusion::physical_plan::window_functions::WindowFunction;
 use datafusion::scalar::ScalarValue;
-use egg::{rewrite, Applier, Pattern, PatternAst, Subst, Symbol};
+use egg::{rewrite, Applier, Pattern, PatternAst, SearchMatches, Searcher, Subst, Symbol, Var};
 use egg::{EGraph, Id, Rewrite};
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::slice::Iter;
 use std::str::FromStr;
 
-// trace_macros!(false);
+// trace_macros!(true);
 
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
@@ -107,6 +108,7 @@ crate::plan_to_language! {
             column: Column,
         },
         ScalarVariableExpr {
+            data_type: DataType,
             variable: Vec<String>,
         },
         LiteralExpr { value: ScalarValue, },
@@ -181,6 +183,8 @@ crate::plan_to_language! {
             order: Vec<LogicalPlan>,
             limit: Option<usize>,
             offset: Option<usize>,
+            aliases: Option<Vec<String>>,
+            table_name: String,
         },
         Measure {
             name: String,
@@ -201,6 +205,9 @@ crate::plan_to_language! {
         },
         SegmentMember {
             member: String,
+        },
+        MemberError {
+            error: String,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
@@ -236,7 +243,7 @@ crate::plan_to_language! {
         ColumnAliasReplacer {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
-            cube: Option<String>,
+            table_name: Option<String>,
         },
     }
 }
@@ -336,6 +343,33 @@ where
     Rewrite::new(
         name.to_string(),
         searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        TransformingPattern::new(applier.as_str(), transform_fn),
+    )
+    .unwrap()
+}
+
+pub fn transforming_chain_rewrite<T>(
+    name: &str,
+    main_searcher: String,
+    chain: Vec<(&str, String)>,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        ChainSearcher {
+            main: main_searcher.parse().unwrap(),
+            chain: chain
+                .into_iter()
+                .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
+                .collect(),
+        },
         TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
@@ -598,11 +632,116 @@ fn cube_scan(
     orders: impl Display,
     limit: impl Display,
     offset: impl Display,
+    aliases: impl Display,
+    table_name: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset
+        "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
+        source_table_name, members, filters, orders, limit, offset, aliases, table_name
     )
+}
+
+pub struct ChainSearcher {
+    main: Pattern<LogicalPlanLanguage>,
+    chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
+}
+
+impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
+    fn search(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+        let matches = self.main.search(egraph);
+        let mut result = Vec::new();
+        for m in matches {
+            if let Some(m) = self.search_match_chained(egraph, m, self.chain.iter()) {
+                result.push(m);
+            }
+        }
+        result
+    }
+
+    fn search_eclass(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclass: Id,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        if let Some(m) = self.main.search_eclass(egraph, eclass) {
+            self.search_match_chained(egraph, m, self.chain.iter())
+        } else {
+            None
+        }
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.main.vars();
+        for (_, p) in self.chain.iter() {
+            vars.extend(p.vars());
+        }
+        vars
+    }
+}
+
+impl ChainSearcher {
+    fn search_match_chained<'a>(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        cur_match: SearchMatches<'a, LogicalPlanLanguage>,
+        chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
+    ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
+        let mut chain = chain.clone();
+        let mut matches_to_merge = Vec::new();
+        if let Some((var, pattern)) = chain.next() {
+            for subst in cur_match.substs.iter() {
+                if let Some(id) = subst.get(var.clone()) {
+                    if let Some(next_match) = pattern.search_eclass(egraph, id.clone()) {
+                        let chain_matches = self.search_match_chained(
+                            egraph,
+                            SearchMatches {
+                                eclass: cur_match.eclass.clone(),
+                                substs: next_match
+                                    .substs
+                                    .iter()
+                                    .map(|next_subst| {
+                                        let mut new_subst = subst.clone();
+                                        for pattern_var in pattern.vars().into_iter() {
+                                            if let Some(pattern_var_value) =
+                                                next_subst.get(pattern_var)
+                                            {
+                                                new_subst
+                                                    .insert(pattern_var, pattern_var_value.clone());
+                                            }
+                                        }
+                                        new_subst
+                                    })
+                                    .collect::<Vec<_>>(),
+                                // TODO merge
+                                ast: cur_match.ast.clone(),
+                            },
+                            chain.clone(),
+                        );
+                        matches_to_merge.extend(chain_matches);
+                    }
+                }
+            }
+            if !matches_to_merge.is_empty() {
+                let mut substs = Vec::new();
+                for m in matches_to_merge {
+                    substs.extend(m.substs.clone());
+                }
+                Some(SearchMatches {
+                    eclass: cur_match.eclass.clone(),
+                    substs,
+                    // TODO merge
+                    ast: cur_match.ast.clone(),
+                })
+            } else {
+                None
+            }
+        } else {
+            Some(cur_match)
+        }
+    }
 }
 
 pub struct TransformingPattern<T>

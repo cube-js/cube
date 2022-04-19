@@ -5,7 +5,7 @@ import { startBirdBoxFromContainer } from '../../src';
 
   try {
     await startBirdBoxFromContainer({
-      name: 'postgresql-cubestore',
+      type: 'postgresql-cubestore',
     });
   } catch (e) {
     console.log(e);

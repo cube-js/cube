@@ -3,8 +3,11 @@ use std::{env, time::Duration};
 use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
+use futures::{pin_mut, TryStreamExt};
 use portpicker::pick_unused_port;
 use tokio::time::sleep;
+
+use super::utils::escape_snapshot_name;
 use tokio_postgres::{NoTls, Row};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
@@ -37,8 +40,9 @@ impl PostgresIntegrationTestSuite {
             );
         };
 
-        // let random_port = 5432_u16;
         let random_port = pick_unused_port().expect("No ports free");
+        // let random_port = 5555;
+        // let random_port = 5432;
 
         tokio::spawn(async move {
             println!("[PostgresIntegrationTestSuite] Running SQL API");
@@ -60,7 +64,7 @@ impl PostgresIntegrationTestSuite {
 
         let (client, connection) = tokio_postgres::connect(
             format!(
-                "host=127.0.0.1 port={} user=ovr password=skipped",
+                "host=127.0.0.1 port={} user=test password=test",
                 random_port
             )
             .as_str(),
@@ -94,12 +98,58 @@ impl PostgresIntegrationTestSuite {
 
         table.set_header(header);
 
-        for (idx, row) in res.into_iter().enumerate() {
-            let mut values = Vec::new();
+        for row in res.into_iter() {
+            let mut values: Vec<String> = Vec::new();
 
-            for _column in row.columns() {
-                let value: String = row.get(idx);
-                values.push(value);
+            for (idx, column) in row.columns().into_iter().enumerate() {
+                match column.type_().oid() {
+                    20 => {
+                        let value: i64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    25 => {
+                        let value: String = row.get(idx);
+                        values.push(value);
+                    }
+                    16 => {
+                        let value: bool = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    701 => {
+                        let value: f64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    // _int4
+                    1007 => {
+                        let value: Vec<i32> = row.get(idx);
+                        values.push(
+                            value
+                                .into_iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                                .to_string(),
+                        );
+                    }
+                    // _int8
+                    1016 => {
+                        let value: Vec<i64> = row.get(idx);
+                        values.push(
+                            value
+                                .into_iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                                .to_string(),
+                        );
+                    }
+                    // _text
+                    1009 => {
+                        let value: Vec<String> = row.get(idx);
+                        values.push(value.join(",").to_string());
+                    }
+                    oid => unimplemented!("Unsupported pg_type: {}", oid),
+                }
             }
 
             table.add_row(values);
@@ -108,28 +158,88 @@ impl PostgresIntegrationTestSuite {
         table.trim_fmt()
     }
 
-    fn escape_snapshot_name(&self, name: String) -> String {
-        name.to_lowercase()
-            // @todo Real escape?
-            .replace(" ", "_")
-            .replace("*", "asterisk")
-    }
-
     async fn assert_query(&self, res: Vec<Row>, query: String) {
         insta::assert_snapshot!(
-            self.escape_snapshot_name(query),
+            escape_snapshot_name(query),
             self.print_query_result(res).await
         );
     }
 
     #[allow(unused)]
-    async fn test_execute_query(&self, query: String) -> RunResult {
+    async fn test_execute_query(&self, query: String, snapshot_name: Option<String>) -> RunResult {
         print!("test {} .. ", query);
 
         let res = self.client.query(&query, &[]).await.unwrap();
-        self.assert_query(res, query).await;
+        insta::assert_snapshot!(
+            snapshot_name.unwrap_or(escape_snapshot_name(query)),
+            self.print_query_result(res).await
+        );
 
         println!("ok");
+
+        Ok(())
+    }
+
+    async fn test_prepare(&self) -> RunResult {
+        let stmt = self
+            .client
+            .prepare("SELECT $1 as t1, $2 as t2")
+            .await
+            .unwrap();
+
+        self.client
+            .query(&stmt, &[&"test1", &"test2"])
+            .await
+            .unwrap();
+
+        Ok(())
+    }
+
+    async fn test_prepare_empty_query(&self) -> RunResult {
+        let stmt = self.client.prepare("").await.unwrap();
+
+        self.client.query(&stmt, &[]).await.unwrap();
+
+        Ok(())
+    }
+
+    // This test tests paging on the service side which uses stream of RecordBatches to stream this query
+    async fn test_stream_all(&self) -> RunResult {
+        let stmt = self
+            .client
+            .prepare("SELECT * FROM information_schema.testing_dataset WHERE id > CAST($1 as int)")
+            .await
+            .unwrap();
+
+        let it = self.client.query_raw(&stmt, &["0"]).await.unwrap();
+
+        pin_mut!(it);
+
+        let mut total = 1;
+
+        while let Some(_) = it.try_next().await.unwrap() {
+            total += 1;
+        }
+
+        assert_eq!(total, 3000);
+
+        Ok(())
+    }
+
+    // This test should return one row
+    // TODO: Find a way how to manage Execute's return_rows to 1 instead of 100
+    async fn test_stream_single(&self) -> RunResult {
+        let stmt = self
+            .client
+            .prepare("SELECT * FROM information_schema.testing_dataset WHERE id = CAST($1 as int)")
+            .await
+            .expect("Unable to prepare statement");
+
+        let _ = self
+            .client
+            .query_one(&stmt, &[&"2000"])
+            .await
+            .expect("Unable to execute query");
 
         Ok(())
     }
@@ -142,21 +252,29 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult {
-        // self.test_use().await?;
-        // self.test_execute_query("SELECT COUNT(*), status FROM Orders".to_string())
-        //     .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, createdAt FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, DATE_TRUNC('month', createdAt) FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
-        // self.test_execute_query(
-        //     "SELECT COUNT(*), status, DATE_TRUNC('quarter', createdAt) FROM Orders ORDER BY createdAt".to_string(),
-        // )
-        // .await?;
+        self.test_prepare().await?;
+        self.test_prepare_empty_query().await?;
+        self.test_stream_all().await?;
+        self.test_stream_single().await?;
+        self.test_execute_query(
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+            None,
+        )
+        .await?;
+        self.test_execute_query(
+            r#"SELECT
+                true as bool_true,
+                false as bool_false,
+                'test',
+                1.0,
+                1,
+                ARRAY['test1', 'test2'] as str_arr,
+                ARRAY[1,2,3] as int8_arr
+            "#
+            .to_string(),
+            Some("pg_test_types".to_string()),
+        )
+        .await?;
 
         Ok(())
     }

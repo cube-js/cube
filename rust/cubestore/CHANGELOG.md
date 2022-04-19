@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.49](https://github.com/cube-js/cube.js/compare/v0.29.48...v0.29.49) (2022-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
+
+
+### Bug Fixes
+
+* **cubestore:** Empty CUBESTORE_S3_SUB_PATH leads to can't list file error ([#4324](https://github.com/cube-js/cube.js/issues/4324)) ([0b35064](https://github.com/cube-js/cube.js/commit/0b350645bd17e1d2ae7ac7a65a30478a2ba53eb1))
+* **cubestore:** Inactive partition compaction: replace error with warn ([#4337](https://github.com/cube-js/cube.js/issues/4337)) ([2ad61ee](https://github.com/cube-js/cube.js/commit/2ad61ee0b956d0d71774b8b304ae24a361c8c5cf))
+* **cubestore:** Support a space separated binary strings for HyperLogLog fields in csv -- Can't parse column value for countDistinctApprox in Athena ([#4383](https://github.com/cube-js/cube.js/issues/4383)) ([8b320b6](https://github.com/cube-js/cube.js/commit/8b320b6fb124d5670677775d413cf71a0d9e6ff5))
+
+
+
+
+
+## [0.29.44](https://github.com/cube-js/cube.js/compare/v0.29.43...v0.29.44) (2022-04-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.29.43](https://github.com/cube-js/cube.js/compare/v0.29.42...v0.29.43) (2022-04-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Filters aren't included in index choosing ([c582622](https://github.com/cube-js/cube.js/commit/c5826221f24dbd45cd863263a65fe2c90a45b337))
+
+
+### Features
+
+* **cubestore:** Add CUBEJS_GH_API_TOKEN env var to download script ([#4282](https://github.com/cube-js/cube.js/issues/4282)) Thanks [@icebob](https://github.com/icebob)! ([ac57162](https://github.com/cube-js/cube.js/commit/ac571623ed39bfc02c73d5d6bfc01a7e2fa2fa74))
+* **cubestore:** Explain implementation ([#4303](https://github.com/cube-js/cube.js/issues/4303)) ([53fe3f3](https://github.com/cube-js/cube.js/commit/53fe3f325cc47a6f8c53ad2582a9608f4ae1555d))
+
+
+
+
+
 ## [0.29.40](https://github.com/cube-js/cube.js/compare/v0.29.39...v0.29.40) (2022-04-03)
 
 

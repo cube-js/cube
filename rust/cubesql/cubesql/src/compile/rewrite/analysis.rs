@@ -15,7 +15,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{DFSchema, Expr};
 use datafusion::physical_plan::functions::Volatility;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-use datafusion::physical_plan::ColumnarValue;
+use datafusion::physical_plan::{ColumnarValue, PhysicalPlanner};
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::ContextProvider;
 use egg::{Analysis, DidMerge};
@@ -355,7 +355,7 @@ impl LogicalPlanAnalysis {
                             &arrow_schema,
                             &egraph.analysis.cube_context.state,
                         )
-                        .unwrap();
+                        .expect(&format!("Can't evaluate expression: {:?}", expr));
                     let value = physical_expr
                         .evaluate(&RecordBatch::new_empty(arrow_schema))
                         .unwrap();
