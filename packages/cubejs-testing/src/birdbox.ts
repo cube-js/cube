@@ -342,7 +342,7 @@ export async function startBirdBoxFromCli(
             '..',
             '..',
             'birdbox-fixtures',
-            'datasets'
+            'datasets',
           ),
           target: '/data',
           bindMode: 'ro',
@@ -354,7 +354,7 @@ export async function startBirdBoxFromCli(
             '..',
             'birdbox-fixtures',
             'postgresql',
-            'scripts'
+            'scripts',
           ),
           target: '/scripts',
           bindMode: 'ro',
@@ -369,13 +369,7 @@ export async function startBirdBoxFromCli(
     const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
-    if (exitCode === 0 && options.log === Log.PIPE) {
-      process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished successfully\n`
-      );
-    } else {
+    if (exitCode !== 0) {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
       }
@@ -388,6 +382,13 @@ export async function startBirdBoxFromCli(
         }\n`
       );
       process.exit(1);
+    }
+    if (options.log === Log.PIPE) {
+      process.stdout.write(
+        `[Birdbox] Script ${
+          loadScript
+        } finished successfully\n`
+      );
     }
   }
 

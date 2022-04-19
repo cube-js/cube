@@ -103,7 +103,7 @@ export function createBirdBoxTestCase(
           transport: wsTransport,
         });
       } catch (e) {
-        console.log(e);
+        process.stderr.write(`${(e as Error).toString()}\n`);
         process.exit(1);
       }
     });
