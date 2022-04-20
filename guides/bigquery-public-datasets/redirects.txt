@@ -1,2 +1,2 @@
 #https://docs.netlify.com/routing/redirects/
-/*   https://cube.dev/blog/google-bigquery-public-datasets
+/*   https://cube.dev/blog/google-bigquery-public-datasets  301!
