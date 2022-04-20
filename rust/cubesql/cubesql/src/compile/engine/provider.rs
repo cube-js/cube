@@ -109,6 +109,16 @@ impl ContextProvider for CubeContext {
             .cloned()
     }
 
+    fn get_table_function_meta(
+        &self,
+        name: &str,
+    ) -> Option<Arc<datafusion::physical_plan::udtf::TableUDF>> {
+        self.state
+            .table_functions
+            .get(&name.to_ascii_lowercase())
+            .cloned()
+    }
+
     fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
         Some(DataType::Utf8)
     }
