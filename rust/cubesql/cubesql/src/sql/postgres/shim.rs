@@ -570,6 +570,7 @@ impl AsyncPostgresShim {
         mut stream: SendableRecordBatchStream,
         description: bool,
         format: Format,
+        max_rows: usize,
     ) -> Result<u32, CubeError> {
         let mut total: u32 = 0;
         let mut first = true;
@@ -581,6 +582,17 @@ impl AsyncPostgresShim {
                 }
                 Some(res) => match res {
                     Ok(batch) => {
+                        if max_rows != 0 && (total as usize + batch.num_rows()) > max_rows {
+                            self.write(protocol::ErrorResponse::new(
+                                protocol::ErrorSeverity::Error,
+                                protocol::ErrorCode::InternalError,
+                                "Execute with limited rows is not supported".to_string(),
+                            ))
+                            .await?;
+
+                            return Ok(0);
+                        }
+
                         let frame = Arc::new(batch_to_dataframe(&vec![batch])?);
                         total += self
                             .write_data_frame(frame, description && first, format)
@@ -636,20 +648,11 @@ impl AsyncPostgresShim {
                     .await?;
             }
             QueryPlan::DataFusionSelect(_, plan, ctx) => {
-                if max_rows != 0 {
-                    self.write(protocol::ErrorResponse::new(
-                        protocol::ErrorSeverity::Error,
-                        protocol::ErrorCode::InternalError,
-                        "Execute with limited rows is not supported".to_string(),
-                    ))
-                    .await?;
-
-                    return Ok(());
-                }
-
                 let df = DFDataFrame::new(ctx.state, &plan);
                 let stream = df.execute_stream().await?;
-                let total_rows = self.write_stream(stream, description, format).await?;
+                let total_rows = self
+                    .write_stream(stream, description, format, max_rows)
+                    .await?;
 
                 self.write(protocol::CommandComplete::Select(total_rows))
                     .await?;
