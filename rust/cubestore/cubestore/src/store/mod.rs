@@ -584,8 +584,8 @@ mod tests {
                     None,
                     None,
                     Vec::new(),
-                    Vec::new(),
                     true,
+                    None,
                     None,
                     None,
                 )
@@ -668,8 +668,8 @@ mod tests {
                     None,
                     None,
                     vec![],
-                    vec![],
                     true,
+                    None,
                     None,
                     None,
                 )

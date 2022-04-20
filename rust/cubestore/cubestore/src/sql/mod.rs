@@ -44,8 +44,8 @@ use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
-    is_valid_plain_binary_hll, table::Table, AggregateIndexDef, HllFlavour, IdRow, ImportFormat,
-    Index, IndexDef, MetaStoreTable, RowKey, Schema, TableId,
+    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
+    IndexType, MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
@@ -54,7 +54,7 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{AggregateIndexRef, CubeStoreParser, PartitionedIndexRef, SystemCommand};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
@@ -183,8 +183,8 @@ impl SqlServiceImpl {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         indexes: Vec<Statement>,
-        aggregate_indexes: Vec<AggregateIndexRef>,
         unique_key: Option<Vec<Ident>>,
+        aggregates: Option<Vec<(Ident, Ident)>>,
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
@@ -216,11 +216,18 @@ impl SqlServiceImpl {
                 name: "#mi0".to_string(),
                 columns,
                 multi_index: Some(part_index_name),
+                index_type: IndexType::Regular,
             });
         }
 
         for index in indexes.iter() {
-            if let Statement::CreateIndex { name, columns, .. } = index {
+            if let Statement::CreateIndex {
+                name,
+                columns,
+                unique,
+                ..
+            } = index
+            {
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
                     multi_index: None,
@@ -237,31 +244,14 @@ impl SqlServiceImpl {
                             }
                         })
                         .collect::<Result<Vec<_>, _>>()?,
+                    index_type: if *unique {
+                        IndexType::Aggregate
+                    } else {
+                        IndexType::Regular
+                    },
                 });
             }
         }
-
-        let aggr_indexes_to_create = aggregate_indexes
-            .into_iter()
-            .map(|index| AggregateIndexDef {
-                name: index.name.to_string(),
-                columns: index
-                    .columns
-                    .iter()
-                    .map(|c| c.value.to_string())
-                    .collect::<Vec<_>>(),
-                aggregate_columns: index
-                    .aggregates
-                    .iter()
-                    .map(|c| c.1.value.to_string())
-                    .collect::<Vec<_>>(),
-                aggregate_functions: index
-                    .aggregates
-                    .iter()
-                    .map(|c| c.0.value.to_string())
-                    .collect::<Vec<_>>(),
-            })
-            .collect::<Vec<_>>();
 
         if !external {
             return self
@@ -273,9 +263,13 @@ impl SqlServiceImpl {
                     None,
                     None,
                     indexes_to_create,
-                    aggr_indexes_to_create,
                     true,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                    aggregates.map(|keys| {
+                        keys.iter()
+                            .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                            .collect()
+                    }),
                     None,
                 )
                 .await;
@@ -324,9 +318,13 @@ impl SqlServiceImpl {
                 locations,
                 import_format,
                 indexes_to_create,
-                aggr_indexes_to_create,
                 false,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                aggregates.map(|keys| {
+                    keys.iter()
+                        .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                        .collect()
+                }),
                 partition_split_threshold,
             )
             .await?;
@@ -438,6 +436,7 @@ impl SqlServiceImpl {
                     name,
                     multi_index: None,
                     columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                    index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
             .await?)
@@ -765,7 +764,7 @@ impl SqlService for SqlServiceImpl {
                         ..
                     },
                 indexes,
-                aggregate_indexes,
+                aggregates,
                 locations,
                 unique_key,
                 partitioned_index,
@@ -810,8 +809,8 @@ impl SqlService for SqlServiceImpl {
                         locations,
                         Some(import_format),
                         indexes,
-                        aggregate_indexes,
                         unique_key,
+                        aggregates,
                         partitioned_index,
                         &context.trace_obj,
                     )
@@ -1733,6 +1732,8 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2973,37 +2974,60 @@ mod tests {
 
                     let path_2 = dir.clone().join("orders.csv.gz");
 
-                    let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
+                    let mut file = GzipEncoder::new(BufWriter::new(
+                        tokio::fs::File::create(path_2.clone()).await.unwrap(),
+                    ));
 
-                    file.write_all("platform,age,gender,cnt,max_id\n".as_bytes()).await.unwrap();
-                    file.write_all("\"ios\",20,\"M\",10,100\n".as_bytes()).await.unwrap();
-                    file.write_all("\"android\",20,\"M\",2,10\n".as_bytes()).await.unwrap();
-                    file.write_all("\"web\",20,\"M\",20,111\n".as_bytes()).await.unwrap();
+                    file.write_all("platform,age,gender,cnt,max_id\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"ios\",20,\"M\",10,100\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"android\",20,\"M\",2,10\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",20,\"M\",20,111\n".as_bytes())
+                        .await
+                        .unwrap();
 
-                    file.write_all("\"ios\",20,\"F\",10,100\n".as_bytes()).await.unwrap();
-                    file.write_all("\"android\",20,\"F\",2,10\n".as_bytes()).await.unwrap();
-                    file.write_all("\"web\",22,\"F\",20,115\n".as_bytes()).await.unwrap();
-                    file.write_all("\"web\",22,\"F\",20,222\n".as_bytes()).await.unwrap();
-
+                    file.write_all("\"ios\",20,\"F\",10,100\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"android\",20,\"F\",2,10\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",22,\"F\",20,115\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",22,\"F\",20,222\n".as_bytes())
+                        .await
+                        .unwrap();
 
                     file.shutdown().await.unwrap();
 
-                    services.remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/orders.csv.gz").await.unwrap();
+                    services
+                        .remote_fs
+                        .upload_file(path_2.to_str().unwrap(), "temp-uploads/orders.csv.gz")
+                        .await
+                        .unwrap();
 
                     vec!["temp://orders.csv.gz".to_string()]
                 };
-                let query = format!("CREATE TABLE foo.Orders (
+                let query = format!(
+                    "CREATE TABLE foo.Orders (
                                     platform varchar(255),
                                     age int,
                                     gender varchar(2),
                                     cnt int,
                                     max_id int
                                   )
+                    AGGREGATES (sum(cnt), max(max_id))
                     INDEX index1 (platform, age)
-                    AGGREGATE INDEX sum_index (age, gender, sum(cnt))
+                    AGGREGATE INDEX sum_index (age, gender)
                     LOCATION {}",
-                        paths.into_iter().map(|p| format!("'{}'", p)).join(",")
-                    );
+                    paths.into_iter().map(|p| format!("'{}'", p)).join(",")
+                );
                 service.exec_query(&query).await.unwrap();
             })
             .await;

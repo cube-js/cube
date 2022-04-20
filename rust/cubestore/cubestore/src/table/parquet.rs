@@ -120,6 +120,7 @@ mod tests {
             6,
             None,
             None,
+            Index::index_type_default(),
         )
         .unwrap();
 
@@ -209,6 +210,7 @@ mod tests {
                 3,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
             row_group_size: 10,
@@ -319,6 +321,7 @@ mod tests {
                 1,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
@@ -366,6 +369,7 @@ mod tests {
             1,
             None,
             None,
+            Index::index_type_default(),
         )
         .unwrap();
 

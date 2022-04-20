@@ -1,5 +1,6 @@
 use super::{
-    BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex, RocksTable, TableId,
+    AggregateFunction, BaseRocksSecondaryIndex, Column, ColumnType, IndexId, RocksSecondaryIndex,
+    RocksTable, TableId,
 };
 use crate::data_frame_from;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
@@ -32,6 +33,10 @@ pub struct Table {
     #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
+    aggregate_column_indices: Option<Vec<u64>>,
+    #[serde(default)]
+    aggregate_function: Option<Vec<AggregateFunction>>,
+    #[serde(default)]
     seq_column_index: Option<u64>,
     #[serde(default)]
     location_download_sizes: Option<Vec<u64>>,
@@ -63,6 +68,8 @@ impl Table {
         import_format: Option<ImportFormat>,
         is_ready: bool,
         unique_key_column_indices: Option<Vec<u64>>,
+        aggregate_column_indices: Option<Vec<u64>>,
+        aggregate_function: Option<Vec<AggregateFunction>>,
         seq_column_index: Option<u64>,
         partition_split_threshold: Option<u64>,
     ) -> Table {
@@ -77,6 +84,8 @@ impl Table {
             is_ready,
             created_at: Some(Utc::now()),
             unique_key_column_indices,
+            aggregate_column_indices,
+            aggregate_function,
             seq_column_index,
             location_download_sizes,
             partition_split_threshold,
@@ -166,6 +175,16 @@ impl Table {
         self.unique_key_column_indices
             .as_ref()
             .map(|indices| indices.iter().map(|i| &self.columns[*i as usize]).collect())
+    }
+
+    pub fn aggregate_columns(&self) -> Option<Vec<&Column>> {
+        self.aggregate_column_indices
+            .as_ref()
+            .map(|indices| indices.iter().map(|i| &self.columns[*i as usize]).collect())
+    }
+
+    pub fn aggregate_functions(&self) -> &Option<Vec<AggregateFunction>> {
+        &self.aggregate_function
     }
 
     pub fn seq_column(&self) -> Option<&Column> {

@@ -1399,6 +1399,8 @@ pub mod tests {
             None,
             None,
             None,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -1408,6 +1410,7 @@ pub mod tests {
                 1,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1420,6 +1423,7 @@ pub mod tests {
                     1,
                     None,
                     Some(PARTITIONED_INDEX),
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );
@@ -1442,6 +1446,8 @@ pub mod tests {
             None,
             None,
             None,
+            None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -1451,6 +1457,7 @@ pub mod tests {
                 2,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1462,6 +1469,7 @@ pub mod tests {
                 2,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1474,6 +1482,7 @@ pub mod tests {
                     1,
                     None,
                     Some(PARTITIONED_INDEX),
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );
@@ -1486,6 +1495,8 @@ pub mod tests {
             None,
             None,
             true,
+            None,
+            None,
             None,
             None,
             None,
@@ -1544,6 +1555,7 @@ pub mod tests {
                     t.get_columns().len() as u64,
                     None,
                     None,
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );
