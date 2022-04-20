@@ -1,6 +1,6 @@
 import R from 'ramda';
 
-import { UserError } from '../compiler';
+import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
   constructor(query, historyQueries, cubeLatticeCache) {
@@ -671,16 +671,19 @@ export class PreAggregations {
   }
 
   originalSqlPreAggregationQuery(cube, aggregation) {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      timeDimensions: aggregation.partitionTimeDimensions,
-      preAggregationQuery: true,
-    });
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        timeDimensions: aggregation.partitionTimeDimensions,
+        preAggregationQuery: true,
+      }
+    );
   }
 
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
-    return this.query.newSubQuery2(
+    return this.query.newSubQueryForCube(
       cube,
       {
         rowLimit: null,
@@ -694,15 +697,18 @@ export class PreAggregations {
   }
 
   autoRollupPreAggregationQuery(cube, aggregation) {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      measures: aggregation.measures,
-      dimensions: aggregation.dimensions,
-      timeDimensions:
-        this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
-      preAggregationQuery: true,
-      useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-    });
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        measures: aggregation.measures,
+        dimensions: aggregation.dimensions,
+        timeDimensions:
+          this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
+        preAggregationQuery: true,
+        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+      }
+    );
   }
 
   mergePartitionTimeDimensions(aggregation, partitionTimeDimensions) {

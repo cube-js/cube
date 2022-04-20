@@ -1990,7 +1990,7 @@ class BaseQuery {
     return new QueryClass(this.compilers, this.subQueryOptions(options));
   }
 
-  newSubQuery2(cube, options) {
+  newSubQueryForCube(cube, options) {
     return this.compilers.queryFactory.createQuery(cube, this.subQueryOptions(options));
   }
 
@@ -2006,7 +2006,7 @@ class BaseQuery {
       historyQueries: this.options.historyQueries,
       externalQueryClass: this.options.externalQueryClass,
       ...options,
-    }
+    };
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries
