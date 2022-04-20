@@ -43,5 +43,14 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
 
+    variables.insert(
+        "lc_collate".to_string(),
+        DatabaseVariable::system(
+            "lc_collate".to_string(),
+            ScalarValue::Utf8(Some("en_US.utf8".to_string())),
+            None,
+        ),
+    );
+
     variables
 }
