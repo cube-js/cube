@@ -27,4 +27,7 @@ cd ../../../
 cd "$GUIDE_DIRECTORY"
 yarn build
 npm install -g netlify-cli
+if [ -e ./redirects.txt ]
+  then cp ./redirects.txt ./public/_redirects
+fi
 netlify deploy --dir=public --prod

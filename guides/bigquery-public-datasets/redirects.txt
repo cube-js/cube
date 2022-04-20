@@ -1,0 +1,2 @@
+#https://docs.netlify.com/routing/redirects/
+/test   https://cube.dev/blog/google-bigquery-public-datasets
