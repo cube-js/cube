@@ -1,8 +1,2 @@
 #https://docs.netlify.com/routing/redirects/
-/   https://cube.dev/blog/google-bigquery-public-datasets
-/what-is-google-big-query   https://cube.dev/blog/google-bigquery-public-datasets
-/what-are-big-query-public-datasets   https://cube.dev/blog/google-bigquery-public-datasets
-/how-to-create-an-analytical-api   https://cube.dev/blog/google-bigquery-public-datasets
-/how-to-define-a-data-schema   https://cube.dev/blog/google-bigquery-public-datasets
-/how-to-explore-the-data   https://cube.dev/blog/google-bigquery-public-datasets
-/how-to-build-an-analytical-app   https://cube.dev/blog/google-bigquery-public-datasets
+/*   https://cube.dev/blog/google-bigquery-public-datasets
