@@ -30,7 +30,7 @@ jobs:
       - if: steps.modified.outputs.modified
         run: .github/actions/deploy-guide.sh
         env:
-          GUIDE_SLUG: bigquery-public-datasets
+          GUIDE_SLUG: multi-tenant-analytics
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   bigquery-public-datasets:
