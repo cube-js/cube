@@ -1,7 +1,6 @@
 import moment from 'moment-timezone';
 import { UserError } from '../../src/compiler/UserError';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { QueryFactory } from '../../src/adapter/QueryFactory';
 import { prepareCompiler } from './PrepareCompiler';
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { BaseQuery } from '../../src';
