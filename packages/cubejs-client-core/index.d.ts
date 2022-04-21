@@ -8,7 +8,6 @@
  */
 
 declare module '@cubejs-client/core' {
-
   export type TransportOptions = {
     /**
      * [jwt auth token](security)
@@ -27,21 +26,13 @@ declare module '@cubejs-client/core' {
   };
 
   export interface ITransportResponse<R> {
-    subscribe: <CBResult>(
-      cb: (
-        result: R,
-        resubscribe: () => Promise<CBResult>
-      ) => CBResult
-    ) => Promise<CBResult>;
+    subscribe: <CBResult>(cb: (result: R, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
     // Optional, supported in WebSocketTransport
     unsubscribe?: () => Promise<void>;
   }
 
   export interface ITransport<R> {
-    request(
-      method: string,
-      params: Record<string, unknown>
-    ): ITransportResponse<R>;
+    request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
   }
 
   /**
@@ -140,6 +131,12 @@ declare module '@cubejs-client/core' {
 
   type QueryType = 'regularQuery' | 'compareDateRangeQuery' | 'blendingQuery';
 
+  type LeafMeasure = {
+    measure: string;
+    additive: boolean;
+    type: 'count' | 'countDistinct' | 'sum' | 'min' | 'max' | 'number' | 'countDistinctApprox'
+  };
+
   export type TransformedQuery = {
     allFiltersWithinSelectedDimensions: boolean;
     granularityHierarchies: Record<string, string[]>;
@@ -151,6 +148,7 @@ declare module '@cubejs-client/core' {
     measures: string[];
     sortedDimensions: string[];
     sortedTimeDimensions: [[string, string]];
+    measureToLeafMeasures?: Record<string, LeafMeasure[]>;
   };
 
   export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
@@ -168,9 +166,10 @@ declare module '@cubejs-client/core' {
     external: boolean | null;
     dbType: string;
     extDbType: string;
-    requestId?: string,
+    requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
+    total?: number
   };
 
   export type LoadResponse<T> = {
@@ -467,7 +466,7 @@ declare module '@cubejs-client/core' {
     /**
      * Base method for pivoting [ResultSet](#result-set) data.
      * Most of the times shouldn't be used directly and [chartPivot](#result-set-chart-pivot)
-     * or (tablePivot)[#table-pivot] should be used instead.
+     * or [tablePivot](#table-pivot) should be used instead.
      *
      * You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
      * ```js
@@ -756,6 +755,8 @@ declare module '@cubejs-client/core' {
     | 'notEquals'
     | 'contains'
     | 'notContains'
+    | 'startsWith'
+    | 'endsWith'
     | 'gt'
     | 'gte'
     | 'lt'
@@ -793,13 +794,14 @@ declare module '@cubejs-client/core' {
     filters?: Filter[];
     timeDimensions?: TimeDimension[];
     segments?: string[];
-    limit?: number;
+    limit?: null | number;
     offset?: number;
     order?: TQueryOrderObject | TQueryOrderArray;
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
-    responseFormat?: 'compact' | 'default'
+    responseFormat?: 'compact' | 'default';
+    total?: boolean;
   }
 
   export class ProgressResult {
@@ -1003,7 +1005,12 @@ declare module '@cubejs-client/core' {
      * @param query - [Query object](query-format)
      */
     load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    load(query: Query | Query[], options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>, responseFormat?: string):  Promise<ResultSet>;
+    load(
+      query: Query | Query[],
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet>,
+      responseFormat?: string
+    ): Promise<ResultSet>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)

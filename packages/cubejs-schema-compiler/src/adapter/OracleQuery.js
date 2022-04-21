@@ -20,8 +20,10 @@ class OracleFilter extends BaseFilter {
   /**
    * "ILIKE" does't support
    */
-  likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} LIKE '%' || ${this.allocateParam(param)} || '%'`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s}`;
   }
 }
 

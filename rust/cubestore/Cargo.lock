@@ -1091,6 +1091,7 @@ version = "0.1.0"
 dependencies = [
  "async-compression",
  "async-trait",
+ "base64 0.13.0",
  "cubestore",
  "futures 0.3.16",
  "futures-timer 3.0.2",
@@ -1118,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#c44cac2fd44c70d3ae44307cefa4ca05cf60a5d5"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#0229e9350832e1c6b5bdccbe6e2ab50ff6a99384"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -4768,7 +4769,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.8.4",
+ "rand 0.6.5",
  "static_assertions",
 ]
 

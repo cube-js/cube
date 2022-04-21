@@ -6466,10 +6466,10 @@ csstype@^3.0.2:
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.0.7.tgz#2a5fb75e1015e84dd15692f71e89a1450290950b"
   integrity sha512-KxnUB0ZMlnUWCsx2Z8MUsr6qV6ja1w9ArPErJaJaF8a5SOWoHLIszeCTKGRGRgtLgYrs1E8CHkNSP1VZTTPc9g==
 
-cubedev-tracking@^1.0.4:
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.0.7.tgz#7cf7d2a608ed584f0769526f2e63abf9a8a678b9"
-  integrity sha512-ZtDJqdyR8K/Kr2YygnCocl9hrMv42knJs2fSi/15amCfg2llYFlkPBrn3EsWhGCzclAGa/JWt7WAljhU6Tvmfw==
+cubedev-tracking@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/cubedev-tracking/-/cubedev-tracking-1.1.0.tgz#3579309804e0b36e6504c9e12c3b70af0261b14f"
+  integrity sha512-/0HsxxuivdV/t1U8mumYtfz/uS6j0F+Jdv2Z7Eb3dYLZ7T9Jua2WO/d4FuKtgt9NZFH3CFJr29D+LhpyQaxkEQ==
   dependencies:
     "@babel/runtime" "^7.11.0"
     component-cookie "^1.1.4"

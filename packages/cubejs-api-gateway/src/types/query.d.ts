@@ -12,6 +12,7 @@ import {
   QueryTimeDimensionGranularity,
   QueryOrderType,
 } from './strings';
+import { ResultType } from './enums';
 
 /**
  * Query base filter definition.
@@ -56,12 +57,15 @@ interface Query {
   filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
   segments?: Member[];
-  limit?: number;
+  limit?: null | number;
   offset?: number;
+  total?: boolean;
+  totalQuery?: boolean;
   order?: QueryOrderType;
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
+  responseFormat?: ResultType;
 }
 
 /**
@@ -76,7 +80,7 @@ interface NormalizedQueryFilter extends QueryFilter {
  */
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
-  rowLimit?: number;
+  rowLimit?: null | number;
 }
 
 export {

@@ -8,6 +8,10 @@ export class BaseGroupFilter {
     this.dimension = filter.dimension;
   }
 
+  conditionSql(column) {
+    return `(\n${this.values.map(f => f.conditionSql(column)).join(` ${this.operator.toUpperCase()} `)}\n)`;
+  }
+
   filterToWhere() {
     const r = this.values.map(f => {
       const sql = f.filterToWhere();
@@ -21,6 +25,10 @@ export class BaseGroupFilter {
       return null;
     }
     return r;
+  }
+
+  filterParams() {
+    return this.values.map(f => f.filterParams());
   }
 
   getMembers() {

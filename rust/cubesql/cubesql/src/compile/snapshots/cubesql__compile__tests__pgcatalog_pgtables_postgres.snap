@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
+| schemaname | tablename                 | tableowner | tablespace | hasindexes | hasrules | hastriggers | rowsecurity |
++------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
+| db         | KibanaSampleDataEcommerce | def        |            | true       | false    | false       | false       |
+| db         | Logs                      | def        |            | true       | false    | false       | false       |
++------------+---------------------------+------------+------------+------------+----------+-------------+-------------+

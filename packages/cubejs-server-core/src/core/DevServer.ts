@@ -526,6 +526,6 @@ export class DevServer {
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')
-      .substr(0, 10);
+      .slice(0, 10);
   }
 }

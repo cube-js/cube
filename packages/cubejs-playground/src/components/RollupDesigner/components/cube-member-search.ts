@@ -2,7 +2,7 @@ import { AvailableMembers } from '@cubejs-client/react';
 import FlexSearch from 'flexsearch';
 import { useEffect, useRef, useState } from 'react';
 
-import useDeepMemo from '../../../hooks/deep-memo';
+import { useDeepMemo } from '../../../hooks/deep-memo';
 import { getNameMemberPairs } from '../../../shared/helpers';
 
 export function useCubeMemberSearch(memberTypeCubeMap: AvailableMembers) {

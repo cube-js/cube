@@ -11,7 +11,7 @@ use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
-use crate::config::is_router;
+use crate::config::{is_router, WorkerServices};
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
@@ -85,6 +85,14 @@ pub trait Cluster: DIService + Send + Sync {
         node_name: &str,
         plan: SerializedPlan,
     ) -> Result<Vec<RecordBatch>, CubeError>;
+
+    /// Runs explain analyze on a single worker node to get pretty printed physical plan
+    /// from that worker.
+    async fn run_explain_analyze(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<String, CubeError>;
 
     /// Like [run_select], but streams results as they are requested.
     /// This allows to send only a limited number of results, if the caller does not need all.
@@ -204,6 +212,7 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
     for WorkerProcessor
 {
     async fn process(
+        services: &WorkerServices,
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
@@ -223,8 +232,9 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                         ))
                     })
                     .collect::<Result<HashMap<_, _>, _>>()?;
-                let res = Config::current_worker_services()
+                let res = services
                     .query_executor
+                    .clone()
                     .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
                     .await;
                 debug!(
@@ -307,6 +317,20 @@ impl Cluster for ClusterImpl {
                 r.and_then(|(_, batches)| batches.into_iter().map(|b| b.read()).collect())
             }
             _ => panic!("unexpected response for select"),
+        }
+    }
+
+    async fn run_explain_analyze(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<String, CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::ExplainAnalyze(plan))
+            .await?;
+        match response {
+            NetworkMessage::ExplainAnalyzeResult(r) => r,
+            _ => panic!("unexpected result for explain analize"),
         }
     }
 
@@ -469,6 +493,10 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan).await;
                 NetworkMessage::SelectResult(res)
             }
+            NetworkMessage::ExplainAnalyze(plan) => {
+                let res = self.run_local_explain_analyze_worker(plan).await;
+                NetworkMessage::ExplainAnalyzeResult(res)
+            }
             NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
                 let res = self
                     .remote_fs
@@ -476,7 +504,9 @@ impl Cluster for ClusterImpl {
                     .await;
                 NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
             }
-            NetworkMessage::SelectResult(_) | NetworkMessage::WarmupDownloadResult(_) => {
+            NetworkMessage::SelectResult(_)
+            | NetworkMessage::WarmupDownloadResult(_)
+            | NetworkMessage::ExplainAnalyzeResult(_) => {
                 panic!("result sent to worker");
             }
             NetworkMessage::AddMemoryChunk { chunk_id, data } => {
@@ -1153,34 +1183,7 @@ impl ClusterImpl {
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         let start = SystemTime::now();
         debug!("Running select");
-        let to_download = plan_node.files_to_download();
-        let file_futures = to_download
-            .iter()
-            .map(|(partition, remote, file_size)| {
-                let meta_store = self.meta_store.clone();
-                async move {
-                    let res = self
-                        .remote_fs
-                        .download_file(remote, file_size.clone())
-                        .await;
-                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
-                    res
-                }
-            })
-            .collect::<Vec<_>>();
-        let remote_to_local_names = to_download
-            .clone()
-            .into_iter()
-            .zip(
-                join_all(file_futures)
-                    .instrument(tracing::span!(tracing::Level::TRACE, "warmup_download"))
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter(),
-            )
-            .map(|((_, remote_path, _), path)| (remote_path, path))
-            .collect::<HashMap<_, _>>();
+        let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
         let warmup = start.elapsed()?;
         if warmup.as_millis() > 200 {
             warn!("Warmup download for select ({:?})", warmup);
@@ -1261,6 +1264,63 @@ impl ClusterImpl {
 
         info!("Running select completed ({:?})", start.elapsed()?);
         res.unwrap()
+    }
+
+    async fn run_local_explain_analyze_worker(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<String, CubeError> {
+        let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
+        let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
+        let chunk_id_to_record_batches = in_memory_chunks_to_load
+            .clone()
+            .into_iter()
+            .map(|c| (c.get_id(), Vec::new()))
+            .collect();
+
+        let res = self
+            .query_executor
+            .pp_worker_plan(plan_node, remote_to_local_names, chunk_id_to_record_batches)
+            .await;
+
+        res
+    }
+
+    async fn warmup_select_worker_files(
+        &self,
+        plan_node: &SerializedPlan,
+    ) -> Result<HashMap<String, String>, CubeError> {
+        let to_download = plan_node.files_to_download();
+        let file_futures = to_download
+            .iter()
+            .map(|(partition, remote, file_size)| {
+                let meta_store = self.meta_store.clone();
+                async move {
+                    let res = self
+                        .remote_fs
+                        .download_file(remote, file_size.clone())
+                        .await;
+                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
+                    res
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let remote_to_local_names = to_download
+            .clone()
+            .into_iter()
+            .zip(
+                join_all(file_futures)
+                    .instrument(tracing::span!(tracing::Level::TRACE, "warmup_download"))
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter(),
+            )
+            .map(|((_, remote_path, _), path)| (remote_path, path))
+            .collect::<HashMap<_, _>>();
+
+        Ok(remote_to_local_names)
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {

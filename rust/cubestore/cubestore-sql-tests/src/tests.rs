@@ -87,6 +87,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("create_table_with_csv", create_table_with_csv),
         t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
+        t(
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
         ),
@@ -98,6 +102,14 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_inputs", hyperloglog_empty_inputs),
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
+        t(
+            "create_table_with_location_and_hyperloglog",
+            create_table_with_location_and_hyperloglog,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_postgress",
+            create_table_with_location_and_hyperloglog_postgress,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -161,7 +173,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             unique_key_and_multi_measures_for_stream_table,
         ),
         t("divide_by_zero", divide_by_zero),
+        t(
+            "filter_multiple_in_for_decimal",
+            filter_multiple_in_for_decimal,
+        ),
         t("panic_worker", panic_worker),
+        t("filter_index_selection", filter_index_selection),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -1785,6 +1802,35 @@ async fn create_table_with_csv(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
 async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
     let file = write_tmp_file(indoc! {"
         apple,2
@@ -2037,6 +2083,115 @@ async fn hyperloglog_inserts(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
         .await
         .expect_err("should not allow invalid HLL (with extra bytes)");
+}
+
+async fn create_table_with_location_and_hyperloglog(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 80 a5 90 34,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x80, 0xa5, 0x90, 0x34])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0C 02 00 C0 2F F5 89 41 D5 F0 C6,{}\n",
+                base64::encode(vec![
+                    0x02, 0x0c, 0x02, 0x00, 0xc0, 0x2f, 0xf5, 0x89, 0x41, 0xd5, 0xf0, 0xc6
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-pg.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,11 8b 7f,{}\n", base64::encode(vec![0x11, 0x8b, 0x7f])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,12 8b 7f ee 22 c4 70 69 1a 81 34,{}\n",
+                base64::encode(vec![
+                    0x12, 0x8b, 0x7f, 0xee, 0x22, 0xc4, 0x70, 0x69, 0x1a, 0x81, 0x34
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_pg GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
 }
 
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
@@ -2299,20 +2454,21 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
            \n          Empty"
     );
 
+    // TODO
     // Removing single value columns should keep the sort order of the rest.
-    let p = service
-        .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
-        .await
-        .unwrap();
-    assert_eq!(
-        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker, sort_order: [0]\
-           \n  Projection, [id3], sort_order: [0]\
-           \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n      Merge, sort_order: [0, 1, 2]\
-           \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-           \n          Empty"
-    );
+    // let p = service
+    //     .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+    //     .await
+    //     .unwrap();
+    // assert_eq!(
+    //     pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+    //     "Worker, sort_order: [0]\
+    //        \n  Projection, [id3], sort_order: [0]\
+    //        \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+    //        \n      Merge, sort_order: [0, 1, 2]\
+    //        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+    //        \n          Empty"
+    // );
     let p = service
         .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
         .await
@@ -2753,6 +2909,64 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn filter_index_selection(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, d int, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX cb ON s.Orders(c, b)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX bcd ON s.Orders(d, b, c)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalInplaceAggregate\
+           \n    Worker\
+           \n      PartialInplaceAggregate\
+           \n        Filter\
+           \n          MergeSort\
+           \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c in (5, 6) GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalHashAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalHashAggregate\
+           \n    Worker\
+           \n      PartialHashAggregate\
+           \n        Filter\
+           \n          Merge\
+           \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
+           \n              Empty"
+    );
+}
+
 async fn planning_joins(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2840,6 +3054,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     service
+        .exec_query("CREATE INDEX by_product_customer ON s.Orders(product_id, customer_id)")
+        .await
+        .unwrap();
+    service
         .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
         .await
         .unwrap();
@@ -2859,7 +3077,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 3, 4]]"
+        "ClusterSend, partitions: [[2, 4, 5]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
@@ -2872,10 +3090,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
            \n              Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      MergeSort\
-           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n        Scan, index: default:5:[5]:sort_on[product_id], fields: *\
            \n          Empty",
         );
 
@@ -2902,14 +3120,14 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
            \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
+           \n              Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      Filter, predicate: product_id@0 = 125\
            \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
 }
@@ -4509,6 +4727,24 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
         r.elide_backtrace(),
         CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
     );
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[(2)]));
 }
 
 async fn panic_worker(service: Box<dyn SqlClient>) {

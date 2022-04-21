@@ -17,3 +17,20 @@ export function cancelCombinator(fn) {
 
   return promise;
 }
+
+export class TableName {
+  public constructor(
+    public readonly schema: string,
+    public readonly name: string,
+  ) {
+  }
+
+  public static split(tableName: string): TableName {
+    const parts = tableName.split('.');
+    return new TableName(parts[0], parts.slice(1).join('.'));
+  }
+
+  public join() {
+    return `${this.schema}.${this.name}`;
+  }
+}

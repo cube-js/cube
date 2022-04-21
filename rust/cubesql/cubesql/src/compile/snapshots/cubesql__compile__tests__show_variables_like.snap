@@ -1,8 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4067
-expression: "execute_query(\"show variables like '%_mode';\".to_string()).await?"
-
+assertion_line: 4572
+expression: "execute_query(\"show variables like '%_mode';\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------+-----------------------------------------------------------------------------------------------------------------------+
 | Variable_name | Value                                                                                                                 |

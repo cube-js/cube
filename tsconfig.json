@@ -26,6 +26,9 @@
       "path": "packages/cubejs-schema-compiler"
     },
     {
+      "path": "packages/cubejs-testing-shared"
+    },
+    {
       "path": "packages/cubejs-testing"
     },
     {

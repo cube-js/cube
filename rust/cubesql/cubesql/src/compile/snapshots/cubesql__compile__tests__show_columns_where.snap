@@ -1,14 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4109
-expression: "execute_query(\"show columns from KibanaSampleDataEcommerce where Type = 'int';\".to_string()).await?"
-
+expression: "execute_query(\"show columns from KibanaSampleDataEcommerce where Type = 'int';\".to_string(),\n              DatabaseProtocol::MySQL).await?"
 ---
-+----------+------+------+-----+---------+-------+
-| Field    | Type | Null | Key | Default | Extra |
-+----------+------+------+-----+---------+-------+
-| count    | int  | NO   |     | NULL    |       |
-| maxPrice | int  | NO   |     | NULL    |       |
-| minPrice | int  | NO   |     | NULL    |       |
-| avgPrice | int  | NO   |     | NULL    |       |
-+----------+------+------+-----+---------+-------+
++-------+------+------+-----+---------+-------+
+| Field | Type | Null | Key | Default | Extra |
++-------+------+------+-----+---------+-------+
+| count | int  | NO   |     | NULL    |       |
++-------+------+------+-----+---------+-------+

@@ -1,8 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4141
-expression: "execute_query(\"show tables;\".to_string()).await?"
-
+assertion_line: 4678
+expression: "execute_query(\"show tables;\".to_string(), DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+
 | Tables_in_db              |

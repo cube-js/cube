@@ -1,24 +1,31 @@
 use std::any::type_name;
 use std::sync::Arc;
 
+use chrono::{Duration, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray,
-            IntervalDayTimeBuilder, PrimitiveArray, StringBuilder, UInt32Builder,
+            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int64Array,
+            Int64Builder, IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder,
+            PrimitiveArray, StringArray, StringBuilder, TimestampNanosecondArray, UInt32Builder,
         },
         compute::cast,
         datatypes::{
-            DataType, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
+            DataType, Field, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
             TimestampNanosecondType, UInt64Type,
         },
     },
-    error::DataFusionError,
-    logical_plan::create_udf,
+    error::{DataFusionError, Result},
+    logical_plan::{create_udaf, create_udf},
     physical_plan::{
-        functions::{make_scalar_function, ReturnTypeFunction, Signature, Volatility},
+        functions::{
+            datetime_expressions::date_trunc, make_scalar_function, Signature, Volatility,
+        },
+        udaf::AggregateUDF,
         udf::ScalarUDF,
+        ColumnarValue,
     },
+    scalar::ScalarValue,
 };
 
 use crate::{
@@ -26,13 +33,15 @@ use crate::{
         coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
-    mysql::ConnectionState,
+    sql::SessionState,
 };
 
-pub fn create_version_udf() -> ScalarUDF {
-    let version = make_scalar_function(|_args: &[ArrayRef]| {
+pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
+
+pub fn create_version_udf(v: String) -> ScalarUDF {
+    let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
-        builder.append_value("8.0.25").unwrap();
+        builder.append_value(v.to_string()).unwrap();
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -46,7 +55,7 @@ pub fn create_version_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_db_udf(name: String, state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     let db_state = state.database().unwrap_or("db".to_string());
 
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -65,7 +74,7 @@ pub fn create_db_udf(name: String, state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -86,7 +95,7 @@ pub fn create_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -107,7 +116,7 @@ pub fn create_current_user_udf(state: Arc<ConnectionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_connection_id_udf(state: Arc<ConnectionState>) -> ScalarUDF {
+pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     let version = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
         builder.append_value(state.connection_id).unwrap();
@@ -121,6 +130,24 @@ pub fn create_connection_id_udf(state: Arc<ConnectionState>) -> ScalarUDF {
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
         version,
+    )
+}
+
+pub fn create_current_schema_udf() -> ScalarUDF {
+    let current_schema = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+
+        builder.append_value("public").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "current_schema",
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        current_schema,
     )
 }
 
@@ -477,10 +504,13 @@ pub fn create_convert_tz_udf() -> ScalarUDF {
             )));
         }
 
-        if input_tz.is_some() {
-            return Err(DataFusionError::NotImplemented(format!(
-                "convert_tz is not implemented, it's stub"
-            )));
+        if let Some(tz) = input_tz {
+            if tz != &"UTC" {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "convert_tz does not non UTC timezone as input, actual {}",
+                    tz
+                )));
+            };
         };
 
         Ok(input_dt.clone())
@@ -619,5 +649,577 @@ pub fn create_time_format_udf() -> ScalarUDF {
         &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
+    )
+}
+
+pub fn create_date_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let mut args = args
+            .into_iter()
+            .map(|i| -> Result<ColumnarValue> {
+                if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
+                    let mut builder = TimestampNanosecondArray::builder(strings.len());
+                    for i in 0..strings.len() {
+                        builder.append_value(
+                            NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
+                                .map_err(|e| DataFusionError::Execution(e.to_string()))?
+                                .timestamp_nanos(),
+                        )?;
+                    }
+                    Ok(ColumnarValue::Array(Arc::new(builder.finish())))
+                } else {
+                    assert!(i
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .is_some());
+                    Ok(ColumnarValue::Array(i.clone()))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        args.insert(
+            0,
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("day".to_string()))),
+        );
+
+        let res = date_trunc(args.as_slice())?;
+        match res {
+            ColumnarValue::Array(a) => Ok(a),
+            ColumnarValue::Scalar(_) => Err(DataFusionError::Internal(
+                "Date trunc returned scalar value for array input".to_string(),
+            )),
+        }
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "date",
+        &Signature::uniform(
+            1,
+            vec![
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Utf8,
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_makedate_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+
+    ScalarUDF::new(
+        "makedate",
+        &Signature::exact(
+            vec![DataType::Int64, DataType::Int64],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_year_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "year",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_quarter_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "quarter",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofweek_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofweek",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofmonth_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofmonth",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_dayofyear_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dayofyear",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_hour_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "hour",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_minute_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "minute",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_second_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "second",
+        &Signature::exact(
+            vec![DataType::Timestamp(TimeUnit::Millisecond, None)],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_sub_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "date_sub",
+        &Signature::exact(
+            vec![
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                DataType::Interval(IntervalUnit::DayTime),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_add_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let timestamps = args[0]
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+        let intervals = args[1]
+            .as_any()
+            .downcast_ref::<IntervalDayTimeArray>()
+            .unwrap();
+        let mut builder = TimestampNanosecondArray::builder(timestamps.len());
+        for i in 0..timestamps.len() {
+            let timestamp = timestamps.value(i);
+            let interval = intervals.value(i);
+            let interval_days = interval >> 32;
+            let interval_millis = interval & 0xffffffff;
+            let timestamp = NaiveDateTime::from_timestamp(
+                timestamp / 1000000000,
+                (timestamp % 1000000000) as u32,
+            );
+            let timestamp = timestamp
+                .checked_add_signed(Duration::days(interval_days))
+                .unwrap();
+            let timestamp = timestamp
+                .checked_add_signed(Duration::milliseconds(interval_millis))
+                .unwrap();
+            builder.append_value(timestamp.timestamp_nanos())?;
+        }
+        Ok(Arc::new(builder.finish()))
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "date_add",
+        &Signature::exact(
+            vec![
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Interval(IntervalUnit::DayTime),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_str_to_date() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        Arc::new(move |args: &[ColumnarValue]| {
+            let timestamp = match &args[0] {
+                ColumnarValue::Scalar(ScalarValue::Utf8(Some(value))) => value,
+                _ => {
+                    todo!()
+                }
+            };
+
+            let format = match &args[1] {
+                ColumnarValue::Scalar(ScalarValue::Utf8(Some(value))) => value,
+                ColumnarValue::Scalar(value) => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Expected string but got {:?} as a format param",
+                        value
+                    )))
+                }
+                ColumnarValue::Array(_) => {
+                    return Err(DataFusionError::Execution(
+                        "Array is not supported for format param in str_to_date".to_string(),
+                    ))
+                }
+            };
+
+            let format = format
+                .replace("%i", "%M")
+                .replace("%s", "%S")
+                .replace(".%f", "%.f");
+
+            let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Error evaluating str_to_date('{}', '{}'): {}",
+                    timestamp,
+                    format,
+                    e.to_string()
+                ))
+            })?;
+
+            Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                Some(res.timestamp_nanos()),
+                None,
+            )))
+        });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+
+    ScalarUDF::new(
+        "str_to_date",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_current_schemas_udf() -> ScalarUDF {
+    let current_schemas = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let primitive_builder = StringBuilder::new(2);
+        let mut builder = ListBuilder::new(primitive_builder);
+
+        let including_implicit = downcast_boolean_arr!(&args[0]).value(0);
+        if including_implicit {
+            builder.values().append_value("pg_catalog").unwrap();
+        }
+        builder.values().append_value("public").unwrap();
+        builder.append(true).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "current_schemas",
+        vec![DataType::Boolean],
+        Arc::new(DataType::List(Box::new(Field::new(
+            "item",
+            DataType::Utf8,
+            true,
+        )))),
+        Volatility::Immutable,
+        current_schemas,
+    )
+}
+
+pub fn create_format_type_udf(name: &str) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let oid = downcast_primitive_arg!(&args[0], "oid", Int64Type).value(0);
+        let mut typemod = if args[1].is_null(0) {
+            None
+        } else {
+            Some(downcast_primitive_arg!(&args[1], "mod", Int64Type).value(0))
+        };
+
+        // character varying returns length lowered by 4
+        if oid == 1043 && typemod.is_some() {
+            typemod = Some(typemod.unwrap() - 4);
+        }
+
+        let mut builder = StringBuilder::new(1);
+
+        let typemod_str = match typemod {
+            None => "".to_string(),
+            Some(typemod) if typemod < 0 => "".to_string(),
+            Some(typemod) => format!("({})", typemod),
+        };
+
+        let type_str = match oid {
+            0 => "-".to_string(),
+            19 => format!("name{}", typemod_str),
+            23 => "integer".to_string(),
+            1043 => format!("character varying{}", typemod_str),
+            1184 => format!("timestamp{} with time zone", typemod_str),
+            13408 => format!("information_schema.character_data{}", typemod_str),
+            13410 => format!("information_schema.sql_identifier{}", typemod_str),
+            _ => "???".to_string(),
+        };
+
+        builder.append_value(type_str).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        name,
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = Int64Builder::new(typids.len());
+        for i in 0..typids.len() {
+            let typid = typids.value(i);
+            let typmod = typmods.value(i);
+
+            // https://github.com/postgres/postgres/blob/REL_14_2/src/backend/catalog/information_schema.sql#L155
+            let precision = match typid {
+                1082 => Some(0),
+                1083 | 1114 | 1184 | 1266 => {
+                    if typmod < 0 {
+                        Some(6)
+                    } else {
+                        Some(typmod)
+                    }
+                }
+                1186 => {
+                    if typmod < 0 || ((typmod & 65535) == 65535) {
+                        Some(6)
+                    } else {
+                        Some(typmod & 65535)
+                    }
+                }
+                _ => None,
+            };
+
+            if precision.is_some() {
+                builder.append_value(precision.unwrap()).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "information_schema._pg_datetime_precision",
+        vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = Int64Builder::new(typids.len());
+        for i in 0..typids.len() {
+            let typid = typids.value(i);
+            let typmod = typmods.value(i);
+
+            // https://github.com/postgres/postgres/blob/REL_14_2/src/backend/catalog/information_schema.sql#L109
+            let precision = match typid {
+                20 => Some(64),
+                21 => Some(16),
+                23 => Some(32),
+                700 => Some(24),
+                701 => Some(53),
+                1700 => match typmod {
+                    -1 => None,
+                    _ => Some(((typmod - 4) >> 16) & 65535),
+                },
+                _ => None,
+            };
+
+            if precision.is_some() {
+                builder.append_value(precision.unwrap()).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "information_schema._pg_numeric_precision",
+        vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = Int64Builder::new(typids.len());
+        for i in 0..typids.len() {
+            let typid = typids.value(i);
+            let typmod = typmods.value(i);
+
+            // https://github.com/postgres/postgres/blob/REL_14_2/src/backend/catalog/information_schema.sql#L140
+            let scale = match typid {
+                20 | 21 | 23 => Some(0),
+                1700 => match typmod {
+                    -1 => None,
+                    _ => Some((typmod - 4) & 65535),
+                },
+                _ => None,
+            };
+
+            if scale.is_some() {
+                builder.append_value(scale.unwrap()).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "information_schema._pg_numeric_scale",
+        vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let role_oids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
+        let mut builder = StringBuilder::new(role_oids.len());
+        for i in 0..role_oids.len() {
+            let role_oid = role_oids.value(i);
+
+            let user = match role_oid {
+                10 => state.user().unwrap_or("postgres".to_string()),
+                _ => format!("unknown (OID={})", role_oid),
+            };
+
+            builder.append_value(user).unwrap();
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    create_udf(
+        "pg_get_userbyid",
+        vec![DataType::Int64],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_measure_udaf() -> AggregateUDF {
+    create_udaf(
+        "measure",
+        DataType::Float64,
+        Arc::new(DataType::Float64),
+        Volatility::Immutable,
+        Arc::new(|| todo!("Not implemented")),
+        Arc::new(vec![DataType::Float64]),
     )
 }

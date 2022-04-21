@@ -6,7 +6,7 @@ import FlexSearch from 'flexsearch';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import useDeepMemo from '../hooks/deep-memo';
+import { useDeepMemo } from '../hooks/deep-memo';
 import { getNameMemberPairs } from '../shared/helpers';
 
 const Menu = styled(AntdMenu)`
@@ -22,10 +22,14 @@ const Menu = styled(AntdMenu)`
 const SearchMenuItem = styled(Menu.Item)`
   position: sticky;
   top: 0;
-  background: white;
-  padding-top: 10px;
-  padding-bottom: 0;
-  margin-bottom: 16px;
+  // this isn't the best solution ever, but according to the situation other solutions are worse
+  // antd uses double class pattern (.disabled.active.active) to override the value of background color. actually the
+  // easiest way to override it is to use smtn with higher specificity
+  background: white !important;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  cursor: default;
 
   ::after {
     display: block;
@@ -75,6 +79,7 @@ export default function MemberMenu({
   onClick,
   ...buttonProps
 }: MemberDropdownProps) {
+  const searchInputRef = useRef<Input | null>(null);
   const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
@@ -117,9 +122,40 @@ export default function MemberMenu({
   return (
     <ButtonDropdown
       {...buttonProps}
+      onClick={() => {
+        // we need to delay focusing since React needs to render <Menu /> first :)
+        setTimeout(() => {
+          searchInputRef.current?.focus({ preventScroll: true });
+        });
+      }}
       overlay={
         <Menu
+          onKeyDown={(e) => {
+            if (
+              [
+                'ArrowDown',
+                'ArrowUp',
+                'ArrowLeft',
+                'ArrowRight',
+                'Enter',
+                'Escape',
+                'Tab',
+                'CapsLock',
+              ].includes(e.key)
+            ) {
+              return;
+            }
+
+            if (document.activeElement === searchInputRef.current?.input)
+              return;
+
+            searchInputRef.current?.focus({ preventScroll: true });
+          }}
           onClick={(event) => {
+            if (['__not-found__', '__search_field__'].includes(event.key)) {
+              return;
+            }
+
             setSearch('');
             setFilteredKeys([]);
             onClick(indexedMembers[event.key]);
@@ -127,15 +163,19 @@ export default function MemberMenu({
         >
           {hasMembers ? (
             <>
-              <SearchMenuItem disabled>
+              <SearchMenuItem disabled key="__search_field__">
                 <Input
+                  ref={searchInputRef}
                   placeholder="Search"
                   autoFocus
-                  value={search}
                   allowClear
                   onKeyDown={(event) => {
-                    if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+                    if (['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) {
                       event.preventDefault();
+                    }
+
+                    if (['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                      event.stopPropagation();
                     }
                   }}
                   onChange={(event) => {
@@ -163,7 +203,9 @@ export default function MemberMenu({
               })}
             </>
           ) : showNoMembersPlaceholder ? (
-            <Menu.Item disabled>No members found</Menu.Item>
+            <Menu.Item key="__not-found__" disabled>
+              No members found
+            </Menu.Item>
           ) : null}
         </Menu>
       }

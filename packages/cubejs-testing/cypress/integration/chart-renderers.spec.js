@@ -33,7 +33,7 @@ context('Playground: Chart Renderers', () => {
     });
 
     chartTypeByQuery.forEach(([query, chartTypes]) => {
-      const queryHash = crypto.createHash('md5').update(JSON.stringify(query)).digest('hex').substr(0, 5);
+      const queryHash = crypto.createHash('md5').update(JSON.stringify(query)).digest('hex').slice(0, 5);
 
       it(`opens the explore page: query hash ${queryHash}`, () => {
         cy.log(`QUERY: ${JSON.stringify(query)}`);

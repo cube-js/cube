@@ -39,7 +39,7 @@ use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, Ingestion};
+use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
@@ -48,7 +48,8 @@ use crate::metastore::{
     MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::query_executor::{batch_to_dataframe, QueryExecutor};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
+use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor};
 use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -57,7 +58,6 @@ use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
-use crate::util::catch_unwind::async_try_with_catch_unwind;
 use crate::util::decimal::Decimal;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -67,6 +67,7 @@ use crate::{
     store::DataFrame,
 };
 use data::create_array_builder;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use std::mem::take;
 
 pub mod cache;
@@ -512,6 +513,95 @@ impl SqlServiceImpl {
             vec![Row::new(vec![TableValue::String(dump_dir)])],
         )))
     }
+    async fn explain(
+        &self,
+        statement: Statement,
+        analyze: bool,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        fn extract_worker_plans(
+            p: &Arc<dyn ExecutionPlan>,
+        ) -> Option<Vec<(String, SerializedPlan)>> {
+            if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
+                Some(p.worker_plans())
+            } else {
+                for c in p.children() {
+                    let res = extract_worker_plans(&c);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
+                None
+            }
+        }
+
+        let query_plan = self
+            .query_planner
+            .logical_plan(DFStatement::Statement(statement))
+            .await?;
+        let res = match query_plan {
+            QueryPlan::Select(serialized, _) => {
+                let res = if !analyze {
+                    let logical_plan = serialized.logical_plan(HashMap::new(), HashMap::new())?;
+
+                    DataFrame::new(
+                        vec![Column::new(
+                            "logical plan".to_string(),
+                            ColumnType::String,
+                            0,
+                        )],
+                        vec![Row::new(vec![TableValue::String(pp_plan(&logical_plan))])],
+                    )
+                } else {
+                    let cluster = self.cluster.clone();
+                    let executor = self.query_executor.clone();
+                    let headers: Vec<Column> = vec![
+                        Column::new("node type".to_string(), ColumnType::String, 0),
+                        Column::new("node name".to_string(), ColumnType::String, 1),
+                        Column::new("physical plan".to_string(), ColumnType::String, 2),
+                    ];
+                    let mut rows = Vec::new();
+
+                    let router_plan = executor.router_plan(serialized.clone(), cluster).await?.0;
+                    rows.push(Row::new(vec![
+                        TableValue::String("router".to_string()),
+                        TableValue::String("".to_string()),
+                        TableValue::String(pp_phys_plan(router_plan.as_ref())),
+                    ]));
+
+                    if let Some(worker_plans) = extract_worker_plans(&router_plan) {
+                        let worker_futures = worker_plans
+                            .into_iter()
+                            .map(|(name, plan)| async move {
+                                self.cluster
+                                    .run_explain_analyze(&name, plan.clone())
+                                    .await
+                                    .map(|p| (name, p))
+                            })
+                            .collect::<Vec<_>>();
+                        join_all(worker_futures)
+                            .await
+                            .into_iter()
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter()
+                            .for_each(|(name, pp_plan)| {
+                                rows.push(Row::new(vec![
+                                    TableValue::String("worker".to_string()),
+                                    TableValue::String(name.to_string()),
+                                    TableValue::String(pp_plan),
+                                ]));
+                            });
+                    }
+
+                    DataFrame::new(headers, rows)
+                };
+                Ok(res)
+            }
+            _ => Err(CubeError::user(
+                "Explain not supported for selects from system tables".to_string(),
+            )),
+        }?;
+        Ok(Arc::new(res))
+    }
 }
 
 #[derive(Debug)]
@@ -613,8 +703,14 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                     if workers.len() == 0 {
                         let executor = self.query_executor.clone();
-                        async_try_with_catch_unwind(executor.execute_router_plan(plan, cluster))
-                            .await?;
+                        match async_try_with_catch_unwind(
+                            executor.execute_router_plan(plan, cluster),
+                        )
+                        .await
+                        {
+                            Ok(result) => result,
+                            Err(panic) => Err(CubeError::from(panic)),
+                        }?;
                     } else {
                         let worker = &workers[0];
                         cluster.run_select(worker, plan).await?;
@@ -910,6 +1006,18 @@ impl SqlService for SqlServiceImpl {
                 };
                 Ok(res)
             }
+            CubeStoreStatement::Statement(Statement::Explain {
+                analyze,
+                verbose: _,
+                statement,
+            }) => match *statement {
+                Statement::Query(q) => self.explain(Statement::Query(q.clone()), analyze).await,
+                _ => Err(CubeError::user(format!(
+                    "Unsupported explain request: '{}'",
+                    query
+                ))),
+            },
+
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -1105,22 +1213,6 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRe
     Ok(arrays)
 }
 
-fn decode_byte(s: &str) -> Option<u8> {
-    let v = s.as_bytes();
-    if v.len() != 2 {
-        return None;
-    }
-    let decode_char = |c| match c {
-        b'a'..=b'f' => Some(10 + c - b'a'),
-        b'A'..=b'F' => Some(10 + c - b'A'),
-        b'0'..=b'9' => Some(c - b'0'),
-        _ => None,
-    };
-    let v0 = decode_char(v[0])?;
-    let v1 = decode_char(v[1])?;
-    return Some(v0 * 16 + v1);
-}
-
 fn parse_hyper_log_log<'a>(
     buffer: &'a mut Vec<u8>,
     v: &'a Value,
@@ -1160,18 +1252,7 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
         // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
-        Value::SingleQuotedString(s) => {
-            *buffer = s
-                .split(' ')
-                .filter(|b| !b.is_empty())
-                .map(|s| {
-                    decode_byte(s).ok_or_else(|| {
-                        CubeError::user(format!("cannot convert value to binary string: {}", v))
-                    })
-                })
-                .try_collect()?;
-            Ok(buffer.as_slice())
-        }
+        Value::SingleQuotedString(s) => parse_space_separated_binstring(buffer, s.as_ref()),
         // TODO: allocate directly on arena.
         Value::HexStringLiteral(s) => {
             *buffer = Vec::from_hex(s.as_bytes())?;
@@ -1466,11 +1547,12 @@ mod tests {
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
     use crate::queryplanner::pretty_printers::pp_phys_plan;
+    use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use regex::Regex;
@@ -1605,6 +1687,87 @@ mod tests {
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[derive(Debug)]
+    pub struct FailingRemoteFs(Arc<dyn RemoteFs>);
+
+    crate::di_service!(FailingRemoteFs, [RemoteFs]);
+
+    #[async_trait::async_trait]
+    impl RemoteFs for FailingRemoteFs {
+        async fn upload_file(
+            &self,
+            _temp_upload_path: &str,
+            _remote_path: &str,
+        ) -> Result<u64, CubeError> {
+            Err(CubeError::internal("Not allowed".to_string()))
+        }
+
+        async fn download_file(
+            &self,
+            remote_path: &str,
+            expected_file_size: Option<u64>,
+        ) -> Result<String, CubeError> {
+            self.0.download_file(remote_path, expected_file_size).await
+        }
+
+        async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+            self.0.delete_file(remote_path).await
+        }
+
+        async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+            self.0.list(remote_prefix).await
+        }
+
+        async fn list_with_metadata(
+            &self,
+            remote_prefix: &str,
+        ) -> Result<Vec<RemoteFile>, CubeError> {
+            self.0.list_with_metadata(remote_prefix).await
+        }
+
+        async fn local_path(&self) -> String {
+            self.0.local_path().await
+        }
+
+        async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+            self.0.local_file(remote_path).await
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_upload_drop() {
+        Config::test("failed_upload_drop").start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn RemoteFs, _, _, _>(async move |injector| {
+                Arc::new(FailingRemoteFs(
+                    injector.get_service_typed::<QueueRemoteFs>().await,
+                ))
+            })
+                .await
+        }, async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await
+                .unwrap();
+
+            let res = service
+                .exec_query("INSERT INTO foo.values (id, dec_value, dec_value_1) VALUES (1, -153, 1), (2, 20.01, 3.5), (3, 20.30, 12.3), (4, 120.30, 43.12), (5, NULL, NULL), (6, NULL, NULL), (7, NULL, NULL), (NULL, NULL, NULL)")
+                .await;
+
+            assert!(res.is_err(), "Expected {:?} to be not allowed error", res);
+
+            let remote_fs = services.injector.get_service_typed::<QueueRemoteFs>().await;
+
+            let temp_upload = remote_fs.temp_upload_path("").await.unwrap();
+            let res = fs::read_dir(temp_upload.clone()).unwrap();
+            assert!(res.into_iter().next().is_none(), "Expected empty uploads directory but found: {:?}", fs::read_dir(temp_upload).unwrap().into_iter().map(|e| e.unwrap().path().to_string_lossy().to_string()).collect::<Vec<_>>());
+        })
+            .await;
     }
 
     #[tokio::test]
@@ -2612,6 +2775,129 @@ mod tests {
 
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn explain_logical_plan() {
+        Config::run_test("explain_logical_plan", async move |services| {
+            let service = services.sql_service;
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
+                ).await.unwrap();
+
+            let result = service.exec_query(
+                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+            ).await.unwrap();
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get_columns().len(), 1);
+
+            let pp_plan = match &result
+                .get_rows()[0]
+                .values()[0] {
+                    TableValue::String(pp_plan) => pp_plan,
+                    _ => {assert!(false); ""}
+                };
+            assert_eq!(
+                pp_plan,
+                "Projection, [foo.orders.platform, SUM(foo.orders.amount)]\
+                \n  Aggregate\
+                \n    ClusterSend, indices: [[1]]\
+                \n      Filter\
+                \n        Scan foo.orders, source: CubeTable(index: default:1:[1]), fields: [platform, age, amount]"
+            );
+        }).await;
+    }
+    #[tokio::test]
+    async fn explain_physical_plan() {
+        Config::test("explain_analyze_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14006".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15006".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("expalain_analyze_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14006".to_string());
+                config.server_name = "127.0.0.1:14006".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15006".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_analyze_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await.unwrap();
+
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'andorid', 17, 4), (3, 'ios', 20, 5)"
+                    ).await.unwrap();
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                    ).await.unwrap();
+
+                assert_eq!(result.len(), 2);
+
+                assert_eq!(result.get_columns().len(), 3);
+
+                let router_row = &result.get_rows()[0];
+                match &router_row
+                    .values()[0] {
+                        TableValue::String(node_type) => {assert_eq!(node_type, "router");},
+                        _ => {assert!(false);}
+                    };
+                match &router_row
+                    .values()[1] {
+                        TableValue::String(node_name) => {assert!(node_name.is_empty());},
+                        _ => {assert!(false);}
+                    };
+                match &router_row
+                    .values()[2] {
+                        TableValue::String(pp_plan) => {
+                            assert_eq!(
+                                pp_plan,
+                                "Projection, [platform, SUM(foo.orders.amount)@1:SUM(amount)]\
+                                \n  FinalHashAggregate\
+                                \n    ClusterSend, partitions: [[1]]"
+                            );
+                        },
+                        _ => {assert!(false);}
+                    };
+
+                let worker_row = &result.get_rows()[1];
+                match &worker_row
+                    .values()[0] {
+                        TableValue::String(node_type) => {assert_eq!(node_type, "worker");},
+                        _ => {assert!(false);}
+                    };
+                match &worker_row
+                    .values()[1] {
+                        TableValue::String(node_name) => {assert_eq!(node_name, "127.0.0.1:14006");},
+                        _ => {assert!(false);}
+                    };
+                match &worker_row
+                    .values()[2] {
+                        TableValue::String(pp_plan) => {
+                            let regex = Regex::new(
+                                r"PartialHas+hAggregate\s+Filter\s+Merge\s+Scan, index: default:1:\[1\], fields+: \[platform, age, amount\]\s+ParquetScan, files+: .*\.chunk\.parquet"
+                            ).unwrap();
+                            let matches = regex.captures_iter(&pp_plan).count();
+                            assert_eq!(matches, 1);
+                        },
+                        _ => {assert!(false);}
+                    };
+
+            }).await;
         }).await;
     }
 }

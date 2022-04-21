@@ -87,9 +87,22 @@ export class QuestQuery extends BaseQuery {
       .join(' AND ');
   }
 
+  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string): string {
+    // QuestDB doesn't support COUNT(column_name) syntax.
+    // COUNT() or COUNT(*) should be used instead.
+
+    if (symbol.type === 'count') {
+      return 'count(*)';
+    }
+    return super.renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure);
+  }
+
   public primaryKeyCount(cubeName: string, distinct: boolean): string {
+    const primaryKeys: string[] = this.cubeEvaluator.primaryKeys[cubeName];
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     if (distinct) {
-      const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
       return `count_distinct(${primaryKeySql})`;
     } else {
       return 'count(*)';
