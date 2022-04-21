@@ -55,25 +55,23 @@ export class CompilerApi {
         standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
+      this.queryFactory = await this.createQueryFactory(this.compilers);
     }
 
     return this.compilers;
   }
 
-  getQueryFactory() {
-    if (!this.queryFactory) {
-      const { cubeEvaluator } = this.compilers;
-      const cubeToQueryClass = R.fromPairs(
-        cubeEvaluator.cubeNames().map(cube => {
-          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
-          const dbType = this.getDbType(dataSource);
-          const dialectClass = this.getDialectClass(dataSource, dbType);
-          return [cube, queryClass(dbType, dialectClass)];
-        })
-      );
-      this.queryFactory = new QueryFactory(cubeToQueryClass);
-    }
-    return this.queryFactory;
+  async createQueryFactory(compilers) {
+    const { cubeEvaluator } = compilers;
+    const cubeToQueryClass = R.fromPairs(
+      cubeEvaluator.cubeNames().map(cube => {
+        const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+        const dbType = this.getDbType(dataSource);
+        const dialectClass = this.getDialectClass(dataSource, dbType);
+        return [cube, queryClass(dbType, dialectClass)];
+      })
+    );
+    return new QueryFactory(cubeToQueryClass);
   }
 
   getDbType(dataSource = 'default') {
@@ -166,7 +164,7 @@ export class CompilerApi {
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
-        queryFactory: this.getQueryFactory(),
+        queryFactory: this.queryFactory,
       }
     );
   }
