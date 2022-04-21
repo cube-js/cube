@@ -1991,7 +1991,9 @@ class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
+    return this.options.queryFactory
+      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
+      : this.newSubQuery(options);
   }
 
   subQueryOptions(options) {

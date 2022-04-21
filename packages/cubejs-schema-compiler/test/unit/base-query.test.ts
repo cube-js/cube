@@ -277,7 +277,8 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
         timezone: 'America/Los_Angeles',
-        externalQueryClass: MssqlQuery
+        externalQueryClass: MssqlQuery,
+        queryFactory: new QueryFactory({ cards: PostgresQuery }),
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
@@ -308,7 +309,8 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
         timezone: 'America/Los_Angeles',
-        externalQueryClass: MssqlQuery
+        externalQueryClass: MssqlQuery,
+        queryFactory: new QueryFactory({ cards: PostgresQuery }),
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
@@ -339,7 +341,8 @@ describe('SQL Generation', () => {
         }],
         filters: [],
         timezone: 'America/Los_Angeles',
-        externalQueryClass: MssqlQuery
+        externalQueryClass: MssqlQuery,
+        queryFactory: new QueryFactory({ cards: PostgresQuery }),
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
@@ -423,6 +426,7 @@ describe('SQL Generation', () => {
         }],
         filters: [],
         timezone: 'America/Los_Angeles',
+        queryFactory: new QueryFactory({ cards: PostgresQuery }),
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
@@ -453,7 +457,8 @@ describe('SQL Generation', () => {
         }],
         filters: [],
         timezone: 'America/Los_Angeles',
-        externalQueryClass: MssqlQuery
+        externalQueryClass: MssqlQuery,
+        queryFactory: new QueryFactory({ cards: PostgresQuery }),
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
