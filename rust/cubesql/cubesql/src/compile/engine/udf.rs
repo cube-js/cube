@@ -133,6 +133,23 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_pg_backend_pid(state: Arc<SessionState>) -> ScalarUDF {
+    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = UInt32Builder::new(1);
+        builder.append_value(state.connection_id).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "pg_backend_pid",
+        vec![],
+        Arc::new(DataType::UInt32),
+        Volatility::Immutable,
+        version,
+    )
+}
+
 pub fn create_current_schema_udf() -> ScalarUDF {
     let current_schema = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
