@@ -185,8 +185,6 @@ class ChartContainer extends Component<
       );
       let codeExample = '';
       
-      // console.log('>>>', __cubejsPlayground.getDependencies(props.chartingLibrary))
-
       if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
       } else if (props.framework === 'angular') {
