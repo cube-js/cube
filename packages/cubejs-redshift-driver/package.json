@@ -21,6 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "npm run integration:redshift",
+    "integration:redshift": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -34,6 +36,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
+    "@cubejs-backend/testing": "^0.29.23",
     "typescript": "~4.1.5"
   },
   "publishConfig": {

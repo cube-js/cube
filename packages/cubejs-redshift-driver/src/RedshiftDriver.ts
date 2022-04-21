@@ -64,6 +64,14 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return undefined;
   }
 
+  protected getPostgresTypeForField(dataTypeID: number): string | null {
+    if (dataTypeID === 4000) {
+      return 'super';
+    }
+
+    return super.getPostgresTypeForField(dataTypeID);
+  }
+
   public async loadUserDefinedTypes(): Promise<void> {
     // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
   }
