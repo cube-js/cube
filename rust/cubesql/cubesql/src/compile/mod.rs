@@ -44,9 +44,9 @@ use self::{
         create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
         create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
         create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
-        create_pg_get_userbyid_udf, create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-        create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
-        create_version_udf,
+        create_pg_get_expr_udf, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+        create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
+        create_user_udf, create_version_udf,
     },
     parser::parse_sql_to_statement,
 };
@@ -2279,6 +2279,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
+        ctx.register_udf(create_pg_get_expr_udf());
+
         // udaf
         ctx.register_udaf(create_measure_udaf());
 
@@ -5625,6 +5627,30 @@ mod tests {
             "generate_series_from_table",
             execute_query(
                 "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_get_expr_1",
+            execute_query(
+                "SELECT pg_catalog.pg_get_expr(adbin, adrelid) FROM pg_catalog.pg_attrdef;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "pg_get_expr_2",
+            execute_query(
+                "SELECT pg_catalog.pg_get_expr(adbin, adrelid, true) FROM pg_catalog.pg_attrdef;"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )

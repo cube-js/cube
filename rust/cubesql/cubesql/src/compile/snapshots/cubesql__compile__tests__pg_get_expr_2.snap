@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT pg_catalog.pg_get_expr(adbin, adrelid, true) FROM pg_catalog.pg_attrdef;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------------------------------------------------------------------------------+
+| pg_catalog.pg_get_expr(pg_catalog.pg_attrdef.adbin,pg_catalog.pg_attrdef.adrelid,Boolean(true)) |
++-------------------------------------------------------------------------------------------------+
++-------------------------------------------------------------------------------------------------+
