@@ -149,7 +149,7 @@ impl MySqlConnection {
 
         if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -164,7 +164,7 @@ impl MySqlConnection {
             )
         } else if query_lower.eq("select cast('test unicode returns' as char(60)) as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -179,7 +179,7 @@ impl MySqlConnection {
             )
         } else if query_lower.eq("select cast('test collated returns' as char character set utf8mb4) collate utf8mb4_bin as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -215,7 +215,7 @@ impl MySqlConnection {
                     let batches = df.collect().await?;
                     let response =  batch_to_dataframe(&batches)?;
 
-                    return Ok(QueryResponse::ResultSet(status, Arc::new(response)))
+                    return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
             }
         }
@@ -223,7 +223,7 @@ impl MySqlConnection {
         if ignore {
             Ok(QueryResponse::ResultSet(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
             ))
         } else {
             Err(CubeError::internal("Unsupported query".to_string()))

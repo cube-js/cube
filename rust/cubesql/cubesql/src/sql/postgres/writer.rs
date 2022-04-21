@@ -225,6 +225,7 @@ pub struct BatchWriter {
     data: BytesMut,
     // Current row
     current: u32,
+    rows: u32,
     row: BytesMut,
 }
 
@@ -235,6 +236,7 @@ impl BatchWriter {
             data: BytesMut::new(),
             row: BytesMut::new(),
             current: 0,
+            rows: 0,
         }
     }
 
@@ -260,8 +262,17 @@ impl BatchWriter {
 
         self.data.extend(buffer);
         self.current = 0;
+        self.rows += 1;
 
         Ok(())
+    }
+
+    pub fn num_rows(&self) -> u32 {
+        self.rows
+    }
+
+    pub fn has_data(&self) -> bool {
+        self.rows > 0
     }
 }
 

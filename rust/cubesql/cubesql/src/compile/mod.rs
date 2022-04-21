@@ -1514,7 +1514,7 @@ impl QueryPlanner {
         {
             return Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "_".to_string(),
                         ColumnType::Int8,
@@ -1603,7 +1603,7 @@ impl QueryPlanner {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
             (ast::Statement::SetNames { charset_name, .. }, DatabaseProtocol::MySQL) => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
@@ -1617,7 +1617,7 @@ impl QueryPlanner {
 
                 Ok(QueryPlan::MetaTabular(
                     StatusFlags::empty(),
-                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                    Box::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
             (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => Ok(QueryPlan::MetaOk(
@@ -1720,7 +1720,7 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "Database".to_string(),
                         ColumnType::String,
@@ -1751,7 +1751,7 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![
                         dataframe::Column::new(
                             "Level".to_string(),
@@ -1843,7 +1843,7 @@ impl QueryPlanner {
                 ));
             }
 
-            QueryPlan::MetaTabular(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
+            QueryPlan::MetaTabular(StatusFlags::empty(), Box::new(dataframe::DataFrame::new(
                 vec![
                     dataframe::Column::new(
                         "Table".to_string(),
@@ -2045,7 +2045,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         return Ok(QueryPlan::MetaTabular(
             StatusFlags::empty(),
-            Arc::new(dataframe::DataFrame::new(
+            Box::new(dataframe::DataFrame::new(
                 vec![dataframe::Column::new(
                     "Execution Plan".to_string(),
                     ColumnType::String,
@@ -2197,7 +2197,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         Ok(QueryPlan::MetaTabular(
             flags,
-            Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+            Box::new(dataframe::DataFrame::new(vec![], vec![])),
         ))
     }
 
@@ -2393,12 +2393,11 @@ impl CompiledQuery {
     }
 }
 
-#[derive(Clone)]
 pub enum QueryPlan {
     // Meta will not be executed in DF,
     // we already knows how respond to it
     MetaOk(StatusFlags, CommandCompletion),
-    MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
+    MetaTabular(StatusFlags, Box<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
     DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
 }
