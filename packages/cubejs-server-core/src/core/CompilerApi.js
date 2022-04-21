@@ -47,7 +47,6 @@ export class CompilerApi {
         version: compilerVersion,
         requestId
       });
-      // TODO check if saving this promise can produce memory leak?
       this.compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
