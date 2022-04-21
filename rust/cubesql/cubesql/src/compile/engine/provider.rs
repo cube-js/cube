@@ -381,7 +381,7 @@ impl DatabaseProtocol {
                     return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()))
                 }
                 "testing_dataset" => {
-                    return Some(Arc::new(InfoSchemaTestingDatasetProvider::new()))
+                    return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
                 }
                 _ => return None,
             },

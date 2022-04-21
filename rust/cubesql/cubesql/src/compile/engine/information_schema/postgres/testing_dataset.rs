@@ -14,7 +14,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-struct InfoSchemaTestingDatasetProviderBuilder {
+pub struct InfoSchemaTestingDatasetProviderBuilder {
     start: usize,
     capacity: usize,
     id: UInt32Builder,
@@ -22,7 +22,7 @@ struct InfoSchemaTestingDatasetProviderBuilder {
 }
 
 impl InfoSchemaTestingDatasetProviderBuilder {
-    fn new(start: usize, capacity: usize) -> Self {
+    pub fn new(start: usize, capacity: usize) -> Self {
         Self {
             start,
             capacity,
@@ -31,7 +31,7 @@ impl InfoSchemaTestingDatasetProviderBuilder {
         }
     }
 
-    fn finish(mut self) -> Vec<Arc<dyn Array>> {
+    pub fn finish(mut self) -> Vec<Arc<dyn Array>> {
         for i in self.start..(self.start + self.capacity) {
             self.id.append_value(i as u32).unwrap();
             self.random_str.append_value("test".to_string()).unwrap();
@@ -45,11 +45,17 @@ impl InfoSchemaTestingDatasetProviderBuilder {
     }
 }
 
-pub struct InfoSchemaTestingDatasetProvider {}
+pub struct InfoSchemaTestingDatasetProvider {
+    batches: usize,
+    rows_per_batch: usize,
+}
 
 impl InfoSchemaTestingDatasetProvider {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(batches: usize, rows_per_batch: usize) -> Self {
+        Self {
+            batches,
+            rows_per_batch,
+        }
     }
 }
 
@@ -76,18 +82,22 @@ impl TableProvider for InfoSchemaTestingDatasetProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let p1 = InfoSchemaTestingDatasetProviderBuilder::new(0, 1000);
+        let mut batches: Vec<RecordBatch> = vec![];
 
-        let p2 = InfoSchemaTestingDatasetProviderBuilder::new(1000, 1000);
+        for i in 0..self.batches {
+            let builder = InfoSchemaTestingDatasetProviderBuilder::new(
+                i * self.rows_per_batch,
+                self.rows_per_batch,
+            );
 
-        let p3 = InfoSchemaTestingDatasetProviderBuilder::new(2000, 1000);
+            batches.push(RecordBatch::try_new(
+                self.schema(),
+                builder.finish().to_vec(),
+            )?);
+        }
 
         Ok(Arc::new(MemoryExec::try_new(
-            &[vec![
-                RecordBatch::try_new(self.schema(), p1.finish().to_vec())?,
-                RecordBatch::try_new(self.schema(), p2.finish().to_vec())?,
-                RecordBatch::try_new(self.schema(), p3.finish().to_vec())?,
-            ]],
+            &[batches],
             self.schema(),
             projection.clone(),
         )?))

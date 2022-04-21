@@ -214,7 +214,7 @@ impl PostgresIntegrationTestSuite {
             total += 1;
         }
 
-        assert_eq!(total, 3000);
+        assert_eq!(total, 5000);
 
         Ok(())
     }

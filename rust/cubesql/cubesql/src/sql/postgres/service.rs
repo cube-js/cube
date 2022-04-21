@@ -61,6 +61,8 @@ impl ProcessingLoop for PostgresServer {
                 socket.peer_addr().unwrap().to_string(),
             );
 
+            trace!("[pg] New connection {}", session.state.connection_id);
+
             tokio::spawn(async move {
                 if let Err(e) = AsyncPostgresShim::run_on(socket, session).await {
                     error!("Error during processing PostgreSQL connection: {}", e);

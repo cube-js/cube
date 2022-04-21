@@ -19,6 +19,7 @@
 
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use core::fmt;
 use cubeclient::apis::default_api::{LoadV1Error, MetaV1Error};
