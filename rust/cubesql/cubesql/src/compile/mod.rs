@@ -2310,16 +2310,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
         //    CompilationError::Internal(format!("Planning optimization error: {}", err))
         // })?;
 
-        // let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
-        // let root = converter
-        //     .add_logical_plan(&optimized_plan)
-        //     .map_err(|e| CompilationError::User(e.to_string()))?;
-        // let rewrite_plan = converter
-        //     .take_rewriter()
-        //     .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
-        //     .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
-
-        let rewrite_plan = optimized_plan;
+        let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
+        let root = converter
+            .add_logical_plan(&optimized_plan)
+            .map_err(|e| CompilationError::User(e.to_string()))?;
+        let rewrite_plan = converter
+            .take_rewriter()
+            .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
 
