@@ -1991,7 +1991,7 @@ class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    return this.compilers.queryFactory.createQuery(cube, this.subQueryOptions(options));
+    return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
   }
 
   subQueryOptions(options) {
@@ -2005,6 +2005,7 @@ class BaseQuery {
       cubeLatticeCache: this.options.cubeLatticeCache,
       historyQueries: this.options.historyQueries,
       externalQueryClass: this.options.externalQueryClass,
+      queryFactory: this.options.queryFactory,
       ...options,
     };
   }

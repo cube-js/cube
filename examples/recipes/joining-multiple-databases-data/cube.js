@@ -21,7 +21,6 @@ function postgres() {
 
 module.exports = {
   dbType: ({ dataSource }) => {
-    console.log('QQQ dbType', dataSource)
     switch (dataSource) {
       case 'default': return 'postgres';
       case 'suppliers': return 'postgres';
@@ -31,7 +30,6 @@ module.exports = {
   },
 
   driverFactory: ({ dataSource }) => {
-    console.log('QQQ driverFactory', dataSource)
     switch (dataSource) {
       case 'suppliers': return postgres();
       case 'products': return bigquery();
