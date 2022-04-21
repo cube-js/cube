@@ -77,8 +77,6 @@ export class OrchestratorApi {
         })
       );
 
-      console.log('QQQ', data);
-
       if (Array.isArray(data)) {
         return data.map((item) => ({
           ...item,

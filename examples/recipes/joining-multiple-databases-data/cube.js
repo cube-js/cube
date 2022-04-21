@@ -22,10 +22,9 @@ function postgres() {
 module.exports = {
   dbType: ({ dataSource }) => {
     switch (dataSource) {
-      case 'default': return 'postgres';
       case 'suppliers': return 'postgres';
       case 'products': return 'bigquery';
-      default: throw new Error('dbType: dataSource is undefined');
+      default: return 'postgres';
     }
   },
 
@@ -33,7 +32,7 @@ module.exports = {
     switch (dataSource) {
       case 'suppliers': return postgres();
       case 'products': return bigquery();
-      default: throw new Error('driverFactory: dataSource is undefined');
+      default: throw new Error(`driverFactory: Invalid dataSource '${dataSource}'`);
     }
   },
 };
