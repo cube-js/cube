@@ -73,6 +73,19 @@ remoteDir:
     ##
     annotations: {}
 
+    ## Persistent Volume access modes
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## @param remoteDir.persistence.storageClass The storage class to use for the remoteDir pvc
+    ## If defined, storageClassName: <storageClass>
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClass: ""
+
 cloudStorage:
   gcp:
     ## A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage
@@ -197,7 +210,7 @@ router:
 workers:
   ## Number of workers to deploy
   ##
-  workersCount: 2
+  workersCount: 1
 
   ## The port for Cube Store workers to listen to connections on
   ##
