@@ -1,6 +1,6 @@
 ```shell
 $ yarn install
-$ yarn dev
+$ rm -Rf .cubestore && yarn dev
 $ curl -G --data-urlencode 'query={
   "order": {
     "Products.name": "asc"

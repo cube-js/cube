@@ -463,7 +463,7 @@ export class CubejsServerCore {
     if (!options.devServer || this.isReadyForQueryProcessing()) {
       const fieldsForValidation: (keyof ServerCoreInitializedOptions)[] = [
         'driverFactory',
-        // 'dbType'
+        'dbType'
       ];
 
       if (!options.jwt?.jwkUrl) {
