@@ -193,6 +193,26 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, Arc<TableUDF>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](String);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, Arc<ScalarUDF>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]

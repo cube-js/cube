@@ -44,6 +44,7 @@ use crate::compile::rewrite::TableScanLimit;
 use crate::compile::rewrite::TableScanProjection;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TableScanTableName;
+use crate::compile::rewrite::TableUDFExprFun;
 use crate::compile::rewrite::TimeDimensionDateRange;
 use crate::compile::rewrite::TimeDimensionGranularity;
 use crate::compile::rewrite::TimeDimensionName;
@@ -58,12 +59,13 @@ use cubeclient::models::{
 };
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
-use datafusion::logical_plan::plan::Extension;
+use datafusion::logical_plan::build_table_udf_schema;
 use datafusion::logical_plan::plan::Filter;
 use datafusion::logical_plan::plan::Join;
 use datafusion::logical_plan::plan::Projection;
 use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::plan::{Aggregate, Window};
+use datafusion::logical_plan::plan::{Extension, TableUDFs};
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     LogicalPlan, LogicalPlanBuilder,
@@ -303,6 +305,12 @@ impl LogicalPlanToLanguageConverter {
                 self.graph
                     .add(LogicalPlanLanguage::AggregateUDFExpr([fun, args]))
             }
+            Expr::TableUDF { fun, args } => {
+                let fun = add_data_node!(self, fun.name, TableUDFExprFun);
+                let args = add_expr_list_node!(self, args, TableUDFExprArgs);
+                self.graph
+                    .add(LogicalPlanLanguage::TableUDFExpr([fun, args]))
+            }
             Expr::InList {
                 expr,
                 list,
@@ -402,6 +410,12 @@ impl LogicalPlanToLanguageConverter {
                 let subqueries = add_plan_list_node!(self, node.subqueries, SubquerySubqueries);
                 self.graph
                     .add(LogicalPlanLanguage::Subquery([input, subqueries]))
+            }
+            LogicalPlan::TableUDFs(node) => {
+                let expr = add_expr_list_node!(self, node.expr, TableUDFsExpr);
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                self.graph
+                    .add(LogicalPlanLanguage::TableUDFs([expr, input]))
             }
             LogicalPlan::TableScan(node) => {
                 let source_table_name = add_data_node!(
@@ -594,6 +608,7 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::AggregateFunctionExpr(_) => true,
         LogicalPlanLanguage::WindowFunctionExpr(_) => true,
         LogicalPlanLanguage::AggregateUDFExpr(_) => true,
+        LogicalPlanLanguage::TableUDFExpr(_) => true,
         LogicalPlanLanguage::InListExpr(_) => true,
         LogicalPlanLanguage::WildcardExpr(_) => true,
         LogicalPlanLanguage::OuterColumnExpr(_) => true,
@@ -767,6 +782,17 @@ pub fn node_to_expr(
                 )))?;
             Expr::AggregateUDF { fun, args }
         }
+        LogicalPlanLanguage::TableUDFExpr(params) => {
+            let fun_name = match_data_node!(node_by_id, params[0], TableUDFExprFun);
+            let args = match_expr_list_node!(node_by_id, to_expr, params[1], TableUDFExprArgs);
+            let fun = cube_context
+                .get_table_function_meta(&fun_name)
+                .ok_or(CubeError::user(format!(
+                    "Table UDF '{}' is not found",
+                    fun_name
+                )))?;
+            Expr::TableUDF { fun, args }
+        }
         LogicalPlanLanguage::InListExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
             let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
@@ -928,6 +954,17 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlanBuilder::from(input)
                     .subquery(subqueries)?
                     .build()?
+            }
+            LogicalPlanLanguage::TableUDFs(params) => {
+                let expr = match_expr_list_node!(node_by_id, to_expr, params[0], TableUDFsExpr);
+                let input = Arc::new(self.to_logical_plan(params[1])?);
+                let schema = build_table_udf_schema(&input, expr.as_slice())?;
+
+                LogicalPlan::TableUDFs(TableUDFs {
+                    expr,
+                    input,
+                    schema,
+                })
             }
             LogicalPlanLanguage::TableScan(params) => {
                 let source_table_name =

@@ -42,10 +42,11 @@ use self::{
     engine::udf::{
         create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
         create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
-        create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
-        create_pg_datetime_precision_udf, create_pg_get_userbyid_udf,
-        create_pg_numeric_precision_udf, create_pg_numeric_scale_udf, create_time_format_udf,
-        create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
+        create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
+        create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
+        create_pg_get_userbyid_udf, create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
+        create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
+        create_version_udf,
     },
     parser::parse_sql_to_statement,
 };
@@ -2280,6 +2281,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         // udaf
         ctx.register_udaf(create_measure_udaf());
+
+        // udtf
+        ctx.register_udtf(create_generate_series_udtf(true));
+        ctx.register_udtf(create_generate_series_udtf(false));
 
         ctx
     }
@@ -5552,6 +5557,75 @@ mod tests {
             "pg_get_userbyid_invalid",
             execute_query(
                 "SELECT pg_get_userbyid(0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generate_series_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "generate_series_i64_1",
+            execute_query(
+                "SELECT generate_series(-5, 5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_f64_2",
+            execute_query(
+                "SELECT generate_series(-5, 5, 3);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_f64_1",
+            execute_query(
+                "SELECT generate_series(-5, 5, 0.5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_empty_1",
+            execute_query(
+                "SELECT generate_series(-5, -10, 3);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_empty_2",
+            execute_query(
+                "SELECT generate_series(1, 5, 0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_catalog_generate_series_i64",
+            execute_query(
+                "SELECT pg_catalog.generate_series(1, 5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_from_table",
+            execute_query(
+                "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
