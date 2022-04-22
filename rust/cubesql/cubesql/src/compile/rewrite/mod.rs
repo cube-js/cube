@@ -193,6 +193,10 @@ crate::plan_to_language! {
             negated: bool,
         },
         WildcardExpr {},
+        GetIndexedFieldExpr {
+            expr: Box<Expr>,
+            key: ScalarValue,
+        },
 
         CubeScan {
             cube: Arc<LogicalPlan>,
