@@ -1388,7 +1388,7 @@ impl QueryPlanner {
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
             .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
+            .unwrap_or(self.state.protocol == DatabaseProtocol::PostgreSQL);
         if rewrite_engine {
             return self.create_df_logical_plan(stmt.clone());
         }
@@ -3111,6 +3111,40 @@ mod tests {
         //         .unwrap()
         //     ),
         // );
+    }
+
+    #[test]
+    fn test_select_where_false() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT * FROM KibanaSampleDataEcommerce WHERE 1 = 0".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1),
+                offset: None,
+                filters: None,
+            }
+        );
     }
 
     #[test]
