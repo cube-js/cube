@@ -1246,7 +1246,7 @@ pub fn create_measure_udaf() -> AggregateUDF {
 
 macro_rules! generate_series_udtf {
     ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident) => {{
-        let mut indexes: Vec<usize> = Vec::new();
+        let mut section_sizes: Vec<usize> = Vec::new();
         let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
         if l_arr.is_some() {
             let l_arr = l_arr.unwrap();
@@ -1259,7 +1259,6 @@ macro_rules! generate_series_udtf {
             };
 
             let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
-            let mut current_index: i64 = -1;
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
                 let step = if step_arr.len() > i {
                     step_arr.value(i)
@@ -1269,6 +1268,7 @@ macro_rules! generate_series_udtf {
 
                 let start = start.unwrap();
                 let end = end.unwrap();
+                let mut section_size: i64 = 0;
                 if start <= end && step > 0 as $PRIMITIVE_TYPE {
                     let mut current = start;
                     loop {
@@ -1277,21 +1277,19 @@ macro_rules! generate_series_udtf {
                         }
                         builder.append_value(current).unwrap();
 
-                        current_index += 1;
+                        section_size += 1;
                         current += step;
                     }
-                    if current_index >= 0 {
-                        indexes.push(current_index as usize);
-                    }
                 }
+                section_sizes.push(section_size as usize);
             }
 
-            return Ok((Arc::new(builder.finish()) as ArrayRef, indexes));
+            return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
         }
     }};
 }
 
-pub fn create_generate_series_udtf() -> TableUDF {
+pub fn create_generate_series_udtf(with_catalog_prefix: bool) -> TableUDF {
     let fun = make_table_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2 || args.len() == 3);
 
@@ -1304,9 +1302,15 @@ pub fn create_generate_series_udtf() -> TableUDF {
         Err(DataFusionError::Execution(format!("Unsupported type")))
     });
 
+    let fun_name = if with_catalog_prefix {
+        "generate_series"
+    } else {
+        "pg_catalog.generate_series"
+    };
+
     let return_type: ReturnTypeFunction = Arc::new(move |tp| Ok(Arc::new(tp[0].clone())));
     TableUDF::new(
-        "generate_series",
+        fun_name,
         &Signature::one_of(
             vec![
                 TypeSignature::Exact(vec![DataType::Int64, DataType::Int64]),

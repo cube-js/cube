@@ -2282,7 +2282,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udaf(create_measure_udaf());
 
         // udtf
-        ctx.register_udtf(create_generate_series_udtf());
+        ctx.register_udtf(create_generate_series_udtf(true));
+        ctx.register_udtf(create_generate_series_udtf(false));
 
         ctx
     }
@@ -5592,51 +5593,60 @@ mod tests {
             .await?
         );
 
-        // TODO: Uncomment after Sunquery && DataFusion Fixed
-        // insta::assert_snapshot!(
-        //     "generate_series_empty_1",
-        //     execute_query(
-        //         "SELECT generate_series(-5, -10, 3);".to_string(),
-        //         DatabaseProtocol::PostgreSQL
-        //     )
-        //     .await?
-        // );
+        insta::assert_snapshot!(
+            "generate_series_empty_1",
+            execute_query(
+                "SELECT generate_series(-5, -10, 3);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
 
-        // insta::assert_snapshot!(
-        //     "generate_series_empty_2",
-        //     execute_query(
-        //         "SELECT generate_series(1, 5, 0);".to_string(),
-        //         DatabaseProtocol::PostgreSQL
-        //     )
-        //     .await?
-        // );
+        insta::assert_snapshot!(
+            "generate_series_empty_2",
+            execute_query(
+                "SELECT generate_series(1, 5, 0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
 
-        // insta::assert_snapshot!(
-        //     "generate_series_empty_2",
-        //     execute_query(
-        //         "select generate_series(1, oid) from (select 3 oid union all select 5 oid) x".to_string(),
-        //         DatabaseProtocol::PostgreSQL
-        //     )
-        //     .await?
-        // );
+        insta::assert_snapshot!(
+            "pg_catalog_generate_series_i64",
+            execute_query(
+                "SELECT pg_catalog.generate_series(1, 5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_from_table",
+            execute_query(
+                "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
 
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn superset_subquery() -> Result<(), CubeError> {
-    //     init_logger();
+    #[tokio::test]
+    async fn superset_subquery() -> Result<(), CubeError> {
+        init_logger();
 
-    //     // TODO should be pg_get_expr instead of format_type
-    //     insta::assert_snapshot!(
-    //         "superset_subquery",
-    //         execute_query(
-    //             "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), (SELECT format_type(d.adbin, d.adrelid) FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef) AS DEFAULT, a.attnotnull, a.attnum, a.attrelid as table_oid, pgd.description as comment, a.attgenerated as generated FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_description pgd ON ( pgd.objoid = a.attrelid AND pgd.objsubid = a.attnum) WHERE a.attrelid = 13449 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum;".to_string(),
-    //             DatabaseProtocol::PostgreSQL
-    //         )
-    //         .await?
-    //     );
+        // TODO should be pg_get_expr instead of format_type
+        insta::assert_snapshot!(
+            "superset_subquery",
+            execute_query(
+                "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), (SELECT format_type(d.adbin, d.adrelid) FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef) AS DEFAULT, a.attnotnull, a.attnum, a.attrelid as table_oid, pgd.description as comment, a.attgenerated as generated FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_description pgd ON ( pgd.objoid = a.attrelid AND pgd.objsubid = a.attnum) WHERE a.attrelid = 13449 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
