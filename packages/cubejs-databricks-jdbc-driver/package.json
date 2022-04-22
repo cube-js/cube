@@ -38,7 +38,7 @@
     "inquirer": "^8.0.0",
     "ramda": "^0.27.1",
     "source-map-support": "^0.5.19",
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.29.23",
