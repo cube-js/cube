@@ -42,6 +42,14 @@ pub fn defaults() -> DatabaseVariables {
             None,
         ),
     );
+    variables.insert(
+        "max_index_keys".to_string(),
+        DatabaseVariable::system(
+            "max_index_keys".to_string(),
+            ScalarValue::UInt32(Some(32)),
+            None,
+        ),
+    );
 
     variables.insert(
         "lc_collate".to_string(),
