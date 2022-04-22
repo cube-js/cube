@@ -5,24 +5,27 @@ use chrono::{Duration, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, GenericStringArray, Int64Array,
-            Int64Builder, IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder,
-            PrimitiveArray, StringArray, StringBuilder, TimestampNanosecondArray, UInt32Builder,
+            Array, ArrayRef, BooleanArray, BooleanBuilder, Float64Array, GenericStringArray,
+            Int64Array, Int64Builder, IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder,
+            PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder, TimestampNanosecondArray,
+            UInt32Builder,
         },
         compute::cast,
         datatypes::{
-            DataType, Field, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit, TimeUnit,
-            TimestampNanosecondType, UInt64Type,
+            DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
+            TimeUnit, TimestampNanosecondType, UInt64Type,
         },
     },
     error::{DataFusionError, Result},
     logical_plan::{create_udaf, create_udf},
     physical_plan::{
         functions::{
-            datetime_expressions::date_trunc, make_scalar_function, Signature, Volatility,
+            datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
+            TypeSignature, Volatility,
         },
         udaf::AggregateUDF,
         udf::ScalarUDF,
+        udtf::TableUDF,
         ColumnarValue,
     },
     scalar::ScalarValue,
@@ -126,6 +129,23 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
 
     create_udf(
         "connection_id",
+        vec![],
+        Arc::new(DataType::UInt32),
+        Volatility::Immutable,
+        version,
+    )
+}
+
+pub fn create_pg_backend_pid(state: Arc<SessionState>) -> ScalarUDF {
+    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = UInt32Builder::new(1);
+        builder.append_value(state.connection_id).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "pg_backend_pid",
         vec![],
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
@@ -1213,6 +1233,28 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_expr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(0);
+        Ok(Arc::new(builder.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_get_expr",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64, DataType::Boolean]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_measure_udaf() -> AggregateUDF {
     create_udaf(
         "measure",
@@ -1221,5 +1263,90 @@ pub fn create_measure_udaf() -> AggregateUDF {
         Volatility::Immutable,
         Arc::new(|| todo!("Not implemented")),
         Arc::new(vec![DataType::Float64]),
+    )
+}
+
+macro_rules! generate_series_udtf {
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident) => {{
+        let mut section_sizes: Vec<usize> = Vec::new();
+        let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
+        if l_arr.is_some() {
+            let l_arr = l_arr.unwrap();
+            let r_arr = downcast_primitive_arg!($ARGS[1], "right", $TYPE);
+            let step_arr = PrimitiveArray::<$TYPE>::from_value(1 as $PRIMITIVE_TYPE, 1);
+            let step_arr = if $ARGS.len() > 2 {
+                downcast_primitive_arg!($ARGS[2], "step", $TYPE)
+            } else {
+                &step_arr
+            };
+
+            let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
+            for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
+                let step = if step_arr.len() > i {
+                    step_arr.value(i)
+                } else {
+                    step_arr.value(0)
+                };
+
+                let start = start.unwrap();
+                let end = end.unwrap();
+                let mut section_size: i64 = 0;
+                if start <= end && step > 0 as $PRIMITIVE_TYPE {
+                    let mut current = start;
+                    loop {
+                        if current > end {
+                            break;
+                        }
+                        builder.append_value(current).unwrap();
+
+                        section_size += 1;
+                        current += step;
+                    }
+                }
+                section_sizes.push(section_size as usize);
+            }
+
+            return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
+        }
+    }};
+}
+
+pub fn create_generate_series_udtf(with_catalog_prefix: bool) -> TableUDF {
+    let fun = make_table_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2 || args.len() == 3);
+
+        if args[0].as_any().downcast_ref::<Int64Array>().is_some() {
+            generate_series_udtf!(args, Int64Type, i64)
+        } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
+            generate_series_udtf!(args, Float64Type, f64)
+        }
+
+        Err(DataFusionError::Execution(format!("Unsupported type")))
+    });
+
+    let fun_name = if with_catalog_prefix {
+        "generate_series"
+    } else {
+        "pg_catalog.generate_series"
+    };
+
+    let return_type: ReturnTypeFunction = Arc::new(move |tp| Ok(Arc::new(tp[0].clone())));
+    TableUDF::new(
+        fun_name,
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Int64, DataType::Int64]),
+                TypeSignature::Exact(vec![DataType::Int64, DataType::Int64, DataType::Int64]),
+                TypeSignature::Exact(vec![DataType::Float64, DataType::Float64]),
+                TypeSignature::Exact(vec![
+                    DataType::Float64,
+                    DataType::Float64,
+                    DataType::Float64,
+                ]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
     )
 }

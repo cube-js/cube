@@ -69,6 +69,11 @@ crate::plan_to_language! {
         Repartition {
             input: Arc<LogicalPlan>,
         },
+        Subquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         Union {
             inputs: Vec<LogicalPlan>,
             schema: DFSchemaRef,
@@ -90,6 +95,11 @@ crate::plan_to_language! {
             n: usize,
             input: Arc<LogicalPlan>,
         },
+        TableUDFs {
+            expr: Vec<Expr>,
+            input: Arc<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         CreateExternalTable {
             schema: DFSchemaRef,
             name: String,
@@ -105,6 +115,10 @@ crate::plan_to_language! {
             alias: String,
         },
         ColumnExpr {
+            column: Column,
+        },
+        OuterColumnExpr {
+            data_type: DataType,
             column: Column,
         },
         ScalarVariableExpr {
@@ -167,6 +181,10 @@ crate::plan_to_language! {
         },
         AggregateUDFExpr {
             fun: Arc<AggregateUDF>,
+            args: Vec<Expr>,
+        },
+        TableUDFExpr {
+            fun: Arc<TableUDF>,
             args: Vec<Expr>,
         },
         InListExpr {

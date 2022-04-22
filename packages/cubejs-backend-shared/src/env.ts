@@ -170,6 +170,9 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  // Export bucket options for Azure
+  dbExportBucketAzureKey:
+    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),

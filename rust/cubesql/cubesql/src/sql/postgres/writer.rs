@@ -40,7 +40,7 @@ impl ToPostgresValue for bool {
         if *self {
             "t".to_string().to_text(buf)
         } else {
-            "v".to_string().to_text(buf)
+            "f".to_string().to_text(buf)
         }
     }
 
@@ -225,6 +225,7 @@ pub struct BatchWriter {
     data: BytesMut,
     // Current row
     current: u32,
+    rows: u32,
     row: BytesMut,
 }
 
@@ -235,6 +236,7 @@ impl BatchWriter {
             data: BytesMut::new(),
             row: BytesMut::new(),
             current: 0,
+            rows: 0,
         }
     }
 
@@ -260,8 +262,17 @@ impl BatchWriter {
 
         self.data.extend(buffer);
         self.current = 0;
+        self.rows += 1;
 
         Ok(())
+    }
+
+    pub fn num_rows(&self) -> u32 {
+        self.rows
+    }
+
+    pub fn has_data(&self) -> bool {
+        self.rows > 0
     }
 }
 
@@ -278,13 +289,32 @@ impl<'a> Serialize for BatchWriter {
 
 #[cfg(test)]
 mod tests {
-    use crate::arrow::array::{ArrayRef, Int64Builder};
-    use crate::sql::buffer;
-    use crate::sql::protocol::Format;
-    use crate::sql::writer::BatchWriter;
-    use crate::CubeError;
+    use crate::{
+        arrow::array::{ArrayRef, Int64Builder},
+        sql::buffer,
+        sql::protocol::Format,
+        sql::writer::{BatchWriter, ToPostgresValue},
+        CubeError,
+    };
+    use bytes::BytesMut;
     use std::io::Cursor;
     use std::sync::Arc;
+
+    fn test_text_encode<T: ToPostgresValue>(value: T, expected: &[u8]) {
+        let mut buf = BytesMut::new();
+        value.to_text(&mut buf).unwrap();
+
+        assert_eq!(&buf.as_ref()[..], expected);
+    }
+
+    #[test]
+    fn test_text_encoders() -> Result<(), CubeError> {
+        test_text_encode(true, &[0, 0, 0, 1, 116]);
+        test_text_encode(false, &[0, 0, 0, 1, 102]);
+        test_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_backend_writer_text_simple() -> Result<(), CubeError> {

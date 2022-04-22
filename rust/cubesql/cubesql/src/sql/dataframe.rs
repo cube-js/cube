@@ -18,9 +18,13 @@ use datafusion::arrow::{
 use super::{ColumnFlags, ColumnType};
 
 use crate::arrow::array::{
-    ArrayRef, Float16Array, Float32Array, Int8Array, LargeStringArray, ListArray,
+    ArrayRef, Float16Array, Float32Array, Int8Array, IntervalMonthDayNanoArray, LargeStringArray,
+    ListArray,
 };
-use crate::{make_string_interval_day_time, make_string_interval_year_month, CubeError};
+use crate::{
+    make_string_interval_day_time, make_string_interval_month_day_nano,
+    make_string_interval_year_month, CubeError,
+};
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -370,7 +374,11 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        rows[i].push(TableValue::String(make_string_interval_day_time!(a, i)));
+                        if let Some(as_str) = make_string_interval_day_time!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -379,7 +387,24 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        rows[i].push(TableValue::String(make_string_interval_year_month!(a, i)));
+                        if let Some(as_str) = make_string_interval_year_month!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
+                    }
+                }
+                DataType::Interval(IntervalUnit::MonthDayNano) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<IntervalMonthDayNanoArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        if let Some(as_str) = make_string_interval_month_day_nano!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
                     }
                 }
                 DataType::Boolean => {

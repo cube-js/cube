@@ -1,4 +1,5 @@
 use crate::arrow::datatypes::{DataType, Field};
+use crate::sql::protocol::CommandComplete;
 use crate::sql::PgTypeId;
 use bitflags::bitflags;
 use msql_srv::{
@@ -81,6 +82,29 @@ bitflags! {
 impl StatusFlags {
     pub fn to_mysql_flags(&self) -> MysqlStatusFlags {
         MysqlStatusFlags::empty()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CommandCompletion {
+    Begin,
+    Commit,
+    Use,
+    Rollback,
+    Set,
+    Select(u32),
+}
+
+impl CommandCompletion {
+    pub fn to_pg_command(self) -> CommandComplete {
+        match self {
+            CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
+            CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
+            CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
+            CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
+            CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
+            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+        }
     }
 }
 

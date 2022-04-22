@@ -88,35 +88,9 @@ impl CubeContext {
 impl ContextProvider for CubeContext {
     fn get_table_provider(
         &self,
-        name: datafusion::catalog::TableReference,
+        tr: datafusion::catalog::TableReference,
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
-        let table_path = match name {
-            datafusion::catalog::TableReference::Partial { schema, table, .. } => {
-                if schema == "db" {
-                    Some(table.to_string())
-                } else {
-                    Some(format!("{}.{}", schema, table))
-                }
-            }
-            datafusion::catalog::TableReference::Full {
-                catalog,
-                schema,
-                table,
-            } => Some(format!("{}.{}.{}", catalog, schema, table)),
-            datafusion::catalog::TableReference::Bare { table } => {
-                if table.starts_with("pg_") {
-                    Some(format!("pg_catalog.{}", table))
-                } else {
-                    Some(table.to_string())
-                }
-            }
-        };
-
-        if let Some(tp) = table_path {
-            return self.session_state.protocol.get_provider(&self.clone(), tp);
-        }
-
-        None
+        return self.session_state.protocol.get_provider(&self.clone(), tr);
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
@@ -135,6 +109,16 @@ impl ContextProvider for CubeContext {
             .cloned()
     }
 
+    fn get_table_function_meta(
+        &self,
+        name: &str,
+    ) -> Option<Arc<datafusion::physical_plan::udtf::TableUDF>> {
+        self.state
+            .table_functions
+            .get(&name.to_ascii_lowercase())
+            .cloned()
+    }
+
     fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
         Some(DataType::Utf8)
     }
@@ -144,11 +128,11 @@ impl DatabaseProtocol {
     fn get_provider(
         &self,
         context: &CubeContext,
-        tp: String,
+        tr: datafusion::catalog::TableReference,
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
         match self {
-            DatabaseProtocol::MySQL => self.get_mysql_provider(context, tp),
-            DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tp),
+            DatabaseProtocol::MySQL => self.get_mysql_provider(context, tr),
+            DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
         }
     }
 
@@ -198,73 +182,83 @@ impl DatabaseProtocol {
     fn get_mysql_provider(
         &self,
         context: &CubeContext,
-        tp: String,
+        tr: datafusion::catalog::TableReference,
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
-        if let Some(cube) = context
-            .meta
-            .cubes
-            .iter()
-            .find(|c| c.name.eq_ignore_ascii_case(&tp))
-        {
-            return Some(Arc::new(CubeTableProvider::new(cube.clone()))); // TODO .clone()
-        }
+        let (db, table) = match tr {
+            datafusion::catalog::TableReference::Partial { schema, table, .. } => {
+                (schema.to_ascii_lowercase(), table.to_ascii_lowercase())
+            }
+            datafusion::catalog::TableReference::Full {
+                catalog: _,
+                schema,
+                table,
+            } => (schema.to_ascii_lowercase(), table.to_ascii_lowercase()),
+            datafusion::catalog::TableReference::Bare { table } => {
+                ("db".to_string(), table.to_ascii_lowercase())
+            }
+        };
 
-        if tp.eq_ignore_ascii_case("information_schema.tables") {
-            return Some(Arc::new(MySqlSchemaTableProvider::new(
-                context.meta.clone(),
-            )));
+        match db.as_str() {
+            "db" => {
+                if let Some(cube) = context
+                    .meta
+                    .cubes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(&table))
+                {
+                    // TODO .clone()
+                    return Some(Arc::new(CubeTableProvider::new(cube.clone())));
+                } else {
+                    return None;
+                }
+            }
+            "information_schema" => match table.as_str() {
+                "tables" => {
+                    return Some(Arc::new(MySqlSchemaTableProvider::new(
+                        context.meta.clone(),
+                    )))
+                }
+                "columns" => {
+                    return Some(Arc::new(MySqlSchemaColumnsProvider::new(
+                        context.meta.clone(),
+                    )))
+                }
+                "statistics" => return Some(Arc::new(MySqlSchemaStatisticsProvider::new())),
+                "key_column_usage" => {
+                    return Some(Arc::new(MySqlSchemaKeyColumnUsageProvider::new()))
+                }
+                "schemata" => return Some(Arc::new(MySqlSchemaSchemataProvider::new())),
+                "processlist" => {
+                    return Some(Arc::new(MySqlSchemaProcesslistProvider::new(
+                        context.sessions.clone(),
+                    )))
+                }
+                "referential_constraints" => {
+                    return Some(Arc::new(MySqlSchemaReferentialConstraintsProvider::new()))
+                }
+                "collations" => return Some(Arc::new(MySqlSchemaCollationsProvider::new())),
+                _ => return None,
+            },
+            "performance_schema" => match table.as_str() {
+                "global_variables" => {
+                    return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
+                        "performance_schema.global_variables".to_string(),
+                        context
+                            .sessions
+                            .server
+                            .all_variables(context.session_state.protocol.clone()),
+                    )))
+                }
+                "session_variables" => {
+                    return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
+                        "performance_schema.session_variables".to_string(),
+                        context.session_state.all_variables(),
+                    )))
+                }
+                _ => return None,
+            },
+            _ => return None,
         }
-
-        if tp.eq_ignore_ascii_case("information_schema.columns") {
-            return Some(Arc::new(MySqlSchemaColumnsProvider::new(
-                context.meta.clone(),
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.statistics") {
-            return Some(Arc::new(MySqlSchemaStatisticsProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.key_column_usage") {
-            return Some(Arc::new(MySqlSchemaKeyColumnUsageProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.schemata") {
-            return Some(Arc::new(MySqlSchemaSchemataProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.processlist") {
-            return Some(Arc::new(MySqlSchemaProcesslistProvider::new(
-                context.sessions.clone(),
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {
-            return Some(Arc::new(MySqlSchemaReferentialConstraintsProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.collations") {
-            return Some(Arc::new(MySqlSchemaCollationsProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("performance_schema.global_variables") {
-            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
-                "performance_schema.global_variables".to_string(),
-                context
-                    .sessions
-                    .server
-                    .all_variables(context.session_state.protocol.clone()),
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("performance_schema.session_variables") {
-            return Some(Arc::new(MySqlPerfSchemaVariablesProvider::new(
-                "performance_schema.session_variables".to_string(),
-                context.session_state.all_variables(),
-            )));
-        }
-
-        None
     }
 
     pub fn get_postgres_table_name(
@@ -325,108 +319,116 @@ impl DatabaseProtocol {
     fn get_postgres_provider(
         &self,
         context: &CubeContext,
-        tp: String,
+        tr: datafusion::catalog::TableReference,
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
-        if let Some(cube) = context
-            .meta
-            .cubes
-            .iter()
-            .find(|c| c.name.eq_ignore_ascii_case(&tp))
-        {
-            return Some(Arc::new(CubeTableProvider::new(cube.clone()))); // TODO .clone()
-        }
+        let (_, schema, table) = match tr {
+            datafusion::catalog::TableReference::Partial { schema, table, .. } => (
+                "db".to_string(),
+                schema.to_ascii_lowercase(),
+                table.to_ascii_lowercase(),
+            ),
+            datafusion::catalog::TableReference::Full {
+                catalog,
+                schema,
+                table,
+            } => (
+                catalog.to_ascii_lowercase(),
+                schema.to_ascii_lowercase(),
+                table.to_ascii_lowercase(),
+            ),
+            datafusion::catalog::TableReference::Bare { table } => {
+                if table.starts_with("pg_") {
+                    (
+                        "db".to_string(),
+                        "pg_catalog".to_string(),
+                        table.to_ascii_lowercase(),
+                    )
+                } else {
+                    (
+                        "db".to_string(),
+                        "public".to_string(),
+                        table.to_ascii_lowercase(),
+                    )
+                }
+            }
+        };
 
-        if tp.eq_ignore_ascii_case("information_schema.columns") {
-            return Some(Arc::new(PostgresSchemaColumnsProvider::new(
-                &context.meta.cubes,
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.tables") {
-            return Some(Arc::new(PostgresSchemaTableProvider::new(
-                &context.meta.cubes,
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.character_sets") {
-            return Some(Arc::new(PostgresSchemaCharacterSetsProvider::new(
-                &context.session_state.database().unwrap_or("db".to_string()),
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.key_column_usage") {
-            return Some(Arc::new(PostgresSchemaKeyColumnUsageProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.referential_constraints") {
-            return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("information_schema.table_constraints") {
-            return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()));
-        }
-
-        // Testing
-        if tp.eq_ignore_ascii_case("information_schema.testing_dataset") {
-            return Some(Arc::new(InfoSchemaTestingDatasetProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_tables") {
-            return Some(Arc::new(PgCatalogTableProvider::new(&context.meta.cubes)));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_type") {
-            return Some(Arc::new(PgCatalogTypeProvider::new(&context.meta.tables)));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_namespace") {
-            return Some(Arc::new(PgCatalogNamespaceProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_range") {
-            return Some(Arc::new(PgCatalogRangeProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_attrdef") {
-            return Some(Arc::new(PgCatalogAttrdefProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_attribute") {
-            return Some(Arc::new(PgCatalogAttributeProvider::new(
-                &context.meta.tables,
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_index") {
-            return Some(Arc::new(PgCatalogIndexProvider::new()));
-        }
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_class") {
-            return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_proc") {
-            return Some(Arc::new(PgCatalogProcProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_settings") {
-            return Some(Arc::new(PgCatalogSettingsProvider::new(
-                context
-                    .sessions
-                    .server
-                    .all_variables(context.session_state.protocol.clone()),
-            )));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_description") {
-            return Some(Arc::new(PgCatalogDescriptionProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_constraint") {
-            return Some(Arc::new(PgCatalogConstraintProvider::new()));
-        }
-
-        if tp.eq_ignore_ascii_case("pg_catalog.pg_depend") {
-            return Some(Arc::new(PgCatalogDependProvider::new()));
+        match schema.as_str() {
+            "public" => {
+                if let Some(cube) = context
+                    .meta
+                    .cubes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(&table))
+                {
+                    return Some(Arc::new(CubeTableProvider::new(cube.clone())));
+                    // TODO .clone()
+                }
+            }
+            "information_schema" => match table.as_str() {
+                "columns" => {
+                    return Some(Arc::new(PostgresSchemaColumnsProvider::new(
+                        &context.meta.cubes,
+                    )))
+                }
+                "tables" => {
+                    return Some(Arc::new(PostgresSchemaTableProvider::new(
+                        &context.meta.cubes,
+                    )))
+                }
+                "character_sets" => {
+                    return Some(Arc::new(PostgresSchemaCharacterSetsProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
+                "key_column_usage" => {
+                    return Some(Arc::new(PostgresSchemaKeyColumnUsageProvider::new()))
+                }
+                "referential_constraints" => {
+                    return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()))
+                }
+                "table_constraints" => {
+                    return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()))
+                }
+                "testing_dataset" => {
+                    return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
+                }
+                _ => return None,
+            },
+            "pg_catalog" => match table.as_str() {
+                "pg_tables" => {
+                    return Some(Arc::new(PgCatalogTableProvider::new(&context.meta.cubes)))
+                }
+                "pg_type" => {
+                    return Some(Arc::new(PgCatalogTypeProvider::new(&context.meta.tables)))
+                }
+                "pg_namespace" => return Some(Arc::new(PgCatalogNamespaceProvider::new())),
+                "pg_range" => return Some(Arc::new(PgCatalogRangeProvider::new())),
+                "pg_attrdef" => return Some(Arc::new(PgCatalogAttrdefProvider::new())),
+                "pg_attribute" => {
+                    return Some(Arc::new(PgCatalogAttributeProvider::new(
+                        &context.meta.tables,
+                    )))
+                }
+                "pg_index" => return Some(Arc::new(PgCatalogIndexProvider::new())),
+                "pg_class" => {
+                    return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)))
+                }
+                "pg_proc" => return Some(Arc::new(PgCatalogProcProvider::new())),
+                "pg_settings" => {
+                    return Some(Arc::new(PgCatalogSettingsProvider::new(
+                        context
+                            .sessions
+                            .server
+                            .all_variables(context.session_state.protocol.clone()),
+                    )))
+                }
+                "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
+                "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
+                "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
+                _ => return None,
+            },
+            _ => return None,
         }
 
         None

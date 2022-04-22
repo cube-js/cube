@@ -158,13 +158,6 @@ impl PostgresIntegrationTestSuite {
         table.trim_fmt()
     }
 
-    async fn assert_query(&self, res: Vec<Row>, query: String) {
-        insta::assert_snapshot!(
-            escape_snapshot_name(query),
-            self.print_query_result(res).await
-        );
-    }
-
     #[allow(unused)]
     async fn test_execute_query(&self, query: String, snapshot_name: Option<String>) -> RunResult {
         print!("test {} .. ", query);
@@ -221,7 +214,7 @@ impl PostgresIntegrationTestSuite {
             total += 1;
         }
 
-        assert_eq!(total, 3000);
+        assert_eq!(total, 5000);
 
         Ok(())
     }

@@ -69,7 +69,10 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
 ];
 
 // eslint-disable-next-line import/prefer-default-export
-export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<BirdBox>) {
+export function createBirdBoxTestCase(
+  name: string,
+  entrypoint: () => Promise<BirdBox>,
+): void {
   describe(name, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -100,7 +103,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
           transport: wsTransport,
         });
       } catch (e) {
-        console.log(e);
+        process.stderr.write(`${(e as Error).toString()}\n`);
         process.exit(1);
       }
     });
@@ -109,6 +112,15 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     afterAll(async () => {
       await wsTransport.close();
       await birdbox.stop();
+    });
+
+    it('Failing query rewrite', async () => {
+      try {
+        await httpClient.load({ measures: ['Orders.toRemove'] });
+        throw new Error('Should not successfully run Orders.toRemove query');
+      } catch (e) {
+        expect((e as Error).toString()).toContain('Query should contain either');
+      }
     });
 
     describe('HTTP Transport', () => {
@@ -132,15 +144,6 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
             expect(response.rawData()).toMatchSnapshot(options.name);
           });
         }
-      }
-    });
-
-    it('Failing query rewrite', async () => {
-      try {
-        await httpClient.load({ measures: ['Orders.toRemove'] });
-        throw new Error('Should not successfully run Orders.toRemove query');
-      } catch (e) {
-        expect((e as Error).toString()).toContain('Query should contain either');
       }
     });
 
@@ -291,6 +294,275 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
         expect(responses[0].rawData()).toEqual(responses[6].rawData());
         // @ts-ignore
         expect(responses[0].rawData()).toEqual(responses[7].rawData());
+      });
+    });
+
+    describe('filters', () => {
+      const containsAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.contains: ["e"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['e'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.contains: ["es"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['es'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.contains: ["es", "w"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['es', 'w'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.contains: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'contains',
+                values: ['a'],
+              },
+            ],
+          },
+        ],
+      ];
+      const startsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.startsWith: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['a'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.startsWith: ["n"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['n'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.startsWith: ["p"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['p'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.startsWith: ["sh"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['sh'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#5 Orders.status.startsWith: ["n", "p", "s"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'startsWith',
+                values: ['n', 'p', 's'],
+              },
+            ],
+          },
+        ],
+      ];
+      const endsWithAsserts: [options: QueryTestOptions, query: Query][] = [
+        [
+          {
+            name: '#1 Orders.status.endsWith: ["a"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['a'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#2 Orders.status.endsWith: ["w"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['w'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#3 Orders.status.endsWith: ["sed"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['sed'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.endsWith: ["ped"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['ped'],
+              },
+            ],
+          },
+        ], [
+          {
+            name: '#4 Orders.status.endsWith: ["w", "sed", "ped"]',
+          },
+          {
+            measures: [
+              'Orders.count'
+            ],
+            filters: [
+              {
+                member: 'Orders.status',
+                operator: 'endsWith',
+                values: ['w', 'sed', 'ped'],
+              },
+            ],
+          },
+        ],
+      ];
+
+      describe('contains', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of containsAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      });
+
+      describe('startsWith', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of startsWithAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
+      });
+
+      describe('endsWith', () => {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [options, query] of endsWithAsserts) {
+          // eslint-disable-next-line no-loop-func
+          it(`${options.name}`, async () => {
+            const response = await httpClient.load(query);
+            expect(response.rawData()).toMatchSnapshot(options.name);
+          });
+        }
       });
     });
   });
