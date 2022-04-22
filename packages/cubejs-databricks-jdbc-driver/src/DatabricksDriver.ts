@@ -5,6 +5,13 @@ import fetch, { Headers, Request } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
+  ContainerSASPermissions,
+  SASProtocol,
+  generateBlobSASQueryParameters,
+} from '@azure/storage-blob';
+import {
   DownloadTableCSVData,
 } from '@cubejs-backend/query-orchestrator';
 import {
@@ -18,11 +25,16 @@ import { downloadJDBCDriver } from './installer';
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
-    accessKeyId?: string,
-    secretAccessKey?: string,
-    region?: string,
+    // common bucket config
+    bucketType?: string,
     exportBucket?: string,
-    pollMaxInterval?: number,
+    pollInterval?: number,
+    // AWS bucket config
+    awsKey?: string,
+    awsSecret?: string,
+    awsRegion?: string,
+    // Azure export bucket
+    azureKey?: string,
   };
 
 async function fileExistsOr(
@@ -81,38 +93,32 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    configuration: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration>,
   ) {
-    const accessKeyId =
-      configuration?.accessKeyId || process.env.CUBEJS_AWS_KEY;
-    const secretAccessKey =
-      configuration?.secretAccessKey || process.env.CUBEJS_AWS_SECRET;
-    const region =
-      configuration?.region || process.env.CUBEJS_AWS_REGION;
-    const exportBucket =
-      configuration?.exportBucket || getEnv('dbExportBucket');
-    const pollMaxInterval = (
-      configuration?.pollMaxInterval || getEnv('dbPollMaxInterval')
-    );
-
     const config: DatabricksDriverConfiguration = {
-      ...configuration,
+      ...conf,
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
       properties: {},
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),
       url: getEnv('databrickUrl'),
-      // export bucket section
-      accessKeyId,
-      secretAccessKey,
-      region,
-      exportBucket,
-      pollMaxInterval,
+      // common export bucket config
+      bucketType:
+        conf?.bucketType ||
+        getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
+      exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
+      pollInterval: (
+        conf?.pollInterval || getEnv('dbPollMaxInterval')
+      ) * 1000,
+      // AWS export bucket config
+      awsKey: conf?.awsKey || getEnv('dbExportBucketAwsKey'),
+      awsSecret: conf?.awsSecret || getEnv('dbExportBucketAwsSecret'),
+      awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
+      // Azure export bucket
+      azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
     };
-
     super(config);
-
     this.config = config;
   }
 
@@ -201,10 +207,7 @@ export class DatabricksDriver extends JDBCDriver {
    * @returns {boolean}
    */
   public async isUnloadSupported() {
-    return this.config.exportBucket !== undefined &&
-      this.config.accessKeyId !== undefined &&
-      this.config.secretAccessKey !== undefined &&
-      this.config.region !== undefined;
+    return this.config.exportBucket !== undefined;
   }
 
   /**
@@ -256,19 +259,6 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Split bucket URL to bucket and path.
-   */
-  private splitPathname(
-    url: string,
-  ): {bucket: string, prefix: string} {
-    const _url = new URL(url);
-    return {
-      bucket: _url.host,
-      prefix: _url.pathname.slice(1),
-    };
-  }
-
-  /**
    * Returns IDs of databricks runned clusters.
    */
   private async getClustersIds(): Promise<string[]> {
@@ -296,7 +286,10 @@ export class DatabricksDriver extends JDBCDriver {
     const body: {
       id: string,
       status: string,
-    }[] = await response.json();
+    }[] = (await response.json()) as {
+      id: string,
+      status: string,
+    }[];
     
     return body
       .filter(item => item.status === 'Running')
@@ -334,7 +327,7 @@ export class DatabricksDriver extends JDBCDriver {
         response.statusText
       }`);
     }
-    const body = await response.json();
+    const body = (await response.json()) as { id: string };
     return body.id;
   }
 
@@ -372,7 +365,7 @@ export class DatabricksDriver extends JDBCDriver {
         response.statusText
       }`);
     }
-    const body = await response.json();
+    const body = (await response.json()) as { id: string };
     return body.id;
   }
 
@@ -411,14 +404,21 @@ export class DatabricksDriver extends JDBCDriver {
           }`);
         }
         response.json().then((body) => {
-          if (body.status === 'Finished') {
-            resolve(body.results);
-          } else if (body.status === 'Error') {
-            reject(body.results);
-          } else if (body.status === 'Cancelled') {
-            reject(body.results);
+          const b = body as {
+            status: string,
+            results: {
+              resultType: string,
+              data: string,
+            }
+          };
+          if (b.status === 'Finished') {
+            resolve(b.results);
+          } else if (b.status === 'Error') {
+            reject(b.results);
+          } else if (b.status === 'Cancelled') {
+            reject(b.results);
           } else {
-            pausePromise(this.config.pollMaxInterval as number)
+            pausePromise(this.config.pollInterval as number)
               .then(() => {
                 this.commandResult(
                   clusterId,
@@ -437,59 +437,22 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload workflow.
+   * Returns signed temporary URLs for AWS S3 objects.
    */
-  private async unloadCommand(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<{resultType: string, data: string}> {
-    const clusterId = (await this.getClustersIds())[0];
-    const contextId = await this.getContextId(clusterId);
-    const commandId = await this.runCommand(
-      clusterId,
-      contextId,
-      'scala',
-      `
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsAccessKeyId", "${this.config.accessKeyId}"
-        )
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsSecretAccessKey","${this.config.secretAccessKey}"
-        )
-        sqlContext
-          .sql("SELECT ${columns} FROM ${table}")
-          .write
-          .format("com.databricks.spark.csv")
-          .option("header", "false")
-          .save("${pathname}")
-      `,
-    );
-    const result = await this.commandResult(
-      clusterId,
-      contextId,
-      commandId,
-    );
-    return result;
-  }
-
-  /**
-   * Returns signed temporary URLs for table CSV files.
-   */
-  private async getSignedCsvUrls(
+  private async getSignedS3Urls(
     pathname: string,
   ): Promise<string[]> {
     const client = new S3({
       credentials: {
-        accessKeyId: this.config.accessKeyId as string,
-        secretAccessKey: this.config.secretAccessKey as string,
+        accessKeyId: this.config.awsKey as string,
+        secretAccessKey: this.config.awsSecret as string,
       },
-      region: this.config.region,
+      region: this.config.awsRegion,
     });
-    const { bucket, prefix } = this.splitPathname(pathname);
+    const url = new URL(pathname);
     const list = await client.listObjectsV2({
-      Bucket: bucket,
-      Prefix: prefix,
+      Bucket: url.host,
+      Prefix: url.pathname.slice(1),
     });
     if (list.Contents === undefined) {
       throw new Error(`No content in specified path: ${pathname}`);
@@ -499,13 +462,163 @@ export class DatabricksDriver extends JDBCDriver {
         .filter(file => file.Key && /.csv$/i.test(file.Key))
         .map(async (file) => {
           const command = new GetObjectCommand({
-            Bucket: bucket,
+            Bucket: url.host,
             Key: file.Key,
           });
           return getSignedUrl(client, command, { expiresIn: 3600 });
         })
     );
     return csvFile;
+  }
+
+  /**
+   * Unload to AWS S3 bucket.
+   */
+  private async unloadS3Command(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    const clusterId = (await this.getClustersIds())[0];
+    const contextId = await this.getContextId(clusterId);
+    const commandId = await this.runCommand(
+      clusterId,
+      contextId,
+      'scala',
+      `
+        sc.hadoopConfiguration.set(
+          "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
+        )
+        sc.hadoopConfiguration.set(
+          "fs.s3n.awsSecretAccessKey","${this.config.awsSecret}"
+        )
+        sqlContext
+          .sql("SELECT ${columns} FROM ${table}")
+          .write
+          .format("com.databricks.spark.csv")
+          .option("header", "false")
+          .save("${pathname}")
+      `,
+    );
+    await this.commandResult(
+      clusterId,
+      contextId,
+      commandId,
+    );
+    const result = await this.getSignedS3Urls(pathname);
+    return result;
+  }
+
+  /**
+   * Returns signed temporary URLs for Azure container objects.
+   */
+  private async getSignedWasbsUrls(
+    pathname: string,
+  ): Promise<string[]> {
+    // const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    // wasbs://cubejs-bucket@cubecloud.blob.core.windows.net/test/orderspa.csv
+    const csvFile: string[] = [];
+
+    const [container, account] =
+      pathname.split('wasbs://')[1].split('.blob')[0].split('@');
+    const foldername =
+      pathname.split(`${this.config.exportBucket}/`)[1];
+    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
+
+    const credential = new StorageSharedKeyCredential(
+      account,
+      this.config.azureKey as string,
+    );
+    const blobClient = new BlobServiceClient(
+      `https://${account}.blob.core.windows.net`,
+      credential,
+    );
+    const containerClient = blobClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat();
+    for await (const blob of blobsList) {
+      if (blob.name && expr.test(blob.name)) {
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: blob.name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFile.push(`https://${
+          account
+        }.blob.core.windows.net/${
+          container
+        }/${blob.name}?${sas}`);
+      }
+    }
+    return csvFile;
+  }
+
+  /**
+   * Unload to Azure Blob Container bucket.
+   */
+  private async unloadWasbsCommand(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    const storage = pathname.split('@')[1].split('.')[0];
+    const clusterId = (await this.getClustersIds())[0];
+    const contextId = await this.getContextId(clusterId);
+    const commandId = await this.runCommand(
+      clusterId,
+      contextId,
+      'scala',
+      `
+      spark.conf.set(
+        "fs.azure.account.key.${storage}.blob.core.windows.net",
+        "${this.config.azureKey}"
+      )
+      sqlContext
+        .sql("SELECT ${columns} FROM ${table}")
+        .write
+        .format("com.databricks.spark.csv")
+        .option("header", "false")
+        .save("${pathname}")
+      `,
+    );
+    await this.commandResult(
+      clusterId,
+      contextId,
+      commandId,
+    );
+    const result = await this.getSignedWasbsUrls(pathname);
+    return result;
+  }
+
+  /**
+   * Unload table to bucket.
+   */
+  private async unloadCommand(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    let res;
+    switch (this.config.bucketType) {
+      case 's3':
+        res = await this.unloadS3Command(table, columns, pathname);
+        break;
+      case 'azure':
+        res = await this.unloadWasbsCommand(table, columns, pathname);
+        break;
+      default:
+        throw new Error(`Unsupported export bucket type: ${
+          this.config.bucketType
+        }`);
+    }
+    return res;
   }
 
   /**
@@ -518,8 +631,11 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    await this.unloadCommand(tableName, columns, pathname);
-    const csvFile = await this.getSignedCsvUrls(pathname);
+    const csvFile = await this.unloadCommand(
+      tableName,
+      columns,
+      pathname,
+    );
     return {
       csvFile,
       types,
