@@ -1413,14 +1413,14 @@ class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
-      path: req.path
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
-        path: req.path
+        path: req.path,
       }, req.context);
     });
     if (next) {
