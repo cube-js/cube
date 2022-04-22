@@ -42,10 +42,11 @@ use self::{
     engine::udf::{
         create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
         create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
-        create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
-        create_pg_datetime_precision_udf, create_pg_get_userbyid_udf,
-        create_pg_numeric_precision_udf, create_pg_numeric_scale_udf, create_time_format_udf,
-        create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
+        create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
+        create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
+        create_pg_get_userbyid_udf, create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
+        create_time_format_udf, create_timediff_udf, create_ucase_udf, create_user_udf,
+        create_version_udf,
     },
     parser::parse_sql_to_statement,
 };
