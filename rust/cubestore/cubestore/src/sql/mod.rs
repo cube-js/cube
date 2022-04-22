@@ -3022,13 +3022,15 @@ mod tests {
                                     cnt int,
                                     max_id int
                                   )
-                    AGGREGATES (sum(cnt), max(max_id))
+                    AGGREGATIONS (sum(cnt), max(max_id))
                     INDEX index1 (platform, age)
-                    AGGREGATE INDEX sum_index (age, gender)
+                   /* AGGREGATE INDEX sum_index (age, gender)*/
                     LOCATION {}",
                     paths.into_iter().map(|p| format!("'{}'", p)).join(",")
                 );
                 service.exec_query(&query).await.unwrap();
+                let result = service.exec_query("SELECT count(*) as cnt from foo.Orders").await.unwrap();
+                println!("res {:?}", result);
             })
             .await;
     }
