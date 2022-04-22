@@ -1233,6 +1233,28 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_expr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(0);
+        Ok(Arc::new(builder.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_get_expr",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64, DataType::Boolean]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_measure_udaf() -> AggregateUDF {
     create_udaf(
         "measure",
