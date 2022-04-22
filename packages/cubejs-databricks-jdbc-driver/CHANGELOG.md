@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.51](https://github.com/cube-js/cube.js/compare/v0.29.50...v0.29.51) (2022-04-22)
+
+
+### Features
+
+* **databricks-driver:** Export bucket support for S3/Azure ([#4430](https://github.com/cube-js/cube.js/issues/4430)) ([4512126](https://github.com/cube-js/cube.js/commit/4512126346fd2650fdcba3936ed1eb129b34af9d))
+* **query-language:** "startsWith", "endsWith" filters support ([#4128](https://github.com/cube-js/cube.js/issues/4128)) ([e8c72d6](https://github.com/cube-js/cube.js/commit/e8c72d630eecd930a8fd36fc52f9b594a45d59c0))
+
+
+
+
+
 ## [0.29.48](https://github.com/cube-js/cube.js/compare/v0.29.47...v0.29.48) (2022-04-14)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
