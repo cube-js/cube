@@ -3,7 +3,10 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, StringBuilder, UInt16Builder, UInt32Builder},
+        array::{
+            Array, ArrayRef, BooleanBuilder, Int64Builder, ListBuilder, StringBuilder,
+            UInt16Builder, UInt32Builder,
+        },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -28,7 +31,7 @@ struct PgCatalogIndexBuilder {
     indisready: BooleanBuilder,
     indislive: BooleanBuilder,
     indisreplident: BooleanBuilder,
-    indkey: StringBuilder,
+    indkey: ListBuilder<Int64Builder>,
     indcollation: StringBuilder,
     indclass: StringBuilder,
     indoption: StringBuilder,
@@ -55,7 +58,7 @@ impl PgCatalogIndexBuilder {
             indisready: BooleanBuilder::new(capacity),
             indislive: BooleanBuilder::new(capacity),
             indisreplident: BooleanBuilder::new(capacity),
-            indkey: StringBuilder::new(capacity),
+            indkey: ListBuilder::new(Int64Builder::new(capacity)),
             indcollation: StringBuilder::new(capacity),
             indclass: StringBuilder::new(capacity),
             indoption: StringBuilder::new(capacity),
@@ -131,7 +134,11 @@ impl TableProvider for PgCatalogIndexProvider {
             Field::new("indisready", DataType::Boolean, false),
             Field::new("indislive", DataType::Boolean, false),
             Field::new("indisreplident", DataType::Boolean, false),
-            Field::new("indkey", DataType::Utf8, false),
+            Field::new(
+                "indkey",
+                DataType::List(Box::new(Field::new("item", DataType::Int64, true))),
+                false,
+            ),
             Field::new("indcollation", DataType::Utf8, false),
             Field::new("indclass", DataType::Utf8, false),
             Field::new("indoption", DataType::Utf8, false),
