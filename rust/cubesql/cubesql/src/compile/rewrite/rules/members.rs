@@ -698,13 +698,15 @@ impl MemberRules {
         move |egraph, subst| {
             for limit in var_iter!(egraph[subst[limit_var]], LimitN) {
                 let limit = *limit;
-                subst.insert(
-                    new_limit_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
-                        limit,
-                    )))),
-                );
-                return true;
+                if limit > 0 {
+                    subst.insert(
+                        new_limit_var,
+                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
+                            limit,
+                        )))),
+                    );
+                    return true;
+                }
             }
             false
         }
