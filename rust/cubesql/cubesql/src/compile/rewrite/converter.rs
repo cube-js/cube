@@ -499,6 +499,7 @@ macro_rules! match_params {
     };
 }
 
+#[macro_export]
 macro_rules! match_data_node {
     ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {
         match $node_by_id.index($id_expr.clone()) {

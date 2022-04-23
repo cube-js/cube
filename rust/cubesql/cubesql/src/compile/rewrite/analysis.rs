@@ -8,12 +8,13 @@ use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
+use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::TimeDimensionName;
 use crate::var_iter;
 use crate::CubeError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{DFSchema, Expr};
-use datafusion::physical_plan::functions::Volatility;
+use datafusion::physical_plan::functions::{BuiltinScalarFunction, Volatility};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{ColumnarValue, PhysicalPlanner};
 use datafusion::scalar::ScalarValue;
@@ -31,6 +32,7 @@ pub struct LogicalPlanData {
     pub referenced_expr: Option<Vec<Expr>>,
     pub constant: Option<ScalarValue>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
+    pub can_split: Option<SplitType>,
 }
 
 #[derive(Clone)]
@@ -56,6 +58,13 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
     }
 }
 
+#[derive(Clone, Debug, Ord, Eq, PartialOrd, PartialEq)]
+pub enum SplitType {
+    // TODO there can be also aggregation split where additional aggregation applied on top of split aggregation
+    // Aggregation,
+    Projection,
+}
+
 impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
@@ -77,16 +86,13 @@ impl LogicalPlanAnalysis {
             })
         };
         let original_expr = if is_expr_node(enode) {
-            // TODO .unwrap
-            Some(
-                node_to_expr(
-                    enode,
-                    &egraph.analysis.cube_context,
-                    &id_to_expr,
-                    &SingleNodeIndex { egraph },
-                )
-                .unwrap(),
+            node_to_expr(
+                enode,
+                &egraph.analysis.cube_context,
+                &id_to_expr,
+                &SingleNodeIndex { egraph },
             )
+            .ok()
         } else {
             None
         };
@@ -346,6 +352,40 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_can_split(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<SplitType> {
+        let can_split = |id| egraph.index(id).data.can_split.clone();
+        let node_by_id = &SingleNodeIndex { egraph };
+        match enode {
+            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
+                let fun = crate::match_data_node!(node_by_id, params[0], ScalarFunctionExprFun);
+
+                if fun == BuiltinScalarFunction::DateTrunc {
+                    Some(SplitType::Projection)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::ColumnExpr(_) | LogicalPlanLanguage::AggregateFunctionExpr(_) => {
+                Some(SplitType::Projection)
+            }
+            LogicalPlanLanguage::CastExpr(params) => can_split(params[0]),
+            LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params) => Some(
+                params
+                    .iter()
+                    .map(|p| can_split(*p))
+                    .collect::<Option<Vec<_>>>()?
+                    .into_iter()
+                    .max()
+                    .unwrap_or(SplitType::Projection),
+            ),
+            _ => None,
+        }
+    }
+
     fn eval_constant_expr(
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         expr: &Expr,
@@ -431,6 +471,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             referenced_expr: Self::make_referenced_expr(egraph, enode),
             constant: Self::make_constant(egraph, enode),
             constant_in_list: Self::make_constant_in_list(egraph, enode),
+            can_split: Self::make_can_split(egraph, enode),
         }
     }
 
@@ -441,12 +482,14 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
         let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
         let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
+        let (can_split, b) = self.merge_option_field(a, b, |d| &mut d.can_split);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column_name);
         original_expr
             | member_name_to_expr
             | column_name_to_alias
             | referenced_columns
             | constant_in_list
+            | can_split
             | column_name
     }
 

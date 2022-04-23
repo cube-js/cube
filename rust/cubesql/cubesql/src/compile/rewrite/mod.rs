@@ -267,6 +267,12 @@ crate::plan_to_language! {
             aliases: Vec<(String, String)>,
             table_name: Option<String>,
         },
+        InnerProjectionSplitReplacer {
+            members: Vec<LogicalPlan>,
+        },
+        OuterProjectionSplitReplacer {
+            members: Vec<LogicalPlan>,
+        },
     }
 }
 
@@ -519,6 +525,10 @@ fn column_expr(column: impl Display) -> String {
     format!("(ColumnExpr {})", column)
 }
 
+fn cast_expr(expr: impl Display, data_type: impl Display) -> String {
+    format!("(CastExpr {} {})", expr, data_type)
+}
+
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
@@ -568,6 +578,14 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn inner_projection_split_replacer(members: impl Display) -> String {
+    format!("(InnerProjectionSplitReplacer {})", members)
+}
+
+fn outer_projection_split_replacer(members: impl Display) -> String {
+    format!("(OuterProjectionSplitReplacer {})", members)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
