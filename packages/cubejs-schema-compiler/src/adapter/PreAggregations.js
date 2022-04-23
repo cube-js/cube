@@ -136,8 +136,13 @@ export class PreAggregations {
         td.camelizeOperator === 'inDateRange' // TODO support all date operators
     );
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    const uniqueKeyColumns = preAggregation.type === 'rollup' ?
-      this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dimensionColumns() : null;
+
+    const uniqueKeyColumnsDefault = () => null;
+    const uniqueKeyColumns = ({
+      rollup: () => this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dimensionColumns(),
+      originalSql: () => preAggregation.uniqueKeyColumns || null
+    }[preAggregation.type] || uniqueKeyColumnsDefault)();
+
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
