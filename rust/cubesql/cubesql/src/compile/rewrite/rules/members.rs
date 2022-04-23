@@ -251,19 +251,19 @@ impl RewriteRules for MemberRules {
                     "?date_range",
                     "?alias",
                 ),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             transforming_rewrite(
                 "measure-alias",
                 measure_expr("?measure", "?original_expr"),
                 measure_expr("?measure", "?alias"),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             transforming_rewrite(
                 "dimension-alias",
                 dimension_expr("?dimension", "?original_expr"),
                 dimension_expr("?dimension", "?alias"),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             rewrite(
                 "push-down-aggregate",
@@ -508,7 +508,7 @@ impl RewriteRules for MemberRules {
                 "sort-expr-column-name",
                 sort_expr("?expr", "?asc", "?nulls_first"),
                 sort_expr("?alias", "?asc", "?nulls_first"),
-                self.transform_original_expr_alias("?expr", "?alias"),
+                Self::transform_original_expr_alias("?expr", "?alias"),
             ),
             rewrite(
                 "binary-expr-addition-assoc",
@@ -563,8 +563,7 @@ impl MemberRules {
         }
     }
 
-    fn transform_original_expr_alias(
-        &self,
+    pub fn transform_original_expr_alias(
         original_expr_var: &'static str,
         alias_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
@@ -572,32 +571,26 @@ impl MemberRules {
         let alias_expr_var = alias_expr_var.parse().unwrap();
         move |egraph, subst| {
             let original_expr_id = subst[original_expr_var];
-            if !egraph[original_expr_id]
-                .nodes
-                .iter()
-                .any(|node| match node {
-                    LogicalPlanLanguage::ColumnExpr(_) => true,
-                    _ => false,
-                })
-            {
-                let res = egraph[original_expr_id].data.original_expr.as_ref().ok_or(
-                    CubeError::internal(format!(
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
-                    )),
+                    )));
+            if let Ok(expr) = res {
+                // TODO unwrap
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                    Column::from_name(name),
+                )));
+                subst.insert(
+                    alias_expr_var,
+                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
                 );
-                if let Ok(expr) = res {
-                    // TODO unwrap
-                    let name = expr.name(&DFSchema::empty()).unwrap();
-                    let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                        ColumnExprColumn(Column::from_name(name)),
-                    ));
-                    subst.insert(
-                        alias_expr_var,
-                        egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                    );
-                    return true;
-                }
+                return true;
             }
             false
         }
@@ -976,7 +969,7 @@ impl MemberRules {
                             {
                                 match granularity {
                                     ScalarValue::Utf8(Some(granularity_value)) => {
-                                        let granularity_value = granularity_value.to_string();
+                                        let granularity_value = granularity_value.to_lowercase();
                                         subst.insert(
                                             time_dimension_name_var,
                                             egraph.add(LogicalPlanLanguage::TimeDimensionName(

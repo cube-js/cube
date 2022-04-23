@@ -120,7 +120,16 @@ macro_rules! variant_field_struct {
 
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        let replaced = s.replace(&prefix, "");
+                        if &replaced == "None" {
+                            return Ok([<$variant $var_field:camel>](None));
+                        } else {
+                            return Ok([<$variant $var_field:camel>](Some(s.to_string())));
+                        }
+                    }
                     Err(CubeError::internal("Conversion from string is not supported".to_string()))
                 }
             }

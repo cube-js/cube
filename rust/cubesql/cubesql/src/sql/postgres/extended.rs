@@ -163,7 +163,9 @@ impl Portal {
                     TableValue::Float64(v) => writer.write_value(*v)?,
                     TableValue::List(v) => writer.write_value(v.clone())?,
                     // @todo Support value
-                    TableValue::Timestamp(v) => writer.write_value(v.to_string())?,
+                    TableValue::Timestamp(v) => {
+                        writer.write_value(format!("{}000", v.to_string().replace("T", " ")))?
+                    }
                 };
             }
 
