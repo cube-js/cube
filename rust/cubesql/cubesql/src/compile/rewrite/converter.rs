@@ -18,6 +18,7 @@ use crate::compile::rewrite::FilterMemberMember;
 use crate::compile::rewrite::FilterMemberOp;
 use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterOpOp;
+use crate::compile::rewrite::GetIndexedFieldExprKey;
 use crate::compile::rewrite::InListExprNegated;
 use crate::compile::rewrite::JoinJoinConstraint;
 use crate::compile::rewrite::JoinJoinType;
@@ -30,6 +31,8 @@ use crate::compile::rewrite::MeasureName;
 use crate::compile::rewrite::MemberErrorError;
 use crate::compile::rewrite::OrderAsc;
 use crate::compile::rewrite::OrderMember;
+use crate::compile::rewrite::OuterColumnExprColumn;
+use crate::compile::rewrite::OuterColumnExprDataType;
 use crate::compile::rewrite::ProjectionAlias;
 use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::ScalarUDFExprFun;
@@ -42,6 +45,7 @@ use crate::compile::rewrite::TableScanLimit;
 use crate::compile::rewrite::TableScanProjection;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TableScanTableName;
+use crate::compile::rewrite::TableUDFExprFun;
 use crate::compile::rewrite::TimeDimensionDateRange;
 use crate::compile::rewrite::TimeDimensionGranularity;
 use crate::compile::rewrite::TimeDimensionName;
@@ -56,15 +60,16 @@ use cubeclient::models::{
 };
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
-use datafusion::logical_plan::plan::Extension;
+use datafusion::logical_plan::build_table_udf_schema;
 use datafusion::logical_plan::plan::Filter;
 use datafusion::logical_plan::plan::Join;
 use datafusion::logical_plan::plan::Projection;
 use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::plan::{Aggregate, Window};
+use datafusion::logical_plan::plan::{Extension, TableUDFs};
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
-    LogicalPlan,
+    LogicalPlan, LogicalPlanBuilder,
 };
 use datafusion::logical_plan::{CrossJoin, EmptyRelation, Limit, TableScan};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
@@ -150,6 +155,12 @@ impl LogicalPlanToLanguageConverter {
             Expr::Column(column) => {
                 let column = add_data_node!(self, column, ColumnExprColumn);
                 self.graph.add(LogicalPlanLanguage::ColumnExpr([column]))
+            }
+            Expr::OuterColumn(data_type, column) => {
+                let data_type = add_data_node!(self, data_type, OuterColumnExprDataType);
+                let column = add_data_node!(self, column, OuterColumnExprColumn);
+                self.graph
+                    .add(LogicalPlanLanguage::OuterColumnExpr([data_type, column]))
             }
             Expr::ScalarVariable(data_type, variable) => {
                 let data_type = add_data_node!(self, data_type, ScalarVariableExprDataType);
@@ -295,6 +306,12 @@ impl LogicalPlanToLanguageConverter {
                 self.graph
                     .add(LogicalPlanLanguage::AggregateUDFExpr([fun, args]))
             }
+            Expr::TableUDF { fun, args } => {
+                let fun = add_data_node!(self, fun.name, TableUDFExprFun);
+                let args = add_expr_list_node!(self, args, TableUDFExprArgs);
+                self.graph
+                    .add(LogicalPlanLanguage::TableUDFExpr([fun, args]))
+            }
             Expr::InList {
                 expr,
                 list,
@@ -307,6 +324,12 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
             }
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
+            Expr::GetIndexedField { expr, key } => {
+                let expr = self.add_expr(expr)?;
+                let key = add_data_node!(self, key, GetIndexedFieldExprKey);
+                self.graph
+                    .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
+            }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", expr),
         })
@@ -388,6 +411,18 @@ impl LogicalPlanToLanguageConverter {
                 let inputs = add_plan_list_node!(self, node.inputs, UnionInputs);
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
+            }
+            LogicalPlan::Subquery(node) => {
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                let subqueries = add_plan_list_node!(self, node.subqueries, SubquerySubqueries);
+                self.graph
+                    .add(LogicalPlanLanguage::Subquery([input, subqueries]))
+            }
+            LogicalPlan::TableUDFs(node) => {
+                let expr = add_expr_list_node!(self, node.expr, TableUDFsExpr);
+                let input = self.add_logical_plan(node.input.as_ref())?;
+                self.graph
+                    .add(LogicalPlanLanguage::TableUDFs([expr, input]))
             }
             LogicalPlan::TableScan(node) => {
                 let source_table_name = add_data_node!(
@@ -477,6 +512,31 @@ macro_rules! match_data_node {
     };
 }
 
+macro_rules! match_list_node_ids {
+    ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {{
+        fn match_list(
+            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+            id: Id,
+            result: &mut Vec<Id>,
+        ) -> Result<(), CubeError> {
+            match node_by_id.index(id) {
+                LogicalPlanLanguage::$field_variant(list) => {
+                    for i in list {
+                        match_list(node_by_id, *i, result)?;
+                    }
+                }
+                _ => {
+                    result.push(id);
+                }
+            }
+            Ok(())
+        }
+        let mut result = Vec::new();
+        match_list($node_by_id, $id_expr.clone(), &mut result)?;
+        result
+    }};
+}
+
 macro_rules! match_list_node {
     ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {{
         fn match_list(
@@ -555,8 +615,10 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::AggregateFunctionExpr(_) => true,
         LogicalPlanLanguage::WindowFunctionExpr(_) => true,
         LogicalPlanLanguage::AggregateUDFExpr(_) => true,
+        LogicalPlanLanguage::TableUDFExpr(_) => true,
         LogicalPlanLanguage::InListExpr(_) => true,
         LogicalPlanLanguage::WildcardExpr(_) => true,
+        LogicalPlanLanguage::OuterColumnExpr(_) => true,
         _ => false,
     }
 }
@@ -576,6 +638,11 @@ pub fn node_to_expr(
         LogicalPlanLanguage::ColumnExpr(params) => {
             let column = match_data_node!(node_by_id, params[0], ColumnExprColumn);
             Expr::Column(column)
+        }
+        LogicalPlanLanguage::OuterColumnExpr(params) => {
+            let data_type = match_data_node!(node_by_id, params[0], OuterColumnExprDataType);
+            let column = match_data_node!(node_by_id, params[1], OuterColumnExprColumn);
+            Expr::OuterColumn(data_type, column)
         }
         LogicalPlanLanguage::ScalarVariableExpr(params) => {
             let data_type = match_data_node!(node_by_id, params[0], ScalarVariableExprDataType);
@@ -722,6 +789,17 @@ pub fn node_to_expr(
                 )))?;
             Expr::AggregateUDF { fun, args }
         }
+        LogicalPlanLanguage::TableUDFExpr(params) => {
+            let fun_name = match_data_node!(node_by_id, params[0], TableUDFExprFun);
+            let args = match_expr_list_node!(node_by_id, to_expr, params[1], TableUDFExprArgs);
+            let fun = cube_context
+                .get_table_function_meta(&fun_name)
+                .ok_or(CubeError::user(format!(
+                    "Table UDF '{}' is not found",
+                    fun_name
+                )))?;
+            Expr::TableUDF { fun, args }
+        }
         LogicalPlanLanguage::InListExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
             let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
@@ -733,6 +811,11 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
+        LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
+            let expr = Box::new(to_expr(params[0]).clone()?);
+            let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
+            Expr::GetIndexedField { expr, key }
+        }
         x => panic!("Unexpected expression node: {:?}", x),
     })
 }
@@ -874,6 +957,27 @@ impl LanguageToLogicalPlanConverter {
             //     let alias = self.graph.add(LogicalPlanLanguage::UnionAlias(UnionAlias(alias.clone())));
             //     self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             // }
+            LogicalPlanLanguage::Subquery(params) => {
+                let input = self.to_logical_plan(params[0])?;
+                let subqueries = match_list_node_ids!(node_by_id, params[1], SubquerySubqueries)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n))
+                    .collect::<Result<Vec<_>, _>>()?;
+                LogicalPlanBuilder::from(input)
+                    .subquery(subqueries)?
+                    .build()?
+            }
+            LogicalPlanLanguage::TableUDFs(params) => {
+                let expr = match_expr_list_node!(node_by_id, to_expr, params[0], TableUDFsExpr);
+                let input = Arc::new(self.to_logical_plan(params[1])?);
+                let schema = build_table_udf_schema(&input, expr.as_slice())?;
+
+                LogicalPlan::TableUDFs(TableUDFs {
+                    expr,
+                    input,
+                    schema,
+                })
+            }
             LogicalPlanLanguage::TableScan(params) => {
                 let source_table_name =
                     match_data_node!(node_by_id, params[0], TableScanSourceTableName);
@@ -983,11 +1087,19 @@ impl LanguageToLogicalPlanConverter {
                                     );
                                     let expr = self.to_expr(measure_params[1])?;
                                     query_measures.push(measure.to_string());
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(measure.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find measure '{}'",
+                                            measure
+                                        )))?;
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        DataType::Int64,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));
@@ -1036,13 +1148,20 @@ impl LanguageToLogicalPlanConverter {
                                     let dimension =
                                         match_data_node!(node_by_id, params[0], DimensionName);
                                     let expr = self.to_expr(params[1])?;
+                                    let data_type = self
+                                        .cube_context
+                                        .meta
+                                        .find_df_data_type(dimension.to_string())
+                                        .ok_or(CubeError::internal(format!(
+                                            "Can't find dimension '{}'",
+                                            dimension
+                                        )))?;
                                     query_dimensions.push(dimension.to_string());
                                     fields.push(DFField::new(
                                         None,
                                         // TODO empty schema
                                         &expr.name(&DFSchema::empty())?,
-                                        // TODO
-                                        DataType::Utf8,
+                                        data_type,
                                         // TODO actually nullable. Just to fit tests
                                         false,
                                     ));

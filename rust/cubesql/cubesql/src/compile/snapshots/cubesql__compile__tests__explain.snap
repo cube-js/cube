@@ -1,12 +1,11 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4273
-expression: "execute_query(\"explain select 1+1;\".to_string()).await?"
-
+assertion_line: 5032
+expression: "execute_query(\"explain select 1+1;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
-+---------------------------------+
-| Execution Plan                  |
-+---------------------------------+
-| Projection: Int64(1) + Int64(1) |
-|   EmptyRelation                 |
-+---------------------------------+
++----------------------+
+| Execution Plan       |
++----------------------+
+| Projection: Int64(2) |
+|   EmptyRelation      |
++----------------------+

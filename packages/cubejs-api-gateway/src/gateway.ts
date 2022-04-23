@@ -3,7 +3,12 @@ import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
-import { getEnv, getRealType } from '@cubejs-backend/shared';
+import structuredClone from '@ungap/structured-clone';
+import {
+  getEnv,
+  getRealType,
+  QueryAlias,
+} from '@cubejs-backend/shared';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -717,6 +722,152 @@ class ApiGateway {
   }
 
   /**
+   * Returns an array of sqlQuery objects for specified normalized
+   * queries.
+   * @internal
+   */
+  private async getSqlQueriesInternal(
+    context: RequestContext,
+    normalizedQueries: (NormalizedQuery)[],
+  ): Promise<Array<any>> {
+    const sqlQueries = await Promise.all(
+      normalizedQueries.map(
+        async (normalizedQuery, index) => {
+          const loadRequestSQLStarted = new Date();
+          const sqlQuery = await this.getCompilerApi(context)
+            .getSql(
+              this.coerceForSqlQuery(normalizedQuery, context)
+            );
+  
+          this.log({
+            type: 'Load Request SQL',
+            duration: this.duration(loadRequestSQLStarted),
+            query: normalizedQueries[index],
+            sqlQuery
+          }, context);
+  
+          return sqlQuery;
+        }
+      )
+    );
+    return sqlQueries;
+  }
+
+  /**
+   * Execute query and return adapter's result.
+   * @internal
+   */
+  private async getSqlResponseInternal(
+    context: RequestContext,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+  ) {
+    const queries = [{
+      ...sqlQuery,
+      query: sqlQuery.sql[0],
+      values: sqlQuery.sql[1],
+      continueWait: true,
+      renewQuery: normalizedQuery.renewQuery,
+      requestId: context.requestId,
+      context
+    }];
+    if (normalizedQuery.total) {
+      const normalizedTotal = structuredClone(normalizedQuery);
+      normalizedTotal.totalQuery = true;
+      normalizedTotal.limit = null;
+      normalizedTotal.rowLimit = null;
+      const [totalQuery] = await this.getSqlQueriesInternal(
+        context,
+        [normalizedTotal],
+      );
+      queries.push({
+        ...totalQuery,
+        query: totalQuery.sql[0],
+        values: totalQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedTotal.renewQuery,
+        requestId: context.requestId,
+        context
+      });
+    }
+    const [response, total] = await Promise.all(
+      queries.map(async (query) => {
+        const res = await this
+          .getAdapterApi(context)
+          .executeQuery(query);
+        return res;
+      })
+    );
+    response.total = normalizedQuery.total
+      ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
+      : undefined;
+    return response;
+  }
+
+  /**
+   * Convert adapter's result and other request paramters to a final
+   * result object.
+   * @internal
+   */
+  private getResultInternal(
+    context: RequestContext,
+    queryType: QueryType,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+    annotation: {
+      measures: {
+          [index: string]: unknown;
+      };
+      dimensions: {
+          [index: string]: unknown;
+      };
+      segments: {
+          [index: string]: unknown;
+      };
+      timeDimensions: {
+          [index: string]: unknown;
+      };
+    },
+    response: any,
+    responseType?: ResultType,
+  ) {
+    return {
+      query: normalizedQuery,
+      data: transformData(
+        sqlQuery.aliasNameToMember,
+        {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        } as { [member: string]: ConfigItem },
+        response.data,
+        normalizedQuery,
+        queryType,
+        responseType,
+      ),
+      lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      ...(
+        getEnv('devMode') ||
+        context.signedWithPlaygroundAuthSecret
+          ? {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
+          }
+          : null
+      ),
+      annotation,
+      dataSource: response.dataSource,
+      dbType: response.dbType,
+      extDbType: response.extDbType,
+      external: response.external,
+      slowQuery: Boolean(response.slowQuery),
+      total: normalizedQuery.total ? response.total : null,
+    };
+  }
+
+  /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
    * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
    * data.
@@ -744,81 +895,45 @@ class ApiGateway {
         query
       }, context);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
+      
+      const metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
 
-      const [metaConfigResult, ...sqlQueries] = await Promise.all(
-        [
-          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-        ].concat(normalizedQueries.map(
-          async (normalizedQuery, index) => {
-            const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
-            );
-
-            this.log({
-              type: 'Load Request SQL',
-              duration: this.duration(loadRequestSQLStarted),
-              query: normalizedQueries[index],
-              sqlQuery
-            }, context);
-
-            return sqlQuery;
-          }
-        ))
-      );
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
-      const results = await Promise.all(normalizedQueries.map(async (normalizedQuery, index) => {
-        const sqlQuery = sqlQueries[index];
-        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
 
-        const toExecute = {
-          ...sqlQuery,
-          query: sqlQuery.sql[0],
-          values: sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId,
-          context
-        };
+      const results = await Promise.all(
+        normalizedQueries.map(async (normalizedQuery, index) => {
+          slowQuery = slowQuery ||
+            Boolean(sqlQueries[index].slowQuery);
 
-        const response = await this.getAdapterApi(context).executeQuery(toExecute);
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
+          );
 
-        const flattenAnnotation = {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        } as { [member: string]: ConfigItem };
-
-        slowQuery = slowQuery || Boolean(response.slowQuery);
-
-        return {
-          query: normalizedQuery,
-          data: transformData(
-            aliasToMemberNameMap,
-            flattenAnnotation,
-            response.data,
+          const response = await this.getSqlResponseInternal(
+            context,
             normalizedQuery,
+            sqlQueries[index],
+          );
+          
+          return this.getResultInternal(
+            context,
             queryType,
+            normalizedQuery,
+            sqlQueries[index],
+            annotation,
+            response,
             resType,
-          ),
-          lastRefreshTime: response.lastRefreshTime?.toISOString(),
-          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
-            refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
-            transformedQuery: sqlQuery.canUseTransformedQuery,
-            requestId: context.requestId,
-          } : null),
-          annotation,
-          dataSource: response.dataSource,
-          dbType: response.dbType,
-          extDbType: response.extDbType,
-          external: response.external,
-          slowQuery: Boolean(response.slowQuery)
-        };
-      }));
+          );
+        })
+      );
 
       this.log(
         {
@@ -826,17 +941,32 @@ class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
-          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
-          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
-            .length,
-          queriesWithData: results.filter((r: any) => r.data?.length).length,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queriesWithPreAggregations:
+            results.filter(
+              (r: any) => Object.keys(
+                r.usedPreAggregations || {}
+              ).length
+            ).length,
+          queriesWithData:
+            results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.dbType),
         },
-        context
+        context,
       );
 
-      if (queryType !== QueryTypeEnum.REGULAR_QUERY && props.queryType == null) {
-        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${
+            queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
       }
 
       if (props.queryType === 'multi') {
@@ -1283,12 +1413,14 @@ class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
+        path: req.path,
       }, req.context);
     });
     if (next) {

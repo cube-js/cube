@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
 };
 
 class DatabricksFilter extends BaseFilter {
-  public likeIgnoreCase(column: any, not: any, param: any) {
-    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column: any, not: any, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 

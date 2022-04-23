@@ -169,6 +169,7 @@ declare module '@cubejs-client/core' {
     requestId?: string;
     usedPreAggregations?: Record<string, UsedPreAggregation>;
     transformedQuery?: TransformedQuery;
+    total?: number
   };
 
   export type LoadResponse<T> = {
@@ -754,6 +755,8 @@ declare module '@cubejs-client/core' {
     | 'notEquals'
     | 'contains'
     | 'notContains'
+    | 'startsWith'
+    | 'endsWith'
     | 'gt'
     | 'gte'
     | 'lt'
@@ -791,13 +794,14 @@ declare module '@cubejs-client/core' {
     filters?: Filter[];
     timeDimensions?: TimeDimension[];
     segments?: string[];
-    limit?: number;
+    limit?: null | number;
     offset?: number;
     order?: TQueryOrderObject | TQueryOrderArray;
     timezone?: string;
     renewQuery?: boolean;
     ungrouped?: boolean;
     responseFormat?: 'compact' | 'default';
+    total?: boolean;
   }
 
   export class ProgressResult {

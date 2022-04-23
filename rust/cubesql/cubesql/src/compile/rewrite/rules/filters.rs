@@ -1,9 +1,9 @@
 use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::analysis::{ConstantData, LogicalPlanAnalysis};
+use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::FilterMemberValues;
 use crate::compile::rewrite::FilterReplacerCube;
 use crate::compile::rewrite::InListExprNegated;
+use crate::compile::rewrite::LimitN;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::SegmentMemberMember;
@@ -24,6 +24,8 @@ use crate::compile::rewrite::{
 };
 use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
 use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
+use crate::compile::rewrite::{limit, CubeScanLimit};
+use crate::compile::rewrite::{projection, FilterMemberValues};
 use crate::compile::rewrite::{segment_member, FilterMemberOp};
 use crate::transport::ext::V1CubeMetaExt;
 use crate::transport::MemberType;
@@ -70,6 +72,108 @@ impl RewriteRules for FilterRules {
                     "?table_name",
                 ),
                 self.push_down_filter("?source_table_name", "?expr", "?cube"),
+            ),
+            transforming_rewrite(
+                "push-down-limit-filter",
+                filter(
+                    literal_expr("?literal"),
+                    cube_scan(
+                        "?source_table_name",
+                        "?members",
+                        "?filters",
+                        "?order",
+                        "?limit",
+                        "?offset",
+                        "?aliases",
+                        "?table_name",
+                    ),
+                ),
+                limit(
+                    "?new_limit_n",
+                    cube_scan(
+                        "?source_table_name",
+                        "?members",
+                        "?filters",
+                        "?order",
+                        "?new_limit",
+                        "?offset",
+                        "?aliases",
+                        "?table_name",
+                    ),
+                ),
+                self.push_down_limit_filter("?literal", "?new_limit", "?new_limit_n"),
+            ),
+            rewrite(
+                "swap-limit-filter",
+                filter(
+                    "?filter",
+                    limit(
+                        "LimitN:0",
+                        cube_scan(
+                            "?source_table_name",
+                            "?members",
+                            "?filters",
+                            "?order",
+                            "?limit",
+                            "?offset",
+                            "?aliases",
+                            "?table_name",
+                        ),
+                    ),
+                ),
+                limit(
+                    "LimitN:0",
+                    filter(
+                        "?filter",
+                        cube_scan(
+                            "?source_table_name",
+                            "?members",
+                            "?filters",
+                            "?order",
+                            "?limit",
+                            "?offset",
+                            "?aliases",
+                            "?table_name",
+                        ),
+                    ),
+                ),
+            ),
+            rewrite(
+                "swap-limit-projection",
+                projection(
+                    "?filter",
+                    limit(
+                        "LimitN:0",
+                        cube_scan(
+                            "?source_table_name",
+                            "?members",
+                            "?filters",
+                            "?order",
+                            "?limit",
+                            "?offset",
+                            "?aliases",
+                            "?table_name",
+                        ),
+                    ),
+                    "?alias",
+                ),
+                limit(
+                    "LimitN:0",
+                    projection(
+                        "?filter",
+                        cube_scan(
+                            "?source_table_name",
+                            "?members",
+                            "?filters",
+                            "?order",
+                            "?limit",
+                            "?offset",
+                            "?aliases",
+                            "?table_name",
+                        ),
+                        "?alias",
+                    ),
+                ),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -451,6 +555,33 @@ impl FilterRules {
         }
     }
 
+    fn push_down_limit_filter(
+        &self,
+        literal_var: &'static str,
+        new_limit_var: &'static str,
+        new_limit_n_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        let new_limit_var = var!(new_limit_var);
+        let new_limit_n_var = var!(new_limit_n_var);
+        move |egraph, subst| {
+            for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let ScalarValue::Boolean(Some(false)) = literal_value {
+                    subst.insert(
+                        new_limit_var,
+                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(1)))),
+                    );
+                    subst.insert(
+                        new_limit_n_var,
+                        egraph.add(LogicalPlanLanguage::LimitN(LimitN(0))),
+                    );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
     fn transform_filter(
         &self,
         column_var: &'static str,
@@ -648,9 +779,7 @@ impl FilterRules {
                     .as_ref()
                     .and_then(|cube| meta_context.find_cube_with_name(cube.to_string()))
                 {
-                    if let Some(ConstantData::Intermediate(list)) =
-                        &egraph[subst[list_var]].data.constant
-                    {
+                    if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
                         let values = list
                             .into_iter()
                             .map(|literal| FilterRules::scalar_to_value(literal))
@@ -801,15 +930,11 @@ impl FilterRules {
                             for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated)
                             {
                                 let negated = *negated;
-                                if let Some(ConstantData::Intermediate(low)) =
-                                    &egraph[subst[low_var]].data.constant
-                                {
-                                    if let Some(ConstantData::Intermediate(high)) =
-                                        &egraph[subst[high_var]].data.constant
-                                    {
+                                if let Some(low) = &egraph[subst[low_var]].data.constant {
+                                    if let Some(high) = &egraph[subst[high_var]].data.constant {
                                         let values = vec![
-                                            FilterRules::scalar_to_value(&low[0]),
-                                            FilterRules::scalar_to_value(&high[0]),
+                                            FilterRules::scalar_to_value(&low),
+                                            FilterRules::scalar_to_value(&high),
                                         ];
 
                                         subst.insert(

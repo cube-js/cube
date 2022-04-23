@@ -17,8 +17,10 @@ class KsqlFilter extends BaseFilter {
     super(query, filter);
   }
 
-  public likeIgnoreCase(column: string, not: boolean, param: any) {
-    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 

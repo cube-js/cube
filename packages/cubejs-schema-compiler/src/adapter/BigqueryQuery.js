@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class BigqueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(${this.allocateParam(param)}) ,'%')`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
   }
 
   castParameter() {
@@ -25,6 +27,10 @@ class BigqueryFilter extends BaseFilter {
       return 'CAST(? AS FLOAT64)';
     }
     return '?';
+  }
+
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
   }
 }
 

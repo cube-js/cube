@@ -3285,12 +3285,6 @@ impl MetaStore for RocksMetaStore {
                     Some(MultiPartitionRocksTable::new(db_ref.clone()).get_row_or_not_found(m)?)
                 }
             };
-            if !partition.get_row().is_active() && !multi_part.is_some() {
-                return Err(CubeError::internal(format!(
-                    "Cannot compact inactive partition: {:?}",
-                    partition.get_row()
-                )));
-            }
             Ok((partition, index, table, multi_part))
         })
         .await
