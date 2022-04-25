@@ -5,9 +5,11 @@ use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use futures::{pin_mut, TryStreamExt};
 use portpicker::pick_unused_port;
+use rust_decimal::prelude::*;
 use tokio::time::sleep;
 
 use super::utils::escape_snapshot_name;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio_postgres::{NoTls, Row};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
@@ -107,9 +109,13 @@ impl PostgresIntegrationTestSuite {
                         let value: i64 = row.get(idx);
                         values.push(value.to_string());
                     }
+                    23 => {
+                        let value: i32 = row.get(idx);
+                        values.push(value.to_string());
+                    }
                     25 => {
-                        let value: String = row.get(idx);
-                        values.push(value);
+                        let value: Option<String> = row.get(idx);
+                        values.push(value.unwrap_or("NULL".to_string()));
                     }
                     16 => {
                         let value: bool = row.get(idx);
@@ -117,6 +123,16 @@ impl PostgresIntegrationTestSuite {
                     }
                     701 => {
                         let value: f64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    // timestamp
+                    1114 => {
+                        let value: NaiveDateTime = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    // timestamptz
+                    1184 => {
+                        let value: DateTime<Utc> = row.get(idx);
                         values.push(value.to_string());
                     }
                     // _int4
@@ -148,6 +164,11 @@ impl PostgresIntegrationTestSuite {
                         let value: Vec<String> = row.get(idx);
                         values.push(value.join(",").to_string());
                     }
+                    // numeric
+                    1700 => {
+                        let value: Decimal = row.get(idx);
+                        values.push(value.to_string());
+                    }
                     oid => unimplemented!("Unsupported pg_type: {}", oid),
                 }
             }
@@ -158,8 +179,11 @@ impl PostgresIntegrationTestSuite {
         table.trim_fmt()
     }
 
-    #[allow(unused)]
-    async fn test_execute_query(&self, query: String, snapshot_name: Option<String>) -> RunResult {
+    async fn test_snapshot_execute_query(
+        &self,
+        query: String,
+        snapshot_name: Option<String>,
+    ) -> RunResult<()> {
         print!("test {} .. ", query);
 
         let res = self.client.query(&query, &[]).await.unwrap();
@@ -173,7 +197,21 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_prepare(&self) -> RunResult {
+    async fn test_execute_query<AssertFn>(&self, query: String, f: AssertFn) -> RunResult<()>
+    where
+        AssertFn: FnOnce(Vec<Row>) -> (),
+    {
+        print!("test {} .. ", query);
+
+        let res = self.client.query(&query, &[]).await.unwrap();
+        f(res);
+
+        println!("ok");
+
+        Ok(())
+    }
+
+    async fn test_prepare(&self) -> RunResult<()> {
         let stmt = self
             .client
             .prepare("SELECT $1 as t1, $2 as t2")
@@ -188,7 +226,7 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_prepare_empty_query(&self) -> RunResult {
+    async fn test_prepare_empty_query(&self) -> RunResult<()> {
         let stmt = self.client.prepare("").await.unwrap();
 
         self.client.query(&stmt, &[]).await.unwrap();
@@ -197,7 +235,7 @@ impl PostgresIntegrationTestSuite {
     }
 
     // This test tests paging on the service side which uses stream of RecordBatches to stream this query
-    async fn test_stream_all(&self) -> RunResult {
+    async fn test_stream_all(&self) -> RunResult<()> {
         let stmt = self
             .client
             .prepare("SELECT * FROM information_schema.testing_dataset WHERE id > CAST($1 as int)")
@@ -221,7 +259,7 @@ impl PostgresIntegrationTestSuite {
 
     // This test should return one row
     // TODO: Find a way how to manage Execute's return_rows to 1 instead of 100
-    async fn test_stream_single(&self) -> RunResult {
+    async fn test_stream_single(&self) -> RunResult<()> {
         let stmt = self
             .client
             .prepare("SELECT * FROM information_schema.testing_dataset WHERE id = CAST($1 as int)")
@@ -240,32 +278,55 @@ impl PostgresIntegrationTestSuite {
 
 #[async_trait]
 impl AsyncTestSuite for PostgresIntegrationTestSuite {
-    async fn after_all(&mut self) -> RunResult {
+    async fn after_all(&mut self) -> RunResult<()> {
         todo!()
     }
 
-    async fn run(&mut self) -> RunResult {
+    async fn run(&mut self) -> RunResult<()> {
         self.test_prepare().await?;
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
-        self.test_execute_query(
+        self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
         )
         .await?;
-        self.test_execute_query(
+        self.test_snapshot_execute_query(
             r#"SELECT
+                NULL,
                 true as bool_true,
                 false as bool_false,
                 'test',
                 1.0,
                 1,
                 ARRAY['test1', 'test2'] as str_arr,
-                ARRAY[1,2,3] as int8_arr
+                ARRAY[1,2,3] as int8_arr,
+                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp
             "#
             .to_string(),
             Some("pg_test_types".to_string()),
+        )
+        .await?;
+
+        self.test_execute_query(
+            r#"SELECT
+                now() as tsmp_tz,
+                now()::timestamp as tsmp
+            "#
+            .to_string(),
+            |rows| {
+                assert_eq!(rows.len(), 1);
+
+                let columns = rows.get(0).unwrap().columns();
+                assert_eq!(
+                    columns
+                        .into_iter()
+                        .map(|col| col.type_().oid())
+                        .collect::<Vec<u32>>(),
+                    vec![1184, 1114]
+                );
+            },
         )
         .await?;
 

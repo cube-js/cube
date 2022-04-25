@@ -5,10 +5,16 @@ use crate::arrow::array::{
     Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use crate::arrow::datatypes::DataType;
+use crate::sql::dataframe::TimestampValue;
 use crate::sql::df_type_to_pg_tid;
 use bytes::{BufMut, BytesMut};
+use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
+use chrono::format::Pad::Zero;
+use chrono::format::{Fixed, Item};
+use chrono::prelude::*;
 use std::convert::TryFrom;
 use std::io;
+use std::io::Error;
 use std::mem;
 
 pub trait ToPostgresValue {
@@ -45,8 +51,85 @@ impl ToPostgresValue for bool {
     }
 
     fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend_from_slice(&1_u32.to_be_bytes());
+        buf.put_i32(1_i32);
         buf.extend_from_slice(if *self { &[1] } else { &[0] });
+
+        Ok(())
+    }
+}
+
+// POSTGRES_EPOCH_JDATE
+fn pg_base_date_epoch() -> NaiveDateTime {
+    NaiveDate::from_ymd(2000, 1, 1).and_hms(0, 0, 0)
+}
+
+impl ToPostgresValue for TimestampValue {
+    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+        let ndt = match self.tz_ref() {
+            None => self.to_naive_datetime(),
+            Some(_) => self.to_fixed_datetime()?.naive_utc(),
+        };
+
+        // 2022-04-25 15:36:49.39705+00
+        let as_str = ndt
+            .format_with_items(
+                [
+                    Item::Numeric(Year, Zero),
+                    Item::Literal("-"),
+                    Item::Numeric(Month, Zero),
+                    Item::Literal("-"),
+                    Item::Numeric(Day, Zero),
+                    Item::Literal(" "),
+                    Item::Numeric(Hour, Zero),
+                    Item::Literal(":"),
+                    Item::Numeric(Minute, Zero),
+                    Item::Literal(":"),
+                    Item::Numeric(Second, Zero),
+                    Item::Fixed(Fixed::Nanosecond6),
+                ]
+                .iter(),
+            )
+            .to_string();
+
+        match self.tz_ref() {
+            None => as_str.to_text(buf),
+            Some(_) => (as_str + &"+00").to_text(buf),
+        }
+    }
+
+    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+        match self.tz_ref() {
+            None => {
+                let seconds = self
+                    .to_naive_datetime()
+                    .signed_duration_since(pg_base_date_epoch())
+                    .num_microseconds()
+                    .ok_or(Error::new(
+                        io::ErrorKind::Other,
+                        "Unable to extract number of seconds from timestamp",
+                    ))?;
+
+                buf.put_i32(8_i32);
+                buf.put_i64(seconds)
+            }
+            Some(tz) => {
+                let seconds = self
+                    .to_fixed_datetime()?
+                    .naive_utc()
+                    .signed_duration_since(pg_base_date_epoch())
+                    .num_microseconds()
+                    .ok_or(Error::new(
+                        io::ErrorKind::Other,
+                        format!(
+                            "Unable to extract number of seconds from timestamp with tz: {}",
+                            tz
+                        ),
+                    ))?;
+
+                buf.put_i32(8_i32);
+                buf.put_i64(seconds)
+            }
+        };
 
         Ok(())
     }
@@ -289,6 +372,7 @@ impl<'a> Serialize for BatchWriter {
 
 #[cfg(test)]
 mod tests {
+    use crate::sql::dataframe::TimestampValue;
     use crate::{
         arrow::array::{ArrayRef, Int64Builder},
         sql::buffer,
@@ -300,7 +384,7 @@ mod tests {
     use std::io::Cursor;
     use std::sync::Arc;
 
-    fn test_text_encode<T: ToPostgresValue>(value: T, expected: &[u8]) {
+    fn assert_text_encode<T: ToPostgresValue>(value: T, expected: &[u8]) {
         let mut buf = BytesMut::new();
         value.to_text(&mut buf).unwrap();
 
@@ -309,9 +393,46 @@ mod tests {
 
     #[test]
     fn test_text_encoders() -> Result<(), CubeError> {
-        test_text_encode(true, &[0, 0, 0, 1, 116]);
-        test_text_encode(false, &[0, 0, 0, 1, 102]);
-        test_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
+        assert_text_encode(true, &[0, 0, 0, 1, 116]);
+        assert_text_encode(false, &[0, 0, 0, 1, 102]);
+        assert_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
+        assert_text_encode(
+            TimestampValue::new(1650890322, None),
+            &[
+                0, 0, 0, 26, 49, 57, 55, 48, 45, 48, 49, 45, 48, 49, 32, 48, 48, 58, 48, 48, 58,
+                48, 49, 46, 54, 53, 48, 56, 57, 48,
+            ],
+        );
+        assert_text_encode(
+            TimestampValue::new(1650890322, Some("UTC".to_string())),
+            &[
+                0, 0, 0, 29, 49, 57, 55, 48, 45, 48, 49, 45, 48, 49, 32, 48, 48, 58, 48, 48, 58,
+                48, 49, 46, 54, 53, 48, 56, 57, 48, 43, 48, 48,
+            ],
+        );
+
+        Ok(())
+    }
+
+    fn assert_bind_encode<T: ToPostgresValue>(value: T, expected: &[u8]) {
+        let mut buf = BytesMut::new();
+        value.to_binary(&mut buf).unwrap();
+
+        assert_eq!(&buf.as_ref()[..], expected);
+    }
+
+    #[test]
+    fn test_binary_encoders() -> Result<(), CubeError> {
+        assert_bind_encode(true, &[0, 0, 0, 1, 1]);
+        assert_bind_encode(false, &[0, 0, 0, 1, 0]);
+        assert_bind_encode(
+            TimestampValue::new(1650890322, None),
+            &[0, 0, 0, 8, 255, 252, 162, 254, 196, 225, 80, 202],
+        );
+        assert_bind_encode(
+            TimestampValue::new(1650890322, Some("UTC".to_string())),
+            &[0, 0, 0, 8, 255, 252, 162, 254, 196, 225, 80, 202],
+        );
 
         Ok(())
     }
