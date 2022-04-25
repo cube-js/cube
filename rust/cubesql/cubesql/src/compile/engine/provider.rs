@@ -38,6 +38,7 @@ use super::information_schema::postgres::{
 };
 
 use crate::compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider;
+use crate::compile::engine::information_schema::postgres::PgCatalogAmProvider;
 use crate::sql::ColumnType;
 use crate::transport::V1CubeMetaExt;
 use crate::CubeError;
@@ -306,6 +307,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_constraint".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogDependProvider>() {
             "pg_catalog.pg_depend".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogAmProvider>() {
+            "pg_catalog.pg_am".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else {
@@ -426,6 +429,7 @@ impl DatabaseProtocol {
                 "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
                 "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
+                "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
                 _ => return None,
             },
             _ => return None,
