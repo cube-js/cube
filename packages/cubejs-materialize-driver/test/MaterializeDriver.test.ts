@@ -1,4 +1,4 @@
-import { MaterializeDBRunner } from '@cubejs-backend/testing';
+import { MaterializeDBRunner } from '@cubejs-backend/testing-shared';
 
 import { streamToArray } from '@cubejs-backend/shared';
 
