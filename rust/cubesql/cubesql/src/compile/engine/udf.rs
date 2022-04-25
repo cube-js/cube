@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use chrono::{Duration, NaiveDateTime};
 use datafusion::{
+    arrow::datatypes::UInt32Type,
     arrow::{
         array::{
             Array, ArrayRef, BooleanArray, BooleanBuilder, Float64Array, GenericStringArray,
@@ -1249,6 +1250,66 @@ pub fn create_pg_get_expr_udf() -> ScalarUDF {
                 TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64]),
                 TypeSignature::Exact(vec![DataType::Utf8, DataType::Int64, DataType::Boolean]),
             ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn pg_table_is_visible() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(_oid) => Some(true),
+                _ => Some(false),
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_table_is_visible",
+        &Signature::one_of(
+            vec![TypeSignature::Exact(vec![DataType::UInt32])],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn pg_get_userbyid() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(_oid) => Some("current".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_get_userbyid",
+        &Signature::one_of(
+            vec![TypeSignature::Exact(vec![DataType::UInt32])],
             Volatility::Immutable,
         ),
         &return_type,
