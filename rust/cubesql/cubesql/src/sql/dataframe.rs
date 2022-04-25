@@ -1,26 +1,28 @@
-use std::fmt::{self, Debug, Formatter};
-
-use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
-use chrono::format::Pad::Zero;
-use chrono::format::{Fixed, Item};
-use chrono::{TimeZone, Utc};
+use chrono::{
+    format::Numeric::{Day, Hour, Minute, Month, Second, Year},
+    format::Pad::Zero,
+    format::{Fixed, Item},
+    prelude::*,
+};
+use chrono_tz::Tz;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, BooleanArray, Float64Array, Int16Array, Int32Array, Int64Array,
-        IntervalDayTimeArray, IntervalYearMonthArray, StringArray, TimestampMicrosecondArray,
-        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        Array, ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
+        Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalMonthDayNanoArray,
+        IntervalYearMonthArray, LargeStringArray, ListArray, StringArray,
+        TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+        UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
+    temporal_conversions,
 };
+use std::fmt::{self, Debug, Formatter};
+use std::io;
 
 use super::{ColumnFlags, ColumnType};
 
-use crate::arrow::array::{
-    ArrayRef, Float16Array, Float32Array, Int8Array, IntervalMonthDayNanoArray, LargeStringArray,
-    ListArray,
-};
 use crate::{
     make_string_interval_day_time, make_string_interval_month_day_nano,
     make_string_interval_year_month, CubeError,
@@ -194,17 +196,42 @@ impl DataFrame {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
+    tz: Option<String>,
 }
 
 impl TimestampValue {
-    pub fn new(mut unix_nano: i64) -> TimestampValue {
+    pub fn new(mut unix_nano: i64, tz: Option<String>) -> TimestampValue {
         // This is a hack to workaround a mismatch between on-disk and in-memory representations.
         // We use millisecond precision on-disk.
         unix_nano -= unix_nano % 1000;
-        TimestampValue { unix_nano }
+        TimestampValue { unix_nano, tz }
+    }
+
+    pub fn to_naive_datetime(&self) -> NaiveDateTime {
+        assert!(self.tz.is_none());
+
+        temporal_conversions::timestamp_ns_to_datetime(self.unix_nano)
+    }
+
+    pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
+        assert!(self.tz.is_some());
+
+        let tz = self
+            .tz
+            .as_ref()
+            .unwrap()
+            .parse::<Tz>()
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+
+        let ndt = temporal_conversions::timestamp_ns_to_datetime(self.unix_nano);
+        Ok(tz.from_utc_datetime(&ndt))
+    }
+
+    pub fn tz_ref(&self) -> &Option<String> {
+        &self.tz
     }
 
     pub fn get_time_stamp(&self) -> i64 {
@@ -216,6 +243,7 @@ impl Debug for TimestampValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimestampValue")
             .field("unix_nano", &self.unix_nano)
+            .field("tz", &self.tz)
             .field("str", &self.to_string())
             .finish()
     }
@@ -342,7 +370,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                DataType::Timestamp(TimeUnit::Microsecond, tz) => {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampMicrosecondArray>()
@@ -351,11 +379,14 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000_i64))
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1000_i64,
+                                tz.clone(),
+                            ))
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, tz) => {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampNanosecondArray>()
@@ -364,7 +395,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i)))
+                            TableValue::Timestamp(TimestampValue::new(a.value(i), tz.clone()))
                         });
                     }
                 }

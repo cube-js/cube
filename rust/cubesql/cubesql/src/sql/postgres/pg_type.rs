@@ -88,7 +88,10 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
         DataType::Float32 => Ok(PgTypeId::FLOAT4),
         DataType::Float64 => Ok(PgTypeId::FLOAT8),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(PgTypeId::TEXT),
-        DataType::Timestamp(_, None) => Ok(PgTypeId::TIMESTAMP),
+        DataType::Timestamp(_, tz) => match tz {
+            None => Ok(PgTypeId::TIMESTAMP),
+            Some(_) => Ok(PgTypeId::TIMESTAMPTZ),
+        },
         DataType::Null => Ok(PgTypeId::BOOL),
         DataType::List(field) => match field.data_type() {
             DataType::Boolean => Ok(PgTypeId::ArrayBool),
