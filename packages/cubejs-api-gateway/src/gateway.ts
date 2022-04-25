@@ -1409,19 +1409,24 @@ class ApiGateway {
   };
 
   protected logNetworkUsage: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    this.log({
-      type: 'Incoming network usage',
-      service: 'api-http',
-      bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
-      path: req.path,
-    }, req.context);
+    const errorStatusCodes = [400, 401, 403, 500];
+    
     res.on('finish', () => {
-      this.log({
-        type: 'Outgoing network usage',
-        service: 'api-http',
-        bytes: Number(res.get('content-length')) || 0,
-        path: req.path,
-      }, req.context);
+      if (!errorStatusCodes.includes(res?.statusCode)) {
+        this.log({
+          type: 'Incoming network usage',
+          service: 'api-http',
+          bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+          path: req.path,
+        }, req.context);
+  
+        this.log({
+          type: 'Outgoing network usage',
+          service: 'api-http',
+          bytes: Number(res.get('content-length')) || 0,
+          path: req.path,
+        }, req.context);
+      }
     });
     if (next) {
       next();
