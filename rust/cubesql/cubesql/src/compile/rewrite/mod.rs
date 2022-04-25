@@ -267,10 +267,13 @@ crate::plan_to_language! {
             aliases: Vec<(String, String)>,
             table_name: Option<String>,
         },
-        InnerProjectionSplitReplacer {
+        InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
         },
         OuterProjectionSplitReplacer {
+            members: Vec<LogicalPlan>,
+        },
+        OuterAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
         },
     }
@@ -580,12 +583,16 @@ fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
 }
 
-fn inner_projection_split_replacer(members: impl Display) -> String {
-    format!("(InnerProjectionSplitReplacer {})", members)
+fn inner_aggregate_split_replacer(members: impl Display) -> String {
+    format!("(InnerAggregateSplitReplacer {})", members)
 }
 
 fn outer_projection_split_replacer(members: impl Display) -> String {
     format!("(OuterProjectionSplitReplacer {})", members)
+}
+
+fn outer_aggregate_split_replacer(members: impl Display) -> String {
+    format!("(OuterAggregateSplitReplacer {})", members)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {

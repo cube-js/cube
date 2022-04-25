@@ -60,8 +60,7 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
 
 #[derive(Clone, Debug, Ord, Eq, PartialOrd, PartialEq)]
 pub enum SplitType {
-    // TODO there can be also aggregation split where additional aggregation applied on top of split aggregation
-    // Aggregation,
+    Aggregation,
     Projection,
 }
 
@@ -361,25 +360,29 @@ impl LogicalPlanAnalysis {
         match enode {
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
                 let fun = crate::match_data_node!(node_by_id, params[0], ScalarFunctionExprFun);
+                let can_split_args = can_split(params[1]);
 
-                if fun == BuiltinScalarFunction::DateTrunc {
-                    Some(SplitType::Projection)
-                } else {
-                    None
+                match fun {
+                    BuiltinScalarFunction::DateTrunc => Some(SplitType::Projection),
+                    BuiltinScalarFunction::Trunc | BuiltinScalarFunction::DatePart => {
+                        can_split_args.map(|_| SplitType::Aggregation)
+                    }
+                    _ => None,
                 }
             }
-            LogicalPlanLanguage::ColumnExpr(_) | LogicalPlanLanguage::AggregateFunctionExpr(_) => {
-                Some(SplitType::Projection)
-            }
+            LogicalPlanLanguage::LiteralExpr(_)
+            | LogicalPlanLanguage::ColumnExpr(_)
+            | LogicalPlanLanguage::AggregateFunctionExpr(_) => Some(SplitType::Projection),
             LogicalPlanLanguage::CastExpr(params) => can_split(params[0]),
             LogicalPlanLanguage::AggregateGroupExpr(params)
-            | LogicalPlanLanguage::AggregateAggrExpr(params) => Some(
+            | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => Some(
                 params
                     .iter()
                     .map(|p| can_split(*p))
                     .collect::<Option<Vec<_>>>()?
                     .into_iter()
-                    .max()
+                    .min()
                     .unwrap_or(SplitType::Projection),
             ),
             _ => None,

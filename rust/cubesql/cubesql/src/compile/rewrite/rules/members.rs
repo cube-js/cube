@@ -204,6 +204,46 @@ impl RewriteRules for MemberRules {
                     "?date_range",
                 ),
             ),
+            // TODO duplicate of previous rule with aliasing. Extract aliasing as separate step?
+            transforming_rewrite(
+                "date-trunc-alias",
+                member_replacer(
+                    aggr_group_expr(
+                        alias_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), column_expr("?column")],
+                            ),
+                            "?alias",
+                        ),
+                        "?tail_group_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    time_dimension_expr(
+                        "?time_dimension_name",
+                        "?time_dimension_granularity",
+                        "?date_range",
+                        alias_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), column_expr("?column")],
+                            ),
+                            "?alias",
+                        ),
+                    ),
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
             transforming_rewrite(
                 "date-trunc-projection",
                 member_replacer(
@@ -591,6 +631,64 @@ impl MemberRules {
                     egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
                 );
                 return true;
+            }
+            false
+        }
+    }
+
+    pub fn transform_original_expr_date_trunc(
+        original_expr_var: &'static str,
+        granularity_var: &'static str,
+        column_expr_var: &'static str,
+        alias_expr_var: Option<&'static str>,
+        inner_replacer: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let granularity_var = var!(granularity_var);
+        let column_expr_var = var!(column_expr_var);
+        let alias_expr_var = alias_expr_var.map(|alias_expr_var| var!(alias_expr_var));
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                match granularity {
+                    ScalarValue::Utf8(Some(granularity)) => {
+                        if let Ok(expr) = res {
+                            // TODO unwrap
+                            let name = expr.name(&DFSchema::empty()).unwrap();
+                            let suffix_alias = format!("{}_{}", name, granularity);
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(Column::from_name(suffix_alias.to_string())),
+                            ));
+                            subst.insert(
+                                column_expr_var,
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                            );
+                            if let Some(alias_expr_var) = alias_expr_var {
+                                subst.insert(
+                                    alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(if inner_replacer {
+                                            suffix_alias.to_string()
+                                        } else {
+                                            name
+                                        }),
+                                    )),
+                                );
+                            }
+                            return true;
+                        }
+                    }
+                    _ => {}
+                }
             }
             false
         }

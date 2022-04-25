@@ -3209,6 +3209,59 @@ mod tests {
     }
 
     #[test]
+    fn tableau_extract_year() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CAST(TRUNC(EXTRACT(YEAR FROM \"KibanaSampleDataEcommerce\".\"order_date\")) AS INTEGER) AS \"yr:timestamp:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CAST(TRUNC(EXTRACT(YEAR FROM \"KibanaSampleDataEcommerce\".\"order_date\")) AS INTEGER) AS \"yr:timestamp:ok\", SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:teraBytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
     fn test_select_aggregations() {
         let variants = vec![
             (
