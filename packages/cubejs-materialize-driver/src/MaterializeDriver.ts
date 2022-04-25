@@ -1,6 +1,5 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
-import { checkNonNullable } from '@cubejs-backend/shared';
 import { PoolClient, QueryResult } from 'pg';
 import { Readable } from 'stream';
 
