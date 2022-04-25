@@ -1235,7 +1235,8 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_pg_get_expr_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(0);
+        let mut builder = StringBuilder::new(1);
+        builder.append_null().unwrap();
         Ok(Arc::new(builder.finish()))
     });
 
@@ -1330,7 +1331,14 @@ pub fn create_generate_series_udtf(with_catalog_prefix: bool) -> TableUDF {
         "pg_catalog.generate_series"
     };
 
-    let return_type: ReturnTypeFunction = Arc::new(move |tp| Ok(Arc::new(tp[0].clone())));
+    let return_type: ReturnTypeFunction = Arc::new(move |tp| {
+        if tp.len() > 0 {
+            Ok(Arc::new(tp[0].clone()))
+        } else {
+            Ok(Arc::new(DataType::Int64))
+        }
+    });
+
     TableUDF::new(
         fun_name,
         &Signature::one_of(

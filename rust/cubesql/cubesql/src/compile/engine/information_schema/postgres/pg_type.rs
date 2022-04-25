@@ -42,7 +42,7 @@ struct PgCatalogTypeBuilder {
     typanalyze: StringBuilder,
     typalign: StringBuilder,
     typstorage: StringBuilder,
-    typnotnull: StringBuilder,
+    typnotnull: BooleanBuilder,
     typbasetype: StringBuilder,
     typtypmod: StringBuilder,
     typndims: StringBuilder,
@@ -82,7 +82,7 @@ impl PgCatalogTypeBuilder {
             typanalyze: StringBuilder::new(capacity),
             typalign: StringBuilder::new(capacity),
             typstorage: StringBuilder::new(capacity),
-            typnotnull: StringBuilder::new(capacity),
+            typnotnull: BooleanBuilder::new(capacity),
             typbasetype: StringBuilder::new(capacity),
             typtypmod: StringBuilder::new(capacity),
             typndims: StringBuilder::new(capacity),
@@ -119,7 +119,7 @@ impl PgCatalogTypeBuilder {
         self.typanalyze.append_null().unwrap();
         self.typalign.append_value(typ.typalign).unwrap();
         self.typstorage.append_value(typ.typstorage).unwrap();
-        self.typnotnull.append_null().unwrap();
+        self.typnotnull.append_value(false).unwrap();
         self.typbasetype.append_null().unwrap();
         self.typtypmod.append_null().unwrap();
         self.typndims.append_null().unwrap();
@@ -265,7 +265,7 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typanalyze", DataType::Utf8, true),
             Field::new("typalign", DataType::Utf8, true),
             Field::new("typstorage", DataType::Utf8, true),
-            Field::new("typnotnull", DataType::Utf8, true),
+            Field::new("typnotnull", DataType::Boolean, true),
             Field::new("typbasetype", DataType::Utf8, true),
             Field::new("typtypmod", DataType::Utf8, true),
             Field::new("typndims", DataType::Utf8, true),

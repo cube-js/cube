@@ -5730,4 +5730,30 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn tableau_get_expr_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "tableau_get_expr_query",
+            execute_query(
+                "SELECT c.oid, a.attnum, a.attname, c.relname, n.nspname, a.attnotnull OR ( t.typtype = 'd' AND t.typnotnull ), a.attidentity != '' OR pg_catalog.Pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%'
+                FROM   pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n
+                    ON ( c.relnamespace = n.oid )
+                JOIN pg_catalog.pg_attribute a
+                    ON ( c.oid = a.attrelid )
+                JOIN pg_catalog.pg_type t
+                    ON ( a.atttypid = t.oid )
+                LEFT JOIN pg_catalog.pg_attrdef d
+                    ON ( d.adrelid = a.attrelid AND d.adnum = a.attnum )
+                JOIN (SELECT 2615 AS oid, 2 AS attnum UNION ALL SELECT 1259, 2 UNION ALL SELECT 2609, 4) vals
+                ON ( c.oid = vals.oid AND a.attnum = vals.attnum );"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

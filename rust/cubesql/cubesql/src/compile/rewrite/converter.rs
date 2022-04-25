@@ -67,6 +67,7 @@ use datafusion::logical_plan::plan::Projection;
 use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::plan::{Aggregate, Window};
 use datafusion::logical_plan::plan::{Extension, TableUDFs};
+use datafusion::logical_plan::Union;
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     LogicalPlan, LogicalPlanBuilder,
@@ -1349,6 +1350,45 @@ impl LanguageToLogicalPlanConverter {
                 };
 
                 LogicalPlan::Extension(Extension { node })
+            }
+            LogicalPlanLanguage::Union(params) => {
+                let inputs = match_list_node_ids!(node_by_id, params[0], UnionInputs)
+                    .into_iter()
+                    .map(|n| self.to_logical_plan(n))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let schema = inputs[0].schema().as_ref().clone();
+
+                // TODO: temp solution. RM after DF union. is fixed
+                let inputs: Vec<LogicalPlan> = inputs
+                    .iter()
+                    .enumerate()
+                    .map(|(i, input)| {
+                        if i == 0 || schema == *input.schema().as_ref() {
+                            input.clone()
+                        } else {
+                            LogicalPlan::Projection(Projection {
+                                expr: input.expressions(),
+                                input: Arc::new(input.clone()),
+                                schema: Arc::new(schema.clone()),
+                                alias: None,
+                            })
+                        }
+                    })
+                    .collect::<Vec<LogicalPlan>>();
+
+                let alias = match_data_node!(node_by_id, params[1], UnionAlias);
+
+                let schema = match alias {
+                    Some(ref alias) => schema.replace_qualifier(alias.as_str()),
+                    None => schema,
+                };
+
+                LogicalPlan::Union(Union {
+                    inputs,
+                    schema: Arc::new(schema),
+                    alias,
+                })
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })
