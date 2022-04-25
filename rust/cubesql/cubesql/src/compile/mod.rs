@@ -50,6 +50,7 @@ use self::{
     },
     parser::parse_sql_to_statement,
 };
+use crate::compile::engine::udf::{pg_get_userbyid, pg_table_is_visible};
 use crate::{
     compile::builder::QueryBuilder,
     compile::engine::udf::{
@@ -2280,6 +2281,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         ctx.register_udf(create_pg_get_expr_udf());
+        ctx.register_udf(pg_table_is_visible());
+        ctx.register_udf(pg_get_userbyid());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -5821,6 +5824,34 @@ mod tests {
             "superset_subquery",
             execute_query(
                 "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), (SELECT format_type(d.adbin, d.adrelid) FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef) AS DEFAULT, a.attnotnull, a.attnum, a.attrelid as table_oid, pgd.description as comment, a.attgenerated as generated FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_description pgd ON ( pgd.objoid = a.attrelid AND pgd.objsubid = a.attnum) WHERE a.attrelid = 13449 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn pgcli_queries() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "pgcli_queries_d",
+            execute_query(
+                r#"SELECT n.nspname as "Schema",
+                    c.relname as "Name",
+                    CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "Type",
+                    pg_catalog.pg_get_userbyid(c.relowner) as "Owner"
+                    FROM pg_catalog.pg_class c
+                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+                    WHERE c.relkind IN ('r','p','v','m','S','f','')
+                    AND n.nspname <> 'pg_catalog'
+                    AND n.nspname !~ '^pg_toast'
+                    AND n.nspname <> 'information_schema'
+                    AND pg_catalog.pg_table_is_visible(c.oid)
+                "#.to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
