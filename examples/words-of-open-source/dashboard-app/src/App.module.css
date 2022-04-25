@@ -2,25 +2,15 @@
   font-family: -apple-system, sans-serif;
   box-sizing: border-box;
   margin: auto;
-  padding: 50px 25px;
+  padding: 0px 25px 50px;
   text-align: center;
   width: 90%;
-}
-
-.root h1 {
-  color: #333;
-  font-size: 40px;
-  font-weight: 600;
-}
-
-.root p {
-  margin: 3px auto;
 }
 
 .inputWrapper {
   display: grid;
   grid-template-columns: 1fr min-content;
-  margin: 40px auto;
+  margin: 0 auto;
   width: 40%;
   min-width: 300px;
 }

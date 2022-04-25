@@ -14,11 +14,6 @@ export function App() {
   return (
     <>
       <div className={classes.root}>
-        <h1>Words of Open Source</h1>
-        
-        <p>Ratio of the number of commits containing a certain word to the total number of commits.</p>
-        <p>Based on the public dataset of <a href="https://console.cloud.google.com/marketplace/product/github/github-repos">GitHub Activity Data</a> and powered by <a href="https://cube.dev">Cube</a></p>
-
         <div className={classes.inputWrapper}>
           <input
             defaultValue={word}
