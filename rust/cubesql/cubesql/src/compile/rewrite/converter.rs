@@ -61,13 +61,13 @@ use cubeclient::models::{
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::catalog::TableReference;
 use datafusion::logical_plan::build_table_udf_schema;
-use datafusion::logical_plan::Union;
 use datafusion::logical_plan::plan::Filter;
 use datafusion::logical_plan::plan::Join;
 use datafusion::logical_plan::plan::Projection;
 use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::plan::{Aggregate, Window};
 use datafusion::logical_plan::plan::{Extension, TableUDFs};
+use datafusion::logical_plan::Union;
 use datafusion::logical_plan::{
     build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
     LogicalPlan, LogicalPlanBuilder,
@@ -1352,49 +1352,43 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Extension(Extension { node })
             }
             LogicalPlanLanguage::Union(params) => {
-                // inputs,schema, alias
-
                 let inputs = match_list_node_ids!(node_by_id, params[0], UnionInputs)
                     .into_iter()
                     .map(|n| self.to_logical_plan(n))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let alias = match_data_node!(node_by_id, params[1], UnionAlias);
+                let schema = inputs[0].schema().as_ref().clone();
 
-                let schema = inputs.iter().fold(DFSchema::empty(), |a, b| {
-                    let mut res = a;
-                    res.merge(b.schema());
-                    res
-                });
+                // TODO: temp solution. RM after DF union. is fixed
+                let inputs: Vec<LogicalPlan> = inputs
+                    .iter()
+                    .enumerate()
+                    .map(|(i, input)| {
+                        if i == 0 || schema == *input.schema().as_ref() {
+                            input.clone()
+                        } else {
+                            LogicalPlan::Projection(Projection {
+                                expr: input.expressions(),
+                                input: Arc::new(input.clone()),
+                                schema: Arc::new(schema.clone()),
+                                alias: None,
+                            })
+                        }
+                    })
+                    .collect::<Vec<LogicalPlan>>();
+
+                let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
                     None => schema,
                 };
 
-                // let schema = Arc::new(left.schema().join(right.schema())?);
-                
-                // let inputs = add_plan_list_node!(self, node.inputs, UnionInputs);
-                
-                
-
-                
-                
                 LogicalPlan::Union(Union {
                     inputs,
                     schema: Arc::new(schema),
                     alias,
-                    // alias,
                 })
-
-                // let produce_one_row =
-                //     match_data_node!(node_by_id, params[0], EmptyRelationProduceOneRow);
-
-                // // TODO
-                // LogicalPlan::EmptyRelation(EmptyRelation {
-                //     produce_one_row,
-                //     schema: Arc::new(DFSchema::empty()),
-                // })
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })

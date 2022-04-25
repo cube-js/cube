@@ -9,16 +9,6 @@ use std::env;
 use tokio::runtime::Builder;
 
 fn main() {
-    env::set_var("CUBESQL_CUBE_TOKEN", "");
-    env::set_var("CUBESQL_PG_PORT", "5433");
-    env::set_var("CUBESQL_CUBE_URL", "http://localhost:4000/cubejs-api");
-    env::set_var("CUBESQL_LOG_LEVEL", "debug");
-    env::set_var("CUBESQL_BIND_ADDR", "0.0.0.0:4444");
-    // env::set_var("CUBESQL_BIND_ADDR", "0.0.0.0:5433");
-    env::set_var("CUBE_SQL_USERNAME", "root");
-    env::set_var("CUBE_SQL_PASSWORD", "pass");
-    env::set_var("CUBESQL_REWRITE_ENGINE", "true");
-
     let log_level = match env::var("CUBESQL_LOG_LEVEL")
         .unwrap_or("info".to_string())
         .to_lowercase()
