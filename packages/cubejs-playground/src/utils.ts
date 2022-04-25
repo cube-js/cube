@@ -95,6 +95,13 @@ const peerDependencies = {
   'react-chartjs-2': 'chart.js',
 };
 
+const fixes = {
+  'react': '17.0.1',
+  'react-dom': '17.0.1',
+  'react-chartjs-2': '3.0.3',
+  'chart.js': '3.4.0'
+};
+
 export function codeSandboxDefinition(template, files, dependencies = []) {
   return {
     files: {
@@ -107,7 +114,7 @@ export function codeSandboxDefinition(template, files, dependencies = []) {
           dependencies: {
             ...bootstrapDefinition[template]?.dependencies,
             ...dependencies.reduce((memo, d) => {
-              const [name, version] = Array.isArray(d) ? d : [d, 'latest'];
+              const [name, version] = Array.isArray(d) ? d : [d, fixes[d] || 'latest'];
 
               return {
                 ...memo,

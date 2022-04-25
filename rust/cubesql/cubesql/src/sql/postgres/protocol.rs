@@ -634,6 +634,8 @@ pub enum FrontendMessage {
 }
 
 /// https://www.postgresql.org/docs/14/errcodes-appendix.html
+#[derive(Debug)]
+#[allow(dead_code)]
 pub enum ErrorCode {
     // 0A — Feature Not Supported
     FeatureNotSupported,

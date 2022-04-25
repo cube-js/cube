@@ -286,7 +286,7 @@ export class RefreshScheduler {
 
       const { invalidateKeyQueries, preAggregationStartEndQueries } = partitionsWithDependencies[0]?.partitions[0] || {};
       const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
-      const [[refreshKey]] = invalidateKeyQueries || [[]];
+      const [[refreshKey]] = invalidateKeyQueries?.length ? invalidateKeyQueries : [[]];
 
       const refreshesSqlMap = {
         refreshKey,

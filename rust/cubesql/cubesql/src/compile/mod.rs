@@ -4,17 +4,21 @@ use std::{backtrace::Backtrace, env, fmt};
 
 use chrono::{prelude::*, Duration};
 
-use datafusion::arrow::datatypes::DataType;
-use datafusion::execution::context::{
-    default_session_builder, SessionConfig as DFSessionConfig, SessionContext as DFSessionContext,
+use datafusion::{
+    arrow::datatypes::DataType,
+    execution::context::{
+        default_session_builder, SessionConfig as DFSessionConfig,
+        SessionContext as DFSessionContext,
+    },
+    logical_plan::plan::{Extension, Projection},
+    logical_plan::LogicalPlan,
+    logical_plan::{DFField, DFSchema, DFSchemaRef, Expr},
+    prelude::*,
+    scalar::ScalarValue,
+    sql::parser::Statement as DFStatement,
+    sql::planner::SqlToRel,
+    variable::VarType,
 };
-use datafusion::logical_plan::plan::{Extension, Projection};
-use datafusion::logical_plan::{DFField, DFSchema, DFSchemaRef, Expr};
-use datafusion::scalar::ScalarValue;
-use datafusion::sql::parser::Statement as DFStatement;
-use datafusion::sql::planner::SqlToRel;
-use datafusion::variable::VarType;
-use datafusion::{logical_plan::LogicalPlan, prelude::*};
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use serde::Serialize;
@@ -25,44 +29,47 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 
-use crate::sql::database_variables::{DatabaseVariable, DatabaseVariables};
-use crate::sql::session::DatabaseProtocol;
-use crate::sql::{
-    dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager, SessionState,
-};
-
 pub use crate::transport::ctx::*;
-use crate::transport::{df_data_type_by_column_type, V1CubeMetaExt};
-use crate::CubeError;
+
+use self::{
+    builder::*,
+    context::*,
+    engine::context::VariablesProvider,
+    engine::df::planner::CubeQueryPlanner,
+    engine::df::scan::CubeScanNode,
+    engine::information_schema::mysql::ext::CubeColumnMySqlExt,
+    engine::provider::CubeContext,
+    engine::udf::{
+        create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+        create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
+        create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
+        create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
+        create_pg_get_expr_udf, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+        create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
+        create_user_udf, create_version_udf,
+    },
+    parser::parse_sql_to_statement,
+};
 use crate::{
     compile::builder::QueryBuilder,
+    compile::engine::udf::{
+        create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+        create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
+        create_measure_udaf, create_minute_udf, create_pg_backend_pid, create_quarter_udf,
+        create_second_udf, create_str_to_date, create_year_udf,
+    },
+    compile::rewrite::converter::LogicalPlanToLanguageConverter,
+    sql::database_variables::{DatabaseVariable, DatabaseVariables},
+    sql::session::DatabaseProtocol,
+    sql::types::CommandCompletion,
+    sql::{
+        dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager,
+        SessionState,
+    },
+    transport::{df_data_type_by_column_type, V1CubeMetaExt},
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    CubeError,
 };
-
-use self::builder::*;
-use self::context::*;
-use self::engine::context::VariablesProvider;
-use self::engine::df::planner::CubeQueryPlanner;
-use self::engine::df::scan::CubeScanNode;
-use self::engine::information_schema::mysql::ext::CubeColumnMySqlExt;
-use self::engine::provider::CubeContext;
-use self::engine::udf::{
-    create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
-    create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
-    create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf, create_locate_udf,
-    create_pg_datetime_precision_udf, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-    create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
-    create_user_udf, create_version_udf,
-};
-use self::parser::parse_sql_to_statement;
-use crate::compile::engine::udf::{
-    create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
-    create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
-    create_measure_udaf, create_minute_udf, create_quarter_udf, create_second_udf,
-    create_str_to_date, create_year_udf,
-};
-use crate::compile::rewrite::converter::LogicalPlanToLanguageConverter;
-use crate::sql::types::CommandCompletion;
 
 pub mod builder;
 pub mod context;
@@ -1382,7 +1389,7 @@ impl QueryPlanner {
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
             .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
+            .unwrap_or(self.state.protocol == DatabaseProtocol::PostgreSQL);
         if rewrite_engine {
             return self.create_df_logical_plan(stmt.clone());
         }
@@ -1514,7 +1521,7 @@ impl QueryPlanner {
         {
             return Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "_".to_string(),
                         ColumnType::Int8,
@@ -1603,7 +1610,7 @@ impl QueryPlanner {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
             (ast::Statement::SetNames { charset_name, .. }, DatabaseProtocol::MySQL) => {
                 if !(charset_name.eq_ignore_ascii_case("utf8")
@@ -1617,7 +1624,7 @@ impl QueryPlanner {
 
                 Ok(QueryPlan::MetaTabular(
                     StatusFlags::empty(),
-                    Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                    Box::new(dataframe::DataFrame::new(vec![], vec![])),
                 ))
             }
             (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => Ok(QueryPlan::MetaOk(
@@ -1720,7 +1727,7 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
                         "Database".to_string(),
                         ColumnType::String,
@@ -1751,7 +1758,7 @@ impl QueryPlanner {
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(
+                Box::new(dataframe::DataFrame::new(
                     vec![
                         dataframe::Column::new(
                             "Level".to_string(),
@@ -1843,7 +1850,7 @@ impl QueryPlanner {
                 ));
             }
 
-            QueryPlan::MetaTabular(StatusFlags::empty(), Arc::new(dataframe::DataFrame::new(
+            QueryPlan::MetaTabular(StatusFlags::empty(), Box::new(dataframe::DataFrame::new(
                 vec![
                     dataframe::Column::new(
                         "Table".to_string(),
@@ -2045,7 +2052,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         return Ok(QueryPlan::MetaTabular(
             StatusFlags::empty(),
-            Arc::new(dataframe::DataFrame::new(
+            Box::new(dataframe::DataFrame::new(
                 vec![dataframe::Column::new(
                     "Execution Plan".to_string(),
                     ColumnType::String,
@@ -2197,7 +2204,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         Ok(QueryPlan::MetaTabular(
             flags,
-            Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+            Box::new(dataframe::DataFrame::new(vec![], vec![])),
         ))
     }
 
@@ -2239,6 +2246,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
         ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
+        ctx.register_udf(create_pg_backend_pid(self.state.clone()));
         ctx.register_udf(create_user_udf(self.state.clone()));
         ctx.register_udf(create_current_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
@@ -2271,8 +2279,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
+        ctx.register_udf(create_pg_get_expr_udf());
+
         // udaf
         ctx.register_udaf(create_measure_udaf());
+
+        // udtf
+        ctx.register_udtf(create_generate_series_udtf(true));
+        ctx.register_udtf(create_generate_series_udtf(false));
 
         ctx
     }
@@ -2393,12 +2407,11 @@ impl CompiledQuery {
     }
 }
 
-#[derive(Clone)]
 pub enum QueryPlan {
     // Meta will not be executed in DF,
     // we already knows how respond to it
     MetaOk(StatusFlags, CommandCompletion),
-    MetaTabular(StatusFlags, Arc<dataframe::DataFrame>),
+    MetaTabular(StatusFlags, Box<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
     DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
 }
@@ -3105,6 +3118,94 @@ mod tests {
         //         .unwrap()
         //     ),
         // );
+    }
+
+    #[test]
+    fn test_select_where_false() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT * FROM KibanaSampleDataEcommerce WHERE 1 = 0".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1),
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_group_by_month() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:bytesBilled:ok\",\n  DATE_TRUNC( 'MONTH', CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS TIMESTAMP) ) AS \"tmn:timestamp:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 2".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_group_by_month_and_dimension() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS \"query\",\n  SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:bytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
     }
 
     #[test]
@@ -4918,6 +5019,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_pg_backend_pid() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_backend_pid",
+            execute_query(
+                "select pg_backend_pid();".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_show_collation() -> Result<(), CubeError> {
         // Simplest syntax
         insta::assert_snapshot!(
@@ -5498,6 +5613,99 @@ mod tests {
             "pg_get_userbyid_invalid",
             execute_query(
                 "SELECT pg_get_userbyid(0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generate_series_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "generate_series_i64_1",
+            execute_query(
+                "SELECT generate_series(-5, 5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_f64_2",
+            execute_query(
+                "SELECT generate_series(-5, 5, 3);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_f64_1",
+            execute_query(
+                "SELECT generate_series(-5, 5, 0.5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_empty_1",
+            execute_query(
+                "SELECT generate_series(-5, -10, 3);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_empty_2",
+            execute_query(
+                "SELECT generate_series(1, 5, 0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_catalog_generate_series_i64",
+            execute_query(
+                "SELECT pg_catalog.generate_series(1, 5);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_from_table",
+            execute_query(
+                "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_get_expr_1",
+            execute_query(
+                "SELECT pg_catalog.pg_get_expr(adbin, adrelid) FROM pg_catalog.pg_attrdef;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "pg_get_expr_2",
+            execute_query(
+                "SELECT pg_catalog.pg_get_expr(adbin, adrelid, true) FROM pg_catalog.pg_attrdef;"
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

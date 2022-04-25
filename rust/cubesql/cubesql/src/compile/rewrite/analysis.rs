@@ -1,3 +1,5 @@
+use crate::arrow::array::NullArray;
+use crate::arrow::datatypes::{DataType, Field, Schema};
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::converter::{is_expr_node, node_to_expr};
 use crate::compile::rewrite::AliasExprAlias;
@@ -7,27 +9,19 @@ use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
 use crate::compile::rewrite::ScalarFunctionExprFun;
-use crate::compile::rewrite::ScalarUDFExprFun;
 use crate::compile::rewrite::TimeDimensionName;
 use crate::var_iter;
 use crate::CubeError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{DFSchema, Expr};
-use datafusion::physical_plan::functions::Volatility;
+use datafusion::physical_plan::functions::{BuiltinScalarFunction, Volatility};
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{ColumnarValue, PhysicalPlanner};
 use datafusion::scalar::ScalarValue;
-use datafusion::sql::planner::ContextProvider;
 use egg::{Analysis, DidMerge};
 use egg::{EGraph, Id};
 use std::ops::Index;
 use std::sync::Arc;
-
-#[derive(Clone, Debug)]
-pub enum ConstantData {
-    ExprConstant(ScalarValue),
-    Intermediate(Vec<ScalarValue>),
-}
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
@@ -36,7 +30,9 @@ pub struct LogicalPlanData {
     pub column_name: Option<String>,
     pub expr_to_alias: Option<Vec<(Expr, String)>>,
     pub referenced_expr: Option<Vec<Expr>>,
-    pub constant: Option<ConstantData>,
+    pub constant: Option<ScalarValue>,
+    pub constant_in_list: Option<Vec<ScalarValue>>,
+    pub can_split: Option<SplitType>,
 }
 
 #[derive(Clone)]
@@ -62,6 +58,13 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
     }
 }
 
+#[derive(Clone, Debug, Ord, Eq, PartialOrd, PartialEq)]
+pub enum SplitType {
+    // TODO there can be also aggregation split where additional aggregation applied on top of split aggregation
+    // Aggregation,
+    Projection,
+}
+
 impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
@@ -83,16 +86,13 @@ impl LogicalPlanAnalysis {
             })
         };
         let original_expr = if is_expr_node(enode) {
-            // TODO .unwrap
-            Some(
-                node_to_expr(
-                    enode,
-                    &egraph.analysis.cube_context,
-                    &id_to_expr,
-                    &SingleNodeIndex { egraph },
-                )
-                .unwrap(),
+            node_to_expr(
+                enode,
+                &egraph.analysis.cube_context,
+                &id_to_expr,
+                &SingleNodeIndex { egraph },
             )
+            .ok()
         } else {
             None
         };
@@ -251,134 +251,182 @@ impl LogicalPlanAnalysis {
     fn make_constant(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<ConstantData> {
-        let constant = |id| egraph.index(id).data.constant.clone();
+    ) -> Option<ScalarValue> {
+        let constant_expr = |id| {
+            egraph
+                .index(id)
+                .data
+                .constant
+                .clone()
+                .map(|c| Expr::Literal(c))
+                .ok_or_else(|| CubeError::internal("Not a constant".to_string()))
+        };
         match enode {
-            LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(value)) => {
-                Some(ConstantData::Intermediate(vec![value.clone()]))
+            LogicalPlanLanguage::LiteralExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+                match expr {
+                    Expr::Literal(value) => Some(value),
+                    _ => panic!("Expected Literal but got: {:?}", expr),
+                }
             }
-            LogicalPlanLanguage::LiteralExpr(params) => constant(params[0]),
-            LogicalPlanLanguage::ScalarUDFExpr(params) => {
-                let fun = var_iter!(egraph[params[0]], ScalarUDFExprFun)
-                    .next()
-                    .unwrap()
-                    .to_string();
-
-                if &fun == "str_to_date" || &fun == "date_add" || &fun == "date" {
-                    let args = match constant(params[1])? {
-                        ConstantData::Intermediate(vec) => Some(vec),
-                        _ => None,
-                    }?;
-                    let fun = egraph
-                        .analysis
-                        .cube_context
-                        .get_function_meta(&fun)
-                        .ok_or(CubeError::user(format!(
-                            "Scalar UDF '{}' is not found",
-                            fun
-                        )))
-                        .unwrap();
-                    let expr = Expr::ScalarUDF {
-                        fun,
-                        args: args.into_iter().map(|v| Expr::Literal(v)).collect(),
-                    };
-
-                    let schema = DFSchema::empty();
-                    let arrow_schema = Arc::new(schema.to_owned().into());
-                    let physical_expr = egraph
-                        .analysis
-                        .planner
-                        .create_physical_expr(
-                            &expr,
-                            &schema,
-                            &arrow_schema,
-                            &egraph.analysis.cube_context.state,
-                        )
-                        .unwrap();
-                    let value = physical_expr
-                        .evaluate(&RecordBatch::new_empty(arrow_schema))
-                        .unwrap();
-                    if let ColumnarValue::Scalar(value) = value {
-                        Some(ConstantData::ExprConstant(value))
+            LogicalPlanLanguage::ScalarUDFExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+                if let Expr::ScalarUDF { fun, .. } = &expr {
+                    if &fun.name == "str_to_date" || &fun.name == "date_add" || &fun.name == "date"
+                    {
+                        Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
                     }
                 } else {
-                    None
+                    panic!("Expected ScalarUDF but got: {:?}", expr);
                 }
             }
-            LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
-                let mut vec = Vec::new();
-                for p in params.iter() {
-                    vec.extend(match constant(*p)? {
-                        ConstantData::ExprConstant(c) => vec![c].into_iter(),
-                        ConstantData::Intermediate(vec) => vec.into_iter(),
-                    });
-                }
-                Some(ConstantData::Intermediate(vec))
-            }
-            LogicalPlanLanguage::InListExprList(params) => {
-                let mut vec = Vec::new();
-                for p in params.iter() {
-                    vec.extend(match constant(*p)? {
-                        ConstantData::ExprConstant(c) => vec![c].into_iter(),
-                        ConstantData::Intermediate(vec) => vec.into_iter(),
-                    });
-                }
-                Some(ConstantData::Intermediate(vec))
-            }
-            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
-                let fun = var_iter!(egraph[params[0]], ScalarFunctionExprFun)
-                    .next()
-                    .unwrap();
+            LogicalPlanLanguage::ScalarFunctionExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
 
-                if fun.volatility() == Volatility::Immutable {
-                    let args = match constant(params[1])? {
-                        ConstantData::Intermediate(vec) => Some(vec),
-                        _ => None,
-                    }?;
-
-                    let expr = Expr::ScalarFunction {
-                        fun: fun.clone(),
-                        args: args.into_iter().map(|v| Expr::Literal(v)).collect(),
-                    };
-
-                    let schema = DFSchema::empty();
-                    let arrow_schema = Arc::new(schema.to_owned().into());
-                    let physical_expr = egraph
-                        .analysis
-                        .planner
-                        .create_physical_expr(
-                            &expr,
-                            &schema,
-                            &arrow_schema,
-                            &egraph.analysis.cube_context.state,
-                        )
-                        .expect(&format!("Can't evaluate expression: {:?}", expr));
-                    let value = physical_expr
-                        .evaluate(&RecordBatch::new_empty(arrow_schema))
-                        .unwrap();
-                    if let ColumnarValue::Scalar(value) = value {
-                        Some(ConstantData::ExprConstant(value))
+                if let Expr::ScalarFunction { fun, .. } = &expr {
+                    if fun.volatility() == Volatility::Immutable {
+                        Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
                     }
                 } else {
-                    None
+                    panic!("Expected ScalarFunctionExpr but got: {:?}", expr);
                 }
             }
-            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
-                let mut vec = Vec::new();
-                for p in params.iter() {
-                    vec.extend(match constant(*p)? {
-                        ConstantData::ExprConstant(c) => vec![c].into_iter(),
-                        ConstantData::Intermediate(vec) => vec.into_iter(),
-                    });
-                }
-                Some(ConstantData::Intermediate(vec))
+            LogicalPlanLanguage::BinaryExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+
+                Self::eval_constant_expr(&egraph, &expr)
             }
             _ => None,
         }
+    }
+
+    fn make_constant_in_list(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<ScalarValue>> {
+        let constant = |id| egraph.index(id).data.constant.clone();
+        let constant_in_list = |id| egraph.index(id).data.constant_in_list.clone();
+        match enode {
+            LogicalPlanLanguage::InListExprList(params) => Some(
+                params
+                    .iter()
+                    .map(|id| {
+                        constant(*id)
+                            .map(|c| vec![c])
+                            .or_else(|| constant_in_list(*id))
+                    })
+                    .collect::<Option<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+            ),
+            _ => None,
+        }
+    }
+
+    fn make_can_split(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<SplitType> {
+        let can_split = |id| egraph.index(id).data.can_split.clone();
+        let node_by_id = &SingleNodeIndex { egraph };
+        match enode {
+            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
+                let fun = crate::match_data_node!(node_by_id, params[0], ScalarFunctionExprFun);
+
+                if fun == BuiltinScalarFunction::DateTrunc {
+                    Some(SplitType::Projection)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::ColumnExpr(_) | LogicalPlanLanguage::AggregateFunctionExpr(_) => {
+                Some(SplitType::Projection)
+            }
+            LogicalPlanLanguage::CastExpr(params) => can_split(params[0]),
+            LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params) => Some(
+                params
+                    .iter()
+                    .map(|p| can_split(*p))
+                    .collect::<Option<Vec<_>>>()?
+                    .into_iter()
+                    .max()
+                    .unwrap_or(SplitType::Projection),
+            ),
+            _ => None,
+        }
+    }
+
+    fn eval_constant_expr(
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        expr: &Expr,
+    ) -> Option<ScalarValue> {
+        let schema = DFSchema::empty();
+        let arrow_schema = Arc::new(schema.to_owned().into());
+        let physical_expr = egraph
+            .analysis
+            .planner
+            .create_physical_expr(
+                &expr,
+                &schema,
+                &arrow_schema,
+                &egraph.analysis.cube_context.state,
+            )
+            .expect(&format!("Can't plan expression: {:?}", expr));
+        let batch = RecordBatch::try_new(
+            Arc::new(Schema::new(vec![Field::new(
+                "placeholder",
+                DataType::Null,
+                true,
+            )])),
+            vec![Arc::new(NullArray::new(1))],
+        )
+        .unwrap();
+        let value = physical_expr
+            .evaluate(&batch)
+            .expect(&format!("Can't evaluate expression: {:?}", expr));
+        Some(match value {
+            ColumnarValue::Scalar(value) => value,
+            ColumnarValue::Array(arr) => {
+                if arr.len() == 1 {
+                    ScalarValue::try_from_array(&arr, 0).unwrap()
+                } else {
+                    panic!(
+                        "Expected one row but got {} during constant eval",
+                        arr.len()
+                    )
+                }
+            }
+        })
     }
 
     fn make_column_name(
@@ -422,6 +470,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             expr_to_alias: Self::make_expr_to_alias(egraph, enode),
             referenced_expr: Self::make_referenced_expr(egraph, enode),
             constant: Self::make_constant(egraph, enode),
+            constant_in_list: Self::make_constant_in_list(egraph, enode),
+            can_split: Self::make_can_split(egraph, enode),
         }
     }
 
@@ -431,16 +481,20 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             self.merge_option_field(a, b, |d| &mut d.member_name_to_expr);
         let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
         let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
+        let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
+        let (can_split, b) = self.merge_option_field(a, b, |d| &mut d.can_split);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column_name);
         original_expr
             | member_name_to_expr
             | column_name_to_alias
             | referenced_columns
+            | constant_in_list
+            | can_split
             | column_name
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
-        if let Some(ConstantData::ExprConstant(c)) = &egraph[id].data.constant {
+        if let Some(c) = &egraph[id].data.constant {
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));

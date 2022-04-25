@@ -2028,6 +2028,20 @@
     events "^3.0.0"
     tslib "^2.2.0"
 
+"@azure/storage-blob@^12.9.0":
+  version "12.9.0"
+  resolved "https://registry.yarnpkg.com/@azure/storage-blob/-/storage-blob-12.9.0.tgz#4cbd8b4c7a47dd064867430db892f4ef2d8f17ab"
+  integrity sha512-ank38FdCLfJ+EoeMzCz3hkYJuZAd63ARvDKkxZYRDb+beBYf+/+gx8jNTqkq/hfyUl4dJQ/a7tECU0Y0F98CHg==
+  dependencies:
+    "@azure/abort-controller" "^1.0.0"
+    "@azure/core-http" "^2.0.0"
+    "@azure/core-lro" "^2.2.0"
+    "@azure/core-paging" "^1.1.1"
+    "@azure/core-tracing" "1.0.0-preview.13"
+    "@azure/logger" "^1.0.0"
+    events "^3.0.0"
+    tslib "^2.2.0"
+
 "@babel/cli@^7.5.5":
   version "7.16.0"
   resolved "https://registry.yarnpkg.com/@babel/cli/-/cli-7.16.0.tgz#a729b7a48eb80b49f48a339529fc4129fd7bcef3"
