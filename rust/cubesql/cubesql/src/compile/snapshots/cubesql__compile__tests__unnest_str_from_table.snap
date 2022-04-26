@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5653
+expression: "execute_query(\"SELECT unnest(r.a) FROM (SELECT ARRAY['1', '2'] as a UNION ALL SELECT ARRAY['3', '4'] as a) as r;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------+
+| unnest(r.a) |
++-------------+
+| 1           |
+| 2           |
+| 3           |
+| 4           |
++-------------+
