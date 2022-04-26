@@ -6,12 +6,12 @@ use datafusion::{
     arrow::datatypes::UInt32Type,
     arrow::{
         array::{
-            Array, ArrayRef, BooleanArray, BooleanBuilder, Float64Array, GenericStringArray,
-            Int64Array, Int64Builder, IntervalDayTimeArray, IntervalDayTimeBuilder, ListBuilder,
-            PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder, TimestampNanosecondArray,
-            UInt32Builder,
+            new_null_array, Array, ArrayRef, BooleanArray, BooleanBuilder, Float64Array,
+            GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
+            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, TimestampNanosecondArray, UInt32Builder,
         },
-        compute::cast,
+        compute::{cast, concat},
         datatypes::{
             DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
             TimeUnit, TimestampNanosecondType, UInt64Type,
@@ -1415,6 +1415,66 @@ pub fn create_generate_series_udtf(with_catalog_prefix: bool) -> TableUDF {
             ],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_unnest_udtf() -> TableUDF {
+    let fun = make_table_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        match args[0].data_type() {
+            DataType::List(field) => {
+                let mut result = new_null_array(field.data_type(), 0);
+                let rows = args[0].as_any().downcast_ref::<ListArray>().unwrap();
+
+                let mut section_sizes: Vec<usize> = Vec::new();
+
+                for row in rows.iter() {
+                    match row {
+                        None => {
+                            result = concat(&[&result, &new_null_array(field.data_type(), 1)])?;
+
+                            section_sizes.push(1);
+                        }
+                        Some(column_array) => {
+                            result = concat(&[&result, &column_array])?;
+
+                            section_sizes.push(column_array.len());
+                        }
+                    }
+                }
+
+                Ok((result, section_sizes))
+            }
+            dt => Err(DataFusionError::Execution(format!(
+                "Unsupported argument type, argument must be a List of any type, actual: {:?}",
+                dt
+            ))),
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |tp| {
+        if tp.len() == 1 {
+            match &tp[0] {
+                DataType::List(field) => Ok(Arc::new(field.data_type().clone())),
+                dt => Err(DataFusionError::Execution(format!(
+                    "Unsupported argument type, argument must be a List of any type, actual: {:?}",
+                    dt
+                ))),
+            }
+        } else {
+            Err(DataFusionError::Execution(format!(
+                "Unable to get return type for UNNEST function with arguments: {:?}",
+                tp
+            )))
+        }
+    });
+
+    TableUDF::new(
+        "unnest",
+        &Signature::any(1, Volatility::Immutable),
         &return_type,
         &fun,
     )

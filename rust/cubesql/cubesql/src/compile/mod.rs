@@ -50,7 +50,7 @@ use self::{
     },
     parser::parse_sql_to_statement,
 };
-use crate::compile::engine::udf::{pg_get_userbyid, pg_table_is_visible};
+use crate::compile::engine::udf::{create_unnest_udtf, pg_get_userbyid, pg_table_is_visible};
 use crate::{
     compile::builder::QueryBuilder,
     compile::engine::udf::{
@@ -2290,6 +2290,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         // udtf
         ctx.register_udtf(create_generate_series_udtf(true));
         ctx.register_udtf(create_generate_series_udtf(false));
+        ctx.register_udtf(create_unnest_udtf());
 
         ctx
     }
@@ -5714,6 +5715,38 @@ mod tests {
             "pg_get_userbyid_invalid",
             execute_query(
                 "SELECT pg_get_userbyid(0);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_unnest_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "unnest_i64_from_table",
+            execute_query(
+                "SELECT unnest(r.a) FROM (SELECT ARRAY[1,2,3,4] as a UNION ALL SELECT ARRAY[5,6,7,8] as a) as r;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "unnest_str_from_table",
+            execute_query(
+                "SELECT unnest(r.a) FROM (SELECT ARRAY['1', '2'] as a UNION ALL SELECT ARRAY['3', '4'] as a) as r;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "unnest_i64_scalar",
+            execute_query(
+                "SELECT unnest(ARRAY[1,2,3,4,5]);".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
