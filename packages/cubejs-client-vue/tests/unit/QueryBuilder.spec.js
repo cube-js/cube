@@ -444,7 +444,7 @@ describe('QueryBuilder.vue', () => {
             dimension: 'Orders.status',
             operator: 'equals',
             values: ['that'],
-          }
+          },
         ],
         or: [
           {
@@ -456,8 +456,22 @@ describe('QueryBuilder.vue', () => {
             dimension: 'Orders.status',
             operator: 'equals',
             values: ['that'],
-          }
-        ]
+          },
+          {
+            and: [
+              {
+                dimension: 'Orders.status',
+                operator: 'equals',
+                values: ['this'],
+              },
+              {
+                dimension: 'Orders.status',
+                operator: 'equals',
+                values: ['that'],
+              },
+            ],
+          },
+        ],
       };
 
       const wrapper = mount(QueryBuilder, {
@@ -471,7 +485,7 @@ describe('QueryBuilder.vue', () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.filters[0].or.length).toBe(2);
+      expect(wrapper.vm.filters[0].or.length).toBe(3);
       expect(wrapper.vm.filters[0].and.length).toBe(2);
       wrapper.vm.setMembers('filters', []);
       expect(wrapper.vm.validatedQuery.filters).toBeUndefined();
@@ -483,7 +497,10 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.validatedQuery.filters[0].or[0].member).toBe('Orders.status');
       expect(wrapper.vm.validatedQuery.filters[0].or[0].values).toContain('this');
       expect(wrapper.vm.validatedQuery.filters[0].or[1].values).toContain('that');
-    })
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[0].member).toBe('Orders.status');
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[0].values).toContain('this');
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[1].values).toContain('that');
+    });
 
     it.each([
       [
@@ -495,7 +512,7 @@ describe('QueryBuilder.vue', () => {
             },
           ],
         },
-        0
+        0,
       ],
       [
         {
@@ -504,9 +521,28 @@ describe('QueryBuilder.vue', () => {
               dimension: 'Orders.status',
               values: ['this'],
             },
-          ]
+          ],
         },
-        0
+        0,
+      ],
+      [
+        {
+          or: [
+            {
+              dimension: 'Orders.status',
+              values: ['this'],
+            },
+            {
+              and: [
+                {
+                  dimension: 'Orders.status',
+                  values: ['this'],
+                },
+              ],
+            },
+          ],
+        },
+        0,
       ],
       [
         {
@@ -522,10 +558,30 @@ describe('QueryBuilder.vue', () => {
               operator: 'equals',
               values: ['this'],
             },
-          ]
+          ],
         },
-        1
-      ]
+        1,
+      ],
+      [
+        {
+          or: [
+            {
+              dimension: 'Orders.status',
+              values: ['this'],
+            },
+            {
+              and: [
+                {
+                  dimension: 'Orders.status',
+                  operator: 'equals',
+                  values: ['this'],
+                },
+              ],
+            },
+          ],
+        },
+        1,
+      ],
     ])('does not assign boolean logical operators having no operator', async (filter, expected) => {
       const cube = createCubejsApi();
       jest
@@ -546,7 +602,7 @@ describe('QueryBuilder.vue', () => {
 
       wrapper.vm.setMembers('filters', [filter]);
       expect(wrapper.vm.validatedQuery.filters.length).toBe(expected);
-    })
+    });
 
     it('sets filters when using measure', async () => {
       const cube = createCubejsApi();
@@ -769,14 +825,14 @@ describe('QueryBuilder.vue', () => {
   });
 
   describe('builder slot updatePivotConfig.update', () => {
-     it.each([
-       { x: [ 'Orders.status' ] },
-       { y: [ 'measures' ] },
-       { x: [ 'Orders.status', 'measures' ], y: [] },
-       { aliasSeries: [ 'one' ] },
-       { fillMissingDates: true },
-       { fillMissingDates: false }
-     ])('sets pivotConfig', async (pivotConfig) => {
+    it.each([
+      { x: ['Orders.status'] },
+      { y: ['measures'] },
+      { x: ['Orders.status', 'measures'], y: [] },
+      { aliasSeries: ['one'] },
+      { fillMissingDates: true },
+      { fillMissingDates: false },
+    ])('sets pivotConfig', async (pivotConfig) => {
       const cube = createCubejsApi();
       jest
         .spyOn(cube, 'request')
@@ -792,21 +848,18 @@ describe('QueryBuilder.vue', () => {
           },
         },
         scopedSlots: {
-          builder: function({ updatePivotConfig }) {
-            return this.$createElement(
-              'input',
-              {
-                on: { change: () => updatePivotConfig.update(pivotConfig) }
-              }
-            )
-          }
-        }
+          builder: function ({ updatePivotConfig }) {
+            return this.$createElement('input', {
+              on: { change: () => updatePivotConfig.update(pivotConfig) },
+            });
+          },
+        },
       });
 
       await flushPromises();
 
-      wrapper.find('input').trigger('change')
+      wrapper.find('input').trigger('change');
       expect(wrapper.vm.pivotConfig).toMatchObject(pivotConfig);
     });
-  })
+  });
 });
