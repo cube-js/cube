@@ -26,7 +26,6 @@ use crate::compile::parser::parse_sql_to_statement;
 use crate::config::processing_loop::ProcessingLoop;
 
 use crate::sql::session::DatabaseProtocol;
-use crate::sql::statement::BindValue;
 use crate::sql::statement::{StatementParamsBinder, StatementParamsFinder};
 use crate::sql::Session;
 use crate::sql::SessionManager;
@@ -36,6 +35,7 @@ use crate::sql::{
 };
 use crate::CubeError;
 use msql_srv::ColumnType as MySQLColumnType;
+use pg_srv::BindValue;
 use sqlparser::ast;
 
 #[derive(Debug)]

@@ -13,6 +13,7 @@ datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "7
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
+pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "99ab5292b11906de5e7ed5d8907423a3b6f231f2" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
@@ -55,7 +56,6 @@ insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
 tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
-hex = "0.4.3"
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 
 [[test]]

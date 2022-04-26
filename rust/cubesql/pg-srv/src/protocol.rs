@@ -8,12 +8,9 @@ use std::{
 use async_trait::async_trait;
 
 use bytes::BufMut;
-
-use crate::sql::protocol::CommandComplete::{Plain, Select};
-use crate::sql::statement::BindValue;
 use tokio::io::AsyncReadExt;
 
-use super::{buffer, PgType, PgTypeId};
+use crate::{buffer, BindValue, PgType, PgTypeId};
 
 const DEFAULT_CAPACITY: usize = 64;
 
@@ -224,8 +221,10 @@ impl Serialize for CommandComplete {
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
         match self {
-            Select(rows) => buffer::write_string(&mut buffer, &format!("SELECT {}", rows)),
-            Plain(tag) => buffer::write_string(&mut buffer, &tag),
+            CommandComplete::Select(rows) => {
+                buffer::write_string(&mut buffer, &format!("SELECT {}", rows))
+            }
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
         }
 
         Some(buffer)
@@ -475,7 +474,7 @@ pub struct Bind {
 }
 
 impl Bind {
-    pub(crate) fn to_bind_values(&self) -> Vec<BindValue> {
+    pub fn to_bind_values(&self) -> Vec<BindValue> {
         let mut values = vec![];
 
         for param_value in &self.parameter_values {
@@ -738,13 +737,10 @@ pub trait Deserialize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        sql::{postgres::buffer::read_message, PgTypeId},
-        CubeError,
-    };
-    use std::io::Cursor;
-
     use super::*;
+    use crate::read_message;
+    use std::io;
+    use std::io::Cursor;
 
     fn parse_hex_dump(input: String) -> Vec<u8> {
         let mut result: Vec<Vec<u8>> = vec![];
@@ -761,7 +757,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_parse() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_parse() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
@@ -796,7 +792,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind_variant1() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_bind_variant1() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
@@ -832,7 +828,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind_variant2() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_bind_variant2() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
@@ -863,7 +859,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_describe() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_describe() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             44 00 00 00 08 53 73 30 00                        D....Ss0.          
@@ -890,7 +886,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_password_message() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_password_message() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             70 00 00 00 09 74 65 73 74 00                     p....test.
@@ -916,7 +912,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_execute() -> Result<(), CubeError> {
+    async fn test_frontend_message_execute() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             45 00 00 00 09 00 00 00 00 00                     E.........      
@@ -943,7 +939,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_sequence_sync() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_sequence_sync() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             53 00 00 00 04                                    S....
@@ -962,7 +958,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_write_complete_parse() -> Result<(), CubeError> {
+    async fn test_frontend_message_write_complete_parse() -> Result<(), io::Error> {
         let mut cursor = Cursor::new(vec![]);
 
         buffer::write_message(&mut cursor, ParseComplete {}).await?;
@@ -973,7 +969,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_write_row_description() -> Result<(), CubeError> {
+    async fn test_frontend_message_write_row_description() -> Result<(), io::Error> {
         let mut cursor = Cursor::new(vec![]);
         let desc = RowDescription::new(vec![
             RowDescriptionField::new("num".to_string(), PgType::get_by_tid(PgTypeId::INT8)),

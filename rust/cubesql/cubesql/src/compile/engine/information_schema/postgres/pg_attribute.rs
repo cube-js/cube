@@ -1,5 +1,6 @@
 use std::{any::Any, sync::Arc};
 
+use crate::{sql::ColumnType, transport::CubeMetaTable};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -15,11 +16,7 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::{
-    sql::{ColumnType, PgType},
-    transport::CubeMetaTable,
-};
+use pg_srv::PgType;
 
 struct PgCatalogAttributeBuilder {
     attrelid: UInt32Builder,
