@@ -1,13 +1,12 @@
 use crate::{
     compile::QueryPlan,
     sql::dataframe::{batch_to_dataframe, DataFrame, TableValue},
-    sql::protocol,
-    sql::protocol::{CommandComplete, Format, ParameterDescription, RowDescription},
-    sql::statement::{BindValue, StatementParamsBinder},
+    sql::statement::StatementParamsBinder,
     sql::writer::BatchWriter,
     CubeError,
 };
 use datafusion::arrow::record_batch::RecordBatch;
+use pg_srv::{protocol, BindValue};
 use sqlparser::ast;
 use std::fmt;
 
@@ -18,10 +17,10 @@ use futures::StreamExt;
 #[derive(Debug)]
 pub struct PreparedStatement {
     pub query: ast::Statement,
-    pub parameters: ParameterDescription,
+    pub parameters: protocol::ParameterDescription,
     // Fields which will be returned to the client, It can be None if server doesnt return any field
     // for example BEGIN
-    pub description: Option<RowDescription>,
+    pub description: Option<protocol::RowDescription>,
 }
 
 impl PreparedStatement {
@@ -85,7 +84,7 @@ pub enum PortalState {
 #[derive(Debug)]
 pub struct Portal {
     // Format which is used to return data
-    format: Format,
+    format: protocol::Format,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
 }
@@ -96,7 +95,7 @@ unsafe impl Sync for Portal {}
 impl Portal {
     pub fn new(
         plan: QueryPlan,
-        format: Format,
+        format: protocol::Format,
         description: Option<protocol::RowDescription>,
     ) -> Self {
         Self {
@@ -112,7 +111,7 @@ impl Portal {
         }
     }
 
-    pub fn get_format(&self) -> Format {
+    pub fn get_format(&self) -> protocol::Format {
         self.format.clone()
     }
 
@@ -121,7 +120,7 @@ impl Portal {
         writer: &mut BatchWriter,
         frame_state: InExecutionFrameState,
         max_rows: usize,
-    ) -> Result<(PortalState, CommandComplete), CubeError> {
+    ) -> Result<(PortalState, protocol::CommandComplete), CubeError> {
         let rows_read = frame_state.batch.len();
         if max_rows > 0 && rows_read > 0 && rows_read > max_rows {
             Err(CubeError::internal(format!(
@@ -137,7 +136,7 @@ impl Portal {
 
             Ok((
                 PortalState::Finished,
-                CommandComplete::Select(writer.num_rows() as u32),
+                protocol::CommandComplete::Select(writer.num_rows() as u32),
             ))
         }
     }
@@ -212,7 +211,7 @@ impl Portal {
         writer: &mut BatchWriter,
         mut stream_state: InExecutionStreamState,
         max_rows: usize,
-    ) -> Result<(PortalState, CommandComplete), CubeError> {
+    ) -> Result<(PortalState, protocol::CommandComplete), CubeError> {
         let mut left: usize = max_rows;
 
         if let Some(unused_batch) = stream_state.unused.take() {
@@ -223,7 +222,7 @@ impl Portal {
         if max_rows > 0 && left == 0 {
             return Ok((
                 PortalState::InExecutionStream(stream_state),
-                CommandComplete::Select(writer.num_rows() as u32),
+                protocol::CommandComplete::Select(writer.num_rows() as u32),
             ));
         }
 
@@ -232,7 +231,7 @@ impl Portal {
                 None => {
                     return Ok((
                         PortalState::Finished,
-                        CommandComplete::Select(writer.num_rows() as u32),
+                        protocol::CommandComplete::Select(writer.num_rows() as u32),
                     ))
                 }
                 Some(res) => match res {
@@ -243,7 +242,7 @@ impl Portal {
                         if max_rows > 0 && left == 0 {
                             return Ok((
                                 PortalState::InExecutionStream(stream_state),
-                                CommandComplete::Select(writer.num_rows() as u32),
+                                protocol::CommandComplete::Select(writer.num_rows() as u32),
                             ));
                         }
                     }
@@ -259,7 +258,7 @@ impl Portal {
         &mut self,
         writer: &mut BatchWriter,
         max_rows: usize,
-    ) -> Result<CommandComplete, CubeError> {
+    ) -> Result<protocol::CommandComplete, CubeError> {
         if let Some(state) = self.state.take() {
             match state {
                 PortalState::Prepared(state) => match state.plan {
@@ -309,7 +308,7 @@ impl Portal {
 
                     Ok(complete)
                 }
-                PortalState::Finished => Ok(CommandComplete::Select(0)),
+                PortalState::Finished => Ok(protocol::CommandComplete::Select(0)),
             }
         } else {
             unreachable!();
@@ -323,11 +322,11 @@ mod tests {
         compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider,
         sql::dataframe::{Column, DataFrame, Row, TableValue},
         sql::extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},
-        sql::protocol::Format,
         sql::writer::BatchWriter,
         sql::{ColumnFlags, ColumnType},
         CubeError,
     };
+    use pg_srv::protocol::Format;
 
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;

@@ -4,9 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use log::{debug, error, trace};
-use tokio::{io::AsyncWriteExt, net::TcpStream};
-
+use super::extended::PreparedStatement;
 use crate::{
     compile::{
         convert_sql_to_cube_query, convert_statement_to_cube_query, parser::parse_sql_to_statement,
@@ -14,21 +12,15 @@ use crate::{
     },
     sql::df_type_to_pg_tid,
     sql::extended::Portal,
-    sql::protocol::Format,
     sql::statement::StatementPlaceholderReplacer,
     sql::writer::BatchWriter,
-    sql::{
-        session::DatabaseProtocol, statement::StatementParamsFinder, AuthContext, PgType, PgTypeId,
-        Session,
-    },
+    sql::{session::DatabaseProtocol, statement::StatementParamsFinder, AuthContext, Session},
     CubeError,
 };
-
-use super::{
-    buffer,
-    extended::PreparedStatement,
-    protocol::{self, FrontendMessage, RowDescriptionField, SSL_REQUEST_PROTOCOL},
-};
+use log::{debug, error, trace};
+use pg_srv::{buffer, protocol};
+use pg_srv::{protocol::Format, PgType, PgTypeId};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub struct AsyncPostgresShim {
     socket: TcpStream,
@@ -85,7 +77,7 @@ impl AsyncPostgresShim {
         }
 
         match buffer::read_message(&mut self.socket).await? {
-            FrontendMessage::PasswordMessage(password_message) => {
+            protocol::FrontendMessage::PasswordMessage(password_message) => {
                 if !self.authenticate(password_message).await? {
                     return Ok(());
                 }
@@ -96,14 +88,14 @@ impl AsyncPostgresShim {
 
         loop {
             let result = match buffer::read_message(&mut self.socket).await? {
-                FrontendMessage::Query(body) => self.process_query(body.query).await,
-                FrontendMessage::Parse(body) => self.parse(body).await,
-                FrontendMessage::Bind(body) => self.bind(body).await,
-                FrontendMessage::Execute(body) => self.execute(body).await,
-                FrontendMessage::Close(body) => self.close(body).await,
-                FrontendMessage::Describe(body) => self.describe(body).await,
-                FrontendMessage::Sync => self.sync().await,
-                FrontendMessage::Terminate => return Ok(()),
+                protocol::FrontendMessage::Query(body) => self.process_query(body.query).await,
+                protocol::FrontendMessage::Parse(body) => self.parse(body).await,
+                protocol::FrontendMessage::Bind(body) => self.bind(body).await,
+                protocol::FrontendMessage::Execute(body) => self.execute(body).await,
+                protocol::FrontendMessage::Close(body) => self.close(body).await,
+                protocol::FrontendMessage::Describe(body) => self.describe(body).await,
+                protocol::FrontendMessage::Sync => self.sync().await,
+                protocol::FrontendMessage::Terminate => return Ok(()),
                 command_id => {
                     return Err(Error::new(
                         ErrorKind::Unsupported,
@@ -134,7 +126,7 @@ impl AsyncPostgresShim {
 
         let startup_message = protocol::StartupMessage::from(&mut buffer).await?;
 
-        if startup_message.protocol_version.major == SSL_REQUEST_PROTOCOL {
+        if startup_message.protocol_version.major == protocol::SSL_REQUEST_PROTOCOL {
             self.write(protocol::SSLResponse::new()).await?;
             return Ok(StartupState::SslRequested);
         }
@@ -415,14 +407,14 @@ impl AsyncPostgresShim {
     async fn query_plan_to_row_description(
         &mut self,
         plan: &QueryPlan,
-    ) -> Result<Vec<RowDescriptionField>, Error> {
+    ) -> Result<Vec<protocol::RowDescriptionField>, Error> {
         match plan {
             QueryPlan::MetaOk(_, _) => Ok(vec![]),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
                 for field in frame.get_columns() {
-                    result.push(RowDescriptionField::new(
+                    result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
                     ));
@@ -434,7 +426,7 @@ impl AsyncPostgresShim {
                 let mut result = vec![];
 
                 for field in logical_plan.schema().fields() {
-                    result.push(RowDescriptionField::new(
+                    result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
                     ));
@@ -472,7 +464,7 @@ impl AsyncPostgresShim {
 
             let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())
                 .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))?;
-            let fields: Vec<RowDescriptionField> =
+            let fields: Vec<protocol::RowDescriptionField> =
                 self.query_plan_to_row_description(&plan).await?;
             let description = if fields.len() > 0 {
                 Some(protocol::RowDescription::new(fields))

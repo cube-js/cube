@@ -770,7 +770,6 @@ dependencies = [
  "datafusion",
  "egg",
  "futures",
- "hex",
  "insta",
  "itertools",
  "lazy_static",
@@ -781,6 +780,7 @@ dependencies = [
  "mysql_common 0.26.0",
  "nanoid",
  "paste",
+ "pg-srv",
  "portpicker",
  "pretty_assertions",
  "rand 0.8.5",
@@ -2494,6 +2494,17 @@ name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
+
+[[package]]
+name = "pg-srv"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "hex",
+ "log",
+ "tokio",
+]
 
 [[package]]
 name = "phf"

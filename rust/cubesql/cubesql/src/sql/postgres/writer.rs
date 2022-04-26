@@ -1,5 +1,3 @@
-use crate::sql::protocol::{Format, Serialize};
-
 use crate::arrow::array::{
     ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
     Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
@@ -12,6 +10,7 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::{Fixed, Item};
 use chrono::prelude::*;
+use pg_srv::protocol::{Format, Serialize};
 use std::convert::TryFrom;
 use std::io;
 use std::io::Error;
@@ -375,12 +374,12 @@ mod tests {
     use crate::sql::dataframe::TimestampValue;
     use crate::{
         arrow::array::{ArrayRef, Int64Builder},
-        sql::buffer,
-        sql::protocol::Format,
         sql::writer::{BatchWriter, ToPostgresValue},
         CubeError,
     };
     use bytes::BytesMut;
+    use pg_srv::buffer;
+    use pg_srv::protocol::Format;
     use std::io::Cursor;
     use std::sync::Arc;
 

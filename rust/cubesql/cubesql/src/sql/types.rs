@@ -1,10 +1,9 @@
 use crate::arrow::datatypes::{DataType, Field};
-use crate::sql::protocol::CommandComplete;
-use crate::sql::PgTypeId;
 use bitflags::bitflags;
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
+use pg_srv::{protocol::CommandComplete, PgTypeId};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ColumnType {
