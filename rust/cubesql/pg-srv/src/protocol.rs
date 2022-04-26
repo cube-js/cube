@@ -16,6 +16,7 @@ const DEFAULT_CAPACITY: usize = 64;
 
 pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
     pub protocol_version: ProtocolVersion,
     pub parameters: HashMap<String, String>,
@@ -44,6 +45,25 @@ impl StartupMessage {
             protocol_version,
             parameters,
         })
+    }
+}
+
+impl Serialize for StartupMessage {
+    const CODE: u8 = 0x00;
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
+        buffer.put_u16(self.protocol_version.major);
+        buffer.put_u16(self.protocol_version.minor);
+
+        for (name, value) in &self.parameters {
+            buffer::write_string(&mut buffer, &name);
+            buffer::write_string(&mut buffer, &value);
+        }
+
+        buffer.push(0);
+
+        Some(buffer)
     }
 }
 
@@ -605,7 +625,7 @@ pub enum Format {
     Binary,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ProtocolVersion {
     pub major: u16,
     pub minor: u16,
@@ -739,6 +759,7 @@ pub trait Deserialize {
 mod tests {
     use super::*;
     use crate::read_message;
+
     use std::io;
     use std::io::Cursor;
 
@@ -754,6 +775,43 @@ mod tests {
         }
 
         result.concat()
+    }
+
+    #[tokio::test]
+    async fn test_startup_message_duplex() -> Result<(), io::Error> {
+        // 00 00 00 4c 00 03 00 00 75 73 65 72 00 74 65 73   ...L....user.tes
+        // 74 00 64 61 74 61 62 61 73 65 00 74 65 73 74 00   t.database.test.
+        // 61 70 70 6c 69 63 61 74 69 6f 6e 5f 6e 61 6d 65   application_name
+        // 00 70 73 71 6c 00 63 6c 69 65 6e 74 5f 65 6e 63   .psql.client_enc
+        // 6f 64 69 6e 67 00 55 54 46 38 00 00               oding.UTF8..
+
+        let expected_message = {
+            let mut parameters = HashMap::new();
+            parameters.insert("database".to_string(), "test".to_string());
+            parameters.insert("application_name".to_string(), "psql".to_string());
+            parameters.insert("user".to_string(), "test".to_string());
+            parameters.insert("client_encoding".to_string(), "UTF8".to_string());
+
+            StartupMessage {
+                protocol_version: ProtocolVersion { major: 3, minor: 0 },
+                parameters,
+            }
+        };
+
+        // First step, We write struct to the buffer
+        let mut cursor = Cursor::new(vec![]);
+        buffer::write_message(&mut cursor, expected_message.clone()).await?;
+
+        // Second step, We read form the buffer and output structure must be the same as original
+        let buffer = cursor.get_ref()[..].to_vec();
+        let mut cursor = Cursor::new(buffer);
+        // skipping length
+        cursor.read_u32().await?;
+
+        let actual_message = StartupMessage::from(&mut cursor).await?;
+        assert_eq!(actual_message, expected_message);
+
+        Ok(())
     }
 
     #[tokio::test]

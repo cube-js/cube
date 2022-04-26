@@ -143,7 +143,11 @@ pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     message: Message,
 ) -> Result<(), Error> {
     let mut packet_buffer = Vec::with_capacity(64);
-    packet_buffer.push(message.code());
+
+    if message.code() != 0x00 {
+        packet_buffer.push(message.code());
+    }
+
     match message.serialize() {
         Some(buffer) => {
             let size = u32::try_from(buffer.len() + 4).map_err(|_| {
