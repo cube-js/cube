@@ -146,18 +146,21 @@ export default class QueryBuilder extends React.Component {
 
     let meta;
     let metaError = null;
+    let metaErrorStack = null;
 
     try {
       this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
     } catch (error) {
       metaError = error;
+      metaErrorStack = error.response?.stack?.replace(error.message || '', '') || '';
     }
 
     this.setState(
       {
         meta,
         metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
+        metaErrorStack,
         isFetchingMeta: false,
       },
       () => {
@@ -249,6 +252,7 @@ export default class QueryBuilder extends React.Component {
       missingMembers,
       isFetchingMeta,
       dryRunResponse,
+      metaErrorStack
     } = this.state;
 
     const flatFilters = uniqBy((filter) => `${prop('member', filter)}${prop('operator', filter)}`,
@@ -331,6 +335,7 @@ export default class QueryBuilder extends React.Component {
     return {
       meta,
       metaError,
+      metaErrorStack,
       query,
       error: queryError, // Match same name as QueryRenderer prop
       validatedQuery,

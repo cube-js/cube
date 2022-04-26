@@ -239,6 +239,7 @@ declare module '@cubejs-client/react' {
 
     meta: Meta | undefined;
     metaError?: Error | null;
+    metaErrorStack?: string | null;
     isFetchingMeta: boolean;
     /**
      * Indicates whether the query is ready to be displayed or not

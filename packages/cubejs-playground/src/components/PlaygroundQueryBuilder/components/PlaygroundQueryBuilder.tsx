@@ -200,7 +200,7 @@ export function PlaygroundQueryBuilder({
   const isMounted = useIsMounted();
 
   const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
-  
+
   const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
@@ -286,6 +286,7 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        metaErrorStack,
         meta,
         isQueryPresent,
         chartType,
@@ -477,7 +478,7 @@ export function PlaygroundQueryBuilder({
               <Col span={24}>
                 {!isQueryPresent && metaError ? (
                   <Card>
-                    <FatalError error={metaError} />
+                    <FatalError error={metaError} stack={metaErrorStack} />
                   </Card>
                 ) : null}
 
@@ -524,7 +525,7 @@ export function PlaygroundQueryBuilder({
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
                       if (metaError) {
-                        return <FatalError error={metaError} />;
+                        return <FatalError error={metaError} stack={metaErrorStack} />;
                       }
 
                       return (
