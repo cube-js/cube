@@ -56,7 +56,7 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
-    
+
     this.updateAuthorizationPromise = null;
   }
 
@@ -73,7 +73,7 @@ class CubejsApi {
       callback = options;
       options = undefined;
     }
-    
+
     options = options || {};
 
     const mutexKey = options.mutexKey || 'default';
@@ -127,11 +127,11 @@ class CubejsApi {
         }
         return null;
       };
-      
+
       if (options.subscribe && !skipAuthorizationUpdate) {
         await this.updateTransportAuthorization();
       }
-      
+
       skipAuthorizationUpdate = false;
 
       if (response.status === 502) {
@@ -162,7 +162,7 @@ class CubejsApi {
           await requestInstance.unsubscribe();
         }
 
-        const error = new RequestError(body.error, body); // TODO error class
+        const error = new RequestError(body.error, body, response.status); // TODO error class
         if (callback) {
           callback(error);
         } else {
@@ -209,7 +209,7 @@ class CubejsApi {
       await this.updateAuthorizationPromise;
       return;
     }
-    
+
     if (typeof this.apiToken === 'function') {
       this.updateAuthorizationPromise = new Promise(async (resolve, reject) => {
         try {
@@ -224,7 +224,7 @@ class CubejsApi {
           this.updateAuthorizationPromise = null;
         }
       });
-      
+
       await this.updateAuthorizationPromise;
     }
   }
