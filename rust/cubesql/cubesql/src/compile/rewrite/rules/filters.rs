@@ -1,7 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::FilterReplacerCube;
 use crate::compile::rewrite::InListExprNegated;
 use crate::compile::rewrite::LimitN;
 use crate::compile::rewrite::LiteralExprValue;
@@ -18,6 +17,7 @@ use crate::compile::rewrite::{
     binary_expr, column_expr, cube_scan, cube_scan_filters, filter, filter_member, filter_op,
     filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite,
 };
+use crate::compile::rewrite::{cast_expr, FilterReplacerCube};
 use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
     time_dimension_date_range_replacer, time_dimension_expr, BetweenExprNegated,
@@ -518,6 +518,15 @@ impl RewriteRules for FilterRules {
                     "?time_dimension_date_range",
                     "?output_date_range",
                 ),
+            ),
+            rewrite(
+                "unwrap-cast",
+                binary_expr(
+                    cast_expr(column_expr("?column"), "?data_type"),
+                    "?op",
+                    literal_expr("?literal"),
+                ),
+                binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
             ),
         ]
     }
