@@ -241,7 +241,12 @@ class CubejsApi {
       responseFormat === ResultType.COMPACT &&
       query.responseFormat !== ResultType.COMPACT
     ) {
-      query.responseFormat = ResultType.COMPACT;
+      return {
+        ...query,
+        responseFormat: ResultType.COMPACT,
+      };
+    } else {
+      return query;
     }
   }
 
@@ -287,11 +292,9 @@ class CubejsApi {
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
-        query.forEach((q) => {
-          this.patchQueryInternal(q, ResultType.COMPACT);
-        });
+        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
       } else {
-        this.patchQueryInternal(query, ResultType.COMPACT);
+        query = this.patchQueryInternal(query, ResultType.COMPACT);
       }
     }
     return this.loadMethod(
@@ -318,11 +321,9 @@ class CubejsApi {
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
-        query.forEach((q) => {
-          this.patchQueryInternal(q, ResultType.COMPACT);
-        });
+        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
       } else {
-        this.patchQueryInternal(query, ResultType.COMPACT);
+        query = this.patchQueryInternal(query, ResultType.COMPACT);
       }
     }
     return this.loadMethod(
