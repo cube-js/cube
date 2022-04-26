@@ -1,23 +1,32 @@
-use std::fmt::{self, Debug, Formatter};
-
-use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
-use chrono::format::Pad::Zero;
-use chrono::format::{Fixed, Item};
-use chrono::{TimeZone, Utc};
+use chrono::{
+    format::Numeric::{Day, Hour, Minute, Month, Second, Year},
+    format::Pad::Zero,
+    format::{Fixed, Item},
+    prelude::*,
+};
+use chrono_tz::Tz;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, BooleanArray, Float64Array, Int16Array, Int32Array, Int64Array,
-        IntervalDayTimeArray, IntervalYearMonthArray, StringArray, TimestampMicrosecondArray,
-        TimestampNanosecondArray, UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
+        Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalMonthDayNanoArray,
+        IntervalYearMonthArray, LargeStringArray, ListArray, StringArray,
+        TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+        UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
+    temporal_conversions,
 };
+use std::fmt::{self, Debug, Formatter};
+use std::io;
 
 use super::{ColumnFlags, ColumnType};
 
-use crate::{make_string_interval_day_time, make_string_interval_year_month, CubeError};
+use crate::{
+    make_string_interval_day_time, make_string_interval_month_day_nano,
+    make_string_interval_year_month, CubeError,
+};
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -40,7 +49,7 @@ impl Column {
     }
 
     pub fn get_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 
     pub fn get_flags(&self) -> ColumnFlags {
@@ -48,7 +57,7 @@ impl Column {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -71,14 +80,65 @@ impl Row {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum TableValue {
     Null,
     String(String),
     Int64(i64),
     Boolean(bool),
+    List(ArrayRef),
     Float64(f64),
     Timestamp(TimestampValue),
+}
+
+impl ToString for TableValue {
+    fn to_string(&self) -> String {
+        match &self {
+            TableValue::Null => "NULL".to_string(),
+            TableValue::String(v) => v.clone(),
+            TableValue::Int64(v) => v.to_string(),
+            TableValue::Boolean(v) => v.to_string(),
+            TableValue::Float64(v) => v.to_string(),
+            TableValue::Timestamp(v) => v.to_string(),
+            TableValue::List(v) => {
+                let mut values: Vec<String> = Vec::with_capacity(v.len());
+
+                macro_rules! write_native_array_as_text {
+                    ($ARRAY:expr, $ARRAY_TYPE: ident) => {{
+                        let arr = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+
+                        for i in 0..$ARRAY.len() {
+                            if arr.is_null(i) {
+                                values.push("NULL".to_string());
+                            } else {
+                                values.push(arr.value(i).to_string());
+                            }
+                        }
+                    }};
+                }
+
+                match v.data_type() {
+                    DataType::Float16 => write_native_array_as_text!(v, Float16Array),
+                    DataType::Float32 => write_native_array_as_text!(v, Float32Array),
+                    DataType::Float64 => write_native_array_as_text!(v, Float64Array),
+                    DataType::Int8 => write_native_array_as_text!(v, Int8Array),
+                    DataType::Int16 => write_native_array_as_text!(v, Int16Array),
+                    DataType::Int32 => write_native_array_as_text!(v, Int32Array),
+                    DataType::Int64 => write_native_array_as_text!(v, Int64Array),
+                    DataType::UInt8 => write_native_array_as_text!(v, UInt8Array),
+                    DataType::UInt16 => write_native_array_as_text!(v, UInt16Array),
+                    DataType::UInt32 => write_native_array_as_text!(v, UInt32Array),
+                    DataType::UInt64 => write_native_array_as_text!(v, UInt64Array),
+                    DataType::Boolean => write_native_array_as_text!(v, BooleanArray),
+                    DataType::Utf8 => write_native_array_as_text!(v, StringArray),
+                    DataType::LargeUtf8 => write_native_array_as_text!(v, LargeStringArray),
+                    dt => unimplemented!("Unable to convert List of {} to string", dt),
+                }
+
+                "{".to_string() + &values.join(",") + "}"
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -125,15 +185,8 @@ impl DataFrame {
         for row in self.get_rows().iter() {
             let mut table_row = vec![];
 
-            for (_i, value) in row.values().iter().enumerate() {
-                match value {
-                    TableValue::Null => table_row.push("NULL".to_string()),
-                    TableValue::String(s) => table_row.push(s.clone()),
-                    TableValue::Int64(n) => table_row.push(n.to_string()),
-                    TableValue::Boolean(b) => table_row.push(b.to_string()),
-                    TableValue::Float64(n) => table_row.push(n.to_string()),
-                    TableValue::Timestamp(t) => table_row.push(t.to_string()),
-                }
+            for value in row.values().iter() {
+                table_row.push(value.to_string());
             }
 
             table.add_row(table_row);
@@ -143,17 +196,42 @@ impl DataFrame {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TimestampValue {
     unix_nano: i64,
+    tz: Option<String>,
 }
 
 impl TimestampValue {
-    pub fn new(mut unix_nano: i64) -> TimestampValue {
+    pub fn new(mut unix_nano: i64, tz: Option<String>) -> TimestampValue {
         // This is a hack to workaround a mismatch between on-disk and in-memory representations.
         // We use millisecond precision on-disk.
         unix_nano -= unix_nano % 1000;
-        TimestampValue { unix_nano }
+        TimestampValue { unix_nano, tz }
+    }
+
+    pub fn to_naive_datetime(&self) -> NaiveDateTime {
+        assert!(self.tz.is_none());
+
+        temporal_conversions::timestamp_ns_to_datetime(self.unix_nano)
+    }
+
+    pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
+        assert!(self.tz.is_some());
+
+        let tz = self
+            .tz
+            .as_ref()
+            .unwrap()
+            .parse::<Tz>()
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+
+        let ndt = temporal_conversions::timestamp_ns_to_datetime(self.unix_nano);
+        Ok(tz.from_utc_datetime(&ndt))
+    }
+
+    pub fn tz_ref(&self) -> &Option<String> {
+        &self.tz
     }
 
     pub fn get_time_stamp(&self) -> i64 {
@@ -165,6 +243,7 @@ impl Debug for TimestampValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimestampValue")
             .field("unix_nano", &self.unix_nano)
+            .field("tz", &self.tz)
             .field("str", &self.to_string())
             .finish()
     }
@@ -223,7 +302,8 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Timestamp(_, _) => Ok(ColumnType::String),
         DataType::Interval(_) => Ok(ColumnType::String),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Double),
-        DataType::Boolean => Ok(ColumnType::Int8),
+        DataType::Boolean => Ok(ColumnType::Boolean),
+        DataType::List(field) => Ok(ColumnType::List(field)),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
@@ -290,7 +370,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                DataType::Timestamp(TimeUnit::Microsecond, tz) => {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampMicrosecondArray>()
@@ -299,11 +379,14 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000_i64))
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1000_i64,
+                                tz.clone(),
+                            ))
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, tz) => {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampNanosecondArray>()
@@ -312,7 +395,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i)))
+                            TableValue::Timestamp(TimestampValue::new(a.value(i), tz.clone()))
                         });
                     }
                 }
@@ -322,7 +405,11 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        rows[i].push(TableValue::String(make_string_interval_day_time!(a, i)));
+                        if let Some(as_str) = make_string_interval_day_time!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -331,7 +418,24 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        rows[i].push(TableValue::String(make_string_interval_year_month!(a, i)));
+                        if let Some(as_str) = make_string_interval_year_month!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
+                    }
+                }
+                DataType::Interval(IntervalUnit::MonthDayNano) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<IntervalMonthDayNanoArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        if let Some(as_str) = make_string_interval_month_day_nano!(a, i) {
+                            rows[i].push(TableValue::String(as_str));
+                        } else {
+                            rows[i].push(TableValue::Null);
+                        }
                     }
                 }
                 DataType::Boolean => {
@@ -341,6 +445,17 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             TableValue::Boolean(a.value(i))
+                        });
+                    }
+                }
+                DataType::List(_) => {
+                    let a = array.as_any().downcast_ref::<ListArray>().unwrap();
+
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::List(a.value(i))
                         });
                     }
                 }

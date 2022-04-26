@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class DremioFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('%', ${this.allocateParam(param)}, '%'))`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'))`;
   }
 
   castParameter() {

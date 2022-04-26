@@ -30,6 +30,7 @@ declare module '@cubejs-client/react' {
     DateRange,
     UnaryOperator,
     BinaryOperator,
+    DeeplyReadonly,
   } from '@cubejs-client/core';
 
   type CubeProviderProps = {
@@ -238,6 +239,7 @@ declare module '@cubejs-client/react' {
 
     meta: Meta | undefined;
     metaError?: Error | null;
+    metaErrorStack?: string | null;
     isFetchingMeta: boolean;
     /**
      * Indicates whether the query is ready to be displayed or not
@@ -426,7 +428,7 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: Query | Query[], options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<TData>(query: DeeplyReadonly<Query | Query[]>, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
 
   type UseCubeQueryOptions = {
     /**

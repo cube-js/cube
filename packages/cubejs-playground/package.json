@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.43",
+  "version": "0.29.51",
   "engines": {},
   "repository": {
     "type": "git",
@@ -34,9 +34,9 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.29.43",
-    "@cubejs-client/react": "^0.29.43",
-    "@graphiql/toolkit": "^0.4.2",
+    "@cubejs-client/core": "^0.29.51",
+    "@cubejs-client/react": "^0.29.51",
+    "@graphiql/toolkit": "^0.4.3",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
     "cron-validator": "^1.2.1",
@@ -44,7 +44,8 @@
     "fast-deep-equal": "^3.1.3",
     "fetch-retry": "^4.0.1",
     "flexsearch": "^0.6.32",
-    "graphiql": "^1.5.15",
+    "graphiql": "^1.8.6",
+    "graphql-ws": "^5.7.0",
     "history": "^4.9.0",
     "js-cookie": "^2.2.1",
     "js-object-pretty-print": "^0.3.0",
@@ -88,7 +89,7 @@
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
-    "graphql": "^15.3.0",
+    "graphql": "^15.8.0",
     "less-loader": "^8.1.1",
     "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
@@ -105,7 +106,7 @@
   },
   "peerDependencies": {
     "antd": ">=4.16.13",
-    "graphql": ">=15.3.0",
+    "graphql": ">=15.8.0",
     "react": ">=17.0.1",
     "react-dom": ">=17.0.1",
     "styled-components": ">=5.2.0"

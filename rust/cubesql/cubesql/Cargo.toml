@@ -9,11 +9,12 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1e2bae4d4446dd8a7306c1e76e2dbcbf2642cef5", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "7bcab696faa4bf904b4eac00f1509f7abe86d547", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "f09758d47277e535f8d09e17b4e1773203cc36e7" }
+pg-srv = { path = "../pg-srv" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "99ab5292b11906de5e7ed5d8907423a3b6f231f2" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
@@ -38,6 +39,7 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '76ea0132564959c41ea13f25511fbd84acd06464' }
 bincode = "1.3.1"
 chrono = "0.4.15"
+chrono-tz = "0.6"
 mockall = "0.8.1"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
@@ -53,8 +55,8 @@ pretty_assertions = "1.0.0"
 insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
-tokio-postgres = "0.7.5"
-hex = "0.4.3"
+tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
+rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 
 [[test]]
 name = "e2e"

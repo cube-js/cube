@@ -31,6 +31,30 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, usize) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](usize);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "").parse().unwrap()));
+                    }
+                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, Option<usize>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -96,7 +120,16 @@ macro_rules! variant_field_struct {
 
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    if s.starts_with(&prefix) {
+                        let replaced = s.replace(&prefix, "");
+                        if &replaced == "None" {
+                            return Ok([<$variant $var_field:camel>](None));
+                        } else {
+                            return Ok([<$variant $var_field:camel>](Some(s.to_string())));
+                        }
+                    }
                     Err(CubeError::internal("Conversion from string is not supported".to_string()))
                 }
             }
@@ -150,6 +183,26 @@ macro_rules! variant_field_struct {
     };
 
     ($variant:ident, $var_field:ident, Arc<AggregateUDF>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](String);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
+                }
+            }
+        }
+    };
+
+    ($variant:ident, $var_field:ident, Arc<TableUDF>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
             pub struct [<$variant $var_field:camel>](String);

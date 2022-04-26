@@ -31,6 +31,7 @@ harness = false
 ipc-channel = { version = "0.14.1" }
 
 [dependencies]
+base64 = "0.13.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 async-trait = "0.1.36"
 cubestore = { path = "../cubestore" }

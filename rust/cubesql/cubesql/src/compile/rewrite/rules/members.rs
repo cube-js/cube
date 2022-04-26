@@ -204,6 +204,46 @@ impl RewriteRules for MemberRules {
                     "?date_range",
                 ),
             ),
+            // TODO duplicate of previous rule with aliasing. Extract aliasing as separate step?
+            transforming_rewrite(
+                "date-trunc-alias",
+                member_replacer(
+                    aggr_group_expr(
+                        alias_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), column_expr("?column")],
+                            ),
+                            "?alias",
+                        ),
+                        "?tail_group_expr",
+                    ),
+                    "?source_table_name",
+                ),
+                cube_scan_members(
+                    time_dimension_expr(
+                        "?time_dimension_name",
+                        "?time_dimension_granularity",
+                        "?date_range",
+                        alias_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), column_expr("?column")],
+                            ),
+                            "?alias",
+                        ),
+                    ),
+                    member_replacer("?tail_group_expr", "?source_table_name"),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
             transforming_rewrite(
                 "date-trunc-projection",
                 member_replacer(
@@ -251,19 +291,19 @@ impl RewriteRules for MemberRules {
                     "?date_range",
                     "?alias",
                 ),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             transforming_rewrite(
                 "measure-alias",
                 measure_expr("?measure", "?original_expr"),
                 measure_expr("?measure", "?alias"),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             transforming_rewrite(
                 "dimension-alias",
                 dimension_expr("?dimension", "?original_expr"),
                 dimension_expr("?dimension", "?alias"),
-                self.transform_original_expr_alias("?original_expr", "?alias"),
+                Self::transform_original_expr_alias("?original_expr", "?alias"),
             ),
             rewrite(
                 "push-down-aggregate",
@@ -508,7 +548,7 @@ impl RewriteRules for MemberRules {
                 "sort-expr-column-name",
                 sort_expr("?expr", "?asc", "?nulls_first"),
                 sort_expr("?alias", "?asc", "?nulls_first"),
-                self.transform_original_expr_alias("?expr", "?alias"),
+                Self::transform_original_expr_alias("?expr", "?alias"),
             ),
             rewrite(
                 "binary-expr-addition-assoc",
@@ -563,8 +603,7 @@ impl MemberRules {
         }
     }
 
-    fn transform_original_expr_alias(
-        &self,
+    pub fn transform_original_expr_alias(
         original_expr_var: &'static str,
         alias_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
@@ -572,31 +611,83 @@ impl MemberRules {
         let alias_expr_var = alias_expr_var.parse().unwrap();
         move |egraph, subst| {
             let original_expr_id = subst[original_expr_var];
-            if !egraph[original_expr_id]
-                .nodes
-                .iter()
-                .any(|node| match node {
-                    LogicalPlanLanguage::ColumnExpr(_) => true,
-                    _ => false,
-                })
-            {
-                let res = egraph[original_expr_id].data.original_expr.as_ref().ok_or(
-                    CubeError::internal(format!(
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
-                    )),
+                    )));
+            if let Ok(expr) = res {
+                // TODO unwrap
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                    Column::from_name(name),
+                )));
+                subst.insert(
+                    alias_expr_var,
+                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
                 );
-                if let Ok(expr) = res {
-                    // TODO unwrap
-                    let name = expr.name(&DFSchema::empty()).unwrap();
-                    let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                        ColumnExprColumn(Column::from_name(name)),
-                    ));
-                    subst.insert(
-                        alias_expr_var,
-                        egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                    );
-                    return true;
+                return true;
+            }
+            false
+        }
+    }
+
+    pub fn transform_original_expr_date_trunc(
+        original_expr_var: &'static str,
+        granularity_var: &'static str,
+        column_expr_var: &'static str,
+        alias_expr_var: Option<&'static str>,
+        inner_replacer: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let granularity_var = var!(granularity_var);
+        let column_expr_var = var!(column_expr_var);
+        let alias_expr_var = alias_expr_var.map(|alias_expr_var| var!(alias_expr_var));
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                match granularity {
+                    ScalarValue::Utf8(Some(granularity)) => {
+                        if let Ok(expr) = res {
+                            // TODO unwrap
+                            let name = expr.name(&DFSchema::empty()).unwrap();
+                            let suffix_alias = format!("{}_{}", name, granularity);
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(Column::from_name(suffix_alias.to_string())),
+                            ));
+                            subst.insert(
+                                column_expr_var,
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                            );
+                            if let Some(alias_expr_var) = alias_expr_var {
+                                subst.insert(
+                                    alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(if inner_replacer {
+                                            suffix_alias.to_string()
+                                        } else {
+                                            name
+                                        }),
+                                    )),
+                                );
+                            }
+                            return true;
+                        }
+                    }
+                    _ => {}
                 }
             }
             false
@@ -698,13 +789,15 @@ impl MemberRules {
         move |egraph, subst| {
             for limit in var_iter!(egraph[subst[limit_var]], LimitN) {
                 let limit = *limit;
-                subst.insert(
-                    new_limit_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
-                        limit,
-                    )))),
-                );
-                return true;
+                if limit > 0 {
+                    subst.insert(
+                        new_limit_var,
+                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
+                            limit,
+                        )))),
+                    );
+                    return true;
+                }
             }
             false
         }
@@ -974,7 +1067,7 @@ impl MemberRules {
                             {
                                 match granularity {
                                     ScalarValue::Utf8(Some(granularity_value)) => {
-                                        let granularity_value = granularity_value.to_string();
+                                        let granularity_value = granularity_value.to_lowercase();
                                         subst.insert(
                                             time_dimension_name_var,
                                             egraph.add(LogicalPlanLanguage::TimeDimensionName(

@@ -144,7 +144,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6505f1b1828d451a7ca5a763f2fc50ad9a38cd31"
 dependencies = [
  "bitflags",
  "chrono",
@@ -1184,6 +1184,7 @@ version = "0.1.0"
 dependencies = [
  "async-compression",
  "async-trait",
+ "base64 0.13.0",
  "criterion",
  "cubestore",
  "flate2",
@@ -1216,7 +1217,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#0229e9350832e1c6b5bdccbe6e2ab50ff6a99384"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#9caae4f1e48e9fd0f645e18c5e1b94e823f34f51"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -1227,6 +1228,7 @@ dependencies = [
  "itertools 0.9.0",
  "lazy_static",
  "log",
+ "lru",
  "md-5",
  "num_cpus",
  "ordered-float 2.7.0",
@@ -3058,7 +3060,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#86561f0ba1c0511a4a7b1701b2c53e604758f775"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6505f1b1828d451a7ca5a763f2fc50ad9a38cd31"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -5023,7 +5025,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.8.4",
+ "rand 0.6.5",
  "static_assertions",
 ]
 

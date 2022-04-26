@@ -5,16 +5,18 @@ use std::{
     io::{Cursor, Error},
 };
 
-use crate::sql::postgres::pg_type::PgType;
 use async_trait::async_trait;
+
+use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
-use super::buffer;
+use crate::{buffer, BindValue, PgType, PgTypeId};
 
 const DEFAULT_CAPACITY: usize = 64;
 
 pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
     pub protocol_version: ProtocolVersion,
     pub parameters: HashMap<String, String>,
@@ -43,6 +45,25 @@ impl StartupMessage {
             protocol_version,
             parameters,
         })
+    }
+}
+
+impl Serialize for StartupMessage {
+    const CODE: u8 = 0x00;
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
+        buffer.put_u16(self.protocol_version.major);
+        buffer.put_u16(self.protocol_version.minor);
+
+        for (name, value) in &self.parameters {
+            buffer::write_string(&mut buffer, &name);
+            buffer::write_string(&mut buffer, &value);
+        }
+
+        buffer.push(0);
+
+        Some(buffer)
     }
 }
 
@@ -158,28 +179,139 @@ impl Serialize for ParameterStatus {
     }
 }
 
-pub struct CommandComplete {
-    tag: CommandCompleteTag,
-    rows: u32,
+pub struct BindComplete {}
+
+impl BindComplete {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
-impl CommandComplete {
-    pub fn new(tag: CommandCompleteTag, rows: u32) -> Self {
-        Self { tag, rows }
+impl Serialize for BindComplete {
+    const CODE: u8 = b'2';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        // Use empty vec as workaround to write length
+        Some(vec![])
     }
+}
+
+pub struct CloseComplete {}
+
+impl CloseComplete {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for CloseComplete {
+    const CODE: u8 = b'3';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        // Use empty vec as workaround to write length
+        Some(vec![])
+    }
+}
+
+pub struct ParseComplete {}
+
+impl ParseComplete {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for ParseComplete {
+    const CODE: u8 = b'1';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        // Use empty vec as workaround to write length
+        Some(vec![])
+    }
+}
+
+pub enum CommandComplete {
+    Select(u32),
+    Plain(String),
 }
 
 impl Serialize for CommandComplete {
     const CODE: u8 = b'C';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        let string = format!("{} {}", self.tag, self.rows);
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer::write_string(&mut buffer, &string);
+        match self {
+            CommandComplete::Select(rows) => {
+                buffer::write_string(&mut buffer, &format!("SELECT {}", rows))
+            }
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
+        }
+
         Some(buffer)
     }
 }
 
+pub struct NoData {}
+
+impl NoData {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for NoData {
+    const CODE: u8 = b'n';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
+pub struct EmptyQueryResponse {}
+
+impl EmptyQueryResponse {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for EmptyQueryResponse {
+    const CODE: u8 = b'I';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParameterDescription {
+    parameters: Vec<PgTypeId>,
+}
+
+impl ParameterDescription {
+    pub fn new(parameters: Vec<PgTypeId>) -> Self {
+        Self { parameters }
+    }
+}
+
+impl Serialize for ParameterDescription {
+    const CODE: u8 = b't';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer: Vec<u8> = vec![];
+        // FIXME!
+        let size = i16::try_from(self.parameters.len()).unwrap();
+        buffer.put_i16(size);
+
+        for parameter in &self.parameters {
+            buffer.put_i32((*parameter as u32) as i32);
+        }
+
+        Some(buffer)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct RowDescription {
     fields: Vec<RowDescriptionField>,
 }
@@ -198,6 +330,7 @@ impl Serialize for RowDescription {
         let size = u16::try_from(self.fields.len()).unwrap();
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
         buffer.extend_from_slice(&size.to_be_bytes());
+
         for field in self.fields.iter() {
             buffer::write_string(&mut buffer, &field.name);
             buffer.extend_from_slice(&field.table_oid.to_be_bytes());
@@ -205,12 +338,14 @@ impl Serialize for RowDescription {
             buffer.extend_from_slice(&field.data_type_oid.to_be_bytes());
             buffer.extend_from_slice(&field.data_type_size.to_be_bytes());
             buffer.extend_from_slice(&field.type_modifier.to_be_bytes());
-            buffer.extend_from_slice(&field.format_code.to_be_bytes());
+            buffer.extend_from_slice(&0_i16.to_be_bytes());
         }
+
         Some(buffer)
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RowDescriptionField {
     name: String,
     // TODO: REWORK!
@@ -219,7 +354,6 @@ pub struct RowDescriptionField {
     data_type_oid: i32,
     data_type_size: i16,
     type_modifier: i32,
-    format_code: i16,
 }
 
 impl RowDescriptionField {
@@ -231,39 +365,7 @@ impl RowDescriptionField {
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
-            format_code: 0,
         }
-    }
-}
-
-pub struct DataRow {
-    values: Vec<Option<String>>,
-}
-
-impl DataRow {
-    pub fn new(values: Vec<Option<String>>) -> Self {
-        Self { values }
-    }
-}
-
-impl Serialize for DataRow {
-    const CODE: u8 = b'D';
-
-    fn serialize(&self) -> Option<Vec<u8>> {
-        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        let size = u16::try_from(self.values.len()).unwrap();
-        buffer.extend_from_slice(&size.to_be_bytes());
-        for value in self.values.iter() {
-            match value {
-                None => buffer.extend_from_slice(&(-1_i32).to_be_bytes()),
-                Some(value) => {
-                    let size = u32::try_from(value.len()).unwrap();
-                    buffer.extend_from_slice(&size.to_be_bytes());
-                    buffer.extend_from_slice(value.as_bytes());
-                }
-            };
-        }
-        Some(buffer)
     }
 }
 
@@ -319,6 +421,63 @@ impl Deserialize for Parse {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Execute {
+    // The name of the portal to execute (an empty string selects the unnamed portal).
+    pub portal: String,
+    // Maximum number of rows to return, if portal contains a query that returns rows (ignored otherwise). Zero denotes “no limit”.
+    pub max_rows: i32,
+}
+
+#[async_trait]
+impl Deserialize for Execute {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let portal = buffer::read_string(&mut buffer).await?;
+        let max_rows = buffer.read_i32().await?;
+
+        Ok(Self { portal, max_rows })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum CloseType {
+    Statement,
+    Portal,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Close {
+    pub typ: CloseType,
+    // The name of the prepared statement or portal to close (an empty string selects the unnamed prepared statement or portal).
+    pub name: String,
+}
+
+#[async_trait]
+impl Deserialize for Close {
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        let typ = match buffer.read_u8().await? {
+            b'S' => CloseType::Statement,
+            b'P' => CloseType::Portal,
+            t => {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Unknown describe code: {}", t),
+                ));
+            }
+        };
+
+        let name = buffer::read_string(&mut buffer).await?;
+
+        Ok(Self { typ, name })
+    }
+}
+
 /// This command is used for prepared statement creation on the server side
 #[derive(Debug, PartialEq)]
 pub struct Bind {
@@ -332,6 +491,26 @@ pub struct Bind {
     pub parameter_values: Vec<Option<Vec<u8>>>,
     /// Format for results
     pub result_formats: Vec<Format>,
+}
+
+impl Bind {
+    pub fn to_bind_values(&self) -> Vec<BindValue> {
+        let mut values = vec![];
+
+        for param_value in &self.parameter_values {
+            values.push(match param_value {
+                None => BindValue::Null,
+                Some(raw_value) => {
+                    let decoded = String::from_utf8(raw_value.clone())
+                        .expect("Unable to unpack raw parameter to string");
+
+                    BindValue::String(decoded)
+                }
+            })
+        }
+
+        values
+    }
 }
 
 #[async_trait]
@@ -383,7 +562,7 @@ impl Deserialize for Bind {
             statement,
             parameter_formats,
             parameter_values,
-            result_formats: vec![],
+            result_formats,
         })
     }
 }
@@ -439,13 +618,14 @@ impl Deserialize for Query {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(u8)]
 pub enum Format {
     Text,
     Binary,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ProtocolVersion {
     pub major: u16,
     pub minor: u16,
@@ -464,6 +644,8 @@ pub enum FrontendMessage {
     Parse(Parse),
     Bind(Bind),
     Describe(Describe),
+    Execute(Execute),
+    Close(Close),
     /// Close connection
     Terminate,
     /// Finish
@@ -471,12 +653,20 @@ pub enum FrontendMessage {
 }
 
 /// https://www.postgresql.org/docs/14/errcodes-appendix.html
+#[derive(Debug)]
+#[allow(dead_code)]
 pub enum ErrorCode {
-    // 0A — Feature Not Supported
+    // 0A — Feature Not Supported
     FeatureNotSupported,
     // 28 - Invalid Authorization Specification
     InvalidAuthorizationSpecification,
     InvalidPassword,
+    // 22
+    DataException,
+    // 26
+    InvalidSqlStatement,
+    // 34
+    InvalidCursorName,
     // XX - Internal Error
     InternalError,
 }
@@ -485,10 +675,11 @@ impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
             Self::FeatureNotSupported => "0A000",
-
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
-
+            Self::DataException => "22000",
+            Self::InvalidSqlStatement => "26000",
+            Self::InvalidCursorName => "34000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -529,19 +720,6 @@ impl TransactionStatus {
     }
 }
 
-pub enum CommandCompleteTag {
-    Select,
-}
-
-impl Display for CommandCompleteTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let string = match self {
-            Self::Select => "SELECT",
-        };
-        write!(f, "{}", string)
-    }
-}
-
 pub enum AuthenticationRequest {
     Ok,
     CleartextPassword,
@@ -579,10 +757,11 @@ pub trait Deserialize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{sql::postgres::buffer::read_message, CubeError};
-    use std::io::Cursor;
-
     use super::*;
+    use crate::read_message;
+
+    use std::io;
+    use std::io::Cursor;
 
     fn parse_hex_dump(input: String) -> Vec<u8> {
         let mut result: Vec<Vec<u8>> = vec![];
@@ -599,7 +778,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_parse() -> Result<(), CubeError> {
+    async fn test_startup_message_duplex() -> Result<(), io::Error> {
+        // 00 00 00 4c 00 03 00 00 75 73 65 72 00 74 65 73   ...L....user.tes
+        // 74 00 64 61 74 61 62 61 73 65 00 74 65 73 74 00   t.database.test.
+        // 61 70 70 6c 69 63 61 74 69 6f 6e 5f 6e 61 6d 65   application_name
+        // 00 70 73 71 6c 00 63 6c 69 65 6e 74 5f 65 6e 63   .psql.client_enc
+        // 6f 64 69 6e 67 00 55 54 46 38 00 00               oding.UTF8..
+
+        let expected_message = {
+            let mut parameters = HashMap::new();
+            parameters.insert("database".to_string(), "test".to_string());
+            parameters.insert("application_name".to_string(), "psql".to_string());
+            parameters.insert("user".to_string(), "test".to_string());
+            parameters.insert("client_encoding".to_string(), "UTF8".to_string());
+
+            StartupMessage {
+                protocol_version: ProtocolVersion { major: 3, minor: 0 },
+                parameters,
+            }
+        };
+
+        // First step, We write struct to the buffer
+        let mut cursor = Cursor::new(vec![]);
+        buffer::write_message(&mut cursor, expected_message.clone()).await?;
+
+        // Second step, We read form the buffer and output structure must be the same as original
+        let buffer = cursor.get_ref()[..].to_vec();
+        let mut cursor = Cursor::new(buffer);
+        // skipping length
+        cursor.read_u32().await?;
+
+        let actual_message = StartupMessage::from(&mut cursor).await?;
+        assert_eq!(actual_message, expected_message);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_parse() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
@@ -634,7 +850,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_bind_variant1() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
@@ -659,7 +875,7 @@ mod tests {
                             Some(vec![116, 101, 115, 116]),
                             Some(vec![116, 114, 117, 101]),
                         ],
-                        result_formats: vec![]
+                        result_formats: vec![Format::Text]
                     },
                 )
             }
@@ -670,7 +886,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_describe() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_bind_variant2() -> Result<(), io::Error> {
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 04 74 65 73 74 00 01 00 01                  ...test....
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body,
+                    Bind {
+                        portal: "".to_string(),
+                        statement: "s0".to_string(),
+                        parameter_formats: vec![Format::Binary],
+                        parameter_values: vec![Some(vec![116, 101, 115, 116])],
+                        result_formats: vec![Format::Binary]
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_describe() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             44 00 00 00 08 53 73 30 00                        D....Ss0.          
@@ -697,7 +944,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_password_message() -> Result<(), CubeError> {
+    async fn test_frontend_message_parse_password_message() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             70 00 00 00 09 74 65 73 74 00                     p....test.
@@ -723,7 +970,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_sequence_sync() -> Result<(), CubeError> {
+    async fn test_frontend_message_execute() -> Result<(), io::Error> {
+        let buffer = parse_hex_dump(
+            r#"
+            45 00 00 00 09 00 00 00 00 00                     E.........      
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor).await?;
+        match message {
+            FrontendMessage::Execute(body) => {
+                assert_eq!(
+                    body,
+                    Execute {
+                        portal: "".to_string(),
+                        max_rows: 0
+                    },
+                )
+            }
+            _ => panic!("Wrong message, must be Describe"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_sequence_sync() -> Result<(), io::Error> {
         let buffer = parse_hex_dump(
             r#"
             53 00 00 00 04                                    S....
@@ -737,6 +1011,40 @@ mod tests {
         // simple messages without body in sequence
         read_message(&mut cursor).await?;
         read_message(&mut cursor).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_write_complete_parse() -> Result<(), io::Error> {
+        let mut cursor = Cursor::new(vec![]);
+
+        buffer::write_message(&mut cursor, ParseComplete {}).await?;
+
+        assert_eq!(cursor.get_ref()[0..], vec![49, 0, 0, 0, 4]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_write_row_description() -> Result<(), io::Error> {
+        let mut cursor = Cursor::new(vec![]);
+        let desc = RowDescription::new(vec![
+            RowDescriptionField::new("num".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
+            RowDescriptionField::new("str".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
+            RowDescriptionField::new("bool".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
+        ]);
+        buffer::write_message(&mut cursor, desc).await?;
+
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                84, 0, 0, 0, 73, 0, 3, 110, 117, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 8, 255,
+                255, 255, 255, 0, 0, 115, 116, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 8, 255,
+                255, 255, 255, 0, 0, 98, 111, 111, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 8,
+                255, 255, 255, 255, 0, 0
+            ]
+        );
 
         Ok(())
     }

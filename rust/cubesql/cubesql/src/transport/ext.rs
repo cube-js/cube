@@ -25,6 +25,12 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+            } else if expect_agg_type.eq(&"sum".to_string()) {
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"sum".to_string())
+                    || agg_type.eq(&"count".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else {
                 self.agg_type.as_ref().unwrap().eq(expect_agg_type)
             }
@@ -122,7 +128,7 @@ impl CubeColumn {
     }
 
     pub fn get_column_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 }
 

@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5662
+expression: "execute_query(\"SELECT unnest(ARRAY[1,2,3,4,5]);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+
+| unnest(List([1,2,3,4,5])) |
++---------------------------+
+| 1                         |
+| 2                         |
+| 3                         |
+| 4                         |
+| 5                         |
++---------------------------+

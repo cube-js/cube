@@ -69,6 +69,11 @@ crate::plan_to_language! {
         Repartition {
             input: Arc<LogicalPlan>,
         },
+        Subquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         Union {
             inputs: Vec<LogicalPlan>,
             schema: DFSchemaRef,
@@ -90,6 +95,11 @@ crate::plan_to_language! {
             n: usize,
             input: Arc<LogicalPlan>,
         },
+        TableUDFs {
+            expr: Vec<Expr>,
+            input: Arc<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         CreateExternalTable {
             schema: DFSchemaRef,
             name: String,
@@ -105,6 +115,10 @@ crate::plan_to_language! {
             alias: String,
         },
         ColumnExpr {
+            column: Column,
+        },
+        OuterColumnExpr {
+            data_type: DataType,
             column: Column,
         },
         ScalarVariableExpr {
@@ -169,12 +183,20 @@ crate::plan_to_language! {
             fun: Arc<AggregateUDF>,
             args: Vec<Expr>,
         },
+        TableUDFExpr {
+            fun: Arc<TableUDF>,
+            args: Vec<Expr>,
+        },
         InListExpr {
             expr: Box<Expr>,
             list: Vec<Expr>,
             negated: bool,
         },
         WildcardExpr {},
+        GetIndexedFieldExpr {
+            expr: Box<Expr>,
+            key: ScalarValue,
+        },
 
         CubeScan {
             cube: Arc<LogicalPlan>,
@@ -244,6 +266,15 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
             table_name: Option<String>,
+        },
+        InnerAggregateSplitReplacer {
+            members: Vec<LogicalPlan>,
+        },
+        OuterProjectionSplitReplacer {
+            members: Vec<LogicalPlan>,
+        },
+        OuterAggregateSplitReplacer {
+            members: Vec<LogicalPlan>,
         },
     }
 }
@@ -497,6 +528,10 @@ fn column_expr(column: impl Display) -> String {
     format!("(ColumnExpr {})", column)
 }
 
+fn cast_expr(expr: impl Display, data_type: impl Display) -> String {
+    format!("(CastExpr {} {})", expr, data_type)
+}
+
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
@@ -546,6 +581,18 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn inner_aggregate_split_replacer(members: impl Display) -> String {
+    format!("(InnerAggregateSplitReplacer {})", members)
+}
+
+fn outer_projection_split_replacer(members: impl Display) -> String {
+    format!("(OuterProjectionSplitReplacer {})", members)
+}
+
+fn outer_aggregate_split_replacer(members: impl Display) -> String {
+    format!("(OuterAggregateSplitReplacer {})", members)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {

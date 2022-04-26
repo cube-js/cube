@@ -6,6 +6,7 @@ use crate::compile::rewrite::rules::dates::DateRules;
 use crate::compile::rewrite::rules::filters::FilterRules;
 use crate::compile::rewrite::rules::members::MemberRules;
 use crate::compile::rewrite::rules::order::OrderRules;
+use crate::compile::rewrite::rules::split::SplitRules;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::sql::AuthContext;
 use crate::CubeError;
@@ -52,6 +53,7 @@ impl Rewriter {
         let extractor = Extractor::new(&runner.egraph, BestCubePlan);
         let (_, best) = extractor.find_best(root);
         let new_root = Id::from(best.as_ref().len() - 1);
+        //log::debug!("Egraph: {:#?}", runner.egraph);
         log::debug!("Best: {:?}", best);
         self.graph = runner.egraph.clone();
         let converter =
@@ -65,6 +67,7 @@ impl Rewriter {
             Box::new(FilterRules::new(self.cube_context.clone())),
             Box::new(DateRules::new(self.cube_context.clone())),
             Box::new(OrderRules::new(self.cube_context.clone())),
+            Box::new(SplitRules::new(self.cube_context.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

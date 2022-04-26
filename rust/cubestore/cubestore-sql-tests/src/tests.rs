@@ -102,6 +102,14 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_inputs", hyperloglog_empty_inputs),
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
+        t(
+            "create_table_with_location_and_hyperloglog",
+            create_table_with_location_and_hyperloglog,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_postgress",
+            create_table_with_location_and_hyperloglog_postgress,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -2075,6 +2083,115 @@ async fn hyperloglog_inserts(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO hll.sketches(id, hll) VALUES (0, X'020C0200C02FF58941D5F0C6123')")
         .await
         .expect_err("should not allow invalid HLL (with extra bytes)");
+}
+
+async fn create_table_with_location_and_hyperloglog(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 80 a5 90 34,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x80, 0xa5, 0x90, 0x34])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0C 02 00 C0 2F F5 89 41 D5 F0 C6,{}\n",
+                base64::encode(vec![
+                    0x02, 0x0c, 0x02, 0x00, 0xc0, 0x2f, 0xf5, 0x89, 0x41, 0xd5, 0xf0, 0xc6
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-pg.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,11 8b 7f,{}\n", base64::encode(vec![0x11, 0x8b, 0x7f])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,12 8b 7f ee 22 c4 70 69 1a 81 34,{}\n",
+                base64::encode(vec![
+                    0x12, 0x8b, 0x7f, 0xee, 0x22, 0xc4, 0x70, 0x69, 0x1a, 0x81, 0x34
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_pg GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
 }
 
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {

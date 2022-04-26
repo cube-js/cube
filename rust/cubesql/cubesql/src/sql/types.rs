@@ -1,10 +1,11 @@
-use crate::sql::PgTypeId;
+use crate::arrow::datatypes::{DataType, Field};
 use bitflags::bitflags;
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
+use pg_srv::{protocol::CommandComplete, PgTypeId};
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ColumnType {
     String,
     VarStr,
@@ -15,6 +16,7 @@ pub enum ColumnType {
     Int64,
     Blob,
     Timestamp,
+    List(Box<Field>),
 }
 
 impl ColumnType {
@@ -40,6 +42,18 @@ impl ColumnType {
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
             ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::List(field) => match field.data_type() {
+                DataType::Binary => PgTypeId::ArrayBytea,
+                DataType::Boolean => PgTypeId::ArrayBool,
+                DataType::Utf8 => PgTypeId::ArrayText,
+                DataType::Int16 => PgTypeId::ArrayInt2,
+                DataType::Int32 => PgTypeId::ArrayInt4,
+                DataType::Int64 => PgTypeId::ArrayInt8,
+                DataType::UInt16 => PgTypeId::ArrayInt2,
+                DataType::UInt32 => PgTypeId::ArrayInt4,
+                DataType::UInt64 => PgTypeId::ArrayInt8,
+                dt => unimplemented!("Unsupported data type for List: {}", dt),
+            },
         }
     }
 }
@@ -67,6 +81,29 @@ bitflags! {
 impl StatusFlags {
     pub fn to_mysql_flags(&self) -> MysqlStatusFlags {
         MysqlStatusFlags::empty()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CommandCompletion {
+    Begin,
+    Commit,
+    Use,
+    Rollback,
+    Set,
+    Select(u32),
+}
+
+impl CommandCompletion {
+    pub fn to_pg_command(self) -> CommandComplete {
+        match self {
+            CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
+            CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
+            CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
+            CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
+            CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
+            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+        }
     }
 }
 
