@@ -2,12 +2,11 @@ import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
-import { useHistory } from 'react-router';
+import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
 import { useCubejsApi, useSecurityContext } from '../../hooks';
-// import { LightningIcon } from '../../shared/icons/LightningIcon';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useHistory } from 'react-router';
+import { useHistory } from 'react-router-dom';
 
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import DashboardSource from '../../DashboardSource';
