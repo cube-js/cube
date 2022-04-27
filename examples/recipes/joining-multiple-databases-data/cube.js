@@ -9,13 +9,11 @@ function bigquery() {
 }
 
 function postgres() {
-  return new PostgresDriver({
-    database: 'ecom',
-    host: 'localhost',
-    user: 'test',
-    password: 'test',
-    port: '5432',
-  })
+  // CUBEJS_DB_HOST
+  // CUBEJS_DB_NAME
+  // CUBEJS_DB_USER
+  // CUBEJS_DB_PASS
+  return new PostgresDriver({})
 }
 
 module.exports = {
