@@ -44,9 +44,9 @@ use self::{
         create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
         create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
         create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
-        create_pg_get_expr_udf, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-        create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
-        create_user_udf, create_version_udf,
+        create_pg_expandarray_udtf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
+        create_pg_numeric_precision_udf, create_pg_numeric_scale_udf, create_time_format_udf,
+        create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
     },
     parser::parse_sql_to_statement,
 };
@@ -2294,6 +2294,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udtf(create_generate_series_udtf(false));
         ctx.register_udtf(create_unnest_udtf());
         ctx.register_udtf(create_generate_subscripts_udtf());
+        ctx.register_udtf(create_pg_expandarray_udtf());
 
         ctx
     }
@@ -5047,6 +5048,130 @@ mod tests {
             "++\n++\n++"
         );
 
+        // TODO: todos!
+        insta::assert_snapshot!(
+            "tableau_null_text_query",
+            execute_query(
+                "
+                SELECT
+                    NULL::text AS PKTABLE_CAT,
+                    pkn.nspname AS PKTABLE_SCHEM,
+                    pkc.relname AS PKTABLE_NAME,
+                    pka.attname AS PKCOLUMN_NAME,
+                    NULL::text AS FKTABLE_CAT,
+                    fkn.nspname AS FKTABLE_SCHEM,
+                    fkc.relname AS FKTABLE_NAME,
+                    fka.attname AS FKCOLUMN_NAME,
+                    /*!TODO pos.n AS KEY_SEQ, */
+                    CASE con.confupdtype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'p' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS UPDATE_RULE,
+                    CASE con.confdeltype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'p' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS DELETE_RULE,
+                    con.conname AS FK_NAME,
+                    pkic.relname AS PK_NAME,
+                    CASE
+                        WHEN con.condeferrable AND con.condeferred THEN 5
+                        WHEN con.condeferrable THEN 6
+                        ELSE 7
+                    END AS DEFERRABILITY
+                FROM
+                    pg_catalog.pg_namespace pkn,
+                    pg_catalog.pg_class pkc,
+                    pg_catalog.pg_attribute pka,
+                    pg_catalog.pg_namespace fkn,
+                    pg_catalog.pg_class fkc,
+                    pg_catalog.pg_attribute fka,
+                    pg_catalog.pg_constraint con,
+                    /*!TODO pg_catalog.generate_series(1, 32) pos(n), */
+                    pg_catalog.pg_class pkic
+                WHERE
+                    pkn.oid = pkc.relnamespace AND
+                    pkc.oid = pka.attrelid AND
+                    /*!TODO pka.attnum = con.confkey[pos.n] AND */
+                    con.confrelid = pkc.oid AND
+                    fkn.oid = fkc.relnamespace AND
+                    fkc.oid = fka.attrelid AND
+                    /*!TODO fka.attnum = con.conkey[pos.n] AND */
+                    con.conrelid = fkc.oid AND
+                    con.contype = 'f' AND
+                    (pkic.relkind = 'i' OR pkic.relkind = 'I') AND
+                    pkic.oid = con.conindid AND
+                    fkn.nspname = 'public' AND
+                    fkc.relname = 'payment'
+                ORDER BY
+                    pkn.nspname,
+                    pkc.relname,
+                    con.conname/*!TODO ,
+                    pos.n */
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        // TODO: todos!
+        insta::assert_snapshot!(
+            "tableau_table_cat_query",
+            execute_query(
+                "
+                SELECT
+                    result.TABLE_CAT,
+                    result.TABLE_SCHEM,
+                    result.TABLE_NAME,
+                    result.COLUMN_NAME,
+                    /*!TODO result.KEY_SEQ, */
+                    result.PK_NAME
+                FROM
+                    (
+                        SELECT
+                            NULL AS TABLE_CAT,
+                            n.nspname AS TABLE_SCHEM,
+                            ct.relname AS TABLE_NAME,
+                            a.attname AS COLUMN_NAME,
+                            /*!TODO (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, */
+                            ci.relname AS PK_NAME,
+                            /*!TODO information_schema._pg_expandarray(i.indkey) AS KEYS, */
+                            a.attnum AS A_ATTNUM
+                        FROM pg_catalog.pg_class ct
+                        JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)
+                        JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
+                        JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)
+                        JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
+                        WHERE
+                            true AND
+                            n.nspname = 'public' AND
+                            ct.relname = 'payment' AND
+                            i.indisprimary
+                    ) result
+                    /*!TODO where result.A_ATTNUM = (result.KEYS).x */
+                ORDER BY
+                    result.table_name /*!TODO ,
+                    result.pk_name, */
+                    /* !TODO result.key_seq */
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -5887,6 +6012,31 @@ mod tests {
             "pg_generate_subscripts_3",
             execute_query(
                 "SELECT generate_subscripts(r.a, 2) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_expandarray_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_expandarray_value",
+            execute_query(
+                "SELECT (information_schema._pg_expandarray(t.a)).x FROM pg_catalog.pg_class c, (SELECT ARRAY[5, 10, 15] a) t;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_expandarray_index",
+            execute_query(
+                "SELECT (information_schema._pg_expandarray(t.a)).n FROM pg_catalog.pg_class c, (SELECT ARRAY[5, 10, 15] a) t;"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
