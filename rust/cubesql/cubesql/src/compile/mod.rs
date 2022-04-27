@@ -50,7 +50,9 @@ use self::{
     },
     parser::parse_sql_to_statement,
 };
-use crate::compile::engine::udf::{create_unnest_udtf, pg_get_userbyid, pg_table_is_visible};
+use crate::compile::engine::udf::{
+    create_generate_subscripts_udtf, create_unnest_udtf, pg_get_userbyid, pg_table_is_visible,
+};
 use crate::{
     compile::builder::QueryBuilder,
     compile::engine::udf::{
@@ -2291,6 +2293,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udtf(create_generate_series_udtf(true));
         ctx.register_udtf(create_generate_series_udtf(false));
         ctx.register_udtf(create_unnest_udtf());
+        ctx.register_udtf(create_generate_subscripts_udtf());
 
         ctx
     }
@@ -5849,8 +5852,72 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn superset_subquery() -> Result<(), CubeError> {
+    async fn test_generate_subscripts_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_generate_subscripts_1",
+            execute_query(
+                "SELECT generate_subscripts(r.a, 1) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_generate_subscripts_2_forward",
+            execute_query(
+                "SELECT generate_subscripts(r.a, 1, false) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_generate_subscripts_2_reverse",
+            execute_query(
+                "SELECT generate_subscripts(r.a, 1, true) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_generate_subscripts_3",
+            execute_query(
+                "SELECT generate_subscripts(r.a, 2) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
+
+        insta::assert_snapshot!(
+            "superset_attname_query",
+            execute_query(
+                r#"SELECT a.attname
+                FROM pg_attribute a JOIN (
+                SELECT unnest(ix.indkey) attnum,
+                generate_subscripts(ix.indkey, 1) ord
+                FROM pg_index ix
+                WHERE ix.indrelid = 13449 AND ix.indisprimary
+                ) k ON a.attnum=k.attnum
+                WHERE a.attrelid = 13449
+                ORDER BY k.ord
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
 
         // TODO should be pg_get_expr instead of format_type
         insta::assert_snapshot!(
