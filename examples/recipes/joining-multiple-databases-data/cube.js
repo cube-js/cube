@@ -2,11 +2,10 @@ const BigQueryDriver = require('@cubejs-backend/bigquery-driver');
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 function bigquery() {
-  return new BigQueryDriver({
-    projectId: 'cube-cloud-staging',
-    exportBucket: 'cube-cloud-staging-export-bucket',
-    keyFilename: '/Users/cristipp/.gcloud.key',
-  })
+  // CUBEJS_DB_BQ_PROJECT_ID
+  // CUBEJS_DB_EXPORT_BUCKET
+  // CUBEJS_DB_BQ_CREDENTIALS
+  return new BigQueryDriver({})
 }
 
 function postgres() {
