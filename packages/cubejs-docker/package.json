@@ -25,6 +25,7 @@
     "@cubejs-backend/postgres-driver": "^0.29.52",
     "@cubejs-backend/prestodb-driver": "^0.29.51",
     "@cubejs-backend/questdb-driver": "^0.29.52",
+    "@cubejs-backend/materialize-driver": "^0.29.52",
     "@cubejs-backend/redshift-driver": "^0.29.52",
     "@cubejs-backend/server": "^0.29.52",
     "@cubejs-backend/snowflake-driver": "^0.29.51",
