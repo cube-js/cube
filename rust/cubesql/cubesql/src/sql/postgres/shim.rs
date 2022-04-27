@@ -24,8 +24,6 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub struct AsyncPostgresShim {
     socket: TcpStream,
-    #[allow(unused)]
-    parameters: HashMap<String, String>,
     // Extended query
     statements: HashMap<String, Option<PreparedStatement>>,
     portals: HashMap<String, Option<Portal>>,
@@ -35,7 +33,8 @@ pub struct AsyncPostgresShim {
 
 #[derive(PartialEq, Eq)]
 pub enum StartupState {
-    Success,
+    // Initial parameters which client sends in the first message, we use it later in auth method
+    Success(HashMap<String, String>),
     SslRequested,
     Denied,
 }
@@ -44,11 +43,11 @@ impl AsyncPostgresShim {
     pub async fn run_on(socket: TcpStream, session: Arc<Session>) -> Result<(), Error> {
         let mut shim = Self {
             socket,
-            parameters: HashMap::new(),
             portals: HashMap::new(),
             statements: HashMap::new(),
             session,
         };
+
         match shim.run().await {
             Err(e) => {
                 if e.kind() == ErrorKind::UnexpectedEof
@@ -66,24 +65,27 @@ impl AsyncPostgresShim {
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        match self.process_startup_message().await? {
-            StartupState::Success => {}
-            StartupState::SslRequested => {
-                if self.process_startup_message().await? != StartupState::Success {
-                    return Ok(());
-                }
-            }
+        let initial_parameters = match self.process_startup_message().await? {
+            StartupState::Success(parameters) => parameters,
+            StartupState::SslRequested => match self.process_startup_message().await? {
+                StartupState::Success(parameters) => parameters,
+                _ => return Ok(()),
+            },
             StartupState::Denied => return Ok(()),
-        }
+        };
 
         match buffer::read_message(&mut self.socket).await? {
             protocol::FrontendMessage::PasswordMessage(password_message) => {
-                if !self.authenticate(password_message).await? {
+                if !self
+                    .authenticate(password_message, initial_parameters)
+                    .await?
+                {
                     return Ok(());
                 }
             }
             _ => return Ok(()),
         }
+
         self.ready().await?;
 
         loop {
@@ -146,8 +148,8 @@ impl AsyncPostgresShim {
             return Ok(StartupState::Denied);
         }
 
-        self.parameters = startup_message.parameters;
-        if !self.parameters.contains_key("user") {
+        let mut parameters = startup_message.parameters;
+        if !parameters.contains_key("user") {
             let error_response = protocol::ErrorResponse::new(
                 protocol::ErrorSeverity::Fatal,
                 protocol::ErrorCode::InvalidAuthorizationSpecification,
@@ -156,11 +158,9 @@ impl AsyncPostgresShim {
             buffer::write_message(&mut self.socket, error_response).await?;
             return Ok(StartupState::Denied);
         }
-        if !self.parameters.contains_key("database") {
-            self.parameters.insert(
-                "database".to_string(),
-                self.parameters.get("user").unwrap().clone(),
-            );
+
+        if !parameters.contains_key("database") {
+            parameters.insert("database".to_string(), "db".to_string());
         }
 
         self.write(protocol::Authentication::new(
@@ -168,20 +168,22 @@ impl AsyncPostgresShim {
         ))
         .await?;
 
-        return Ok(StartupState::Success);
+        return Ok(StartupState::Success(parameters));
     }
 
     pub async fn authenticate(
         &mut self,
         password_message: protocol::PasswordMessage,
+        parameters: HashMap<String, String>,
     ) -> Result<bool, Error> {
-        let user = self.parameters.get("user").unwrap().clone();
+        let user = parameters.get("user").unwrap().clone();
         let authenticate_response = self
             .session
             .server
             .auth
             .authenticate(Some(user.clone()))
             .await;
+
         let mut auth_context: Option<AuthContext> = None;
         let auth_success = match authenticate_response {
             Ok(authenticate_response) => {
