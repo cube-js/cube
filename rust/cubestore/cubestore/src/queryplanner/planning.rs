@@ -112,6 +112,7 @@ pub async fn choose_index_ext(
     for (c, inputs) in collector.constraints.iter().zip(tables) {
         candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
     }
+        
     // We pick partitioned index only when all tables request the same one.
     let mut indices: Vec<_> = match all_have_same_partitioned_index(&candidates) {
         true => candidates
@@ -230,7 +231,7 @@ impl<'a> PlanIndexStore for &'a dyn MetaStore {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct SortColumns {
     sort_on: Vec<String>,
     required: bool,
@@ -494,8 +495,10 @@ async fn pick_index(
 
         // Skipping default index
         let filtered_by_sort_on = indices.iter().skip(1).filter(|i| {
-            if let Some((join_on_columns, _)) = sort_on.as_ref() {
-                // TODO: join_on_columns may be larger than sort_key_size of the index.
+            if let Some((join_on_columns, required)) = sort_on.as_ref() {
+                if i.get_row().sort_key_size() < (join_on_columns.len() as u64) {
+                    return false;
+                }
                 let join_columns_in_index = join_on_columns
                     .iter()
                     .map(|c| {
@@ -510,13 +513,17 @@ async fn pick_index(
                     None => return false,
                     Some(c) => c,
                 };
-                let join_columns_indices = CubeTable::project_to_index_positions(
+                let mut join_columns_indices = CubeTable::project_to_index_positions(
                     &join_columns_in_index
                         .iter()
                         .map(|c| c.get_name().to_string())
                         .collect(),
                     &i,
                 );
+                //TODO We are not touching indexes for join yet, because they should be the same sorted for different tables.
+                if !required {
+                    join_columns_indices.sort();
+                }
 
                 let matches = join_columns_indices
                     .iter()
@@ -537,6 +544,7 @@ async fn pick_index(
         let optimal =
             optimal_index_by_score(filtered_by_sort_on, &projection_columns, &filter_columns);
         if let Some(index) = optimal_with_partitioned_index.or(optimal) {
+
             (
                 Ok(index),
                 index.get_row().multi_index_id().map(|_| index),
@@ -544,6 +552,7 @@ async fn pick_index(
             )
         } else {
             if let Some((join_on_columns, true)) = sort_on.as_ref() {
+
                 let table_name = c.table.table_name();
                 let err = Err(DataFusionError::Plan(format!(
                     "Can't find index to join table {} on {}. Consider creating index: CREATE INDEX {}_{} ON {} ({})",
@@ -593,6 +602,9 @@ async fn pick_index(
 
     let schema = Arc::new(schema);
     let create_snapshot = |index: &IdRow<Index>| {
+        let index_sort_on = sort_on.map(|sc| 
+                index.get_row().columns().iter().take(sc.0.len()).map(|c| c.get_name().clone()).collect::<Vec<_>>()
+                );
         IndexSnapshot {
             index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
@@ -600,7 +612,7 @@ async fn pick_index(
                 table: table.clone(),
                 schema: schema.clone(),
             },
-            sort_on: sort_on.as_ref().map(|(cols, _)| (*cols).clone()),
+            sort_on: index_sort_on,
         }
     };
     Ok(IndexCandidate {
@@ -1027,7 +1039,7 @@ pub mod tests {
            \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
         );
 
-        // Should prefer a non-default index for joins.
+         Should prefer a non-default index for joins.
         let plan = initial_plan(
             "SELECT order_id, order_amount, customer_name \
              FROM s.Orders \
@@ -1065,6 +1077,7 @@ pub mod tests {
              WHERE c1.customer_name = 'Customer 1'",
             &indices,
         );
+        println!("inds {:?}", &indices);
         let plan = choose_index(&plan, &indices).await.unwrap().0;
         assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [1]]\
                                   \n  Projection, [c2.customer_name]\
@@ -1443,6 +1456,7 @@ pub mod tests {
             None,
             None,
         ));
+
         i.indices.push(
             Index::try_new(
                 "by_customer".to_string(),
