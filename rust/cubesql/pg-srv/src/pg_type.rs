@@ -954,7 +954,7 @@ const PG_TYPE_VARCHAR: &PgType = &PgType {
 const PG_TYPE_CHARACTER_DATA: &PgType = &PgType {
     oid: PgTypeId::CHARACTERDATA as u32,
     typname: "character_data",
-    typnamespace: 13391,
+    typnamespace: 13000,
     typowner: 10,
     typlen: -1,
     typbyval: false,
@@ -973,7 +973,7 @@ const PG_TYPE_CHARACTER_DATA: &PgType = &PgType {
 const PG_TYPE_SQL_IDENTIFIER: &PgType = &PgType {
     oid: PgTypeId::SQLIDENTIFIER as u32,
     typname: "sql_identifier",
-    typnamespace: 13391,
+    typnamespace: 13000,
     typowner: 10,
     typlen: 64,
     typbyval: false,
