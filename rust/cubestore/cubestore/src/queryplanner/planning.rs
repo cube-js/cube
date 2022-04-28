@@ -1084,7 +1084,6 @@ pub mod tests {
 
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
-
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
