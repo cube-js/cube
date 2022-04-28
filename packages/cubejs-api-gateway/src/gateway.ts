@@ -69,6 +69,14 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
+import {
+  transformCube,
+  transformDimensions,
+  transformMeasures,
+  transformJoins,
+  transformPreAggregations,
+  transformSegments
+} from './helpers/transformMetaExtended';
 
 /**
  * API gateway server class.
@@ -215,10 +223,17 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      await this.meta({
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
+      if (req.query.hasOwnProperty('extended')) {
+        await this.metaExtended({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      } else {
+        await this.meta({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
@@ -380,6 +395,33 @@ class ApiGateway {
           ...cube,
           measures: cube.measures.filter(visibilityFilter),
           dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    try {
+      const metaExtended = await this.compilerApi(context).metaExtended({
+        requestId: context.requestId,
+      });
+      const cubes = metaExtended
+        .map((cube) => ({
+          ...transformCube(cube),
+          measures: transformMeasures(cube?.measures),
+          dimensions: transformDimensions(cube?.dimensions),
+          joins: transformJoins(cube?.joins),
+          segments: transformSegments(cube?.segments),
+          preAggregations: transformPreAggregations(cube?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {
@@ -738,14 +780,14 @@ class ApiGateway {
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
-  
+
           this.log({
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
             query: normalizedQueries[index],
             sqlQuery
           }, context);
-  
+
           return sqlQuery;
         }
       )
@@ -816,16 +858,16 @@ class ApiGateway {
     sqlQuery: any,
     annotation: {
       measures: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       dimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       segments: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       timeDimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
     },
     response: any,
@@ -848,7 +890,7 @@ class ApiGateway {
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
-        context.signedWithPlaygroundAuthSecret
+          context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
@@ -962,8 +1004,7 @@ class ApiGateway {
         props.queryType == null
       ) {
         throw new UserError(
-          `'${
-            queryType
+          `'${queryType
           }' query type is not supported by the client.` +
           'Please update the client.'
         );
