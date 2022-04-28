@@ -20,35 +20,6 @@
     line-height: 0;
 }
 
-.examples__nav {
-  display: flex;
-  justify-content: space-between;
-}
-
-.examples__nav__buttons a {
-  display: inline-block;
-  background: rgba(213, 213, 226, 0.1);
-  border-radius: 4px;
-  padding: 8px 12px;
-  margin-left: 15px;
-  color: white;
-  line-height: 1.6em;
-}
-
-.examples__nav__buttons a .anticon {
-  margin-right: 4px;
-  color: #a1a1b5;
-}
-
-.examples__nav__buttons a:hover {
-  background: rgba(213, 213, 226, 0.2);
-  color: white;
-}
-
-.examples__nav__buttons a:hover .anticon {
-  color: #d5d5e2;
-}
-
 .mapbox__container {
   position: relative;
   border-radius: 8px;
@@ -210,7 +181,7 @@
   padding: 80px 0 24px;
   position: absolute;
   width: 300px;
-  background-color: white;
+  background-color: #f3f3fb;
   height: 100%;
   top: 0;
   right: 0;

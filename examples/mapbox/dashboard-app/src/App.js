@@ -38,7 +38,7 @@ const App = () => (
       <div className="mapbox__sider" width={300}>
         <Scrollbars style={{ minHeight: 300 }}>
           <Card
-            title='Links'
+            title='Learn more about Mapbox'
             bordered={false}
           >
             <ul className='useful-links'>
