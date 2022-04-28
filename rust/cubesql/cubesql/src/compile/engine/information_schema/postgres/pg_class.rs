@@ -236,7 +236,7 @@ impl TableProvider for PgCatalogClassProvider {
         Arc::new(Schema::new(vec![
             Field::new("oid", DataType::UInt32, false),
             Field::new("relname", DataType::Utf8, false),
-            // info_schma: 13391; pg_catalog: 11; user defined tables: 2200
+            // info_schma: 13000; pg_catalog: 11; user defined tables: 2200
             Field::new("relnamespace", DataType::UInt32, false),
             Field::new("reltype", DataType::UInt32, false),
             Field::new("reloftype", DataType::UInt32, false),
