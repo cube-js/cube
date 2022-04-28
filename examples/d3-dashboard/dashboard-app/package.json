@@ -11,6 +11,7 @@
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
     "antd": "^3.26.2",
+    "cube-example-wrapper": "^1.0.23",
     "d3": "^5.14.2",
     "prop-types": "^15.7.2",
     "react": "^16.12.0",
