@@ -229,6 +229,11 @@ impl RewriteRules for DateRules {
                     vec!["?granularity".to_string(), column_expr("?column")],
                 ),
             ),
+            rewrite(
+                "current-timestamp-to-now",
+                udf_expr("current_timestamp", Vec::<String>::new()),
+                fun_expr("UtcTimestamp", Vec::<String>::new()),
+            ),
         ]
     }
 }

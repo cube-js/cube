@@ -51,7 +51,8 @@ use self::{
     parser::parse_sql_to_statement,
 };
 use crate::compile::engine::udf::{
-    create_generate_subscripts_udtf, create_unnest_udtf, pg_get_userbyid, pg_table_is_visible,
+    create_current_timestamp, create_generate_subscripts_udtf, create_unnest_udtf, pg_get_userbyid,
+    pg_table_is_visible,
 };
 use crate::{
     compile::builder::QueryBuilder,
@@ -2274,6 +2275,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date());
+        ctx.register_udf(create_current_timestamp());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
         ctx.register_udf(create_format_type_udf("format_type"));
@@ -3188,6 +3190,23 @@ mod tests {
                 offset: None,
                 filters: None,
             }
+        );
+    }
+
+    #[test]
+    fn tableau_current_timestamp() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CAST(CURRENT_TIMESTAMP AS TIMESTAMP) AS \"COL\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.print(true).unwrap();
+        assert_eq!(
+            logical_plan,
+            "Projection: CAST(utctimestamp() AS Timestamp(Nanosecond, None)) AS COL\
+            \n  EmptyRelation"
         );
     }
 
