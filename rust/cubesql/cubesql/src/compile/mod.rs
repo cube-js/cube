@@ -3192,6 +3192,52 @@ mod tests {
     }
 
     #[test]
+    fn tableau_default_having() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nHAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        assert_eq!(
+            cube_scan
+                .schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect::<Vec<_>>(),
+            vec![
+                "SUM(KibanaSampleDataEcommerce.count)".to_string(),
+                "COUNT(UInt8(1))".to_string()
+            ]
+        );
+        assert_eq!(
+            &cube_scan.member_fields,
+            &vec![
+                "KibanaSampleDataEcommerce.count".to_string(),
+                "KibanaSampleDataEcommerce.count".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn tableau_group_by_month() {
         init_logger();
 

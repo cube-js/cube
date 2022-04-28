@@ -1077,7 +1077,6 @@ impl LanguageToLogicalPlanConverter {
                         let mut query_time_dimensions = Vec::new();
                         let mut query_order = Vec::new();
                         let mut query_dimensions = Vec::new();
-                        let mut member_fields = Vec::new();
 
                         for m in members {
                             match m {
@@ -1097,15 +1096,17 @@ impl LanguageToLogicalPlanConverter {
                                             "Can't find measure '{}'",
                                             measure
                                         )))?;
-                                    fields.push(DFField::new(
-                                        None,
-                                        // TODO empty schema
-                                        &expr.name(&DFSchema::empty())?,
-                                        data_type,
-                                        // TODO actually nullable. Just to fit tests
-                                        false,
+                                    fields.push((
+                                        DFField::new(
+                                            None,
+                                            // TODO empty schema
+                                            &expr.name(&DFSchema::empty())?,
+                                            data_type,
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ),
+                                        measure.to_string(),
                                     ));
-                                    member_fields.push(measure.to_string());
                                 }
                                 LogicalPlanLanguage::TimeDimension(params) => {
                                     let dimension =
@@ -1134,16 +1135,17 @@ impl LanguageToLogicalPlanConverter {
                                         }),
                                     });
                                     if let Some(granularity) = &granularity {
-                                        fields.push(DFField::new(
-                                            None,
-                                            // TODO empty schema
-                                            &expr.name(&DFSchema::empty())?,
-                                            DataType::Timestamp(TimeUnit::Nanosecond, None),
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                        fields.push((
+                                            DFField::new(
+                                                None,
+                                                // TODO empty schema
+                                                &expr.name(&DFSchema::empty())?,
+                                                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                                                // TODO actually nullable. Just to fit tests
+                                                false,
+                                            ),
+                                            format!("{}.{}", dimension, granularity),
                                         ));
-                                        member_fields
-                                            .push(format!("{}.{}", dimension, granularity));
                                     }
                                 }
                                 LogicalPlanLanguage::Dimension(params) => {
@@ -1159,15 +1161,17 @@ impl LanguageToLogicalPlanConverter {
                                             dimension
                                         )))?;
                                     query_dimensions.push(dimension.to_string());
-                                    fields.push(DFField::new(
-                                        None,
-                                        // TODO empty schema
-                                        &expr.name(&DFSchema::empty())?,
-                                        data_type,
-                                        // TODO actually nullable. Just to fit tests
-                                        false,
+                                    fields.push((
+                                        DFField::new(
+                                            None,
+                                            // TODO empty schema
+                                            &expr.name(&DFSchema::empty())?,
+                                            data_type,
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ),
+                                        dimension,
                                     ));
-                                    member_fields.push(dimension);
                                 }
                                 LogicalPlanLanguage::MemberError(params) => {
                                     let error =
@@ -1331,28 +1335,25 @@ impl LanguageToLogicalPlanConverter {
 
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
-                        member_fields = member_fields.into_iter().unique().collect();
                         fields = fields
                             .into_iter()
-                            .unique_by(|f| f.qualified_name())
+                            .unique_by(|(f, _)| f.qualified_name())
                             .collect();
                         if let Some(aliases) = aliases {
                             let new_fields = aliases
                                 .iter()
-                                .map(|a| fields.iter().find(|f| f.name() == a).unwrap().clone())
-                                .collect();
-                            member_fields = aliases
-                                .iter()
                                 .map(|a| {
-                                    member_fields
-                                        [fields.iter().find_position(|f| f.name() == a).unwrap().0]
-                                        .clone()
+                                    fields.iter().find(|(f, _)| f.name() == a).unwrap().clone()
                                 })
                                 .collect();
                             fields = new_fields;
                         }
+                        let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
                         Arc::new(CubeScanNode::new(
-                            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?),
+                            Arc::new(DFSchema::new_with_metadata(
+                                fields.into_iter().map(|(f, _)| f).collect(),
+                                HashMap::new(),
+                            )?),
                             member_fields,
                             query,
                             self.auth_context.clone(),
