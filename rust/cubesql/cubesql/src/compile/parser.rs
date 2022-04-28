@@ -33,6 +33,7 @@ pub fn parse_sql_to_statement(
     query: &String,
     protocol: DatabaseProtocol,
 ) -> CompilationResult<Statement> {
+    log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
     let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
