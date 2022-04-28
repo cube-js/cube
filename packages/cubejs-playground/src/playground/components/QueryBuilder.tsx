@@ -29,7 +29,7 @@ type QueryBuilderProps = {
   Pick<SecurityContextProviderProps, 'tokenUpdater'> &
   Pick<QueryTabsProps, 'onTabChange'>;
 
-function QueryBuilderComponent({
+function _QueryBuilder({
   token,
   identifier,
   ...props
@@ -48,7 +48,7 @@ function QueryBuilderComponent({
 }
 
 export const QueryBuilder = memo(
-  QueryBuilderComponent,
+  _QueryBuilder,
   (prevProps, nextProps) => {
     return equals(prevProps, nextProps);
   }

@@ -81,6 +81,7 @@ export function QueryBuilderContainer({
               securityContextToken={securityContextToken}
               onTabChange={props.onTabChange}
               extra={props.extra}
+              onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
