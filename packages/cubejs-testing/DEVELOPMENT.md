@@ -26,6 +26,9 @@ $ env $(cat ~/.env.athena | xargs) yarn test
 
 $ cd packages/cubejs-bigquery-driver
 $ env $(cat ~/.env.bigquery | xargs) yarn test
+
+$ cd packages/cubejs-firebolt-driver
+$ env $(cat ~/.env.firebolt | xargs) yarn test
 ```
 
 Run e2e tests:

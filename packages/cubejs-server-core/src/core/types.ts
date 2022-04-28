@@ -63,6 +63,7 @@ export type DatabaseType =
   | 'clickhouse'
   | 'druid'
   | 'jdbc'
+  | 'firebolt'
   | 'hive'
   | 'mongobi'
   | 'mssql'

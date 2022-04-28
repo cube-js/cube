@@ -179,7 +179,7 @@ export function configureCreateCommand(program: CommanderStatic) {
     .option(
       '-d, --db-type <db-type>',
       'Preconfigure for selected database.\n\t\t\t     ' +
-      'Options: postgres, mysql, mongobi, athena, redshift, bigquery, mssql, clickhouse, snowflake, presto, questdb, materialize'
+      'Options: postgres, mysql, mongobi, athena, redshift, bigquery, mssql, clickhouse, snowflake, presto, questdb, materialize, firebolt'
     )
     .option(
       '-t, --template <template>',
