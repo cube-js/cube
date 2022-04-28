@@ -3163,6 +3163,35 @@ mod tests {
     }
 
     #[test]
+    fn tableau_min_max() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MIN(\"KibanaSampleDataEcommerce\".\"order_date\") AS \"tmn:timestamp:min\", MAX(\"KibanaSampleDataEcommerce\".\"order_date\") AS \"tmn:timestamp:max\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
     fn tableau_group_by_month() {
         init_logger();
 
@@ -3434,14 +3463,14 @@ mod tests {
             //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
             //     CompilationError::User("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
             // ),
-            (
-                "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
-            ),
-            (
-                "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
-            ),
+            // (
+            //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+            //     CompilationError::User("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
+            // ),
+            // (
+            //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
+            //     CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
+            // ),
             // (
             //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
             //     CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),

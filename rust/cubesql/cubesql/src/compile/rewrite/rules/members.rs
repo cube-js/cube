@@ -91,6 +91,30 @@ impl RewriteRules for MemberRules {
                 member_replacer(projection_expr_empty_tail(), "?source_table_name"),
                 cube_scan_members_empty_tail(),
             ),
+            rewrite(
+                "member-replacer-aggr",
+                member_replacer(aggr_aggr_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
+            ),
+            rewrite(
+                "member-replacer-group",
+                member_replacer(aggr_group_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
+            ),
+            rewrite(
+                "member-replacer-projection",
+                member_replacer(projection_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
+            ),
             self.measure_rewrite(
                 "simple-count",
                 agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
@@ -115,16 +139,10 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "projection-columns-with-alias",
                 member_replacer(
-                    projection_expr(
-                        alias_expr(column_expr("?column"), "?alias"),
-                        "?tail_group_expr",
-                    ),
+                    alias_expr(column_expr("?column"), "?alias"),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    "?member",
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
+                "?member".to_string(),
                 self.transform_projection_member(
                     "?source_table_name",
                     "?column",
@@ -134,14 +152,8 @@ impl RewriteRules for MemberRules {
             ),
             transforming_rewrite(
                 "projection-columns",
-                member_replacer(
-                    projection_expr(column_expr("?column"), "?tail_group_expr"),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    "?member",
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
+                member_replacer(column_expr("?column"), "?source_table_name"),
+                "?member".to_string(),
                 self.transform_projection_member("?source_table_name", "?column", None, "?member"),
             ),
             transforming_rewrite(
@@ -153,6 +165,7 @@ impl RewriteRules for MemberRules {
                 member_replacer("?tail_group_expr", "?source_table_name"),
                 self.transform_segment("?source_table_name", "?column"),
             ),
+            // TODO this rule only for group by segment error
             transforming_chain_rewrite(
                 "member-replacer-dimension",
                 member_replacer(
@@ -174,26 +187,20 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "date-trunc",
                 member_replacer(
-                    aggr_group_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?tail_group_expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
                 ),
                 self.transform_time_dimension(
                     "?source_table_name",
@@ -208,65 +215,26 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "date-trunc-alias",
                 member_replacer(
-                    aggr_group_expr(
-                        alias_expr(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), column_expr("?column")],
-                            ),
-                            "?alias",
+                    alias_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
-                        "?tail_group_expr",
+                        "?alias",
                     ),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
-                        alias_expr(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), column_expr("?column")],
-                            ),
-                            "?alias",
-                        ),
-                    ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
-                self.transform_time_dimension(
-                    "?source_table_name",
-                    "?column",
+                time_dimension_expr(
                     "?time_dimension_name",
-                    "?granularity",
                     "?time_dimension_granularity",
                     "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "date-trunc-projection",
-                member_replacer(
-                    projection_expr(
+                    alias_expr(
                         fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
-                        "?tail_group_expr",
+                        "?alias",
                     ),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                    ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
                 ),
                 self.transform_time_dimension(
                     "?source_table_name",
@@ -1115,15 +1083,9 @@ impl MemberRules {
     ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
         transforming_chain_rewrite(
             &format!("measure-{}", name),
-            member_replacer(
-                aggr_aggr_expr("?aggr_expr", "?tail_aggr_expr"),
-                "?source_table_name",
-            ),
+            member_replacer("?aggr_expr", "?source_table_name"),
             vec![("?aggr_expr", aggr_expr)],
-            cube_scan_members(
-                "?measure",
-                member_replacer("?tail_aggr_expr", "?source_table_name"),
-            ),
+            "?measure".to_string(),
             self.transform_measure(
                 "?source_table_name",
                 measure_var,

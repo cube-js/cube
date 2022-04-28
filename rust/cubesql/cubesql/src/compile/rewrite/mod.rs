@@ -269,12 +269,15 @@ crate::plan_to_language! {
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
         OuterProjectionSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
         OuterAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
     }
 }
@@ -374,6 +377,28 @@ where
     Rewrite::new(
         name.to_string(),
         searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
+    )
+    .unwrap()
+}
+
+pub fn transforming_rewrite_with_root<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
         TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
@@ -401,7 +426,9 @@ where
                 .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
                 .collect(),
         },
-        TransformingPattern::new(applier.as_str(), transform_fn),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
     )
     .unwrap()
 }
@@ -583,16 +610,16 @@ fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
 }
 
-fn inner_aggregate_split_replacer(members: impl Display) -> String {
-    format!("(InnerAggregateSplitReplacer {})", members)
+fn inner_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(InnerAggregateSplitReplacer {} {})", members, cube)
 }
 
-fn outer_projection_split_replacer(members: impl Display) -> String {
-    format!("(OuterProjectionSplitReplacer {})", members)
+fn outer_projection_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(OuterProjectionSplitReplacer {} {})", members, cube)
 }
 
-fn outer_aggregate_split_replacer(members: impl Display) -> String {
-    format!("(OuterAggregateSplitReplacer {})", members)
+fn outer_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(OuterAggregateSplitReplacer {} {})", members, cube)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
@@ -686,6 +713,17 @@ fn cube_scan(
         "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
         source_table_name, members, filters, orders, limit, offset, aliases, table_name
     )
+}
+
+pub fn original_expr_name(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+) -> Option<String> {
+    egraph[id]
+        .data
+        .original_expr
+        .as_ref()
+        .map(|e| e.name(&DFSchema::empty()).unwrap())
 }
 
 pub struct ChainSearcher {
@@ -793,7 +831,7 @@ impl ChainSearcher {
 
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -801,7 +839,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -813,7 +851,7 @@ where
 
 impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
@@ -824,7 +862,7 @@ where
         rule_name: Symbol,
     ) -> Vec<Id> {
         let mut new_subst = subst.clone();
-        if (self.vars_to_substitute)(egraph, &mut new_subst) {
+        if (self.vars_to_substitute)(egraph, eclass, &mut new_subst) {
             self.pattern
                 .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
         } else {

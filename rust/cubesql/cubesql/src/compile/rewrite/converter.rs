@@ -1305,10 +1305,17 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
-                        query.measures = Some(query_measures);
-                        query.dimensions = Some(query_dimensions);
+                        query.measures = Some(query_measures.into_iter().unique().collect());
+                        query.dimensions = Some(query_dimensions.into_iter().unique().collect());
                         query.time_dimensions = if query_time_dimensions.len() > 0 {
-                            Some(query_time_dimensions)
+                            Some(
+                                query_time_dimensions
+                                    .into_iter()
+                                    .unique_by(|td| {
+                                        (td.dimension.to_string(), td.granularity.clone())
+                                    })
+                                    .collect(),
+                            )
                         } else {
                             None
                         };
@@ -1324,6 +1331,11 @@ impl LanguageToLogicalPlanConverter {
 
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
+                        member_fields = member_fields.into_iter().unique().collect();
+                        fields = fields
+                            .into_iter()
+                            .unique_by(|f| f.qualified_name())
+                            .collect();
                         if let Some(aliases) = aliases {
                             let new_fields = aliases
                                 .iter()
