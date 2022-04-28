@@ -406,6 +406,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::CastExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
             LogicalPlanLanguage::SortExpr(params) => {
                 if column_name(params[0]).is_some() {

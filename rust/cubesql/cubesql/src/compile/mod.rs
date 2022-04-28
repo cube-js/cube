@@ -3243,6 +3243,24 @@ mod tests {
     }
 
     #[test]
+    fn non_cube_filters_cast_kept() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT id FROM information_schema.testing_dataset WHERE id > CAST('0' AS INTEGER)"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.print(true).unwrap();
+        assert!(
+            logical_plan.contains("CAST"),
+            "{:?} doesn't contain CAST",
+            logical_plan
+        );
+    }
+
+    #[test]
     fn tableau_default_having() {
         init_logger();
 
