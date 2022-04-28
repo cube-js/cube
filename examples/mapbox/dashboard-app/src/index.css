@@ -1,10 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap");
 
-body {
+.mapbox {
   margin: 0;
   font-family: "DM Sans", sans-serif;
   font-feature-settings: "ss03" on;
   font-feature-settings: "ss04" on;
+  background-color: #f3f3fb !important;
+  position: relative;
 }
 
 ::selection {
@@ -206,7 +208,7 @@ body {
 
 .mapbox .mapbox__sider {
   padding: 80px 0 24px;
-  position: fixed;
+  position: absolute;
   width: 300px;
   background-color: white;
   height: 100%;
