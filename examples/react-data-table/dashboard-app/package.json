@@ -14,6 +14,7 @@
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
     "chart.js": "^2.9.3",
+    "cube-example-wrapper": "^1.0.23",
     "date-fns": "^2.16.1",
     "moment": "^2.29.1",
     "prop-types": "^15.7.2",
