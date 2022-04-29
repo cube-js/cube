@@ -27,7 +27,7 @@
 
 .sidebar {
   background-color: var(--color-bg-sidebar);
-  padding: 0 48px;
+  padding: 3.2rem 48px;
   min-width: 350px;
 }
 
