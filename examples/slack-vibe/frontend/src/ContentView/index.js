@@ -11,6 +11,7 @@ import {
 import styles from './styles.module.css';
 import MemberList from '../MemberList';
 import ChannelList from '../ChannelList';
+import Banner from '../Banner';
 import MessagesChart from '../MessagesChart';
 import MembersChart from '../MembersChart';
 import WeekChart from '../WeekChart';
@@ -100,6 +101,7 @@ function ContentView() {
         {/*</div>*/}
       </div>
       <div className={styles.sidebar}>
+        <Banner />
         <MemberList
           data={membersList}
           limit={membersListDoShowAll ? undefined : defaultListSize}

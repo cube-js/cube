@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import styles from './styles.module.css';
+import Banner from '../Banner';
 import UploadBlock from '../UploadBlock';
 
 function UploadView(props) {
@@ -10,6 +11,9 @@ function UploadView(props) {
     <div className={styles.root}>
       <div className={styles.content}>
         <UploadBlock onUpload={onUpload} />
+      </div>
+      <div className={styles.sidebar}>
+        <Banner />
       </div>
     </div>
   );
