@@ -478,9 +478,9 @@ export async function startBirdBoxFromCli(
 }
 
 export interface BirdboxOptions {
-   // Schema directory
+   // Schema directory. LOCAL mode.
   schemaDir?: string,
-  // Config file
+  // Config file. LOCAL mode.
   cubejsConfig?: string,
 }
 
