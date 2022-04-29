@@ -277,17 +277,10 @@ export async function startBirdBoxFromContainer(
     } else {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
-        process.stderr.write(
-          `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
-        );
       }
       await env.down();
       process.stderr.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished with error: ${
-          exitCode
-        }\n`
+        `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
       );
       process.exit(1);
     }
