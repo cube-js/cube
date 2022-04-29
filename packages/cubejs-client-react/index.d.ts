@@ -31,6 +31,7 @@ declare module '@cubejs-client/react' {
     UnaryOperator,
     BinaryOperator,
     DeeplyReadonly,
+    QueryRecordType,
   } from '@cubejs-client/core';
 
   type CubeProviderProps = {
@@ -428,7 +429,16 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: DeeplyReadonly<Query | Query[]>, options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<
+    TData,
+    TQuery extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>>(
+    query: TQuery,
+    options?: UseCubeQueryOptions,
+  ): UseCubeQueryResult<
+    unknown extends TData
+      ? QueryRecordType<TQuery>
+      : TData
+  >;
 
   type UseCubeQueryOptions = {
     /**
