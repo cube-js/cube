@@ -8,8 +8,8 @@ import './index.css';
 import App from './App';
 
 createExampleWrapper({
-  title: "demo title",
-  text: `demo description text`,
+  title: "Open Source Story of Hacktoberfest 2020",
+  text: `This story reveals the unofficial results of <a href='https://hacktoberfest.digitalocean.com' target='_blank' rel='noreferrer'>Hacktoberfest 2020</a> based on a subset of public data.`,
 });
 
 const api = cubejs(process.env.REACT_APP_CUBE_TOKEN, {

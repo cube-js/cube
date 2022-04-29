@@ -10,20 +10,19 @@
     background-color: var(--color-very-light-blue);
     color: var(--color-black);
     margin: 0;
-    font-family: 'Inter', sans-serif;
     font-size: 18px;
     font-weight: normal;
     line-height: 27px;
 }
 
 .root {
-    padding: 50px 0 0;
-    margin: auto;
-    max-width: 1200px;
+    display: grid;
+    grid-template-columns: 5fr 1fr;
 }
 
 .content {
-    padding: 50px calc(8vw + 250px) 50px 8vw;
+    margin: auto;
+    max-width: 800px;
 }
 
 .paragraph {
@@ -50,12 +49,7 @@
 }
 
 .sidebar {
-    padding-right: 100px;
-    position: fixed;
-    top: 50px;
-    right: 0;
-    width: 250px;
-    z-index: 999;
+    padding: 50px 50px 0 0;
 }
 
 .menu {
@@ -79,8 +73,9 @@
 }
 
 @media only screen and (max-width: 1100px) {
-    .content {
-        padding: 25px 8vw 100px 8vw;
+    .root {
+        display: block;
+        padding: 0 50px;
     }
 
     .paragraph {
