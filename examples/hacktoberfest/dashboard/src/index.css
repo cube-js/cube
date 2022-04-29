@@ -14,23 +14,6 @@
   /*--color-very-dark-blue: #072540;*/
 }
 
-body {
-  background-color: var(--color-very-light-blue);
-  color: var(--color-black);
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  font-weight: normal;
-  line-height: 27px;
-/*  -webkit-font-smoothing: antialiased;*/
-/*  -moz-osx-font-smoothing: grayscale;*/
-}
-
-/*code {*/
-/*  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',*/
-/*    monospace;*/
-/*}*/
-
 h1 {
   color: inherit;
   font-size: 45px;

@@ -82,13 +82,7 @@ export default function App() {
   })
 
   return (
-    <>
-      <div className={styles.banner}>
-        <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>
-          This story is powered by Cube.js,
-          an open source analytical API platform
-        </a>
-      </div>
+    <div className={styles.wrapper}>
       <div className={styles.root}>
         <Logo />
         <div className={styles.content}>
@@ -146,6 +140,6 @@ export default function App() {
           <LanguageSelector defaultSelected={defaultLanguages} onUpdate={setLanguages}/>
         </div>
       </div>
-    </>
+    </div>
   )
 }

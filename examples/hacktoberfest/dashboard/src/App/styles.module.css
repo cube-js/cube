@@ -1,15 +1,3 @@
-.banner {
-    background: var(--color-light-blue);
-    font-size: 14px;
-    font-weight: 800;
-    line-height: 22px;
-    padding: 15px 20px;
-    position: fixed;
-    text-align: center;
-    width: 100%;
-    z-index: 999;
-}
-
 .banner a {
     color: inherit;
 }
@@ -18,8 +6,18 @@
     text-decoration: underline;
 }
 
+.wrapper {
+    background-color: var(--color-very-light-blue);
+    color: var(--color-black);
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: normal;
+    line-height: 27px;
+}
+
 .root {
-    padding: 100px 0 0;
+    padding: 50px 0 0;
     margin: auto;
     max-width: 1200px;
 }
@@ -52,10 +50,9 @@
 }
 
 .sidebar {
-    padding-top: 25px;
     padding-right: 100px;
     position: fixed;
-    top: 100px;
+    top: 50px;
     right: 0;
     width: 250px;
     z-index: 999;
