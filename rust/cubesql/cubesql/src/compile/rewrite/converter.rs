@@ -505,11 +505,13 @@ macro_rules! match_data_node {
     ($node_by_id:expr, $id_expr:expr, $field_variant:ident) => {
         match $node_by_id.index($id_expr.clone()) {
             LogicalPlanLanguage::$field_variant($field_variant(data)) => data.clone(),
-            x => panic!(
-                "Expected {} but found {:?}",
-                std::stringify!($field_variant),
-                x
-            ),
+            x => {
+                return Err(CubeError::internal(format!(
+                    "Expected {} but found {:?}",
+                    std::stringify!($field_variant),
+                    x
+                )))
+            }
         }
     };
 }

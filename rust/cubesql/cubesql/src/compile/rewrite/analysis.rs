@@ -55,11 +55,12 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
     type Output = LogicalPlanLanguage;
 
     fn index(&self, index: Id) -> &Self::Output {
-        assert!(
-            self.egraph.index(index).nodes.len() == 1,
-            "Single node expected but {:?} found",
-            self.egraph.index(index).nodes
-        );
+        // TODO As we replace inside lists for casts here can be multiple terminal nodes
+        // assert!(
+        //     self.egraph.index(index).nodes.len() == 1,
+        //     "Single node expected but {:?} found",
+        //     self.egraph.index(index).nodes
+        // );
         &self.egraph.index(index).nodes[0]
     }
 }
@@ -410,6 +411,17 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
+                for p in params.iter() {
+                    vec.extend(referenced_columns(*p)?.into_iter());
+                }
+
+                Some(vec)
+            }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
             LogicalPlanLanguage::SortExpr(params) => {
                 if column_name(params[0]).is_some() {
@@ -541,10 +553,9 @@ impl LogicalPlanAnalysis {
     ) -> Option<CanSplitNode> {
         let can_split = |id| egraph.index(id).data.can_split.clone();
         let cube_reference = |id| egraph.index(id).data.cube_reference.clone();
-        let node_by_id = &SingleNodeIndex { egraph };
         match enode {
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
-                let fun = crate::match_data_node!(node_by_id, params[0], ScalarFunctionExprFun);
+                let fun = var_iter!(egraph[params[0]], ScalarFunctionExprFun).next()?;
                 let can_split_args = can_split(params[1]);
 
                 match fun {

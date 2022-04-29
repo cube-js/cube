@@ -1,10 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::InListExprNegated;
-use crate::compile::rewrite::LimitN;
-use crate::compile::rewrite::LiteralExprValue;
-use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::SegmentMemberMember;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TimeDimensionDateRange;
@@ -22,10 +18,14 @@ use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
     time_dimension_date_range_replacer, time_dimension_expr, BetweenExprNegated,
 };
+use crate::compile::rewrite::{filter_cast_unwrap_replacer, InListExprNegated};
+use crate::compile::rewrite::{fun_expr, LogicalPlanLanguage};
+use crate::compile::rewrite::{fun_expr_var_arg, scalar_fun_expr_args, LimitN};
 use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
 use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
 use crate::compile::rewrite::{limit, CubeScanLimit};
 use crate::compile::rewrite::{projection, FilterMemberValues};
+use crate::compile::rewrite::{scalar_fun_expr_args_empty_tail, LiteralExprValue};
 use crate::compile::rewrite::{segment_member, FilterMemberOp};
 use crate::transport::ext::V1CubeMetaExt;
 use crate::transport::MemberType;
@@ -64,7 +64,10 @@ impl RewriteRules for FilterRules {
                 cube_scan(
                     "?source_table_name",
                     "?members",
-                    cube_scan_filters("?filters", filter_replacer("?expr", "?cube")),
+                    cube_scan_filters(
+                        "?filters",
+                        filter_replacer(filter_cast_unwrap_replacer("?expr"), "?cube"),
+                    ),
                     "?order",
                     "?limit",
                     "?offset",
@@ -283,6 +286,86 @@ impl RewriteRules for FilterRules {
                     ),
                     "or",
                 ),
+            ),
+            // TODO define zero
+            rewrite(
+                "filter-str-pos-to-like",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Strpos",
+                            vec![
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                literal_expr("?value"),
+                            ],
+                        ),
+                        ">",
+                        literal_expr("?zero"),
+                    ),
+                    "?cube",
+                ),
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "LIKE", literal_expr("?value")),
+                    "?cube",
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap",
+                filter_cast_unwrap_replacer(cast_expr("?expr", "?data_type")),
+                filter_cast_unwrap_replacer("?expr"),
+            ),
+            rewrite(
+                "filter-cast-unwrap-binary-push-down",
+                filter_cast_unwrap_replacer(binary_expr("?left", "?op", "?right")),
+                binary_expr(
+                    filter_cast_unwrap_replacer("?left"),
+                    "?op",
+                    filter_cast_unwrap_replacer("?right"),
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-inlist-push-down",
+                filter_cast_unwrap_replacer(inlist_expr("?expr", "?list", "?negated")),
+                // TODO unwrap list as well
+                inlist_expr(filter_cast_unwrap_replacer("?expr"), "?list", "?negated"),
+            ),
+            rewrite(
+                "filter-cast-unwrap-is-null-push-down",
+                filter_cast_unwrap_replacer(is_null_expr("?expr")),
+                is_null_expr(filter_cast_unwrap_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-cast-unwrap-is-not-null-push-down",
+                filter_cast_unwrap_replacer(is_not_null_expr("?expr")),
+                is_not_null_expr(filter_cast_unwrap_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-cast-unwrap-literal-push-down",
+                filter_cast_unwrap_replacer(literal_expr("?literal")),
+                literal_expr("?literal"),
+            ),
+            rewrite(
+                "filter-cast-unwrap-column-push-down",
+                filter_cast_unwrap_replacer(column_expr("?column")),
+                column_expr("?column"),
+            ),
+            rewrite(
+                "filter-cast-unwrap-scalar-fun-push-down",
+                filter_cast_unwrap_replacer(fun_expr_var_arg("?fun", "?args")),
+                fun_expr_var_arg("?fun", filter_cast_unwrap_replacer("?args")),
+            ),
+            rewrite(
+                "filter-cast-unwrap-scalar-args-push-down",
+                filter_cast_unwrap_replacer(scalar_fun_expr_args("?left", "?right")),
+                scalar_fun_expr_args(
+                    filter_cast_unwrap_replacer("?left"),
+                    filter_cast_unwrap_replacer("?right"),
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-scalar-args-empty-tail-push-down",
+                filter_cast_unwrap_replacer(scalar_fun_expr_args_empty_tail()),
+                scalar_fun_expr_args_empty_tail(),
             ),
             rewrite(
                 "filter-flatten-upper-and-left",
@@ -517,37 +600,6 @@ impl RewriteRules for FilterRules {
                     "?time_dimension_member",
                     "?time_dimension_date_range",
                     "?output_date_range",
-                ),
-            ),
-            rewrite(
-                "unwrap-cast-column",
-                filter_replacer(
-                    binary_expr(
-                        cast_expr(column_expr("?column"), "?data_type"),
-                        "?op",
-                        literal_expr("?literal"),
-                    ),
-                    "?cube",
-                ),
-                filter_replacer(
-                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
-                    "?cube",
-                ),
-            ),
-            // We want to defer cast evaluation to filter value parse as it differs from DF
-            rewrite(
-                "unwrap-cast-literal",
-                filter_replacer(
-                    binary_expr(
-                        column_expr("?column"),
-                        "?op",
-                        cast_expr(literal_expr("?literal"), "?data_type"),
-                    ),
-                    "?cube",
-                ),
-                filter_replacer(
-                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
-                    "?cube",
                 ),
             ),
         ]

@@ -257,6 +257,9 @@ crate::plan_to_language! {
             filters: Vec<LogicalPlan>,
             cube: Option<String>,
         },
+        FilterCastUnwrapReplacer {
+            filters: Vec<LogicalPlan>,
+        },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
@@ -450,11 +453,19 @@ fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarFunctionExpr {} {})",
-        fun_name,
-        list_expr("ScalarFunctionExprArgs", args)
-    )
+    fun_expr_var_arg(fun_name, list_expr("ScalarFunctionExprArgs", args))
+}
+
+fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    format!("(ScalarFunctionExpr {} {})", fun_name, arg_list)
+}
+
+fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarFunctionExprArgs {} {})", left, right)
+}
+
+fn scalar_fun_expr_args_empty_tail() -> String {
+    "ScalarFunctionExprArgs".to_string()
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
@@ -608,6 +619,10 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn filter_cast_unwrap_replacer(members: impl Display) -> String {
+    format!("(FilterCastUnwrapReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {

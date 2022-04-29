@@ -3445,6 +3445,37 @@ mod tests {
     }
 
     #[test]
+    fn tableau_contains_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:freeCount:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nWHERE (STRPOS(CAST(LOWER(CAST(CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS TEXT)) AS TEXT),CAST('fem' AS TEXT)) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["fem".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[test]
     fn test_select_aggregations() {
         let variants = vec![
             (
