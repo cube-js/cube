@@ -1,7 +1,7 @@
 .root {
   background-color: var(--color-bg);
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 3fr min-content;
   min-height: 100vh;
 }
 
