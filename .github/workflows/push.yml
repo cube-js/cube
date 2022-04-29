@@ -317,7 +317,7 @@ jobs:
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
   integration-birdbox:
-    needs: [ unit, lint, latest-tag-sha ]
+    needs: [ lint, latest-tag-sha ]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
