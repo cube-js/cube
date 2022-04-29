@@ -1,5 +1,8 @@
 .root {
+  padding: 2rem;
+  background-color: var(--color-bg-card);
   margin-bottom: 2rem;
+  border-radius: var(--border-radius);
 }
 
 .header {
