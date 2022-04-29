@@ -1,7 +1,8 @@
 /**
- * Required environment variables per datasource.
+ * Environment variables that cannot be hardcoded in code, and instead must be specified via the cli.
+ * Usually cloud db config & auth variables.
  */
-export const REQ_ENV_VARS: {[key: string]: string[]} = {
+export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   athena: [
     'CUBEJS_AWS_KEY',
     'CUBEJS_AWS_SECRET',
@@ -16,9 +17,5 @@ export const REQ_ENV_VARS: {[key: string]: string[]} = {
   ],
   multidb: [],
   questdb: [],
-  postgres: [
-    'CUBEJS_DB_USER',
-    'CUBEJS_DB_PASS',
-    'CUBEJS_DB_TYPE',
-  ],
+  postgres: [],
 };

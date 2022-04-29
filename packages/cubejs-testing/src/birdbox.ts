@@ -15,7 +15,7 @@ import {
   getLocalHostnameByOs,
   PostgresDBRunner,
 } from '@cubejs-backend/testing-shared';
-import { REQ_ENV_VARS } from './REQ_ENV_VARS';
+import { REQUIRED_ENV_VARS } from './REQUIRED_ENV_VARS';
 
 /**
  * Logging options defined in CLI.
@@ -501,7 +501,7 @@ export async function getBirdbox(
   const { mode, log } = args;
 
   // extract/assert env variables
-  if (REQ_ENV_VARS[type] === undefined) {
+  if (REQUIRED_ENV_VARS[type] === undefined) {
     if (log === Log.PIPE) {
       process.stderr.write(
         `List of required environment variables is missing for ${
@@ -511,7 +511,7 @@ export async function getBirdbox(
     }
     process.exit(1);
   } else {
-    REQ_ENV_VARS[type].forEach((key: string) => {
+    REQUIRED_ENV_VARS[type].forEach((key: string) => {
       if (process.env[key] === undefined) {
         if (log === Log.PIPE) {
           process.stderr.write(
