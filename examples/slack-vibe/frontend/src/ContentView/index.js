@@ -11,8 +11,6 @@ import {
 import styles from './styles.module.css';
 import MemberList from '../MemberList';
 import ChannelList from '../ChannelList';
-import Header from '../Header';
-import Banner from '../Banner';
 import MessagesChart from '../MessagesChart';
 import MembersChart from '../MembersChart';
 import WeekChart from '../WeekChart';
@@ -61,15 +59,6 @@ function ContentView() {
   return (
     <div className={styles.root}>
       <div className={styles.content}>
-        <Header
-          onClick={() => {
-            setPeriod(defaultPeriod);
-            setGranularity(defaultGranularity);
-            setChosenChannel(null);
-            setChosenMember(null);
-            setDoShowFilter(false);
-          }}
-        />
         <div className={styles.header}>
           {renderHeader(period, granularity, chosenMember, chosenChannel, () =>
             setDoShowFilter(true)
@@ -111,7 +100,6 @@ function ContentView() {
         {/*</div>*/}
       </div>
       <div className={styles.sidebar}>
-        <Banner />
         <MemberList
           data={membersList}
           limit={membersListDoShowAll ? undefined : defaultListSize}
