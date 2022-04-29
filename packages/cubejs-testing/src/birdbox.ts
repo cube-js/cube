@@ -30,7 +30,7 @@ enum Log {
  */
 enum Mode {
   CLI = 'cli',
-  LOC = 'local',
+  LOCAL = 'local',
   DOCKER = 'docker',
 }
 
@@ -55,8 +55,7 @@ export interface ContainerOptions {
 /**
  * Birdbox options for local/cli mode.
  */
-export interface LocalOptions
-  extends ContainerOptions {
+export interface LocalOptions extends ContainerOptions {
   cubejsConfig?: string;
   useCubejsServerBinary?: boolean;
 }
@@ -185,17 +184,11 @@ export async function startBirdBoxFromContainer(
 
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
-    const tag = `${
-      process.env.BIRDBOX_CUBEJS_REGISTRY_PATH
-    }cubejs/cube:${
-      process.env.BIRDBOX_CUBEJS_VERSION
-    }`;
+    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
     if (
       execInDir(
         '../..',
-        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${
-          tag
-        }`
+        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`
       ) !== 0
     ) {
       throw new Error('[Birdbox] Docker build failed.');
@@ -243,9 +236,7 @@ export async function startBirdBoxFromContainer(
   if (process.env.TEST_PLAYGROUND_PORT) {
     if (options.log === Log.PIPE) {
       process.stdout.write(
-        `[Birdbox] Creating a proxy server 4000->${
-          port
-        } for local testing\n`
+        `[Birdbox] Creating a proxy server 4000->${port} for local testing\n`
       );
     }
     
@@ -288,11 +279,7 @@ export async function startBirdBoxFromContainer(
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
         process.stderr.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
+          `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
         );
       }
       await env.down();
@@ -339,25 +326,12 @@ export async function startBirdBoxFromCli(
     db = await PostgresDBRunner.startContainer({
       volumes: [
         {
-          source: path.join(
-            __dirname,
-            '..',
-            '..',
-            'birdbox-fixtures',
-            'datasets'
-          ),
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
           target: '/data',
           bindMode: 'ro',
         },
         {
-          source: path.join(
-            __dirname,
-            '..',
-            '..',
-            'birdbox-fixtures',
-            'postgresql',
-            'scripts'
-          ),
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
           target: '/scripts',
           bindMode: 'ro',
         },
@@ -373,19 +347,13 @@ export async function startBirdBoxFromCli(
 
     if (exitCode === 0 && options.log === Log.PIPE) {
       process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished successfully\n`
+        `[Birdbox] Script ${loadScript} finished successfully\n`
       );
     } else {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
         process.stdout.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
+          `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
         );
       }
       await db.stop();
@@ -411,12 +379,7 @@ export async function startBirdBoxFromCli(
 
   if (options.cubejsConfig) {
     fs.copySync(
-      path.join(
-        process.cwd(),
-        'birdbox-fixtures',
-        'postgresql',
-        options.cubejsConfig
-      ),
+      path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', options.cubejsConfig),
       path.join(testDir, 'cube.js')
     );
   }
@@ -505,7 +468,13 @@ export async function startBirdBoxFromCli(
 export async function getBirdbox(
   type: string,
   env: Env,
+  cubejsConfig?: string,
 ) {
+  // default args
+  if (!cubejsConfig) {
+    cubejsConfig = 'single/cube.js';
+  }
+
   // extract mode
   const args: Args = yargs(process.argv.slice(2))
     .exitProcess(false)
@@ -514,10 +483,10 @@ export async function getBirdbox(
         describe: 'Determines Birdbox mode.',
         choices: [
           Mode.CLI,
-          Mode.LOC,
+          Mode.LOCAL,
           Mode.DOCKER,
         ],
-        default: Mode.LOC,
+        default: Mode.LOCAL,
       },
       log: {
         describe: 'Determines Birdbox logging.',
@@ -565,13 +534,13 @@ export async function getBirdbox(
   try {
     switch (mode) {
       case Mode.CLI:
-      case Mode.LOC: {
+      case Mode.LOCAL: {
         birdbox = await startBirdBoxFromCli({
           type,
           env,
           log,
-          cubejsConfig: 'single/cube.js',
-          useCubejsServerBinary: mode === Mode.LOC,
+          cubejsConfig,
+          useCubejsServerBinary: mode === Mode.LOCAL,
         });
         break;
       }
@@ -597,6 +566,8 @@ export async function getBirdbox(
       process.stderr.write(e as string);
     }
     clearTestData();
+    console.log('momomomo');
+    await new Promise(resolve => setTimeout(resolve, 500000));
     process.exit(1);
   }
   return birdbox;

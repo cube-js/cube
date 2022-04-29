@@ -14,10 +14,11 @@ export const REQ_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET',
     'CUBEJS_DB_BQ_CREDENTIALS',
   ],
+  multidb: [],
+  questdb: [],
   postgres: [
     'CUBEJS_DB_USER',
     'CUBEJS_DB_PASS',
     'CUBEJS_DB_TYPE',
   ],
-  questdb: [],
 };

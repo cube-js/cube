@@ -429,6 +429,7 @@ jobs:
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
           yarn run birdbox:questdb
+          yarn run birdbox:multidb
       # - name: Testing Athena driver (container mode) via BirdBox
       #   env:
       #     CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
