@@ -15,7 +15,7 @@ function App() {
   const [ jwtSecret, setJwtSecret ] = useState(defaultJwtSecret);
   const [ apiUrl, setApiUrl ] = useState(defaultApiUrl);
 
-  const suppliers = [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
+  const suppliers = [ ...Array(10).keys() ].map( i => i+1)
     .map(id => ({
       id,
       token: !jwtSecret ? 'foobar' : jwt.sign({
