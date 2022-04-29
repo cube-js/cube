@@ -404,22 +404,16 @@ export async function startBirdBoxFromCli(
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
     CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-    ...db
-      ? {
-        CUBEJS_DB_HOST: db!.getHost(),
-        CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
-      }
-      : {},
     ...options.env
       ? options.env
       : {
+        CUBEJS_DB_HOST: db!.getHost(),
+        CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
         CUBEJS_DB_NAME: 'test',
         CUBEJS_DB_USER: 'test',
         CUBEJS_DB_PASS: 'test',
       }
   };
-
-  process.stdout.write(`ZZZ ${JSON.stringify(env, null, 4)}`);
 
   try {
     cli = spawn(
@@ -486,7 +480,6 @@ export interface BirdboxOptions {
   schemaDir?: string,
   // Config file
   cubejsConfig?: string,
-  loadScript?: string,
 }
 
 /**
