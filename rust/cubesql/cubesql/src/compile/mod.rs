@@ -39,30 +39,25 @@ use self::{
         provider::CubeContext,
         udf::{
             create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
-            create_current_schemas_udf, create_current_user_udf, create_db_udf,
-            create_format_type_udf, create_generate_series_udtf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_least_udf, create_locate_udf,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf, create_pg_get_expr_udf,
-            create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-            create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf,
-            create_ucase_udf, create_user_udf, create_version_udf,
+            create_current_schemas_udf, create_current_timestamp, create_current_user_udf,
+            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf, create_hour_udf,
+            create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf,
+            create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
+            create_pg_backend_pid, create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
+            create_pg_get_expr_udf, create_pg_get_userbyid, create_pg_get_userbyid_udf,
+            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
+            create_pg_table_is_visible, create_pg_type_is_visible, create_quarter_udf,
+            create_second_udf, create_str_to_date, create_time_format_udf, create_timediff_udf,
+            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
+            create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
 };
 use crate::{
-    compile::{
-        builder::QueryBuilder,
-        engine::udf::{
-            create_current_timestamp, create_date_add_udf, create_date_sub_udf, create_date_udf,
-            create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
-            create_generate_subscripts_udtf, create_hour_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid, create_quarter_udf,
-            create_second_udf, create_str_to_date, create_unnest_udtf, create_year_udf,
-            pg_get_userbyid, pg_table_is_visible,
-        },
-        rewrite::converter::LogicalPlanToLanguageConverter,
-    },
+    compile::{builder::QueryBuilder, rewrite::converter::LogicalPlanToLanguageConverter},
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
@@ -2309,8 +2304,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         ctx.register_udf(create_pg_get_expr_udf());
-        ctx.register_udf(pg_table_is_visible());
-        ctx.register_udf(pg_get_userbyid());
+        ctx.register_udf(create_pg_table_is_visible());
+        ctx.register_udf(create_pg_get_userbyid());
+        ctx.register_udf(create_pg_type_is_visible());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -6471,6 +6467,26 @@ mod tests {
             execute_query(
                 "SELECT (information_schema._pg_expandarray(t.a)).n FROM pg_catalog.pg_class c, (SELECT ARRAY[5, 10, 15] a) t;"
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_type_is_visible_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_type_is_visible",
+            execute_query(
+                "
+                SELECT t.oid, t.typname, n.nspname, pg_catalog.pg_type_is_visible(t.oid) is_visible
+                FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n
+                WHERE t.typnamespace = n.oid
+                ORDER BY t.oid ASC;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

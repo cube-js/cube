@@ -29,6 +29,7 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
+use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
@@ -1276,7 +1277,7 @@ pub fn create_pg_get_expr_udf() -> ScalarUDF {
     )
 }
 
-pub fn pg_table_is_visible() -> ScalarUDF {
+pub fn create_pg_table_is_visible() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
@@ -1306,7 +1307,7 @@ pub fn pg_table_is_visible() -> ScalarUDF {
     )
 }
 
-pub fn pg_get_userbyid() -> ScalarUDF {
+pub fn create_pg_get_userbyid() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
@@ -1331,6 +1332,40 @@ pub fn pg_get_userbyid() -> ScalarUDF {
             vec![TypeSignature::Exact(vec![DataType::UInt32])],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_type_is_visible() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(oid) => {
+                    if oid >= 18000 {
+                        return Some(true);
+                    }
+
+                    match PgTypeId::from_oid(oid)?.to_type().typnamespace {
+                        11 | 2200 => Some(true),
+                        _ => Some(false),
+                    }
+                }
+                None => None,
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_type_is_visible",
+        &Signature::exact(vec![DataType::UInt32], Volatility::Immutable),
         &return_type,
         &fun,
     )
