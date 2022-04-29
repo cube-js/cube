@@ -6,16 +6,9 @@ import 'antd/dist/antd.css';
 import './index.css';
 import App from './App';
 
-const API_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://nervous-itmann.gcp-us-central1.cubecloudapp.dev'
-    : 'http://localhost:4000';
 
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2Mjc0NjM2MDZ9.1boj2JrVcsxVkbQsZxuOP21VDxNQyHpxrh3go45k9pc';
-
-const api = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
+const api = cubejs(process.env.REACT_APP_CUBE_TOKEN, {
+  apiUrl: `${process.env.REACT_APP_CUBE_API}`,
 });
 
 ReactDOM.render(
