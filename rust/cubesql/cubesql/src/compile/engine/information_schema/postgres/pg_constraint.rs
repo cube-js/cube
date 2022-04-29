@@ -4,7 +4,10 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder, ListBuilder, Int64Builder},
+        array::{
+            Array, ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, ListBuilder,
+            StringBuilder, UInt32Builder,
+        },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -152,7 +155,11 @@ impl TableProvider for PgCatalogConstraintProvider {
             Field::new("conislocal", DataType::Boolean, false),
             Field::new("coninhcount", DataType::Int32, false),
             Field::new("connoinherit", DataType::Boolean, false),
-            Field::new("conkey", DataType::List(Box::new(Field::new("item", DataType::Int64, true))), true),
+            Field::new(
+                "conkey",
+                DataType::List(Box::new(Field::new("item", DataType::Int64, true))),
+                true,
+            ),
             Field::new("confkey", DataType::Utf8, true),
             Field::new("conpfeqop", DataType::Utf8, true),
             Field::new("conppeqop", DataType::Utf8, true),
