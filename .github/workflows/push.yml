@@ -363,6 +363,7 @@ jobs:
       - name: Run Integration Birdbox tests
         timeout-minutes: 30
         run: |
+          yarn run birdbox:multidb
           yarn run birdbox:questdb
 
   docker-image-latest-set-tag:
