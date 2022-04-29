@@ -30,7 +30,8 @@ services:
       - "4000:4000"
     restart: always
 
-  # Database instances, for troubleshooting. NOT required.
+  # Database instances, for troubleshooting.
+  # NOT required.
   # Tests provide db instances via testcontainers, in both LOCAL and DOCKER modes.
 
   db:
