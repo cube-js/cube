@@ -5550,7 +5550,7 @@ mod tests {
                     pg_catalog.pg_class fkc,
                     pg_catalog.pg_attribute fka,
                     pg_catalog.pg_constraint con,
-                    /*!TODO pg_catalog.generate_series(1, 32) pos(n), */
+                    pg_catalog.generate_series(1, 32) pos(n),
                     pg_catalog.pg_class pkic
                 WHERE
                     pkn.oid = pkc.relnamespace AND
@@ -5579,7 +5579,6 @@ mod tests {
             .await?
         );
 
-        // TODO: todos!
         insta::assert_snapshot!(
             "tableau_table_cat_query",
             execute_query(
@@ -5589,7 +5588,7 @@ mod tests {
                     result.TABLE_SCHEM,
                     result.TABLE_NAME,
                     result.COLUMN_NAME,
-                    /*!TODO result.KEY_SEQ, */
+                    result.KEY_SEQ,
                     result.PK_NAME
                 FROM
                     (
@@ -5598,9 +5597,9 @@ mod tests {
                             n.nspname AS TABLE_SCHEM,
                             ct.relname AS TABLE_NAME,
                             a.attname AS COLUMN_NAME,
-                            /*!TODO (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, */
+                            (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ,
                             ci.relname AS PK_NAME,
-                            /*!TODO information_schema._pg_expandarray(i.indkey) AS KEYS, */
+                            information_schema._pg_expandarray(i.indkey) AS KEYS,
                             a.attnum AS A_ATTNUM
                         FROM pg_catalog.pg_class ct
                         JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)
@@ -5613,12 +5612,11 @@ mod tests {
                             ct.relname = 'payment' AND
                             i.indisprimary
                     ) result
-                    /*!TODO where result.A_ATTNUM = (result.KEYS).x */
+                    where result.A_ATTNUM = (result.KEYS).x
                 ORDER BY
-                    result.table_name /*!TODO ,
-                    result.pk_name, */
-                    /* !TODO result.key_seq */
-                ;
+                    result.table_name,
+                    result.pk_name,
+                    result.key_seq;
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
