@@ -2,7 +2,7 @@ const createExampleWrapper = require("cube-example-wrapper").default
 
 
 createExampleWrapper({
-    title: "Google Chart Dashboard",
+    title: "Google Charts Dashboard",
     text: `
         <p>This live demo shows a Google Charts dashboard created with Cube and vanilla JavaScript.</p>
         <p>Follow 
