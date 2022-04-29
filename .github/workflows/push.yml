@@ -363,6 +363,7 @@ jobs:
       - name: Run Integration Birdbox tests
         timeout-minutes: 30
         run: |
+          cd packages/cubejs-testing/
           yarn run birdbox:multidb
           yarn run birdbox:questdb
 
