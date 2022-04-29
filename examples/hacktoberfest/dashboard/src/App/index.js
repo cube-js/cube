@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { page } from 'cubedev-tracking'
 import { Col, Row } from 'antd'
 import styles from './styles.module.css'
-import Logo from '../Logo'
 import LanguageSelector from '../LanguageSelector'
 import UserCountCard from '../Card/UserCountCard'
 import RepoCountCard from '../Card/RepoCountCard'
@@ -82,22 +81,9 @@ export default function App() {
   })
 
   return (
-    <>
-      <div className={styles.banner}>
-        <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>
-          This story is powered by Cube.js,
-          an open source analytical API platform
-        </a>
-      </div>
+    <div className={styles.wrapper}>
       <div className={styles.root}>
-        <Logo />
         <div className={styles.content}>
-          <div className={styles.paragraph}>
-            This story reveals the <b>unofficial results of <a href='https://hacktoberfest.digitalocean.com' target='_blank' rel='noreferrer'>Hacktoberfest 2020</a> based on a subset of public data</b>,
-            presented by the <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>Cube.js</a> team.
-            Learn all about Hacktoberfest, check out <a href='https://cube.dev?utm_source=product&utm_medium=app&utm_campaign=hacktoberfest' target='_blank' rel='noreferrer'>Cube.js</a>, and don't forget to pick your favorite language -->
-          </div>
-
           <h2 id='key-highlights'>Key Highlights 🔦</h2>
 
           <div className={styles.paragraph}>
@@ -146,6 +132,6 @@ export default function App() {
           <LanguageSelector defaultSelected={defaultLanguages} onUpdate={setLanguages}/>
         </div>
       </div>
-    </>
+    </div>
   )
 }
