@@ -71,11 +71,11 @@ import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
 import {
   transformCube,
-  transformDimensions,
-  transformMeasures,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
   transformJoins,
   transformPreAggregations,
-  transformSegments
 } from './helpers/transformMetaExtended';
 
 /**
@@ -410,18 +410,31 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
     try {
-      const metaExtended = await this.compilerApi(context).metaExtended({
+      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
       });
-      const cubes = metaExtended
+      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+
+      const cubes = metaConfig
+        .map((meta) => meta.config)
         .map((cube) => ({
-          ...transformCube(cube),
-          measures: transformMeasures(cube?.measures),
-          dimensions: transformDimensions(cube?.dimensions),
-          joins: transformJoins(cube?.joins),
-          segments: transformSegments(cube?.segments),
-          preAggregations: transformPreAggregations(cube?.preAggregations),
+          ...transformCube(cube, cubeDefinitions),
+          measures: cube.measures.filter(visibilityFilter).map((measure) => ({
+            ...transformMeasure(measure, cubeDefinitions),
+          })),
+          dimensions: cube.dimensions.filter(visibilityFilter).map((dimension) => ({
+            ...transformDimension(dimension, cubeDefinitions),
+          })),
+          segments: cube.segments.map((segment) => ({
+            ...transformSegment(segment, cubeDefinitions),
+          })),
+          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {

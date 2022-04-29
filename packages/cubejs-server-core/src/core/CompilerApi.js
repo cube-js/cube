@@ -172,13 +172,12 @@ export class CompilerApi {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 
-  async metaExtended(options) {
-    const { builtCubes } = (await this.getCompilers(options)).cubeEvaluator;
-    return Object.values(builtCubes).map(builtCube => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { allDefinitions, ...cube } = builtCube;
-      return cube;
-    });
+  async metaConfigExtended(options) {
+    const { metaTransformer } = await this.getCompilers(options);
+    return {
+      metaConfig: metaTransformer?.cubes,
+      cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
+    };
   }
 
   canUsePreAggregationForTransformedQuery(transformedQuery, refs) {

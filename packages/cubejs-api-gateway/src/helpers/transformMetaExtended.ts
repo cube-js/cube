@@ -7,12 +7,16 @@ function stringifyMemberSql(sql: any) {
   return sqlStr.substring(sqlStr.indexOf('=>') + 3);
 }
 
-function isVisible(member: any) {
-  if (member.hasOwnProperty('shown')) {
-    return member.shown;
-  }
+type MemberPath = {
+  cubeName: string,
+  memberName: string,
+};
 
-  return true;
+function getMemberPath(name: string): MemberPath {
+  return {
+    cubeName: name?.split('.')[0],
+    memberName: name?.split('.')[1],
+  };
 }
 
 function handleDimensionCaseCondition(caseCondition: any) {
@@ -30,43 +34,41 @@ function handleDimensionCaseCondition(caseCondition: any) {
   };
 }
 
-function transformCube(cube: any) {
+function transformCube(cube: any, cubeDefinitions: any) {
   return {
     ...cube,
-    isVisible: isVisible(cube),
-    extends: stringifyMemberSql(cube?.extends),
-    sql: stringifyMemberSql(cube?.sql)
+    extends: stringifyMemberSql(cubeDefinitions[cube?.name]?.extends),
+    sql: stringifyMemberSql(cubeDefinitions[cube?.name]?.sql),
   };
 }
 
-function transformMeasures(measures: any) {
-  if (!measures) {
-    return undefined;
-  }
-
-  return Object.entries(measures)?.map(([measureName, measure]: [measureName: string, measure: any]) => ({
+function transformMeasure(measure: any, cubeDefinitions: any) {
+  const { cubeName, memberName } = getMemberPath(measure.name);
+  return {
     ...measure,
-    name: measureName,
-    isVisible: isVisible(measure),
-    sql: stringifyMemberSql(measure?.sql),
-    filters: measure?.filters?.map((filter) => ({
+    sql: stringifyMemberSql(cubeDefinitions[cubeName]?.measures?.[memberName]?.sql),
+    filters: cubeDefinitions[cubeName]?.measures?.[memberName]?.filters?.map((filter) => ({
       sql: stringifyMemberSql(filter.sql),
     })),
-  }));
+  };
 }
 
-function transformDimensions(dimensions: any) {
-  if (!dimensions) {
-    return undefined;
-  }
-
-  return Object.entries(dimensions)?.map(([dimensionName, dimension]: [dimensionName: string, dimension: any]) => ({
+function transformDimension(dimension: any, cubeDefinitions: any) {
+  const { cubeName, memberName } = getMemberPath(dimension.name);
+  return {
     ...dimension,
-    name: dimensionName,
-    isVisible: isVisible(dimension),
-    sql: stringifyMemberSql(dimension?.sql),
-    case: handleDimensionCaseCondition(dimension?.case),
-  }));
+    sql: stringifyMemberSql(cubeDefinitions[cubeName]?.dimensions?.[memberName]?.sql),
+    case: handleDimensionCaseCondition(cubeDefinitions[cubeName]?.dimension?.[memberName]?.case),
+  };
+}
+
+function transformSegment(segment: any, cubeDefinitions: any) {
+  const { cubeName, memberName } = getMemberPath(segment.name);
+  
+  return {
+    ...segment,
+    sql: stringifyMemberSql(cubeDefinitions[cubeName]?.segments?.[memberName]?.sql),
+  };
 }
 
 function transformJoins(joins: any) {
@@ -78,18 +80,6 @@ function transformJoins(joins: any) {
     ...join,
     name: joinName,
     sql: stringifyMemberSql(join.sql),
-  }));
-}
-
-function transformSegments(segments: any) {
-  if (!segments) {
-    return undefined;
-  }
-
-  return Object.entries(segments)?.map(([segmentName, segment]: [segmentName: string, segment: any]) => ({
-    ...segment,
-    name: segmentName,
-    sql: stringifyMemberSql(segment.sql),
   }));
 }
 
@@ -109,9 +99,9 @@ function transformPreAggregations(preAggregations: any) {
 
 export {
   transformCube,
-  transformMeasures,
-  transformDimensions,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
   transformJoins,
   transformPreAggregations,
-  transformSegments
 };
