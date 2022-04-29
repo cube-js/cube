@@ -1,5 +1,6 @@
 module.exports = {
   postgres: '@cubejs-backend/postgres-driver',
+  crate: '@cubejs-backend/crate-driver',
   mysql: '@cubejs-backend/mysql-driver',
   mysqlauroraserverless: '@cubejs-backend/mysql-aurora-serverless-driver',
   mssql: '@cubejs-backend/mssql-driver',

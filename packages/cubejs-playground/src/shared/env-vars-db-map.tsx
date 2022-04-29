@@ -2,6 +2,7 @@ import logoPostgres from '../img/db/postgres.svg';
 import logoMysql from '../img/db/mysql.svg';
 import logoAthena from '../img/db/athena.svg';
 import logoClickhouse from '../img/db/clickhouse.svg';
+import logoCrate from '../img/db/crate.svg';
 import logoHive from '../img/db/hive.svg';
 import logoRedshift from '../img/db/redshift.svg';
 import logoPresto from '../img/db/presto.svg';
@@ -35,6 +36,7 @@ const envVarsDbMap = [
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
       { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
+      { title: 'Crate', driver: 'crate', logo: logoCrate },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
   },

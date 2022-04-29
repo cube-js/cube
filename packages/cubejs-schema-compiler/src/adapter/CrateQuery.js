@@ -1,47 +1,25 @@
 import { BaseQuery } from './BaseQuery';
 import { ParamAllocator } from './ParamAllocator';
+import { PostgresParamAllocator, GRANULARITY_TO_INTERVAL } from './PostgresQuery';
 import { UserError } from '../compiler/UserError';
 
-export const GRANULARITY_TO_INTERVAL = {
-  day: 'day',
-  week: 'week',
-  hour: 'hour',
-  minute: 'minute',
-  second: 'second',
-  month: 'month',
-  quarter: 'quarter',
-  year: 'year'
-};
-
-export class PostgresParamAllocator extends ParamAllocator {
-  paramPlaceHolder(paramIndex) {
-    return `$${paramIndex + 1}`;
-  }
-}
-
-export class PostgresQuery extends BaseQuery {
+export class CrateQuery extends BaseQuery {
   newParamAllocator() {
     return new PostgresParamAllocator();
   }
 
   convertTz(field) {
-    return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
+    return `${field}`;
+    // just return the field while debugging
+    //return `(${field}::timestamp AT TIME ZONE '${this.timezone}')`;
   }
 
   timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  hllInit(sql) {
-    return `hll_add_agg(hll_hash_any(${sql}))`;
-  }
-
-  hllMerge(sql) {
-    return `round(hll_cardinality(hll_union_agg(${sql})))`;
-  }
-
   countDistinctApprox(sql) {
-    return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
+    return `hyperloglog_distinct(${sql})`;
   }
 
   preAggregationTableName(cube, preAggregationName, skipSchema) {
