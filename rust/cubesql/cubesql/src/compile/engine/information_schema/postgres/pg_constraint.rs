@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder, ListBuilder, Int64Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -33,7 +33,7 @@ struct PgCatalogConstraintBuilder {
     conislocal: BooleanBuilder,
     coninhcount: Int32Builder,
     connoinherit: BooleanBuilder,
-    conkey: StringBuilder,
+    conkey: ListBuilder<Int64Builder>,
     confkey: StringBuilder,
     conpfeqop: StringBuilder,
     conppeqop: StringBuilder,
@@ -65,7 +65,7 @@ impl PgCatalogConstraintBuilder {
             conislocal: BooleanBuilder::new(capacity),
             coninhcount: Int32Builder::new(capacity),
             connoinherit: BooleanBuilder::new(capacity),
-            conkey: StringBuilder::new(capacity),
+            conkey: ListBuilder::new(Int64Builder::new(capacity)),
             confkey: StringBuilder::new(capacity),
             conpfeqop: StringBuilder::new(capacity),
             conppeqop: StringBuilder::new(capacity),
@@ -152,7 +152,7 @@ impl TableProvider for PgCatalogConstraintProvider {
             Field::new("conislocal", DataType::Boolean, false),
             Field::new("coninhcount", DataType::Int32, false),
             Field::new("connoinherit", DataType::Boolean, false),
-            Field::new("conkey", DataType::Utf8, true),
+            Field::new("conkey", DataType::List(Box::new(Field::new("item", DataType::Int64, true))), true),
             Field::new("confkey", DataType::Utf8, true),
             Field::new("conpfeqop", DataType::Utf8, true),
             Field::new("conppeqop", DataType::Utf8, true),
