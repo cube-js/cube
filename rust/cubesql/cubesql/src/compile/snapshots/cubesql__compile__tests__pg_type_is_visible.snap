@@ -1,0 +1,61 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspname, pg_catalog.pg_type_is_visible(t.oid) is_visible\n                FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n\n                WHERE t.typnamespace = n.oid\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+----------------------------+--------------------+------------+
+| oid   | typname                    | nspname            | is_visible |
++-------+----------------------------+--------------------+------------+
+| 16    | bool                       | pg_catalog         | true       |
+| 17    | bytea                      | pg_catalog         | true       |
+| 19    | name                       | pg_catalog         | true       |
+| 20    | int8                       | pg_catalog         | true       |
+| 21    | int2                       | pg_catalog         | true       |
+| 23    | int4                       | pg_catalog         | true       |
+| 25    | text                       | pg_catalog         | true       |
+| 26    | oid                        | pg_catalog         | true       |
+| 27    | tid                        | pg_catalog         | true       |
+| 700   | float4                     | pg_catalog         | true       |
+| 701   | float8                     | pg_catalog         | true       |
+| 790   | money                      | pg_catalog         | true       |
+| 869   | inet                       | pg_catalog         | true       |
+| 1000  | _bool                      | pg_catalog         | true       |
+| 1001  | _bytea                     | pg_catalog         | true       |
+| 1005  | _int2                      | pg_catalog         | true       |
+| 1007  | _int4                      | pg_catalog         | true       |
+| 1009  | _text                      | pg_catalog         | true       |
+| 1016  | _int8                      | pg_catalog         | true       |
+| 1021  | _float4                    | pg_catalog         | true       |
+| 1022  | _float8                    | pg_catalog         | true       |
+| 1042  | bpchar                     | pg_catalog         | true       |
+| 1043  | varchar                    | pg_catalog         | true       |
+| 1082  | date                       | pg_catalog         | true       |
+| 1083  | time                       | pg_catalog         | true       |
+| 1114  | timestamp                  | pg_catalog         | true       |
+| 1184  | timestamptz                | pg_catalog         | true       |
+| 1186  | interval                   | pg_catalog         | true       |
+| 1266  | timetz                     | pg_catalog         | true       |
+| 1700  | numeric                    | pg_catalog         | true       |
+| 2249  | record                     | pg_catalog         | true       |
+| 2277  | anyarray                   | pg_catalog         | true       |
+| 2283  | anyelement                 | pg_catalog         | true       |
+| 3220  | pg_lsn                     | pg_catalog         | true       |
+| 3500  | anyenum                    | pg_catalog         | true       |
+| 3831  | anyrange                   | pg_catalog         | true       |
+| 3904  | int4range                  | pg_catalog         | true       |
+| 3906  | numrange                   | pg_catalog         | true       |
+| 3908  | tsrange                    | pg_catalog         | true       |
+| 3910  | tstzrange                  | pg_catalog         | true       |
+| 3912  | daterange                  | pg_catalog         | true       |
+| 3926  | int8range                  | pg_catalog         | true       |
+| 4451  | int4multirange             | pg_catalog         | true       |
+| 4532  | nummultirange              | pg_catalog         | true       |
+| 4533  | tsmultirange               | pg_catalog         | true       |
+| 4535  | datemultirange             | pg_catalog         | true       |
+| 4536  | int8multirange             | pg_catalog         | true       |
+| 13408 | character_data             | information_schema | false      |
+| 13410 | sql_identifier             | information_schema | false      |
+| 18001 | KibanaSampleDataEcommerce  | public             | true       |
+| 18002 | _KibanaSampleDataEcommerce | public             | true       |
+| 18014 | Logs                       | public             | true       |
+| 18015 | _Logs                      | public             | true       |
++-------+----------------------------+--------------------+------------+
