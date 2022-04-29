@@ -384,9 +384,6 @@ export async function startBirdBoxFromCli(
   }
 
   if (options.schemaDir) {
-    if (fs.existsSync(path.join(testDir, 'schema'))) {
-      fs.removeSync(path.join(testDir, 'schema'));
-    }
     fs.copySync(
       path.join(process.cwd(), 'birdbox-fixtures', options.schemaDir),
       path.join(testDir, 'schema')
