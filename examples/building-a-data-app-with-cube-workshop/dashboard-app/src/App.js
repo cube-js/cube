@@ -7,15 +7,19 @@ import { CustomBarChart } from './CustomBarChart';
 import { CustomPieChart } from './CustomPieChart';
 
 const defaultJwtSecret = 'SECRET';
-const defaultApiUrl = 'http://localhost:4000/cubejs-api/v1';
 const defaultSupplierId = 1;
+
+/** OSS Cube */
+// const defaultApiUrl = 'http://localhost:4000/cubejs-api/v1';
+/** Cube Cloud */
+const defaultApiUrl = 'https://spotty-leopard.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1';
 
 function App() {
   const [ status, setStatus ] = useState(undefined);
   const [ jwtSecret, setJwtSecret ] = useState(defaultJwtSecret);
   const [ apiUrl, setApiUrl ] = useState(defaultApiUrl);
 
-  const suppliers = [ ...Array(10).keys() ].map( i => i+1)
+  const suppliers = [ ...Array(10).keys() ].map(i => i+1)
     .map(id => ({
       id,
       token: !jwtSecret ? 'foobar' : jwt.sign({
