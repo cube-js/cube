@@ -15,7 +15,7 @@ const exampleDescription = {
       Follow 
       the <a href="https://dev.to/cubejs/react-data-table-with-material-ui-and-a-spark-of-joy-50o1">tutorial</a>
       or explore 
-      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/react-data-table">source code<a>
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/react-data-table">source code</a>
       to learn more.</p>
   `
 }
