@@ -11,8 +11,6 @@ module.exports = {
   },
 
   driverFactory: ({ dataSource }) => {
-    console.log('QQQ', process.env.CUBEJS_DB_HOST2, process.env.CUBEJS_DB_PORT2, process.env.CUBEJS_DB_NAME2, process.env.CUBEJS_DB_USER2, process.env.CUBEJS_DB_PASS2);
-
     switch (dataSource) {
       case 'suppliers': return new PostgresDriver({});
       case 'products': return new MySqlDriver({
