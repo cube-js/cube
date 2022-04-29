@@ -43,7 +43,7 @@ export function executeTestSuiteFor(type: string) {
             dimensions: [
               'Customers.customerId',
               'Customers.customerName'
-            ]
+            ],
           });
           expect(response.rawData()).toMatchSnapshot('query');
         }
@@ -113,6 +113,161 @@ export function executeTestSuiteFor(type: string) {
             response.serialize().loadResponse.results[0].total
           ).toEqual(41);
         },
+      );
+
+      // filtering Customers cube
+      test(
+        'filtering Customers: contains + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['tom'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['us', 'om'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['non'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Customers: startsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['A'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['A', 'B'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['Z'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Customers: endsWith filter + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['0'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['0', '5'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['9'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
       );
       
       // querying Products cube
@@ -212,6 +367,215 @@ export function executeTestSuiteFor(type: string) {
             response.serialize().loadResponse.results[0].total
           ).toEqual(28);
         },
+      );
+
+      // filtering Products cube
+      test(
+        'filtering Products: contains + dimentions + order',
+        async () => {
+          let response;
+          
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['able'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['able', 'urn'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['notexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Products: startsWith filter + dimentions + order',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['O'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['O', 'K'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['noneexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Products: endsWith filter + dimentions + order',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['es'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['es', 'gs'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['noneexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
       );
       
       // querying ECommerce cube
@@ -410,6 +774,260 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
+
+      // filtering ECommerce cube
+      test(
+        'filtering ECommerce: contains dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['able'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['able', 'urn'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['notexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering ECommerce: startsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['A'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['A', 'B'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['Z'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering ECommerce: endsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['0'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['1', '2'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['Z'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
     });
     describe('using cubestore for the pre-aggregations', () => {
       jest.setTimeout(60 * 5 * 1000);
@@ -518,6 +1136,161 @@ export function executeTestSuiteFor(type: string) {
           ).toEqual(41);
         },
       );
+
+      // filtering Customers cube
+      test(
+        'filtering Customers: contains + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['tom'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['us', 'om'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerName',
+                operator: 'contains',
+                values: ['non'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Customers: startsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['A'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['A', 'B'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'startsWith',
+                values: ['Z'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Customers: endsWith filter + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['0'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['0', '5'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            filters: [
+              {
+                member: 'Customers.customerId',
+                operator: 'endsWith',
+                values: ['9'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
       
       // querying Products cube
       test.skip(
@@ -616,6 +1389,215 @@ export function executeTestSuiteFor(type: string) {
             response.serialize().loadResponse.results[0].total
           ).toEqual(28);
         },
+      );
+
+      // filtering Products cube
+      test(
+        'filtering Products: contains + dimentions + order',
+        async () => {
+          let response;
+          
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['able'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['able', 'urn'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'contains',
+                values: ['notexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Products: startsWith filter + dimentions + order',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['O'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['O', 'K'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.productName',
+                operator: 'startsWith',
+                values: ['noneexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering Products: endsWith filter + dimentions + order',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['es'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['es', 'gs'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'Products.category',
+              'Products.subCategory',
+              'Products.productName'
+            ],
+            order: {
+              'Products.category': 'asc',
+              'Products.subCategory': 'asc',
+              'Products.productName': 'asc'
+            },
+            filters: [
+              {
+                member: 'Products.subCategory',
+                operator: 'endsWith',
+                values: ['noneexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
       );
       
       // querying ECommerce cube
@@ -770,9 +1752,10 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
-      test(
-        'querying ECommerce: total quantity, avg discount, total sales, ' +
-        'total profit by product + order + total',
+      test.skip(
+        'querying ECommerce: total quantity, avg discount, total ' +
+        'sales, total profit by product + order + total -- noisy ' +
+        'test',
         async () => {
           let err;
           try {
@@ -815,6 +1798,260 @@ export function executeTestSuiteFor(type: string) {
               'ECommerce.orderDate': 'asc'
             },
             total: true
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+
+      // filtering ECommerce cube
+      test(
+        'filtering ECommerce: contains dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['able'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['able', 'urn'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.subCategory',
+                operator: 'contains',
+                values: ['notexist'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering ECommerce: startsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['A'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['A', 'B'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.customerId',
+                operator: 'startsWith',
+                values: ['Z'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+        }
+      );
+      test(
+        'filtering ECommerce: endsWith + dimensions',
+        async () => {
+          let response;
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['0'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['1', '2'],
+              },
+            ],
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+
+          response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            filters: [
+              {
+                member: 'ECommerce.orderId',
+                operator: 'endsWith',
+                values: ['Z'],
+              },
+            ],
           });
           expect(response.rawData()).toMatchSnapshot('query');
         }

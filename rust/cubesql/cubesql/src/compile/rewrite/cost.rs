@@ -27,6 +27,9 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
+            LogicalPlanLanguage::InnerAggregateSplitReplacer(_) => 1,
+            LogicalPlanLanguage::OuterProjectionSplitReplacer(_) => 1,
+            LogicalPlanLanguage::OuterAggregateSplitReplacer(_) => 1,
             _ => 0,
         };
 
@@ -36,12 +39,12 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             _ => 0,
         };
         enode.children().iter().fold(
-            (this_cube_nodes, this_replacers, this_cube_structure, 1),
-            |(cube_nodes, replacers, structure, nodes), id| {
-                let (child_cube_nodes, child_replacers, child_structure, child_nodes) = costs(*id);
+            (this_replacers, this_cube_nodes, this_cube_structure, 1),
+            |(replacers, cube_nodes, structure, nodes), id| {
+                let (child_replacers, child_cube_nodes, child_structure, child_nodes) = costs(*id);
                 (
-                    cube_nodes + child_cube_nodes,
                     replacers + child_replacers,
+                    cube_nodes + child_cube_nodes,
                     structure + child_structure,
                     nodes + child_nodes,
                 )

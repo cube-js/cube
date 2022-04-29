@@ -1,17 +1,7 @@
 use msql_srv::{Column, ColumnFlags, ColumnType};
+use pg_srv::BindValue;
 use sqlparser::ast;
 use sqlparser::ast::Value;
-
-#[derive(Debug)]
-pub enum BindValue {
-    String(String),
-    Int64(i64),
-    #[allow(unused)]
-    UInt64(u64),
-    Float64(f64),
-    Bool(bool),
-    Null,
-}
 
 trait Visitor<'ast> {
     fn visit_value(&mut self, _val: &mut ast::Value) {}
@@ -23,6 +13,7 @@ trait Visitor<'ast> {
             ast::Expr::Value(value) => self.visit_value(value),
             ast::Expr::Identifier(identifier) => self.visit_identifier(identifier),
             ast::Expr::Nested(v) => self.visit_expr(&mut *v),
+            ast::Expr::Cast { expr, .. } => self.visit_expr(&mut *expr),
             ast::Expr::Between {
                 expr,
                 negated: _,

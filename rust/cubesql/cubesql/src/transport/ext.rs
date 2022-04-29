@@ -25,6 +25,12 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+            } else if expect_agg_type.eq(&"sum".to_string()) {
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"sum".to_string())
+                    || agg_type.eq(&"count".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else {
                 self.agg_type.as_ref().unwrap().eq(expect_agg_type)
             }
@@ -122,7 +128,7 @@ impl CubeColumn {
     }
 
     pub fn get_column_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 }
 
@@ -133,7 +139,13 @@ pub trait V1CubeMetaExt {
 
     fn contains_member(&self, member_name: &str) -> bool;
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+    fn member_name(&self, column_name: &str) -> String;
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure>;
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment>;
 
     fn df_data_type(&self, member_name: &str) -> Option<DataType>;
 
@@ -210,10 +222,29 @@ impl V1CubeMetaExt for V1CubeMeta {
                 .any(|m| m.name.eq_ignore_ascii_case(member_name))
     }
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+    fn member_name(&self, column_name: &str) -> String {
+        format!("{}.{}", self.name, column_name)
+    }
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure> {
+        let member_name = self.member_name(column_name);
+        self.measures
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension> {
+        let member_name = self.member_name(column_name);
         self.dimensions
             .iter()
-            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment> {
+        let member_name = self.member_name(column_name);
+        self.segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
     }
 
     fn df_data_type(&self, member_name: &str) -> Option<DataType> {

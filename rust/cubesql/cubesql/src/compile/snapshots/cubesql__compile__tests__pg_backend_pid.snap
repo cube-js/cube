@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4917
+expression: "execute_query(\"select pg_backend_pid();\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------+
+| pg_backend_pid() |
++------------------+
+| 1                |
++------------------+

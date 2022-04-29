@@ -32,7 +32,8 @@ const ADAPTERS = {
   oracle: OracleQuery,
   sqlite: SqliteQuery,
   awselasticsearch: AWSElasticSearchQuery,
-  elasticsearch: ElasticSearchQuery
+  elasticsearch: ElasticSearchQuery,
+  materialize: PostgresQuery,
 };
 
 export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];
@@ -54,6 +55,6 @@ export const createQuery = (compilers, dbType, queryOptions) => {
 
   return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
     ...queryOptions,
-    externalQueryClass
+    externalQueryClass,
   });
 };

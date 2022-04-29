@@ -1,6 +1,6 @@
 ---
 source: cubesql/e2e/tests/postgres.rs
-assertion_line: 131
+assertion_line: 173
 expression: self.print_query_result(res).await
 ---
 +-------+------------+

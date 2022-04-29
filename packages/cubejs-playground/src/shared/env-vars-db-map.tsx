@@ -12,6 +12,7 @@ import logoBigquery from '../img/db/bigquery.svg';
 import logoMongodb from '../img/db/mongodb.svg';
 import logoDruid from '../img/db/druid.svg';
 import logoQuestdb from '../img/db/questdb.svg';
+import logoMaterialize from '../img/db/materialize.svg';
 
 const BASE_SERVER = [
   { env: 'CUBEJS_DB_HOST', title: 'Hostname' },
@@ -35,6 +36,7 @@ const envVarsDbMap = [
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
       { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
+      { title: 'Materialize', driver: 'materialize', logo: logoMaterialize },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
   },
@@ -54,7 +56,7 @@ const envVarsDbMap = [
         driver: 'athena',
         logo: logoAthena,
         instructions: `
-Specify the AWS access and secret keys with the <a href="https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html" target="_blank">access necessary to run Athena queries</a>, 
+Specify the AWS access and secret keys with the <a href="https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html" target="_blank">access necessary to run Athena queries</a>,
 and the target AWS region and <a href="https://docs.aws.amazon.com/athena/latest/ug/querying.html" target="_blank">S3 output location</a> where query results are stored.
     `,
       },

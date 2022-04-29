@@ -106,7 +106,7 @@ impl MySqlIntegrationTestSuite {
         description.join("\r\n").to_string() + "\r\n" + &table.trim_fmt()
     }
 
-    async fn test_use(&self) -> RunResult {
+    async fn test_use(&self) -> RunResult<()> {
         let mut conn = self.pool.get_conn().await.unwrap();
 
         {
@@ -133,7 +133,7 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_prepared_reset(&self) -> RunResult {
+    async fn test_prepared_reset(&self) -> RunResult<()> {
         let mut conn = self.pool.get_conn().await.unwrap();
 
         // Server should deallocate statement on execution
@@ -153,7 +153,7 @@ impl MySqlIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_prepared(&self) -> RunResult {
+    async fn test_prepared(&self) -> RunResult<()> {
         let mut conn = self.pool.get_conn().await.unwrap();
 
         {
@@ -183,7 +183,7 @@ impl MySqlIntegrationTestSuite {
         );
     }
 
-    async fn test_execute_query(&self, query: String) -> RunResult {
+    async fn test_execute_query(&self, query: String) -> RunResult<()> {
         print!("test {} .. ", query);
 
         let mut conn = self.pool.get_conn().await.unwrap();
@@ -197,11 +197,11 @@ impl MySqlIntegrationTestSuite {
 
 #[async_trait]
 impl AsyncTestSuite for MySqlIntegrationTestSuite {
-    async fn after_all(&mut self) -> RunResult {
+    async fn after_all(&mut self) -> RunResult<()> {
         todo!()
     }
 
-    async fn run(&mut self) -> RunResult {
+    async fn run(&mut self) -> RunResult<()> {
         self.test_use().await?;
         self.test_prepared().await?;
         self.test_prepared_reset().await?;

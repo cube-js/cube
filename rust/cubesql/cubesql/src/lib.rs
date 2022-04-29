@@ -19,9 +19,11 @@
 
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use core::fmt;
 use cubeclient::apis::default_api::{LoadV1Error, MetaV1Error};
+use datafusion::arrow;
 use log::SetLoggerError;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
@@ -175,6 +177,12 @@ impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
+        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+    }
+}
+
+impl From<arrow::error::ArrowError> for CubeError {
+    fn from(v: arrow::error::ArrowError) -> Self {
         CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
     }
 }

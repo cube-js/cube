@@ -1,4 +1,5 @@
-import { Space, Typography } from 'antd';
+import { Space, Typography, Button } from 'antd';
+import { useState } from 'react';
 import styled from 'styled-components';
 
 import { Alert } from './Alert';
@@ -14,9 +15,12 @@ export const Code = styled.pre`
 
 type FatalErrorProps = {
   error: Error | string;
+  stack?: string | null;
 };
 
-export function FatalError({ error }: FatalErrorProps) {
+export function FatalError({ error, stack }: FatalErrorProps) {
+  const [visible, setVisible] = useState(false);
+
   return (
     <Space direction="vertical">
       <Text strong style={{ fontSize: 18 }}>
@@ -38,11 +42,25 @@ export function FatalError({ error }: FatalErrorProps) {
       <Alert
         type="error"
         message={
-          <Code
-            dangerouslySetInnerHTML={{
-              __html: error.toString().replace(/(Error:\s){2,}/g, ''),
-            }}
-          />
+          <Space direction="vertical">
+            <Code
+              dangerouslySetInnerHTML={{
+                __html: error.toString().replace(/(Error:\s)/g, ''),
+              }}
+            />
+
+            {stack ? (
+              <>
+                {!visible ? (
+                  <Button danger ghost onClick={() => setVisible(true)}>
+                    Show stack trace
+                  </Button>
+                ) : null}
+
+                {visible && <pre>{stack}</pre>}
+              </>
+            ) : null}
+          </Space>
         }
       />
     </Space>

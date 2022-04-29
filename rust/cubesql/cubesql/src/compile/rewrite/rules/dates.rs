@@ -1,8 +1,8 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::{binary_expr, column_expr, literal_expr, rewrite};
+use crate::compile::rewrite::{cast_expr, LogicalPlanLanguage};
 use crate::compile::rewrite::{fun_expr, literal_string, to_day_interval_expr, udf_expr};
 use egg::Rewrite;
 use std::sync::Arc;
@@ -213,6 +213,26 @@ impl RewriteRules for DateRules {
                     "DateTrunc",
                     vec![literal_string("day"), column_expr("?column")],
                 ),
+            ),
+            rewrite(
+                "cast-in-date-trunc",
+                fun_expr(
+                    "DateTrunc",
+                    // TODO check data_type?
+                    vec![
+                        "?granularity".to_string(),
+                        cast_expr(column_expr("?column"), "?data_type"),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec!["?granularity".to_string(), column_expr("?column")],
+                ),
+            ),
+            rewrite(
+                "current-timestamp-to-now",
+                udf_expr("current_timestamp", Vec::<String>::new()),
+                fun_expr("UtcTimestamp", Vec::<String>::new()),
             ),
         ]
     }

@@ -12,7 +12,8 @@ import {
   Typography,
   Skeleton,
 } from 'antd';
-import { useMemo, useState } from 'react';
+import deepEquals from 'fast-deep-equal';
+import { useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { CodeSnippet, FatalError } from '../../atoms';
 import { Box, Flex } from '../../grid';
@@ -101,6 +102,7 @@ export function RollupDesigner({
   memberTypeCubeMap,
   token: designerToken,
 }: RollupDesignerProps) {
+  const initialMatching = useRef<boolean>();
   const isMounted = useIsMounted();
   const appToken = useToken();
 
@@ -117,7 +119,7 @@ export function RollupDesigner({
     null
   );
 
-  const [matching, setMatching] = useState<boolean>(true);
+  const [matching, setMatching] = useState<boolean | undefined>();
   const [saving, setSaving] = useState<boolean>(false);
   const [preAggName, setPreAggName] = useState<string>('main');
   const [nonAdditiveMeasure, setNonAdditiveMeasure] = useState<string | null>(
@@ -128,13 +130,6 @@ export function RollupDesigner({
 
   const [timeDimension] = matchedQuery.timeDimensions || [];
 
-  // There's nothing we can do to for a rollup to match such query
-  const hideMatchRollupButton =
-    (timeDimension?.dimension &&
-      !timeDimension?.dateRange &&
-      !timeDimension?.granularity) ||
-    (transformedQuery && !transformedQuery.leafMeasureAdditive);
-
   const segments = new Set<string>();
   memberTypeCubeMap.segments.forEach(({ members }) => {
     members.forEach(({ name }) => segments.add(name));
@@ -143,6 +138,17 @@ export function RollupDesigner({
   const [references, setReferences] = useState<PreAggregationReferences>(
     getPreAggregationReferences(transformedQuery, segments)
   );
+
+  const hideMatchRollupButton = useDeepMemo(() => {
+    if (matching === undefined || !initialMatching.current) {
+      return true;
+    }
+
+    return deepEquals(
+      references,
+      getPreAggregationReferences(transformedQuery, segments)
+    );
+  }, [matching, transformedQuery, references, segments, initialMatching]);
 
   useDeepEffect(() => {
     const references = getPreAggregationReferences(transformedQuery, segments);
@@ -195,7 +201,13 @@ export function RollupDesigner({
       );
 
       if (isMounted() && active) {
-        setMatching(json.canUsePreAggregationForTransformedQuery);
+        setMatching((prevMatching) => {
+          if (prevMatching === undefined) {
+            initialMatching.current =
+              json.canUsePreAggregationForTransformedQuery;
+          }
+          return json.canUsePreAggregationForTransformedQuery;
+        });
       }
     }
 
@@ -612,7 +624,9 @@ export function RollupDesigner({
                 ) : (
                   <Typography.Text data-testid="rd-query-tab">
                     Query Compatibility
-                    <WarningFilled style={{ color: '#FBBC05' }} />
+                    {matching != null ? (
+                      <WarningFilled style={{ color: '#FBBC05' }} />
+                    ) : null}
                   </Typography.Text>
                 )
               }

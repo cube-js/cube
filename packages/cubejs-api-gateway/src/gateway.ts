@@ -897,7 +897,7 @@ class ApiGateway {
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
-      
+
       const metaConfigResult = await this
         .getCompilerApi(context).metaConfig({
           requestId: context.requestId
@@ -922,7 +922,7 @@ class ApiGateway {
             normalizedQuery,
             sqlQueries[index],
           );
-          
+
           return this.getResultInternal(
             context,
             queryType,
@@ -1111,7 +1111,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message }, { status: e.status });
+      res({ error: e.message, stack: e.stack }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1138,7 +1138,8 @@ class ApiGateway {
       res(
         {
           type: e.type,
-          error: e.message
+          error: e.message,
+          stack: e.stack
         },
         { status: 400 }
       );
@@ -1149,7 +1150,7 @@ class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString() }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack }, { status: 500 });
     }
   }
 
@@ -1369,16 +1370,20 @@ class ApiGateway {
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         res.status(e.status).json({ error: e.message });
-      } else {
+      } else if (e instanceof Error) {
         this.log({
           type: 'Auth Error',
           token,
-          error: (e as Error).stack || (e as Error).toString()
+          error: e.stack || e.toString()
         }, <any>req);
-        res.status(500).json({ error: (e as Error).toString() });
+
+        res.status(500).json({
+          error: e.toString(),
+          stack: e.stack
+        });
       }
     }
   }
@@ -1413,12 +1418,14 @@ class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
+        path: req.path,
       }, req.context);
     });
     if (next) {

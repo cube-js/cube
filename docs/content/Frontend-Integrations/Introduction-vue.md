@@ -50,10 +50,12 @@ You can install Cube.js JavaScript Client and the Vue package with npm or Yarn:
 
 ```bash
 # npm
-$ npm install --save @cubejs-client/core @cubejs-client/vue
+$ npm install --save @cubejs-client/core @cubejs-client/vue3
 
 # Yarn
-$ yarn add @cubejs-client/core @cubejs-client/vue
+$ yarn add @cubejs-client/core @cubejs-client/vue3
 ```
+
+**Note.** If you're using Vue 2, please use `@cubejs-client/vue`.
 
 Now you can build your application from scratch or generate the code with [Cube.js Playground](https://cube.dev/docs/dashboard-app). You can also [explore example applications](https://cube.dev/docs/examples) built with Cube.js.

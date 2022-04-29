@@ -26,7 +26,6 @@ use crate::compile::parser::parse_sql_to_statement;
 use crate::config::processing_loop::ProcessingLoop;
 
 use crate::sql::session::DatabaseProtocol;
-use crate::sql::statement::BindValue;
 use crate::sql::statement::{StatementParamsBinder, StatementParamsFinder};
 use crate::sql::Session;
 use crate::sql::SessionManager;
@@ -36,6 +35,7 @@ use crate::sql::{
 };
 use crate::CubeError;
 use msql_srv::ColumnType as MySQLColumnType;
+use pg_srv::BindValue;
 use sqlparser::ast;
 
 #[derive(Debug)]
@@ -117,6 +117,7 @@ impl MySqlConnection {
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
+                            dt => unimplemented!("Not supported type for MySQL: {:?}", dt),
                         }
                     }
 
@@ -148,7 +149,7 @@ impl MySqlConnection {
 
         if query_lower.eq("select cast('test plain returns' as char(60)) as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -163,7 +164,7 @@ impl MySqlConnection {
             )
         } else if query_lower.eq("select cast('test unicode returns' as char(60)) as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -178,7 +179,7 @@ impl MySqlConnection {
             )
         } else if query_lower.eq("select cast('test collated returns' as char character set utf8mb4) collate utf8mb4_bin as anon_1") {
             return Ok(
-                QueryResponse::ResultSet(StatusFlags::empty(), Arc::new(
+                QueryResponse::ResultSet(StatusFlags::empty(), Box::new(
                     dataframe::DataFrame::new(
                         vec![dataframe::Column::new(
                             "anon_1".to_string(),
@@ -200,7 +201,7 @@ impl MySqlConnection {
 
             let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
             match plan {
-                crate::compile::QueryPlan::MetaOk(status) => {
+                crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
                 },
                 crate::compile::QueryPlan::MetaTabular(status, data_frame) => {
@@ -214,7 +215,7 @@ impl MySqlConnection {
                     let batches = df.collect().await?;
                     let response =  batch_to_dataframe(&batches)?;
 
-                    return Ok(QueryResponse::ResultSet(status, Arc::new(response)))
+                    return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
             }
         }
@@ -222,7 +223,7 @@ impl MySqlConnection {
         if ignore {
             Ok(QueryResponse::ResultSet(
                 StatusFlags::empty(),
-                Arc::new(dataframe::DataFrame::new(vec![], vec![])),
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
             ))
         } else {
             Err(CubeError::internal("Unsupported query".to_string()))
