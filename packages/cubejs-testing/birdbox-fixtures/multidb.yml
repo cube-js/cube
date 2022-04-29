@@ -23,9 +23,8 @@ services:
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
     volumes:
-      - ./postgresql/single/multidb.js:/cube/conf/cube.js
-      - ./postgresql/schema/Products.multidb.js:/cube/conf/schema/Products.multidb.js
-      - ./postgresql/schema/Suppliers.multidb.js:/cube/conf/schema/Suppliers.multidb.js
+      - ./multidb/cube.js:/cube/conf/cube.js
+      - ./multidb/schema:/cube/conf/schema
     ports:
       - "4000:4000"
     restart: always

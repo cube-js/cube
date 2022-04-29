@@ -40,7 +40,10 @@ describe('multidb', () => {
         CUBEJS_REFRESH_WORKER: 'true',
         CUBEJS_ROLLUP_ONLY: 'true',
       },
-      'single/multidb.js'
+      {
+        schemaDir: 'multidb/schema',
+        cubejsConfig: 'multidb/cube.js',
+      }
     );
     client = cubejs(async () => 'test', {
       apiUrl: birdbox.configuration.apiUrl,

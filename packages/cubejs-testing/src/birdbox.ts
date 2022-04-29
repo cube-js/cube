@@ -56,8 +56,9 @@ export interface ContainerOptions {
  * Birdbox options for local/cli mode.
  */
 export interface LocalOptions extends ContainerOptions {
-  cubejsConfig?: string;
-  useCubejsServerBinary?: boolean;
+  schemaDir?: string
+  cubejsConfig?: string
+  useCubejsServerBinary?: boolean
 }
 
 /**
@@ -76,7 +77,7 @@ export interface Env {
 /**
  * List of permanent test data files.
  */
-const files = [
+const FILES = [
   'CAST.js',
   'Customers.sql.js',
   'ECommerce.sql.js',
@@ -86,7 +87,7 @@ const files = [
 /**
  * List of test schemas needs to be patched for certain datasource.
  */
-const schemas = [
+const SCHEMAS = [
   'Customers.js',
   'ECommerce.js',
   'Products.js',
@@ -95,7 +96,7 @@ const schemas = [
 /**
  * Test data files source folder.
  */
-const source = path.join(
+const SOURCE = path.join(
   process.cwd(),
   'birdbox-fixtures',
   'driver-test-data',
@@ -104,7 +105,7 @@ const source = path.join(
 /**
  * Test data files target source.
  */
-const target = path.join(
+const TARGET = path.join(
   process.cwd(),
   'birdbox-fixtures',
   'postgresql',
@@ -115,9 +116,9 @@ const target = path.join(
  * Remove test data files from target directory.
  */
 function clearTestData() {
-  files.concat(schemas).forEach((name) => {
-    if (fs.existsSync(path.join(target, name))) {
-      fs.removeSync(path.join(target, name));
+  FILES.concat(SCHEMAS).forEach((name) => {
+    if (fs.existsSync(path.join(TARGET, name))) {
+      fs.removeSync(path.join(TARGET, name));
     }
   });
 }
@@ -127,17 +128,17 @@ function clearTestData() {
  */
 function prepareTestData(type: string) {
   clearTestData();
-  files.forEach((name) => {
+  FILES.forEach((name) => {
     fs.copySync(
-      path.join(source, name),
-      path.join(target, name),
+      path.join(SOURCE, name),
+      path.join(TARGET, name),
     );
   });
-  schemas.forEach((name) => {
+  SCHEMAS.forEach((name) => {
     fs.writeFileSync(
-      path.join(target, name),
+      path.join(TARGET, name),
       fs.readFileSync(
-        path.join(source, name), 'utf8'
+        path.join(SOURCE, name), 'utf8'
       ).replace('_type_', type)
     );
   });
@@ -322,6 +323,11 @@ export async function startBirdBoxFromCli(
 ): Promise<BirdBox> {
   let db: StartedTestContainer;
   let cli: ChildProcess;
+
+  if (!options.cubejsConfig) {
+    options.cubejsConfig = 'postgresql/single/cube.js';
+  }
+  
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
@@ -372,17 +378,48 @@ export async function startBirdBoxFromCli(
     fs.removeSync(path.join(testDir, '.cubestore'));
   }
 
-  fs.copySync(
-    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql'),
-    path.join(testDir)
-  );
+  if (options.schemaDir) {
+    if (fs.existsSync(path.join(testDir, 'schema'))) {
+      fs.removeSync(path.join(testDir, 'schema'));
+    }
+    fs.copySync(
+      path.join(process.cwd(), 'birdbox-fixtures', options.schemaDir),
+      path.join(testDir, 'schema')
+    );
+  }
 
   if (options.cubejsConfig) {
     fs.copySync(
-      path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', options.cubejsConfig),
+      path.join(process.cwd(), 'birdbox-fixtures', options.cubejsConfig),
       path.join(testDir, 'cube.js')
     );
   }
+
+  const env = {
+    ...process.env,
+    CUBEJS_DB_TYPE: options.type === 'postgresql'
+      ? 'postgres'
+      : options.type,
+    CUBEJS_DEV_MODE: 'true',
+    CUBEJS_API_SECRET: 'mysupersecret',
+    CUBEJS_WEB_SOCKETS: 'true',
+    CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+    ...db
+      ? {
+        CUBEJS_DB_HOST: db!.getHost(),
+        CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
+      }
+      : {},
+    ...options.env
+      ? options.env
+      : {
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+      }
+  };
+
+  process.stdout.write(`ZZZ ${JSON.stringify(env, null, 4)}`);
 
   try {
     cli = spawn(
@@ -401,25 +438,7 @@ export async function startBirdBoxFromCli(
           options.log,
           options.log,
         ],
-        env: {
-          ...process.env,
-          CUBEJS_DB_TYPE: options.type === 'postgresql'
-            ? 'postgres'
-            : options.type,
-          CUBEJS_DEV_MODE: 'true',
-          CUBEJS_API_SECRET: 'mysupersecret',
-          CUBEJS_WEB_SOCKETS: 'true',
-          CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-          ...options.env
-            ? options.env
-            : {
-              CUBEJS_DB_HOST: db!.getHost(),
-              CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
-              CUBEJS_DB_NAME: 'test',
-              CUBEJS_DB_USER: 'test',
-              CUBEJS_DB_PASS: 'test',
-            }
-        },
+        env,
       }
     );
     if (cli.stdout) {
@@ -462,17 +481,25 @@ export async function startBirdBoxFromCli(
   };
 }
 
+export interface BirdboxOptions {
+   // Schema directory
+  schemaDir?: string,
+  // Config file
+  cubejsConfig?: string,
+  loadScript?: string,
+}
+
 /**
  * Returns birdbox.
  */
 export async function getBirdbox(
   type: string,
   env: Env,
-  cubejsConfig?: string,
+  options?: BirdboxOptions,
 ) {
-  // default args
-  if (!cubejsConfig) {
-    cubejsConfig = 'single/cube.js';
+  // default options
+  if (!options) {
+    options = {};
   }
 
   // extract mode
@@ -504,9 +531,7 @@ export async function getBirdbox(
   if (REQUIRED_ENV_VARS[type] === undefined) {
     if (log === Log.PIPE) {
       process.stderr.write(
-        `List of required environment variables is missing for ${
-          type
-        }\n`
+        `List of required environment variables is missing for ${type}\n`
       );
     }
     process.exit(1);
@@ -539,7 +564,8 @@ export async function getBirdbox(
           type,
           env,
           log,
-          cubejsConfig,
+          cubejsConfig: options.cubejsConfig,
+          schemaDir: options.schemaDir,
           useCubejsServerBinary: mode === Mode.LOCAL,
         });
         break;
@@ -548,7 +574,7 @@ export async function getBirdbox(
         birdbox = await startBirdBoxFromContainer({
           type: type === 'postgres' ? 'postgresql' : type,
           log,
-          env
+          env,
         });
         break;
       }
@@ -563,11 +589,9 @@ export async function getBirdbox(
     }
   } catch (e) {
     if (log === Log.PIPE) {
-      process.stderr.write(e as string);
+      process.stderr.write(e.toString());
     }
     clearTestData();
-    console.log('momomomo');
-    await new Promise(resolve => setTimeout(resolve, 500000));
     process.exit(1);
   }
   return birdbox;
