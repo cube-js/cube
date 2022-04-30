@@ -403,6 +403,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::NotExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::BetweenExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)

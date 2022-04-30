@@ -1,7 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::SegmentMemberMember;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TimeDimensionDateRange;
 use crate::compile::rewrite::TimeDimensionDateRangeReplacerDateRange;
@@ -24,6 +23,7 @@ use crate::compile::rewrite::{fun_expr_var_arg, scalar_fun_expr_args, LimitN};
 use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
 use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
 use crate::compile::rewrite::{limit, CubeScanLimit};
+use crate::compile::rewrite::{not_expr, SegmentMemberMember};
 use crate::compile::rewrite::{projection, FilterMemberValues};
 use crate::compile::rewrite::{scalar_fun_expr_args_empty_tail, LiteralExprValue};
 use crate::compile::rewrite::{segment_member, FilterMemberOp};
@@ -247,6 +247,11 @@ impl RewriteRules for FilterRules {
                     false,
                 ),
             ),
+            rewrite(
+                "filter-replacer-is-null-negation",
+                filter_replacer(not_expr(is_null_expr("?expr")), "?cube"),
+                filter_replacer(is_not_null_expr("?expr"), "?cube"),
+            ),
             transforming_rewrite(
                 "filter-replacer-between",
                 filter_replacer(
@@ -322,6 +327,11 @@ impl RewriteRules for FilterRules {
                     "?op",
                     filter_cast_unwrap_replacer("?right"),
                 ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-not-push-down",
+                filter_cast_unwrap_replacer(not_expr("?expr")),
+                not_expr(filter_cast_unwrap_replacer("?expr")),
             ),
             rewrite(
                 "filter-cast-unwrap-inlist-push-down",
