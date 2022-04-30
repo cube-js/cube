@@ -141,89 +141,6 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer(aggr_aggr_expr_empty_tail(), "?cube"),
                 aggr_aggr_expr_empty_tail(),
             ),
-            transforming_chain_rewrite(
-                "split-push-down-column-inner-replacer",
-                inner_aggregate_split_replacer("?expr", "?cube"),
-                vec![("?expr", column_expr("?column"))],
-                alias_expr(column_expr("?column"), "?alias"),
-                self.transform_inner_column("?expr", "?alias"),
-            ),
-            rewrite(
-                "split-push-down-date-trunc-inner-replacer",
-                inner_aggregate_split_replacer(
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                    "?cube",
-                ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
-                ),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-date-part-inner-replacer",
-                inner_aggregate_split_replacer(
-                    fun_expr(
-                        "DatePart",
-                        vec![literal_expr("?granularity"), "?expr".to_string()],
-                    ),
-                    "?cube",
-                ),
-                vec![("?expr", column_expr("?column"))],
-                alias_expr(
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                    "?alias",
-                ),
-                MemberRules::transform_original_expr_date_trunc(
-                    "?expr",
-                    "?granularity",
-                    "?alias_column",
-                    Some("?alias"),
-                    true,
-                ),
-            ),
-            transforming_rewrite(
-                "split-push-down-aggr-fun-inner-replacer",
-                inner_aggregate_split_replacer(
-                    agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
-                    "?cube",
-                ),
-                agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
-                self.transform_inner_measure("?cube", "?arg"),
-            ),
-            // TODO It replaces aggregate function with scalar one. This breaks Aggregate consistency.
-            // Works because push down aggregate rule doesn't care about if it's in group by or aggregate.
-            // Member types detected by column names.
-            transforming_rewrite(
-                "split-push-down-aggr-min-max-date-trunc-fun-inner-replacer",
-                inner_aggregate_split_replacer(
-                    agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
-                    "?cube",
-                ),
-                alias_expr(
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_string("month"), "?arg".to_string()],
-                    ),
-                    "?alias",
-                ),
-                self.transform_min_max_time_dimension("?cube", "?fun", "?arg", "?alias"),
-            ),
-            rewrite(
-                "split-push-down-cast-inner-replacer",
-                inner_aggregate_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
-                inner_aggregate_split_replacer("?expr", "?cube"),
-            ),
-            rewrite(
-                "split-push-down-trunc-inner-replacer",
-                inner_aggregate_split_replacer(fun_expr("Trunc", vec!["?expr"]), "?cube"),
-                inner_aggregate_split_replacer("?expr", "?cube"),
-            ),
             // Outer projection replacer
             rewrite(
                 "split-push-down-group-outer-replacer",
@@ -250,41 +167,6 @@ impl RewriteRules for SplitRules {
                 "split-push-down-aggr-outer-replacer-tail",
                 outer_projection_split_replacer(aggr_aggr_expr_empty_tail(), "?cube"),
                 projection_expr_empty_tail(),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-column-outer-replacer",
-                outer_projection_split_replacer("?expr", "?cube"),
-                vec![("?expr", column_expr("?column"))],
-                "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-date-trunc-outer-replacer",
-                outer_projection_split_replacer("?expr", "?cube"),
-                vec![(
-                    "?expr",
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                )],
-                "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-aggr-fun-outer-replacer",
-                outer_projection_split_replacer("?expr", "?cube"),
-                vec![("?expr", agg_fun_expr("?fun", vec!["?arg"], "?distinct"))],
-                "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
-            ),
-            rewrite(
-                "split-push-down-cast-outer-replacer",
-                outer_projection_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
-                cast_expr(
-                    outer_projection_split_replacer("?expr", "?cube"),
-                    "?data_type",
-                ),
             ),
             // Outer aggregate replacer
             rewrite(
@@ -313,12 +195,43 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(aggr_aggr_expr_empty_tail(), "?cube"),
                 aggr_aggr_expr_empty_tail(),
             ),
+            // Members
+            // Column rules
+            transforming_chain_rewrite(
+                "split-push-down-column-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?cube"),
+                vec![("?expr", column_expr("?column"))],
+                alias_expr(column_expr("?column"), "?alias"),
+                self.transform_inner_column("?expr", "?alias"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-column-outer-replacer",
+                outer_projection_split_replacer("?expr", "?cube"),
+                vec![("?expr", column_expr("?column"))],
+                "?alias".to_string(),
+                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+            ),
             transforming_chain_rewrite(
                 "split-push-down-column-outer-aggr-replacer",
                 outer_aggregate_split_replacer("?expr", "?cube"),
                 vec![("?expr", column_expr("?column"))],
                 "?alias".to_string(),
                 MemberRules::transform_original_expr_alias("?expr", "?alias"),
+            ),
+            // Date trunc
+            rewrite(
+                "split-push-down-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                    "?cube",
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_expr("?granularity"), column_expr("?column")],
+                ),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-aggr-replacer",
@@ -332,6 +245,45 @@ impl RewriteRules for SplitRules {
                 )],
                 "?alias".to_string(),
                 MemberRules::transform_original_expr_alias("?expr", "?alias"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-date-trunc-outer-replacer",
+                outer_projection_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                )],
+                "?alias".to_string(),
+                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+            ),
+            // Date part
+            transforming_chain_rewrite(
+                "split-push-down-date-part-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_expr("?granularity"), "?expr".to_string()],
+                    ),
+                    "?cube",
+                ),
+                vec![("?expr", column_expr("?column"))],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                MemberRules::transform_original_expr_date_trunc(
+                    "?expr",
+                    "?granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    true,
+                ),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-part-outer-aggr-replacer",
@@ -358,6 +310,23 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            // Aggregate function
+            transforming_rewrite(
+                "split-push-down-aggr-fun-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
+                self.transform_inner_measure("?cube", "?arg"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-outer-replacer",
+                outer_projection_split_replacer("?expr", "?cube"),
+                vec![("?expr", agg_fun_expr("?fun", vec!["?arg"], "?distinct"))],
+                "?alias".to_string(),
+                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+            ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-aggr-replacer",
                 outer_aggregate_split_replacer("?expr", "?cube"),
@@ -376,6 +345,47 @@ impl RewriteRules for SplitRules {
                     "?output_fun",
                 ),
             ),
+            // TODO It replaces aggregate function with scalar one. This breaks Aggregate consistency.
+            // Works because push down aggregate rule doesn't care about if it's in group by or aggregate.
+            // Member types detected by column names.
+            transforming_rewrite(
+                "split-push-down-aggr-min-max-date-trunc-fun-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
+                    "?cube",
+                ),
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("month"), "?arg".to_string()],
+                    ),
+                    "?alias",
+                ),
+                self.transform_min_max_dimension("?cube", "?fun", "?arg", "?alias", true),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-min-max-dimension-fun-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec!["?arg"], "?distinct"),
+                    "?cube",
+                ),
+                alias_expr("?arg", "?alias"),
+                self.transform_min_max_dimension("?cube", "?fun", "?arg", "?alias", false),
+            ),
+            // Cast
+            rewrite(
+                "split-push-down-cast-inner-replacer",
+                inner_aggregate_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            rewrite(
+                "split-push-down-cast-outer-replacer",
+                outer_projection_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
+                cast_expr(
+                    outer_projection_split_replacer("?expr", "?cube"),
+                    "?data_type",
+                ),
+            ),
             rewrite(
                 "split-push-down-cast-outer-aggr-replacer",
                 outer_aggregate_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
@@ -383,6 +393,12 @@ impl RewriteRules for SplitRules {
                     outer_aggregate_split_replacer("?expr", "?cube"),
                     "?data_type",
                 ),
+            ),
+            // Trunc
+            rewrite(
+                "split-push-down-trunc-inner-replacer",
+                inner_aggregate_split_replacer(fun_expr("Trunc", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
                 "split-push-down-trunc-outer-aggr-replacer",
@@ -403,12 +419,13 @@ impl SplitRules {
         }
     }
 
-    fn transform_min_max_time_dimension(
+    fn transform_min_max_dimension(
         &self,
         cube_expr_var: &'static str,
         fun_expr_var: &'static str,
         arg_expr_var: &'static str,
         alias_var: &'static str,
+        is_time_dimension: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
         let fun_expr_var = var!(fun_expr_var);
@@ -431,9 +448,13 @@ impl SplitRules {
                                 let alternatives_with_cube =
                                     can_split.narrow_down_alternatives_with_meta(&cube);
 
-                                if let Some(true) =
-                                    alternatives_with_cube.map(|a| a.has_time_dimension())
-                                {
+                                if let Some(true) = alternatives_with_cube.map(|a| {
+                                    if is_time_dimension {
+                                        a.has_time_dimension()
+                                    } else {
+                                        !a.has_time_dimension() && a.has_dimension()
+                                    }
+                                }) {
                                     if let Some(expr_name) =
                                         original_expr_name(egraph, subst[arg_expr_var])
                                     {
@@ -624,9 +645,11 @@ impl SplitRules {
                                     alternatives_with_cube.as_ref().map(|a| a.has_measure())
                                 {
                                     Some((name.to_string(), name.to_string()))
-                                } else if let Some(true) = alternatives_with_cube
-                                    .as_ref()
-                                    .map(|a| a.has_time_dimension())
+                                } else if let Some(true) =
+                                    alternatives_with_cube.as_ref().map(|a| {
+                                        a.has_time_dimension()
+                                            || !a.has_time_dimension() && a.has_dimension()
+                                    })
                                 {
                                     original_expr_name(egraph, subst[arg_var])
                                         .map(|inner| (inner, name.to_string()))
