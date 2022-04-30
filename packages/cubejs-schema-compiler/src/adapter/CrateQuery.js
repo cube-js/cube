@@ -9,9 +9,7 @@ export class CrateQuery extends BaseQuery {
   }
 
   convertTz(field) {
-    return `${field}`;
-    // just return the field while debugging
-    //return `(${field}::timestamp AT TIME ZONE '${this.timezone}')`;
+    return `(${field}::timestamp AT TIME ZONE '${this.timezone}')`;
   }
 
   timeGroupedColumn(granularity, dimension) {
