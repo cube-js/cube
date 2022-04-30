@@ -1337,19 +1337,30 @@ impl LanguageToLogicalPlanConverter {
 
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
-                        fields = fields
-                            .into_iter()
-                            .unique_by(|(f, _)| f.qualified_name())
-                            .collect();
+
                         if let Some(aliases) = aliases {
                             let new_fields = aliases
                                 .iter()
-                                .map(|a| {
-                                    fields.iter().find(|(f, _)| f.name() == a).unwrap().clone()
+                                .zip_eq(fields.iter())
+                                .map(|(a, (f, m))| {
+                                    (
+                                        DFField::new(
+                                            None,
+                                            &a,
+                                            f.data_type().clone(),
+                                            f.is_nullable(),
+                                        ),
+                                        m.to_string(),
+                                    )
                                 })
                                 .collect();
                             fields = new_fields;
                         }
+
+                        fields = fields
+                            .into_iter()
+                            .unique_by(|(f, _)| f.qualified_name())
+                            .collect();
                         let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(
