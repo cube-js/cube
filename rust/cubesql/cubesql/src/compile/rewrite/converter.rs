@@ -12,6 +12,7 @@ use crate::compile::rewrite::CastExprDataType;
 use crate::compile::rewrite::ColumnExprColumn;
 use crate::compile::rewrite::CubeScanAliases;
 use crate::compile::rewrite::CubeScanLimit;
+use crate::compile::rewrite::CubeScanTableName;
 use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::EmptyRelationProduceOneRow;
 use crate::compile::rewrite::FilterMemberMember;
@@ -1071,6 +1072,8 @@ impl LanguageToLogicalPlanConverter {
                             match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                         let order =
                             match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
+                        let table_name =
+                            match_data_node!(node_by_id, cube_scan_params[7], CubeScanTableName);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
@@ -1100,9 +1103,8 @@ impl LanguageToLogicalPlanConverter {
                                         )))?;
                                     fields.push((
                                         DFField::new(
-                                            None,
-                                            // TODO empty schema
-                                            &expr.name(&DFSchema::empty())?,
+                                            Some(&table_name),
+                                            &expr_name(&expr)?,
                                             data_type,
                                             // TODO actually nullable. Just to fit tests
                                             false,
@@ -1139,9 +1141,9 @@ impl LanguageToLogicalPlanConverter {
                                     if let Some(granularity) = &granularity {
                                         fields.push((
                                             DFField::new(
-                                                None,
+                                                Some(&table_name),
                                                 // TODO empty schema
-                                                &expr.name(&DFSchema::empty())?,
+                                                &expr_name(&expr)?,
                                                 DataType::Timestamp(TimeUnit::Nanosecond, None),
                                                 // TODO actually nullable. Just to fit tests
                                                 false,
@@ -1165,9 +1167,9 @@ impl LanguageToLogicalPlanConverter {
                                     query_dimensions.push(dimension.to_string());
                                     fields.push((
                                         DFField::new(
-                                            None,
+                                            Some(&table_name),
                                             // TODO empty schema
-                                            &expr.name(&DFSchema::empty())?,
+                                            &expr_name(&expr)?,
                                             data_type,
                                             // TODO actually nullable. Just to fit tests
                                             false,
@@ -1409,5 +1411,12 @@ impl LanguageToLogicalPlanConverter {
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })
+    }
+}
+
+pub fn expr_name(expr: &Expr) -> Result<String, CubeError> {
+    match expr {
+        Expr::Column(c) => Ok(c.name.to_string()),
+        _ => Ok(expr.name(&DFSchema::empty())?),
     }
 }

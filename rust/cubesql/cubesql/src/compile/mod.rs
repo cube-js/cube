@@ -3221,7 +3221,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn tableau_filter_and_group_by() {
         init_logger();
 
