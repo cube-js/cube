@@ -3221,7 +3221,8 @@ mod tests {
     }
 
     #[test]
-    fn tableau_filter_ang_group_by() {
+    #[ignore]
+    fn tableau_filter_and_group_by() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
