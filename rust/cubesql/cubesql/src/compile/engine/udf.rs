@@ -5,9 +5,10 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampNanosecondArray, UInt32Builder,
+            Float64Array, GenericStringArray, Int32Array, Int64Array, Int64Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
+            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampNanosecondArray,
+            UInt32Array, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -1051,42 +1052,43 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 
 pub fn create_format_type_udf(name: &str) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2);
+        let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let typemods = args[1].as_any().downcast_ref::<Int32Array>().unwrap();
 
-        let oid = downcast_primitive_arg!(&args[0], "oid", Int64Type).value(0);
-        let mut typemod = if args[1].is_null(0) {
-            None
-        } else {
-            Some(downcast_primitive_arg!(&args[1], "mod", Int64Type).value(0))
-        };
+        let result = oids
+            .iter()
+            .zip(typemods.iter())
+            .map(|args| match args {
+                (Some(oid), typemod) => {
+                    let typemod_str = typemod.map_or("".to_string(), |typemod| {
+                        let typemod = match typemod {
+                            // character varying returns length lowered by 4
+                            1043 => typemod - 4,
+                            _ => typemod,
+                        };
 
-        // character varying returns length lowered by 4
-        if oid == 1043 && typemod.is_some() {
-            typemod = Some(typemod.unwrap() - 4);
-        }
+                        match typemod {
+                            0.. => format!("({})", typemod),
+                            _ => "".to_string(),
+                        }
+                    });
 
-        let mut builder = StringBuilder::new(1);
+                    Some(match oid {
+                        0 => "-".to_string(),
+                        19 => format!("name{}", typemod_str),
+                        23 => "integer".to_string(),
+                        1043 => format!("character varying{}", typemod_str),
+                        1184 => format!("timestamp{} with time zone", typemod_str),
+                        13408 => format!("information_schema.character_data{}", typemod_str),
+                        13410 => format!("information_schema.sql_identifier{}", typemod_str),
+                        _ => "???".to_string(),
+                    })
+                }
+                _ => None,
+            })
+            .collect::<StringArray>();
 
-        let typemod_str = match typemod {
-            None => "".to_string(),
-            Some(typemod) if typemod < 0 => "".to_string(),
-            Some(typemod) => format!("({})", typemod),
-        };
-
-        let type_str = match oid {
-            0 => "-".to_string(),
-            19 => format!("name{}", typemod_str),
-            23 => "integer".to_string(),
-            1043 => format!("character varying{}", typemod_str),
-            1184 => format!("timestamp{} with time zone", typemod_str),
-            13408 => format!("information_schema.character_data{}", typemod_str),
-            13410 => format!("information_schema.sql_identifier{}", typemod_str),
-            _ => "???".to_string(),
-        };
-
-        builder.append_value(type_str).unwrap();
-
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+        Ok(Arc::new(result))
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));

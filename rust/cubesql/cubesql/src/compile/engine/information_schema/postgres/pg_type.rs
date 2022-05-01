@@ -5,7 +5,10 @@ use async_trait::async_trait;
 use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, Int16Builder, StringBuilder, UInt32Builder},
+        array::{
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, StringBuilder,
+            UInt32Builder,
+        },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -43,8 +46,8 @@ struct PgCatalogTypeBuilder {
     typalign: StringBuilder,
     typstorage: StringBuilder,
     typnotnull: BooleanBuilder,
-    typbasetype: StringBuilder,
-    typtypmod: StringBuilder,
+    typbasetype: UInt32Builder,
+    typtypmod: Int32Builder,
     typndims: StringBuilder,
     typcollation: StringBuilder,
     typdefaultbin: StringBuilder,
@@ -83,8 +86,8 @@ impl PgCatalogTypeBuilder {
             typalign: StringBuilder::new(capacity),
             typstorage: StringBuilder::new(capacity),
             typnotnull: BooleanBuilder::new(capacity),
-            typbasetype: StringBuilder::new(capacity),
-            typtypmod: StringBuilder::new(capacity),
+            typbasetype: UInt32Builder::new(capacity),
+            typtypmod: Int32Builder::new(capacity),
             typndims: StringBuilder::new(capacity),
             typcollation: StringBuilder::new(capacity),
             typdefaultbin: StringBuilder::new(capacity),
@@ -120,8 +123,8 @@ impl PgCatalogTypeBuilder {
         self.typalign.append_value(typ.typalign).unwrap();
         self.typstorage.append_value(typ.typstorage).unwrap();
         self.typnotnull.append_value(false).unwrap();
-        self.typbasetype.append_null().unwrap();
-        self.typtypmod.append_null().unwrap();
+        self.typbasetype.append_value(typ.typbasetype).unwrap();
+        self.typtypmod.append_value(-1).unwrap();
         self.typndims.append_null().unwrap();
         self.typcollation.append_null().unwrap();
         self.typdefaultbin.append_null().unwrap();
@@ -199,6 +202,7 @@ impl PgCatalogTypeProvider {
                 // TODO Verify
                 typalign: "i",
                 typstorage: "x",
+                typbasetype: 0,
             });
 
             builder.add_type(&PgType {
@@ -219,6 +223,7 @@ impl PgCatalogTypeProvider {
                 // TODO Verify
                 typalign: "d",
                 typstorage: "x",
+                typbasetype: 0,
             });
         }
 
@@ -266,8 +271,8 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typalign", DataType::Utf8, true),
             Field::new("typstorage", DataType::Utf8, true),
             Field::new("typnotnull", DataType::Boolean, true),
-            Field::new("typbasetype", DataType::Utf8, true),
-            Field::new("typtypmod", DataType::Utf8, true),
+            Field::new("typbasetype", DataType::UInt32, true),
+            Field::new("typtypmod", DataType::Int32, true),
             Field::new("typndims", DataType::Utf8, true),
             Field::new("typcollation", DataType::Utf8, true),
             Field::new("typdefaultbin", DataType::Utf8, true),

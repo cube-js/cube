@@ -6188,36 +6188,13 @@ mod tests {
     #[tokio::test]
     async fn test_format_type_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "format_type_simple",
+            "format_type",
             execute_query(
-                "SELECT format_type(19, NULL);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_mod",
-            execute_query(
-                "SELECT format_type(1184, 5);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_unknown",
-            execute_query(
-                "SELECT format_type(1, NULL);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_none",
-            execute_query(
-                "SELECT format_type(0, NULL);".to_string(),
+                "
+                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f
+                FROM pg_catalog.pg_type t;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
