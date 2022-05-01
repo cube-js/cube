@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT\n                    t.typname as \"name\",\n                    pg_catalog.format_type(t.typbasetype, t.typtypmod) as \"attype\",\n                    not t.typnotnull as \"nullable\",\n                    t.typdefault as \"default\",\n                    pg_catalog.pg_type_is_visible(t.oid) as \"visible\",\n                    n.nspname as \"schema\"\n                FROM pg_catalog.pg_type t\n                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace\n                WHERE t.typtype = 'd'\n                ;\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------+-------------------+----------+---------+---------+--------------------+
+| name           | attype            | nullable | default | visible | schema             |
++----------------+-------------------+----------+---------+---------+--------------------+
+| character_data | character varying | true     | NULL    | false   | information_schema |
+| sql_identifier | name              | true     | NULL    | false   | information_schema |
++----------------+-------------------+----------+---------+---------+--------------------+
