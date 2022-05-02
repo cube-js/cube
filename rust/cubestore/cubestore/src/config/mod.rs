@@ -670,7 +670,7 @@ impl Config {
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
                 metadata_cache_max_capacity_bytes: env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0),
-                metadata_cache_time_to_idle_secs: env_parse("CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS", 0)
+                metadata_cache_time_to_idle_secs: env_parse("CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS", 0),
             }),
         }
     }
