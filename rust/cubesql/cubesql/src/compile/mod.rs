@@ -2520,6 +2520,10 @@ mod tests {
                         name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         _type: "number".to_string(),
                     },
+                    V1CubeMetaDimension {
+                        name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                        _type: "boolean".to_string(),
+                    },
                 ],
                 measures: vec![
                     V1CubeMetaMeasure {
@@ -3040,6 +3044,7 @@ mod tests {
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                "KibanaSampleDataEcommerce.has_subscription".to_string(),
             ])
         )
     }
@@ -3061,6 +3066,7 @@ mod tests {
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                "KibanaSampleDataEcommerce.has_subscription".to_string(),
             ])
         )
     }
@@ -3154,6 +3160,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
                 time_dimensions: None,
                 order: None,
@@ -3300,6 +3307,57 @@ mod tests {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
                     values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_boolean_filter_inplace_where() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE \"KibanaSampleDataEcommerce\".\"is_female\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE NOT(\"KibanaSampleDataEcommerce\".\"has_subscription\") HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["false".to_string()]),
                     or: None,
                     and: None,
                 }]),

@@ -1,19 +1,20 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"show create table KibanaSampleDataEcommerce;\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+expression: "execute_query(\"show create table KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
-+---------------------------+--------------------------------------------+
-| Table                     | Create Table                               |
-+---------------------------+--------------------------------------------+
-| KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` ( |
-|                           |   `count` int,                             |
-|                           |   `maxPrice` numeric,                      |
-|                           |   `minPrice` numeric,                      |
-|                           |   `avgPrice` numeric,                      |
-|                           |   `order_date` datetime NOT NULL,          |
-|                           |   `customer_gender` varchar(255) NOT NULL, |
-|                           |   `taxful_total_price` numeric NOT NULL,   |
-|                           |   `is_male` boolean,                       |
-|                           |   `is_female` boolean                      |
-|                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4    |
-+---------------------------+--------------------------------------------+
++---------------------------+---------------------------------------------+
+| Table                     | Create Table                                |
++---------------------------+---------------------------------------------+
+| KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` (  |
+|                           |   `count` int,                              |
+|                           |   `maxPrice` numeric,                       |
+|                           |   `minPrice` numeric,                       |
+|                           |   `avgPrice` numeric,                       |
+|                           |   `order_date` datetime NOT NULL,           |
+|                           |   `customer_gender` varchar(255) NOT NULL,  |
+|                           |   `taxful_total_price` numeric NOT NULL,    |
+|                           |   `has_subscription` varchar(255) NOT NULL, |
+|                           |   `is_male` boolean,                        |
+|                           |   `is_female` boolean                       |
+|                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4     |
++---------------------------+---------------------------------------------+

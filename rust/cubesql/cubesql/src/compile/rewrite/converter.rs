@@ -1292,11 +1292,7 @@ impl LanguageToLogicalPlanConverter {
                             None
                         };
 
-                        query.segments = if segments.len() > 0 {
-                            Some(segments)
-                        } else {
-                            None
-                        };
+                        query.segments = Some(segments);
 
                         for o in order {
                             let order_params = match_params!(o, Order);
@@ -1332,7 +1328,6 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.segments = Some(Vec::new());
                         query.limit =
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| n as i32);
