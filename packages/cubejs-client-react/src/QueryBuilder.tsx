@@ -11,7 +11,7 @@ import {
   ResultSet
 } from '@cubejs-client/core';
 
-import QueryRenderer from './QueryRenderer.jsx';
+import QueryRenderer from './QueryRenderer';
 import CubeContext from './CubeContext';
 import { generateAnsiHTML, removeEmpty } from './utils';
 

@@ -1,7 +1,7 @@
-import QueryRenderer from './QueryRenderer.jsx';
-import QueryRendererWithTotals from './QueryRendererWithTotals.jsx';
-import QueryBuilder from './QueryBuilder.jsx';
-import CubeProvider from './CubeProvider.jsx';
+import QueryRenderer from './QueryRenderer.tsx';
+import QueryRendererWithTotals from './QueryRendererWithTotals.tsx';
+import QueryBuilder from './QueryBuilder.tsx';
+import CubeProvider from './CubeProvider.tsx';
 import CubeContext from './CubeContext';
 
 export * from './hooks/cube-sql';

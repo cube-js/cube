@@ -1,5 +1,5 @@
 import React from 'react';
-import QueryRenderer from './QueryRenderer.jsx';
+import QueryRenderer from './QueryRenderer';
 
 const QueryRendererWithTotals = ({ query, ...restProps }) => (
   <QueryRenderer

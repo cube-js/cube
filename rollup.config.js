@@ -178,7 +178,7 @@ export default bundle(
   )
   .concat(
     bundle('cubejs-client-react', 'cubejsReact', {
-      input: 'packages/cubejs-client-react/src/index.js',
+      input: 'packages/cubejs-client-react/src/index.ts',
       external: ['react', 'prop-types'],
     })
   )
