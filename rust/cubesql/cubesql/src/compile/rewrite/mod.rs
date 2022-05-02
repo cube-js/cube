@@ -551,6 +551,10 @@ fn between_expr(
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
 }
 
+fn negative_expr(expr: impl Display) -> String {
+    format!("(NegativeExpr {})", expr)
+}
+
 fn not_expr(expr: impl Display) -> String {
     format!("(NotExpr {})", expr)
 }

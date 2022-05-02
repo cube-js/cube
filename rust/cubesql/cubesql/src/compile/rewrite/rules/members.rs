@@ -1,7 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::table_scan;
 use crate::compile::rewrite::AggregateFunctionExprDistinct;
 use crate::compile::rewrite::AggregateFunctionExprFun;
 use crate::compile::rewrite::AliasExprAlias;
@@ -33,6 +32,7 @@ use crate::compile::rewrite::{
 use crate::compile::rewrite::{
     binary_expr, column_expr, cube_scan, literal_expr, rewrite, transforming_rewrite,
 };
+use crate::compile::rewrite::{cast_expr, table_scan};
 use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
     time_dimension_expr,
@@ -201,6 +201,40 @@ impl RewriteRules for MemberRules {
                     fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
+            // TODO make cast split work
+            transforming_rewrite(
+                "date-trunc-unwrap-cast",
+                member_replacer(
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
+                    ),
+                    "?source_table_name",
+                ),
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
                     ),
                 ),
                 self.transform_time_dimension(
