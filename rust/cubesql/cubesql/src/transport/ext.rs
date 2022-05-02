@@ -182,7 +182,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for segment in &self.segments {
             columns.push(CubeColumn {
                 name: segment.get_real_name(),
-                column_type: ColumnType::Blob,
+                column_type: ColumnType::Boolean,
                 can_be_null: false,
             });
         }
