@@ -33,18 +33,8 @@ cube(`Events`, {
         type: `string`
       },
       
-      repositoryHasDownloads: {
-        sql: `repository_has_downloads`,
-        type: `string`
-      },
-      
       repositoryCreatedAt: {
         sql: `repository_created_at`,
-        type: `string`
-      },
-      
-      repositoryHasIssues: {
-        sql: `repository_has_issues`,
         type: `string`
       },
       
