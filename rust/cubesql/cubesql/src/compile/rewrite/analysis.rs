@@ -8,23 +8,19 @@ use crate::compile::rewrite::DimensionName;
 use crate::compile::rewrite::LiteralExprValue;
 use crate::compile::rewrite::LogicalPlanLanguage;
 use crate::compile::rewrite::MeasureName;
-use crate::compile::rewrite::ScalarFunctionExprFun;
 use crate::compile::rewrite::TableScanSourceTableName;
 use crate::compile::rewrite::TimeDimensionName;
-use crate::transport::V1CubeMetaExt;
 use crate::var_iter;
 use crate::CubeError;
-use cubeclient::models::V1CubeMeta;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::logical_plan::{Column, DFSchema, Expr};
-use datafusion::physical_plan::functions::{BuiltinScalarFunction, Volatility};
+use datafusion::logical_plan::{DFSchema, Expr};
+use datafusion::physical_plan::functions::Volatility;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{ColumnarValue, PhysicalPlanner};
 use datafusion::scalar::ScalarValue;
 use egg::{Analysis, DidMerge};
 use egg::{EGraph, Id};
-use itertools::Itertools;
-use std::cmp::Ordering;
+use std::fmt::Debug;
 use std::ops::Index;
 use std::sync::Arc;
 
@@ -37,7 +33,6 @@ pub struct LogicalPlanData {
     pub referenced_expr: Option<Vec<Expr>>,
     pub constant: Option<ScalarValue>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
-    pub can_split: Option<CanSplitNode>,
     pub cube_reference: Option<String>,
 }
 
@@ -62,186 +57,6 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
         //     self.egraph.index(index).nodes
         // );
         &self.egraph.index(index).nodes[0]
-    }
-}
-
-#[derive(Clone, Debug, Ord, Eq, PartialOrd, PartialEq, Hash)]
-pub enum SplitType {
-    Aggregation,
-    Projection,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Ord, Hash)]
-pub enum CanSplit {
-    Constant(SplitType),
-    Measure(Column, SplitType),
-    Dimension(Column, SplitType),
-    TimeDimension(Column, SplitType),
-}
-
-impl CanSplit {
-    fn split_type(&self) -> &SplitType {
-        match &self {
-            CanSplit::Constant(t) => t,
-            CanSplit::Measure(_, t) => t,
-            CanSplit::Dimension(_, t) => t,
-            CanSplit::TimeDimension(_, t) => t,
-        }
-    }
-}
-
-impl PartialOrd for CanSplit {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.split_type().partial_cmp(other.split_type())
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct CanSplitAlternative(Vec<Arc<CanSplitNode>>);
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum CanSplitNode {
-    Array(Vec<CanSplitAlternative>),
-    Terminal(CanSplit),
-}
-
-impl CanSplitNode {
-    pub fn new_single_node(alternatives: Vec<CanSplit>) -> Self {
-        CanSplitNode::Array(vec![CanSplitAlternative(
-            alternatives
-                .into_iter()
-                .map(|c| Arc::new(CanSplitNode::Terminal(c)))
-                .collect(),
-        )])
-    }
-
-    pub fn merge(&mut self, other: &Self) {
-        match self {
-            CanSplitNode::Array(nodes) => match other {
-                CanSplitNode::Array(other_nodes) => {
-                    *nodes = nodes
-                        .iter()
-                        .zip_eq(other_nodes)
-                        .map(|(n, o)| {
-                            CanSplitAlternative(
-                                n.0.iter()
-                                    .cloned()
-                                    .chain(o.0.iter().cloned())
-                                    .unique()
-                                    .collect(),
-                            )
-                        })
-                        .collect();
-                }
-                x => panic!("Expected Array node but found: {:?}", x),
-            },
-            x => panic!("Expected Array node but found: {:?}", x),
-        }
-    }
-
-    pub fn union(arrays: Vec<Self>) -> Self {
-        CanSplitNode::Array(
-            arrays
-                .into_iter()
-                .map(|a| match a {
-                    CanSplitNode::Array(array) => array.into_iter(),
-                    x => panic!("Expected Array but found: {:?}", x),
-                })
-                .flatten()
-                .collect(),
-        )
-    }
-
-    pub fn min_split_type(&self) -> Option<SplitType> {
-        match self {
-            CanSplitNode::Array(array) => array
-                .iter()
-                .filter_map(|alt| alt.0.iter().filter_map(|a| a.min_split_type()).max())
-                .min(),
-            CanSplitNode::Terminal(t) => Some(t.split_type().clone()),
-        }
-    }
-
-    pub fn narrow_down_alternatives_with_meta(&self, cube: &V1CubeMeta) -> Option<Self> {
-        self.filter_alternatives(|can_split| match can_split {
-            CanSplit::Constant(split_type) => Some(split_type.clone()),
-            CanSplit::Measure(c, split_type) => {
-                cube.lookup_measure(&c.name).map(|_| split_type.clone())
-            }
-            CanSplit::Dimension(c, split_type) => {
-                cube.lookup_dimension(&c.name).map(|_| split_type.clone())
-            }
-            CanSplit::TimeDimension(c, split_type) => cube
-                .lookup_dimension(&c.name)
-                .filter(|d| d._type == "time")
-                .map(|_| split_type.clone()),
-        })
-    }
-
-    pub fn has_measure(&self) -> bool {
-        self.filter_alternatives(|can_split| match can_split {
-            CanSplit::Measure(_, split_type) => Some(split_type.clone()),
-            _ => None,
-        })
-        .is_some()
-    }
-
-    pub fn has_time_dimension(&self) -> bool {
-        self.filter_alternatives(|can_split| match can_split {
-            CanSplit::TimeDimension(_, split_type) => Some(split_type.clone()),
-            _ => None,
-        })
-        .is_some()
-    }
-
-    pub fn has_dimension(&self) -> bool {
-        self.filter_alternatives(|can_split| match can_split {
-            CanSplit::Dimension(_, split_type) => Some(split_type.clone()),
-            _ => None,
-        })
-        .is_some()
-    }
-
-    pub fn filter_alternatives(
-        &self,
-        fun: impl Fn(&CanSplit) -> Option<SplitType>,
-    ) -> Option<Self> {
-        self.filter_alternatives_impl(&fun)
-    }
-
-    pub fn filter_alternatives_impl(
-        &self,
-        fun: &impl Fn(&CanSplit) -> Option<SplitType>,
-    ) -> Option<Self> {
-        match self {
-            CanSplitNode::Array(alternatives) => {
-                let filtered_alternatives = alternatives
-                    .iter()
-                    .map(|a| {
-                        CanSplitAlternative(
-                            a.0.iter()
-                                .filter_map(|node| node.filter_alternatives_impl(fun))
-                                .map(|n| Arc::new(n))
-                                .collect::<Vec<_>>(),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                if filtered_alternatives.iter().all(|a| a.0.is_empty()) {
-                    None
-                } else {
-                    Some(CanSplitNode::Array(filtered_alternatives))
-                }
-            }
-            CanSplitNode::Terminal(can_split) => fun(can_split).map(|new_type| {
-                let new_can_split = match can_split {
-                    CanSplit::Constant(_) => CanSplit::Constant(new_type),
-                    CanSplit::Measure(c, _) => CanSplit::Measure(c.clone(), new_type),
-                    CanSplit::Dimension(c, _) => CanSplit::Dimension(c.clone(), new_type),
-                    CanSplit::TimeDimension(c, _) => CanSplit::TimeDimension(c.clone(), new_type),
-                };
-                CanSplitNode::Terminal(new_can_split)
-            }),
-        }
     }
 }
 
@@ -551,79 +366,6 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn make_can_split(
-        egraph: &EGraph<LogicalPlanLanguage, Self>,
-        enode: &LogicalPlanLanguage,
-    ) -> Option<CanSplitNode> {
-        let can_split = |id| egraph.index(id).data.can_split.clone();
-        let cube_reference = |id| egraph.index(id).data.cube_reference.clone();
-        match enode {
-            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
-                let fun = var_iter!(egraph[params[0]], ScalarFunctionExprFun).next()?;
-                let can_split_args = can_split(params[1]);
-
-                match fun {
-                    BuiltinScalarFunction::DateTrunc => {
-                        Some(CanSplitNode::new_single_node(vec![CanSplit::Constant(
-                            SplitType::Projection,
-                        )]))
-                    }
-                    BuiltinScalarFunction::Trunc | BuiltinScalarFunction::DatePart => {
-                        can_split_args
-                            .and_then(|n| n.filter_alternatives(|_| Some(SplitType::Aggregation)))
-                    }
-                    _ => None,
-                }
-            }
-            LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(column)) => {
-                Some(CanSplitNode::new_single_node(vec![
-                    CanSplit::TimeDimension(column.clone(), SplitType::Projection),
-                    CanSplit::Dimension(column.clone(), SplitType::Projection),
-                    CanSplit::Measure(column.clone(), SplitType::Projection),
-                ]))
-            }
-            LogicalPlanLanguage::LiteralExpr(_) => {
-                Some(CanSplitNode::new_single_node(vec![CanSplit::Constant(
-                    SplitType::Projection,
-                )]))
-            }
-            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
-                can_split(params[1]).and_then(|c| {
-                    c.filter_alternatives(|c| match c {
-                        CanSplit::TimeDimension(_, _) => Some(SplitType::Aggregation),
-                        CanSplit::Dimension(_, _) => Some(SplitType::Aggregation),
-                        _ => Some(SplitType::Projection),
-                    })
-                })
-            }
-            LogicalPlanLanguage::CastExpr(params) => can_split(params[0]),
-            LogicalPlanLanguage::ColumnExpr(params) => can_split(params[0]),
-            LogicalPlanLanguage::AggregateGroupExpr(params)
-            | LogicalPlanLanguage::AggregateAggrExpr(params)
-            | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
-            | LogicalPlanLanguage::AggregateFunctionExprArgs(params) => Some(CanSplitNode::union(
-                params
-                    .iter()
-                    .map(|p| can_split(*p))
-                    .collect::<Option<Vec<_>>>()?,
-            )),
-            LogicalPlanLanguage::Aggregate(params) => {
-                let cube = cube_reference(params[0])?;
-                let cube = egraph
-                    .analysis
-                    .cube_context
-                    .meta
-                    .find_cube_with_name(cube)?;
-                let group = can_split(params[1])?;
-                let aggr = can_split(params[2])?;
-                let all_nodes = CanSplitNode::union(vec![group, aggr]);
-                let narrow_down = all_nodes.narrow_down_alternatives_with_meta(&cube);
-                narrow_down
-            }
-            _ => None,
-        }
-    }
-
     fn eval_constant_expr(
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         expr: &Expr,
@@ -710,27 +452,6 @@ impl LogicalPlanAnalysis {
         };
         (res, b)
     }
-
-    fn merge_option_field_with<T: Clone>(
-        &mut self,
-        a: &mut LogicalPlanData,
-        mut b: LogicalPlanData,
-        field: fn(&mut LogicalPlanData) -> &mut Option<T>,
-        merge_fn: fn(&mut T, T),
-    ) -> (DidMerge, LogicalPlanData) {
-        let res = if field(a).is_none() && field(&mut b).is_some() {
-            *field(a) = field(&mut b).clone();
-            DidMerge(true, false)
-        } else if field(a).is_some() && field(&mut b).is_some() {
-            merge_fn(field(a).as_mut().unwrap(), field(&mut b).clone().unwrap());
-            DidMerge(true, true)
-        } else if field(a).is_some() {
-            DidMerge(false, true)
-        } else {
-            DidMerge(false, false)
-        };
-        (res, b)
-    }
 }
 
 impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
@@ -745,7 +466,6 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             referenced_expr: Self::make_referenced_expr(egraph, enode),
             constant: Self::make_constant(egraph, enode),
             constant_in_list: Self::make_constant_in_list(egraph, enode),
-            can_split: Self::make_can_split(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
         }
     }
@@ -757,8 +477,6 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
         let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
         let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
-        let (can_split, b) =
-            self.merge_option_field_with(a, b, |d| &mut d.can_split, |a, b| a.merge(&b));
         let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column_name);
         original_expr
@@ -766,7 +484,6 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name_to_alias
             | referenced_columns
             | constant_in_list
-            | can_split
             | cube_reference
             | column_name
     }

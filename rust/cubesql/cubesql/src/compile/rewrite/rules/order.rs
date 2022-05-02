@@ -39,6 +39,7 @@ impl RewriteRules for OrderRules {
                         "?offset",
                         "?cube_aliases",
                         "?table_name",
+                        "?split",
                     ),
                 ),
                 cube_scan(
@@ -50,6 +51,7 @@ impl RewriteRules for OrderRules {
                     "?offset",
                     "?cube_aliases",
                     "?table_name",
+                    "?split",
                 ),
                 self.push_down_sort(
                     "?source_table_name",

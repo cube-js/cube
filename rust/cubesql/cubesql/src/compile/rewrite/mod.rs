@@ -207,6 +207,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
             table_name: String,
+            split: bool,
         },
         Measure {
             name: String,
@@ -727,10 +728,11 @@ fn cube_scan(
     offset: impl Display,
     aliases: impl Display,
     table_name: impl Display,
+    split: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset, aliases, table_name
+        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
+        source_table_name, members, filters, orders, limit, offset, aliases, table_name, split
     )
 }
 

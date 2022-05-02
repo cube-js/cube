@@ -3165,6 +3165,60 @@ mod tests {
     }
 
     #[test]
+    fn tableau_projection_with_casts() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \
+             CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS \"customer_gender\",\
+             \"KibanaSampleDataEcommerce\".\"count\" AS \"count\",\
+             \"KibanaSampleDataEcommerce\".\"maxPrice\" AS \"maxPrice\",\
+             \"KibanaSampleDataEcommerce\".\"minPrice\" AS \"minPrice\",\
+             \"KibanaSampleDataEcommerce\".\"avgPrice\" AS \"avgPrice\",\
+             \"KibanaSampleDataEcommerce\".\"order_date\" AS \"order_date\",\
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price1\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price2\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price3\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price4\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price5\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price6\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price7\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price8\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price9\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price10\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price11\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price12\"
+             FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
     fn tableau_min_max() {
         init_logger();
 
