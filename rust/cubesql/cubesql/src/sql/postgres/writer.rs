@@ -11,6 +11,7 @@ use chrono::format::Pad::Zero;
 use chrono::format::{Fixed, Item};
 use chrono::prelude::*;
 use pg_srv::protocol::{Format, Serialize};
+use pg_srv::{protocol, ProtocolError};
 use std::convert::TryFrom;
 use std::io;
 use std::io::Error;
@@ -18,21 +19,21 @@ use std::mem;
 
 pub trait ToPostgresValue {
     // Converts native type to raw value in text format
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()>;
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError>;
 
     // Converts native type to raw value in binary format
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()>;
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError>;
 }
 
 impl ToPostgresValue for String {
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         buf.put_i32(self.len() as i32);
         buf.extend_from_slice(self.as_bytes());
 
         Ok(())
     }
 
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         buf.put_i32(self.len() as i32);
         buf.extend_from_slice(self.as_bytes());
 
@@ -41,7 +42,7 @@ impl ToPostgresValue for String {
 }
 
 impl ToPostgresValue for bool {
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         if *self {
             "t".to_string().to_text(buf)
         } else {
@@ -49,7 +50,7 @@ impl ToPostgresValue for bool {
         }
     }
 
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         buf.put_i32(1_i32);
         buf.extend_from_slice(if *self { &[1] } else { &[0] });
 
@@ -63,7 +64,7 @@ fn pg_base_date_epoch() -> NaiveDateTime {
 }
 
 impl ToPostgresValue for TimestampValue {
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         let ndt = match self.tz_ref() {
             None => self.to_naive_datetime(),
             Some(_) => self.to_fixed_datetime()?.naive_utc(),
@@ -96,7 +97,7 @@ impl ToPostgresValue for TimestampValue {
         }
     }
 
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         match self.tz_ref() {
             None => {
                 let seconds = self
@@ -135,7 +136,7 @@ impl ToPostgresValue for TimestampValue {
 }
 
 impl<T: ToPostgresValue> ToPostgresValue for Option<T> {
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         match &self {
             None => buf.extend_from_slice(&(-1_i32).to_be_bytes()),
             Some(v) => v.to_text(buf)?,
@@ -144,7 +145,7 @@ impl<T: ToPostgresValue> ToPostgresValue for Option<T> {
         Ok(())
     }
 
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         match &self {
             None => buf.extend_from_slice(&(-1_i32).to_be_bytes()),
             Some(v) => v.to_binary(buf)?,
@@ -155,7 +156,7 @@ impl<T: ToPostgresValue> ToPostgresValue for Option<T> {
 }
 
 impl ToPostgresValue for ArrayRef {
-    fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         let mut values: Vec<String> = Vec::with_capacity(self.len());
 
         macro_rules! write_native_array_to_buffer {
@@ -189,10 +190,11 @@ impl ToPostgresValue for ArrayRef {
             DataType::Boolean => write_native_array_to_buffer!(self, values, BooleanArray),
             DataType::Utf8 => write_native_array_to_buffer!(self, values, StringArray),
             dt => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
+                return Err(protocol::ErrorResponse::error(
+                    protocol::ErrorCode::InternalError,
                     format!("Unsupported type for list serializing: {}", dt),
-                ))
+                )
+                .into());
             }
         };
 
@@ -209,7 +211,7 @@ impl ToPostgresValue for ArrayRef {
     // 0000   00 00 00 01 00 00 00 00 00 00 00 19 00 00 00 02   ................
     // 0010   00 00 00 01 00 00 00 05 74 65 73 74 31 00 00 00   ........test1...
     // 0020   05 74 65 73 74 32                                 .test2
-    fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         let mut column_data = BytesMut::with_capacity(3 * 5 + self.len() * 2);
         // row1 from the comment
         // dimensions
@@ -264,10 +266,11 @@ impl ToPostgresValue for ArrayRef {
                 }
             }
             dt => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
+                return Err(protocol::ErrorResponse::error(
+                    protocol::ErrorCode::InternalError,
                     format!("Unsupported type for list serializing: {}", dt),
-                ))
+                )
+                .into())
             }
         };
 
@@ -281,11 +284,11 @@ impl ToPostgresValue for ArrayRef {
 macro_rules! impl_primitive {
     ($type: ident) => {
         impl ToPostgresValue for $type {
-            fn to_text(&self, buf: &mut BytesMut) -> io::Result<()> {
+            fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
                 self.to_string().to_text(buf)
             }
 
-            fn to_binary(&self, buf: &mut BytesMut) -> io::Result<()> {
+            fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
                 buf.extend_from_slice(&(mem::size_of::<$type>() as u32).to_be_bytes());
                 buf.extend_from_slice(&self.to_be_bytes());
 
@@ -322,7 +325,7 @@ impl BatchWriter {
         }
     }
 
-    pub fn write_value<T: ToPostgresValue>(&mut self, value: T) -> io::Result<()> {
+    pub fn write_value<T: ToPostgresValue>(&mut self, value: T) -> Result<(), ProtocolError> {
         self.current += 1;
 
         match self.format {
@@ -333,7 +336,7 @@ impl BatchWriter {
         Ok(())
     }
 
-    pub fn end_row(&mut self) -> io::Result<()> {
+    pub fn end_row(&mut self) -> Result<(), ProtocolError> {
         self.data.extend_from_slice(&b'D'.to_be_bytes());
         let buffer = self.row.split();
 
@@ -372,10 +375,10 @@ impl<'a> Serialize for BatchWriter {
 #[cfg(test)]
 mod tests {
     use crate::sql::dataframe::TimestampValue;
+    use crate::sql::shim::ConnectionError;
     use crate::{
         arrow::array::{ArrayRef, Int64Builder},
         sql::writer::{BatchWriter, ToPostgresValue},
-        CubeError,
     };
     use bytes::BytesMut;
     use pg_srv::buffer;
@@ -391,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn test_text_encoders() -> Result<(), CubeError> {
+    fn test_text_encoders() -> Result<(), ConnectionError> {
         assert_text_encode(true, &[0, 0, 0, 1, 116]);
         assert_text_encode(false, &[0, 0, 0, 1, 102]);
         assert_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
@@ -421,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn test_binary_encoders() -> Result<(), CubeError> {
+    fn test_binary_encoders() -> Result<(), ConnectionError> {
         assert_bind_encode(true, &[0, 0, 0, 1, 1]);
         assert_bind_encode(false, &[0, 0, 0, 1, 0]);
         assert_bind_encode(
@@ -437,7 +440,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_backend_writer_text_simple() -> Result<(), CubeError> {
+    async fn test_backend_writer_text_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
         let mut writer = BatchWriter::new(Format::Text);
@@ -465,7 +468,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_backend_writer_binary_simple() -> Result<(), CubeError> {
+    async fn test_backend_writer_binary_simple() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
 
         let mut writer = BatchWriter::new(Format::Binary);
@@ -493,24 +496,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_backend_writer_binary_int8_array() -> Result<(), CubeError> {
+    async fn test_backend_writer_binary_int8_array() -> Result<(), ConnectionError> {
         let mut cursor = Cursor::new(vec![]);
         let mut writer = BatchWriter::new(Format::Binary);
 
         // Row 1
         let mut col = Int64Builder::new(3);
-        col.append_value(1)?;
-        col.append_value(2)?;
-        col.append_value(3)?;
+        col.append_value(1).unwrap();
+        col.append_value(2).unwrap();
+        col.append_value(3).unwrap();
 
         writer.write_value(Arc::new(col.finish()) as ArrayRef)?;
         writer.end_row()?;
 
         // Row 2
         let mut col = Int64Builder::new(3);
-        col.append_null()?;
-        col.append_value(2)?;
-        col.append_null()?;
+        col.append_null().unwrap();
+        col.append_value(2).unwrap();
+        col.append_null().unwrap();
 
         writer.write_value(Arc::new(col.finish()) as ArrayRef)?;
         writer.end_row()?;

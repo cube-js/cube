@@ -4,6 +4,8 @@ use std::{
     marker::Send,
 };
 
+use crate::protocol::{ErrorCode, ErrorResponse};
+use crate::ProtocolError;
 use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -11,7 +13,7 @@ use super::protocol::{self, Deserialize, FrontendMessage, Serialize};
 
 pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     reader: &mut Reader,
-) -> Result<FrontendMessage, Error> {
+) -> Result<FrontendMessage, ProtocolError> {
     // https://www.postgresql.org/docs/14/protocol-message-formats.html
     let message_tag = reader.read_u8().await?;
     let cursor = read_contents(reader, message_tag).await?;
@@ -29,10 +31,11 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
         b'X' => FrontendMessage::Terminate,
         b'S' => FrontendMessage::Sync,
         identifier => {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
+            return Err(ErrorResponse::error(
+                ErrorCode::DataException,
                 format!("Unknown message identifier: {:X?}", identifier),
-            ))
+            )
+            .into())
         }
     };
 
@@ -108,25 +111,22 @@ pub async fn read_string<Reader: AsyncReadExt + Unpin>(
 
 pub async fn read_format<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
-) -> Result<protocol::Format, Error> {
-    let format = match reader.read_i16().await? {
-        0 => protocol::Format::Text,
-        1 => protocol::Format::Binary,
-        format_code => {
-            return Err(Error::new(
-                std::io::ErrorKind::Unsupported,
-                format!("Unknown format code: {}", format_code),
-            ));
-        }
-    };
-
-    Ok(format)
+) -> Result<protocol::Format, ProtocolError> {
+    match reader.read_i16().await? {
+        0 => Ok(protocol::Format::Text),
+        1 => Ok(protocol::Format::Binary),
+        format_code => Err(protocol::ErrorResponse::error(
+            protocol::ErrorCode::ProtocolViolation,
+            format!("Unknown format code: {}", format_code),
+        )
+        .into()),
+    }
 }
 
 pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,
-) -> Result<(), Error> {
+) -> Result<(), ProtocolError> {
     match message.serialize() {
         Some(buffer) => {
             writer.write_all(&buffer).await?;
@@ -141,7 +141,7 @@ pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
 pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,
-) -> Result<(), Error> {
+) -> Result<(), ProtocolError> {
     let mut packet_buffer = Vec::with_capacity(64);
 
     if message.code() != 0x00 {
@@ -151,9 +151,9 @@ pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     match message.serialize() {
         Some(buffer) => {
             let size = u32::try_from(buffer.len() + 4).map_err(|_| {
-                Error::new(
-                    ErrorKind::OutOfMemory,
-                    "Unable to convert buffer length to a suitable memory size",
+                ErrorResponse::error(
+                    ErrorCode::InternalError,
+                    "Unable to convert buffer length to a suitable memory size".to_string(),
                 )
             })?;
             packet_buffer.extend_from_slice(&size.to_be_bytes());

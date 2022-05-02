@@ -1,8 +1,7 @@
 use datafusion::arrow::datatypes::DataType;
-use pg_srv::PgTypeId;
-use std::io;
+use pg_srv::{protocol, PgTypeId, ProtocolError};
 
-pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
+pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
     match dt {
         DataType::Boolean => Ok(PgTypeId::BOOL),
         DataType::Int16 => Ok(PgTypeId::INT2),
@@ -34,14 +33,16 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
             DataType::Float64 => Ok(PgTypeId::ArrayFloat8),
             DataType::Binary => Ok(PgTypeId::ArrayBytea),
             DataType::Utf8 => Ok(PgTypeId::ArrayText),
-            dt => Err(io::Error::new(
-                io::ErrorKind::Other,
+            dt => Err(protocol::ErrorResponse::error(
+                protocol::ErrorCode::FeatureNotSupported,
                 format!("Unsupported data type in List for pg-wire: {:?}", dt),
-            )),
+            )
+            .into()),
         },
-        dt => Err(io::Error::new(
-            io::ErrorKind::Other,
+        dt => Err(protocol::ErrorResponse::error(
+            protocol::ErrorCode::FeatureNotSupported,
             format!("Unsupported data type for pg-wire: {:?}", dt),
-        )),
+        )
+        .into()),
     }
 }

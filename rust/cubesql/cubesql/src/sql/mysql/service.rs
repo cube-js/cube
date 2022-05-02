@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::io;
 
 use std::sync::Arc;
@@ -508,7 +509,11 @@ impl ProcessingLoop for MySqlServer {
                 .await
                 {
                     error!("Error during processing MySQL connection: {}", e);
-                    trace!("Details: {:?}", e);
+                    if let Some(bt) = e.backtrace() {
+                        trace!("{}", bt.to_string());
+                    } else {
+                        trace!("Backtrace: not found");
+                    }
                 }
             });
         }
