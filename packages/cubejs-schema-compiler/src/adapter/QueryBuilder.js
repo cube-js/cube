@@ -36,6 +36,8 @@ const ADAPTERS = {
   materialize: PostgresQuery,
 };
 
+export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];
+
 export const createQuery = (compilers, dbType, queryOptions) => {
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
@@ -51,7 +53,7 @@ export const createQuery = (compilers, dbType, queryOptions) => {
     externalQueryClass = ADAPTERS[queryOptions.externalDbType];
   }
 
-  return new (queryOptions.dialectClass || ADAPTERS[dbType])(compilers, {
+  return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
     ...queryOptions,
     externalQueryClass,
   });
