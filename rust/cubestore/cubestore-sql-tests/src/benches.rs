@@ -75,8 +75,8 @@ impl Bench for SimpleBench {
 }
 
 // To compare, bench without / with bench enabled.
-// CUBESTORE_MAX_CACHED_METADATA=0 cargo bench parquet_metadata_cache
-// CUBESTORE_MAX_CACHED_METADATA=100 cargo bench parquet_metadata_cache
+// CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES=0 cargo bench parquet_metadata_cache
+// CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES=1000000 cargo bench parquet_metadata_cache
 pub struct ParquetMetadataCacheBench;
 #[async_trait]
 impl Bench for ParquetMetadataCacheBench {
