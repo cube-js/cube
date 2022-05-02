@@ -39,13 +39,11 @@ pub mod sql;
 pub mod telemetry;
 pub mod transport;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     pub message: String,
     pub cause: CubeErrorCauseType,
 }
-
-impl std::error::Error for CubeError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {

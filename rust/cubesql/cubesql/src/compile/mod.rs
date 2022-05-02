@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::{backtrace::Backtrace, env, fmt};
+use std::{backtrace::Backtrace, env};
 
 use chrono::{prelude::*, Duration};
 
@@ -82,44 +82,66 @@ pub mod parser;
 pub mod rewrite;
 pub mod service;
 
-#[derive(Debug, PartialEq)]
+#[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
-    Internal(String),
+    #[error("SQLCompilationError: Internal: {0}")]
+    Internal(String, Backtrace),
+    #[error("SQLCompilationError: User: {0}")]
     User(String),
+    #[error("SQLCompilationError: Unsupported: {0}")]
     Unsupported(String),
-    Unknown(String),
 }
 
-pub type CompilationResult<T> = std::result::Result<T, CompilationError>;
+impl PartialEq for CompilationError {
+    fn eq(&self, other: &Self) -> bool {
+        match &self {
+            CompilationError::Internal(left, _) => match other {
+                CompilationError::Internal(right, _) => left == right,
+                _ => false,
+            },
+            CompilationError::User(left) => match other {
+                CompilationError::User(right) => left == right,
+                _ => false,
+            },
+            CompilationError::Unsupported(left) => match other {
+                CompilationError::Unsupported(right) => left == right,
+                _ => false,
+            },
+        }
+    }
 
-impl fmt::Display for CompilationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
+impl CompilationError {
+    pub fn backtrace(&self) -> Option<&Backtrace> {
         match self {
-            CompilationError::User(message) => {
-                write!(f, "SQLCompilationError: Internal {}", message)
-            }
-            CompilationError::Internal(message) => {
-                write!(f, "SQLCompilationError: User {}", message)
-            }
-            CompilationError::Unsupported(message) => {
-                write!(f, "SQLCompilationError: Unsupported {}", message)
-            }
-            CompilationError::Unknown(message) => {
-                write!(f, "SQLCompilationError: Unknown {}", message)
-            }
+            CompilationError::Internal(_, bt) => Some(bt),
+            CompilationError::User(_) => None,
+            CompilationError::Unsupported(_) => None,
         }
     }
 }
 
+impl CompilationError {
+    pub fn internal(message: String) -> Self {
+        Self::Internal(message, Backtrace::capture())
+    }
+}
+
+pub type CompilationResult<T> = std::result::Result<T, CompilationError>;
+
 impl From<regex::Error> for CompilationError {
     fn from(v: regex::Error) -> Self {
-        CompilationError::Internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CompilationError::internal(format!("{:?}", v))
     }
 }
 
 impl From<serde_json::Error> for CompilationError {
     fn from(v: serde_json::Error) -> Self {
-        CompilationError::Internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CompilationError::internal(format!("{:?}", v))
     }
 }
 
@@ -131,7 +153,7 @@ fn compile_select_expr(
 ) -> CompilationResult<()> {
     let selection =
         ctx.compile_selection_from_projection(expr)?
-            .ok_or(CompilationError::Unknown(format!(
+            .ok_or(CompilationError::Unsupported(format!(
                 "Unknown expression in SELECT statement: {}",
                 expr.to_string()
             )))?;
@@ -266,7 +288,7 @@ impl CompiledExpression {
             CompiledExpression::NumberLiteral(n, is_negative) => {
                 Ok(format!("{}{}", if *is_negative { "-" } else { "" }, n))
             }
-            _ => Err(CompilationError::Internal(format!(
+            _ => Err(CompilationError::internal(format!(
                 "Unable to convert CompiledExpression to String: {:?}",
                 self
             ))),
@@ -1135,7 +1157,7 @@ fn convert_where_filters_base(
                 or: None,
                 and: None,
             }),
-            CompiledFilter::SegmentFilter { member: _ } => Err(CompilationError::Internal(
+            CompiledFilter::SegmentFilter { member: _ } => Err(CompilationError::internal(
                 "Unable to compile segments, it should be pushed down to segments".to_string(),
             )),
         },
@@ -1602,7 +1624,7 @@ impl QueryPlanner {
                 ctx,
             ))
         } else {
-            Err(CompilationError::Unknown(format!(
+            Err(CompilationError::User(format!(
                 "Unknown cube '{}'. Please ensure your schema files are valid.",
                 table_name,
             )))
@@ -1913,7 +1935,7 @@ impl QueryPlanner {
         let table_name = match object_name.pop() {
             Some(table_name) => escape_single_quote_string(&table_name.value).to_string(),
             None => {
-                return Err(CompilationError::Internal(format!(
+                return Err(CompilationError::internal(format!(
                     "Unexpected lack of table name"
                 )))
             }
@@ -2064,7 +2086,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 )],
                 vec![dataframe::Row::new(vec![dataframe::TableValue::String(
                     plan.print(true)
-                        .map_err(|error| CompilationError::Internal(error.message))?,
+                        .map_err(|error| CompilationError::internal(error.message))?,
                 )])],
             )),
         ));
@@ -2316,7 +2338,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt)))
             .map_err(|err| {
-                CompilationError::Internal(format!("Initial planning error: {}", err))
+                CompilationError::internal(format!("Initial planning error: {}", err))
             })?;
 
         let optimized_plan = plan;
