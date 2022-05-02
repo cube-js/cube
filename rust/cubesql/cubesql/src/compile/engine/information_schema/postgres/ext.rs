@@ -18,7 +18,7 @@ impl CubeColumnPostgresExt for CubeColumn {
             ColumnType::Timestamp => "timestamp without time zone".to_string(),
             ColumnType::Int64 => "bigint".to_string(),
             ColumnType::Double => "numeric".to_string(),
-            ColumnType::Blob => "boolean".to_string(),
+            ColumnType::Boolean => "boolean".to_string(),
             _ => "text".to_string(),
         }
     }
@@ -28,7 +28,7 @@ impl CubeColumnPostgresExt for CubeColumn {
             ColumnType::Timestamp => "timestamp".to_string(),
             ColumnType::Int64 => "int8".to_string(),
             ColumnType::Double => "numeric".to_string(),
-            ColumnType::Blob => "bool".to_string(),
+            ColumnType::Boolean => "bool".to_string(),
             _ => "text".to_string(),
         }
     }
