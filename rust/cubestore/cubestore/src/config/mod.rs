@@ -345,7 +345,9 @@ pub trait ConfigObj: DIService {
 
     fn max_cached_queries(&self) -> usize;
 
-    fn max_cached_metadata(&self) -> usize;
+    fn metadata_cache_max_capacity_bytes(&self) -> u64;
+
+    fn metadata_cache_time_to_idle_secs(&self) -> u64;
 
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
@@ -387,7 +389,8 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
-    pub max_cached_metadata: usize,
+    pub metadata_cache_max_capacity_bytes: u64,
+    pub metadata_cache_time_to_idle_secs: u64
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -519,8 +522,11 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
-    fn max_cached_metadata(&self) -> usize {
-        self.max_cached_metadata
+    fn metadata_cache_max_capacity_bytes(&self) -> u64 {
+        self.metadata_cache_max_capacity_bytes
+    }
+    fn metadata_cache_time_to_idle_secs(&self) -> u64 {
+        self.metadata_cache_time_to_idle_secs
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
@@ -663,7 +669,8 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
-                max_cached_metadata: env_parse("CUBESTORE_MAX_CACHED_METADATA", 10_000),
+                metadata_cache_max_capacity_bytes: env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0),
+                metadata_cache_time_to_idle_secs: env_parse("CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS", 0)
             }),
         }
     }
@@ -712,7 +719,8 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
-                max_cached_metadata: 0,
+                metadata_cache_max_capacity_bytes: 0,
+                metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
@@ -1034,14 +1042,15 @@ impl Config {
 
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
+                let c = i.get_service_typed::<dyn ConfigObj>().await;
                 CubestoreParquetMetadataCacheImpl::new(
-                    match i
-                        .get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .max_cached_metadata()
+                    match c.metadata_cache_max_capacity_bytes()
                     {
                         0 => NoopParquetMetadataCache::new(),
-                        max_cached_metadata => LruParquetMetadataCache::new(max_cached_metadata),
+                        max_cached_metadata => LruParquetMetadataCache::new(
+                            max_cached_metadata,
+                            Duration::from_secs(c.metadata_cache_time_to_idle_secs())
+                        ),
                     },
                 )
             })
