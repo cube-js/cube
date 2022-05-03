@@ -316,7 +316,7 @@ jobs:
         timeout-minutes: 30
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
-  integration-birdbox:
+  integration-smoke:
     needs: [ latest-tag-sha ]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
