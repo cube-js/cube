@@ -366,8 +366,9 @@ jobs:
         timeout-minutes: 30
         run: |
           cd packages/cubejs-testing/
-          yarn run smoke:multidb
+          yarn run smoke:materialize
           yarn run smoke:questdb
+          yarn run smoke:multidb
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment

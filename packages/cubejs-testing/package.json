@@ -48,10 +48,10 @@
     "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
     "smoke:materialize": "jest --verbose -i dist/test/smoke/materialize.test.js",
     "smoke:materialize:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke/materialize.test.js",
-    "smoke:multidb": "jest --verbose -i dist/test/smoke/multidb.test.js",
-    "smoke:multidb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke/multidb.test.js",
     "smoke:questdb": "jest --verbose -i dist/test/smoke/questdb.test.js",
-    "smoke:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke/questdb.test.js"
+    "smoke:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke/questdb.test.js",
+    "smoke:multidb": "jest --verbose -i dist/test/smoke/multidb.test.js",
+    "smoke:multidb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke/multidb.test.js"
   },
   "files": [
     "dist/src",
