@@ -1201,8 +1201,7 @@ enum_from_primitive! {
         Jobs = 0x0700,
         Sources = 0x0800,
         MultiIndexes = 0x0900,
-        MultiPartitions = 0x0A00,
-        AggregateIndexes = 0x0B00
+        MultiPartitions = 0x0A00
     }
 }
 
