@@ -1,1 +1,0 @@
-Bare bones tests to validate that plumbing for a given driver is functional.
