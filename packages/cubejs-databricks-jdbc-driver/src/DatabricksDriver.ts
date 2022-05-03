@@ -86,6 +86,17 @@ async function resolveJDBCDriver(): Promise<string> {
 }
 
 export class DatabricksDriver extends JDBCDriver {
+  /**
+   * Static property that RefreshScheduler uses to calculate how many
+   * pre-aggregations refresh worker will build in parallel. If this
+   * property is not implemented or returns 0 and
+   * CUBEJS_SCHEDULED_REFRESH_CONCURRENCY environment variable is not
+   * set, only one refresh worker will be used. Otherwise, specified
+   * value will be used as a default, which can be overriden by the
+   * CUBEJS_SCHEDULED_REFRESH_CONCURRENCY environment variable.
+   */
+  public static DEFAULT_SCHEDULED_REFRESH_CONCURRENCY = 4;
+  
   protected readonly config: DatabricksDriverConfiguration;
 
   public static dialectClass() {
