@@ -362,7 +362,7 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Run Integration Birdbox tests
+      - name: Run Integration smoke tests
         timeout-minutes: 30
         run: |
           cd packages/cubejs-testing/
