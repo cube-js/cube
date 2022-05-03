@@ -841,7 +841,11 @@ impl ChunkStore {
         let mut rows = rows.0;
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
-            println!("index {:?}  with id {:?} ======= begin", index.get_row().get_name(), index.get_id());
+            println!(
+                "index {:?}  with id {:?} ======= begin",
+                index.get_row().get_name(),
+                index.get_id()
+            );
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
             let columns = columns.to_vec();

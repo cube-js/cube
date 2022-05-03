@@ -140,6 +140,48 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
+                Field::new("aggregate_columns", DataType::Utf8, true),
+                Box::new(|tables| {
+                    let aggregates = tables
+                        .iter()
+                        .map(|row| {
+                            row.table
+                                .get_row()
+                                .aggregate_columns()
+                                .as_ref()
+                                .map(|v| format!("{:?}", v))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        aggregates
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("aggregate_functions", DataType::Utf8, true),
+                Box::new(|tables| {
+                    let aggregate_funcs = tables
+                        .iter()
+                        .map(|row| {
+                            row.table
+                                .get_row()
+                                .aggregate_functions()
+                                .as_ref()
+                                .map(|v| format!("{:?}", v))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        aggregate_funcs
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("seq_column_index", DataType::Utf8, true),
                 Box::new(|tables| {
                     let seq_columns = tables

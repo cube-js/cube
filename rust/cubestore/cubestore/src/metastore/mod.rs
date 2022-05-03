@@ -2829,7 +2829,7 @@ impl RocksMetaStore {
     fn add_aggregate_index(
         batch_pipe: &mut BatchPipe,
         rocks_index: &IndexRocksTable,
-        _rocks_partition: &PartitionRocksTable,
+        rocks_partition: &PartitionRocksTable,
         table_cols: &Vec<Column>,
         table_id: &IdRow<Table>,
         index_def: IndexDef,
@@ -2907,6 +2907,7 @@ impl RocksMetaStore {
         )?;
 
         let index_id = rocks_index.insert(index, batch_pipe)?;
+        rocks_partition.insert(Partition::new(index_id.id, None, None, None), batch_pipe)?;
         Ok(index_id)
     }
 
