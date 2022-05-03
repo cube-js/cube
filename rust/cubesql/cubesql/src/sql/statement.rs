@@ -1,7 +1,6 @@
 use msql_srv::{Column, ColumnFlags, ColumnType};
 use pg_srv::BindValue;
-use sqlparser::ast;
-use sqlparser::ast::Value;
+use sqlparser::{ast, ast::Value};
 
 trait Visitor<'ast> {
     fn visit_value(&mut self, _val: &mut ast::Value) {}

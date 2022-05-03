@@ -1,18 +1,19 @@
-use std::backtrace::Backtrace;
-use std::{collections::HashMap, sync::Arc};
+use std::{backtrace::Backtrace, collections::HashMap, sync::Arc};
 
 use super::extended::PreparedStatement;
-use crate::compile::CompilationError;
 use crate::{
     compile::{
         convert_sql_to_cube_query, convert_statement_to_cube_query, parser::parse_sql_to_statement,
-        QueryPlan,
+        CompilationError, QueryPlan,
     },
-    sql::df_type_to_pg_tid,
-    sql::extended::Portal,
-    sql::statement::StatementPlaceholderReplacer,
-    sql::writer::BatchWriter,
-    sql::{session::DatabaseProtocol, statement::StatementParamsFinder, AuthContext, Session},
+    sql::{
+        df_type_to_pg_tid,
+        extended::Portal,
+        session::DatabaseProtocol,
+        statement::{StatementParamsFinder, StatementPlaceholderReplacer},
+        writer::BatchWriter,
+        AuthContext, Session,
+    },
     CubeError,
 };
 use log::{debug, error, trace};

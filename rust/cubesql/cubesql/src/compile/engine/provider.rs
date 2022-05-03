@@ -37,18 +37,23 @@ use super::information_schema::postgres::{
     PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
-use crate::compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider;
-use crate::compile::engine::information_schema::postgres::PgCatalogAmProvider;
-use crate::sql::ColumnType;
-use crate::transport::V1CubeMetaExt;
-use crate::CubeError;
+use crate::{
+    compile::engine::information_schema::postgres::{
+        testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    },
+    sql::ColumnType,
+    transport::V1CubeMetaExt,
+    CubeError,
+};
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMeta;
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::Expr;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{
+    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    datasource::TableProvider,
+    error::DataFusionError,
+    logical_plan::Expr,
+    physical_plan::ExecutionPlan,
+};
 use std::any::Any;
 
 #[derive(Clone)]

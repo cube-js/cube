@@ -1,8 +1,10 @@
 use crate::{
     compile::QueryPlan,
-    sql::dataframe::{batch_to_dataframe, DataFrame, TableValue},
-    sql::statement::StatementParamsBinder,
-    sql::writer::BatchWriter,
+    sql::{
+        dataframe::{batch_to_dataframe, DataFrame, TableValue},
+        statement::StatementParamsBinder,
+        writer::BatchWriter,
+    },
 };
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, ProtocolError};
@@ -10,8 +12,7 @@ use sqlparser::ast;
 use std::fmt;
 
 use crate::sql::shim::ConnectionError;
-use datafusion::dataframe::DataFrame as DFDataFrame;
-use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
 use futures::StreamExt;
 
 #[derive(Debug)]
@@ -324,10 +325,12 @@ impl Portal {
 mod tests {
     use crate::{
         compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider,
-        sql::dataframe::{Column, DataFrame, Row, TableValue},
-        sql::extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},
-        sql::writer::BatchWriter,
-        sql::{ColumnFlags, ColumnType},
+        sql::{
+            dataframe::{Column, DataFrame, Row, TableValue},
+            extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},
+            writer::BatchWriter,
+            ColumnFlags, ColumnType,
+        },
     };
     use pg_srv::protocol::Format;
 

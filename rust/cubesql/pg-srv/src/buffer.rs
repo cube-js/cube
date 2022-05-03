@@ -4,8 +4,10 @@ use std::{
     marker::Send,
 };
 
-use crate::protocol::{ErrorCode, ErrorResponse};
-use crate::ProtocolError;
+use crate::{
+    protocol::{ErrorCode, ErrorResponse},
+    ProtocolError,
+};
 use log::trace;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

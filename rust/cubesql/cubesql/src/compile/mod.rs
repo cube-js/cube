@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::{backtrace::Backtrace, env};
+use std::{backtrace::Backtrace, collections::HashMap, env, sync::Arc};
 
 use chrono::{prelude::*, Duration};
 
@@ -10,13 +8,13 @@ use datafusion::{
         default_session_builder, SessionConfig as DFSessionConfig,
         SessionContext as DFSessionContext,
     },
-    logical_plan::plan::{Extension, Projection},
-    logical_plan::LogicalPlan,
-    logical_plan::{DFField, DFSchema, DFSchemaRef, Expr},
+    logical_plan::{
+        plan::{Extension, Projection},
+        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+    },
     prelude::*,
     scalar::ScalarValue,
-    sql::parser::Statement as DFStatement,
-    sql::planner::SqlToRel,
+    sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
 };
 use itertools::Itertools;
@@ -34,44 +32,48 @@ pub use crate::transport::ctx::*;
 use self::{
     builder::*,
     context::*,
-    engine::context::VariablesProvider,
-    engine::df::planner::CubeQueryPlanner,
-    engine::df::scan::CubeScanNode,
-    engine::information_schema::mysql::ext::CubeColumnMySqlExt,
-    engine::provider::CubeContext,
-    engine::udf::{
-        create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
-        create_current_schemas_udf, create_current_user_udf, create_db_udf, create_format_type_udf,
-        create_generate_series_udtf, create_if_udf, create_instr_udf, create_isnull_udf,
-        create_least_udf, create_locate_udf, create_pg_datetime_precision_udf,
-        create_pg_expandarray_udtf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
-        create_pg_numeric_precision_udf, create_pg_numeric_scale_udf, create_time_format_udf,
-        create_timediff_udf, create_ucase_udf, create_user_udf, create_version_udf,
+    engine::{
+        context::VariablesProvider,
+        df::{planner::CubeQueryPlanner, scan::CubeScanNode},
+        information_schema::mysql::ext::CubeColumnMySqlExt,
+        provider::CubeContext,
+        udf::{
+            create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
+            create_current_schemas_udf, create_current_user_udf, create_db_udf,
+            create_format_type_udf, create_generate_series_udtf, create_if_udf, create_instr_udf,
+            create_isnull_udf, create_least_udf, create_locate_udf,
+            create_pg_datetime_precision_udf, create_pg_expandarray_udtf, create_pg_get_expr_udf,
+            create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+            create_pg_numeric_scale_udf, create_time_format_udf, create_timediff_udf,
+            create_ucase_udf, create_user_udf, create_version_udf,
+        },
     },
     parser::parse_sql_to_statement,
 };
-use crate::compile::engine::udf::{
-    create_current_timestamp, create_generate_subscripts_udtf, create_unnest_udtf, pg_get_userbyid,
-    pg_table_is_visible,
-};
 use crate::{
-    compile::builder::QueryBuilder,
-    compile::engine::udf::{
-        create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
-        create_dayofweek_udf, create_dayofyear_udf, create_hour_udf, create_makedate_udf,
-        create_measure_udaf, create_minute_udf, create_pg_backend_pid, create_quarter_udf,
-        create_second_udf, create_str_to_date, create_year_udf,
+    compile::{
+        builder::QueryBuilder,
+        engine::udf::{
+            create_current_timestamp, create_date_add_udf, create_date_sub_udf, create_date_udf,
+            create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
+            create_generate_subscripts_udtf, create_hour_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid, create_quarter_udf,
+            create_second_udf, create_str_to_date, create_unnest_udtf, create_year_udf,
+            pg_get_userbyid, pg_table_is_visible,
+        },
+        rewrite::converter::LogicalPlanToLanguageConverter,
     },
-    compile::rewrite::converter::LogicalPlanToLanguageConverter,
-    sql::database_variables::{DatabaseVariable, DatabaseVariables},
-    sql::session::DatabaseProtocol,
-    sql::types::CommandCompletion,
     sql::{
-        dataframe, types::StatusFlags, ColumnFlags, ColumnType, Session, SessionManager,
-        SessionState,
+        database_variables::{DatabaseVariable, DatabaseVariables},
+        dataframe,
+        session::DatabaseProtocol,
+        types::{CommandCompletion, StatusFlags},
+        ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::{df_data_type_by_column_type, V1CubeMetaExt},
-    transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    transport::{
+        df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
+        V1CubeMetaSegmentExt,
+    },
     CubeError,
 };
 
