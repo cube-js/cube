@@ -1,5 +1,4 @@
 import R from 'ramda';
-import { Funnels } from '../../src';
 import { prepareCompiler } from './PrepareCompiler';
 
 describe('Funnels', () => {
