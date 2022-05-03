@@ -32,7 +32,7 @@ describe('materialize', () => {
         CUBEJS_ROLLUP_ONLY: 'false',
       },
       {
-        schemaDir: 'postgresql/schema',
+        schemaDir: 'smoke/schema',
       }
     );
     client = cubejs(async () => 'test', {
