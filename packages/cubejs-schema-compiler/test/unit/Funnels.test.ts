@@ -12,8 +12,8 @@ describe('Funnels', () => {
             userId: { sql: 'userid' },
             time: { sql: 'timestamp' },
             steps: [
-               { name: 'A', eventsView: { sql: 'A_SQL' } },
-               { name: 'B', eventsView: { sql: 'B_SQL' } },
+               { name: 'A', eventsView: { sql: 'SQL_A' } },
+               { name: 'B', eventsView: { sql: 'SQL_B' } },
             ],
           })
         })
@@ -50,8 +50,8 @@ describe('Funnels', () => {
             userId: { sql: 'userid' },
             time: { sql: 'timestamp' },
             steps: [
-               { name: 'A', eventsView: { sql: 'A_SQL' } },
-               { name: 'B', eventsView: { sql: 'B_SQL' } },
+               { name: 'A', eventsView: { sql: 'SQL_A' } },
+               { name: 'B', eventsView: { sql: 'SQL_B' } },
             ],
           })
         })
