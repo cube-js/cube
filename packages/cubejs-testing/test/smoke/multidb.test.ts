@@ -3,7 +3,7 @@ import { MysqlDBRunner, PostgresDBRunner } from '@cubejs-backend/testing-shared'
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import { BirdBox, getBirdbox } from '../src';
+import { BirdBox, getBirdbox } from '../../src';
 
 describe('multidb', () => {
   jest.setTimeout(60 * 5 * 1000);
