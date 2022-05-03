@@ -86,7 +86,8 @@ impl Bench for ParquetMetadataCacheBench {
             c.partition_split_threshold = 10_000_000;
             c.max_partition_split_threshold = 10_000_000;
             c.max_cached_queries = 0;
-            c.metadata_cache_max_capacity_bytes = env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0);
+            c.metadata_cache_max_capacity_bytes =
+                env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0);
             c.metadata_cache_time_to_idle_secs = 1000;
             c
         });

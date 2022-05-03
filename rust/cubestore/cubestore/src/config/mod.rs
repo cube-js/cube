@@ -390,7 +390,7 @@ pub struct ConfigObjImpl {
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
     pub metadata_cache_max_capacity_bytes: u64,
-    pub metadata_cache_time_to_idle_secs: u64
+    pub metadata_cache_time_to_idle_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -669,8 +669,14 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
-                metadata_cache_max_capacity_bytes: env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0),
-                metadata_cache_time_to_idle_secs: env_parse("CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS", 0),
+                metadata_cache_max_capacity_bytes: env_parse(
+                    "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
+                    0,
+                ),
+                metadata_cache_time_to_idle_secs: env_parse(
+                    "CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS",
+                    0,
+                ),
             }),
         }
     }
@@ -1044,12 +1050,11 @@ impl Config {
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
                 CubestoreParquetMetadataCacheImpl::new(
-                    match c.metadata_cache_max_capacity_bytes()
-                    {
+                    match c.metadata_cache_max_capacity_bytes() {
                         0 => NoopParquetMetadataCache::new(),
                         max_cached_metadata => LruParquetMetadataCache::new(
                             max_cached_metadata,
-                            Duration::from_secs(c.metadata_cache_time_to_idle_secs())
+                            Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
                         ),
                     },
                 )
