@@ -384,12 +384,6 @@ export async function startBirdBoxFromCli(
   }
 
   if (options.schemaDir) {
-<<<<<<< HEAD
-    if (fs.existsSync(path.join(testDir, 'schema'))) {
-      fs.removeSync(path.join(testDir, 'schema'));
-    }
-=======
->>>>>>> 84e298ed06d6aa68735eecc61a311484eb9cf65b
     fs.copySync(
       path.join(process.cwd(), 'birdbox-fixtures', options.schemaDir),
       path.join(testDir, 'schema')
@@ -484,15 +478,9 @@ export async function startBirdBoxFromCli(
 }
 
 export interface BirdboxOptions {
-<<<<<<< HEAD
-   // Schema directory
-  schemaDir?: string,
-  // Config file
-=======
    // Schema directory. LOCAL mode.
   schemaDir?: string,
   // Config file. LOCAL mode.
->>>>>>> 84e298ed06d6aa68735eecc61a311484eb9cf65b
   cubejsConfig?: string,
 }
 
