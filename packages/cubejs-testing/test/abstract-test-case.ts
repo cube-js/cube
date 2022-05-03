@@ -110,6 +110,7 @@ export function createBirdBoxTestCase(
 
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
+      process.stdout.write('AAA\n');
       await wsTransport.close();
       await birdbox.stop();
     });
@@ -119,7 +120,9 @@ export function createBirdBoxTestCase(
         await httpClient.load({ measures: ['Orders.toRemove'] });
         throw new Error('Should not successfully run Orders.toRemove query');
       } catch (e) {
+        process.stdout.write(`QQQ RRR ${e}\n`);
         expect((e as Error).toString()).toContain('Query should contain either');
+        process.stdout.write('QQQ RRR2\n');
       }
     });
 
@@ -130,6 +133,7 @@ export function createBirdBoxTestCase(
         it(`${options.name}`, async () => {
           const response = await httpClient.load(query);
           expect(response.rawData()).toMatchSnapshot(options.name);
+          process.stdout.write('QQQ TTT\n');
         });
       }
     });
@@ -142,6 +146,7 @@ export function createBirdBoxTestCase(
           it(`${options.name}`, async () => {
             const response = await wsClient.load(query);
             expect(response.rawData()).toMatchSnapshot(options.name);
+            process.stdout.write('QQQ TTT2\n');
           });
         }
       }

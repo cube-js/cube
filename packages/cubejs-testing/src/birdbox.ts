@@ -417,7 +417,10 @@ export async function startBirdBoxFromCli(
       }
   };
 
+  process.stdout.write(`QQQ\n${JSON.stringify(env, null, 4)}\n`);
+
   try {
+    process.stdout.write('QQQ 000');
     cli = spawn(
       options.useCubejsServerBinary
         ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
@@ -447,11 +450,17 @@ export async function startBirdBoxFromCli(
         process.stdout.write(msg);
       });
     }
+    process.stdout.write('QQQ 000\n');
     await pausePromise(10 * 1000);
+    process.stdout.write('QQQ 111\n');
   } catch (e) {
+    process.stdout.write(`Error spawning cube: ${e}`);
     // @ts-ignore
     db.stop();
   }
+
+  process.stdout.write('QQQ 222\n');
+
   return {
     stop: async () => {
       clearTestData();
