@@ -2520,6 +2520,10 @@ mod tests {
                         name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         _type: "number".to_string(),
                     },
+                    V1CubeMetaDimension {
+                        name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                        _type: "boolean".to_string(),
+                    },
                 ],
                 measures: vec![
                     V1CubeMetaMeasure {
@@ -3040,6 +3044,7 @@ mod tests {
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                "KibanaSampleDataEcommerce.has_subscription".to_string(),
             ])
         )
     }
@@ -3061,6 +3066,7 @@ mod tests {
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                "KibanaSampleDataEcommerce.has_subscription".to_string(),
             ])
         )
     }
@@ -3154,10 +3160,65 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
                 time_dimensions: None,
                 order: None,
                 limit: Some(1),
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_projection_with_casts() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \
+             CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS \"customer_gender\",\
+             \"KibanaSampleDataEcommerce\".\"count\" AS \"count\",\
+             \"KibanaSampleDataEcommerce\".\"maxPrice\" AS \"maxPrice\",\
+             \"KibanaSampleDataEcommerce\".\"minPrice\" AS \"minPrice\",\
+             \"KibanaSampleDataEcommerce\".\"avgPrice\" AS \"avgPrice\",\
+             \"KibanaSampleDataEcommerce\".\"order_date\" AS \"order_date\",\
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price1\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price2\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price3\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price4\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price5\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price6\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price7\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price8\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price9\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price10\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price11\",
+             \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price12\"
+             FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
                 offset: None,
                 filters: None,
             }
@@ -3189,6 +3250,150 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_min_max_number() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MIN(\"KibanaSampleDataEcommerce\".\"taxful_total_price\") AS \"tmn:timestamp:min\", MAX(\"KibanaSampleDataEcommerce\".\"taxful_total_price\") AS \"tmn:timestamp:max\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_filter_and_group_by() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE (CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) = 'female') GROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_boolean_filter_inplace_where() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE \"KibanaSampleDataEcommerce\".\"is_female\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE NOT(\"KibanaSampleDataEcommerce\".\"has_subscription\") HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["false".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_not_null_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE (NOT (\"KibanaSampleDataEcommerce\".\"taxful_total_price\" IS NULL)) GROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
             }
         );
     }
@@ -3403,6 +3608,35 @@ mod tests {
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("year".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn tableau_week() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CAST((DATE_TRUNC( 'day', CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS DATE) ) + (-EXTRACT(DOW FROM \"KibanaSampleDataEcommerce\".\"order_date\") * INTERVAL '1 DAY')) AS DATE) AS \"yr:timestamp:ok\", SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:teraBytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
                     date_range: None,
                 }]),
                 order: None,

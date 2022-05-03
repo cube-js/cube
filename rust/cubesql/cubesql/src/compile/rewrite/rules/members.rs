@@ -1,7 +1,6 @@
 use crate::compile::engine::provider::CubeContext;
 use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
 use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::table_scan;
 use crate::compile::rewrite::AggregateFunctionExprDistinct;
 use crate::compile::rewrite::AggregateFunctionExprFun;
 use crate::compile::rewrite::AliasExprAlias;
@@ -33,6 +32,7 @@ use crate::compile::rewrite::{
 use crate::compile::rewrite::{
     binary_expr, column_expr, cube_scan, literal_expr, rewrite, transforming_rewrite,
 };
+use crate::compile::rewrite::{cast_expr, table_scan};
 use crate::compile::rewrite::{
     cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
     time_dimension_expr,
@@ -73,6 +73,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "CubeScanAliases:None",
                     "?cube_table_name",
+                    "CubeScanSplit:false",
                 ),
                 self.transform_table_scan("?source_table_name", "?table_name", "?cube_table_name"),
             ),
@@ -211,6 +212,40 @@ impl RewriteRules for MemberRules {
                     "?date_range",
                 ),
             ),
+            // TODO make cast split work
+            transforming_rewrite(
+                "date-trunc-unwrap-cast",
+                member_replacer(
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
+                    ),
+                    "?source_table_name",
+                ),
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
+                    ),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
             // TODO duplicate of previous rule with aliasing. Extract aliasing as separate step?
             transforming_rewrite(
                 "date-trunc-alias",
@@ -285,6 +320,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -301,6 +337,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
             ),
             rewrite(
@@ -316,6 +353,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?alias",
                 ),
@@ -328,6 +366,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
             ),
             transforming_rewrite(
@@ -343,6 +382,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?cube_aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?alias",
                 ),
@@ -355,6 +395,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?cube_aliases",
                     "?new_table_name",
+                    "?split",
                 ),
                 self.push_down_projection(
                     "?expr",
@@ -380,6 +421,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                 ),
                 cube_scan(
@@ -391,6 +433,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
                 self.push_down_limit("?limit", "?new_limit"),
             ),
