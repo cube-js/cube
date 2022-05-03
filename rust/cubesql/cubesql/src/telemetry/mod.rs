@@ -3,8 +3,7 @@ use chrono::{SecondsFormat, Utc};
 use core::mem;
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use nanoid::nanoid;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, Notify, RwLock};
 
 lazy_static! {

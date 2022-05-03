@@ -1,21 +1,29 @@
-use crate::arrow::array::{
-    ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+use crate::{
+    arrow::{
+        array::{
+            ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
+            Int32Array, Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array,
+            UInt8Array,
+        },
+        datatypes::DataType,
+    },
+    sql::{dataframe::TimestampValue, df_type_to_pg_tid},
 };
-use crate::arrow::datatypes::DataType;
-use crate::sql::dataframe::TimestampValue;
-use crate::sql::df_type_to_pg_tid;
 use bytes::{BufMut, BytesMut};
-use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
-use chrono::format::Pad::Zero;
-use chrono::format::{Fixed, Item};
-use chrono::prelude::*;
-use pg_srv::protocol::{Format, Serialize};
-use pg_srv::{protocol, ProtocolError};
-use std::convert::TryFrom;
-use std::io;
-use std::io::Error;
-use std::mem;
+use chrono::{
+    format::{
+        Fixed, Item,
+        Numeric::{Day, Hour, Minute, Month, Second, Year},
+        Pad::Zero,
+    },
+    prelude::*,
+};
+use pg_srv::{
+    protocol,
+    protocol::{Format, Serialize},
+    ProtocolError,
+};
+use std::{convert::TryFrom, io, io::Error, mem};
 
 pub trait ToPostgresValue {
     // Converts native type to raw value in text format
@@ -374,17 +382,17 @@ impl<'a> Serialize for BatchWriter {
 
 #[cfg(test)]
 mod tests {
-    use crate::sql::dataframe::TimestampValue;
-    use crate::sql::shim::ConnectionError;
     use crate::{
         arrow::array::{ArrayRef, Int64Builder},
-        sql::writer::{BatchWriter, ToPostgresValue},
+        sql::{
+            dataframe::TimestampValue,
+            shim::ConnectionError,
+            writer::{BatchWriter, ToPostgresValue},
+        },
     };
     use bytes::BytesMut;
-    use pg_srv::buffer;
-    use pg_srv::protocol::Format;
-    use std::io::Cursor;
-    use std::sync::Arc;
+    use pg_srv::{buffer, protocol::Format};
+    use std::{io::Cursor, sync::Arc};
 
     fn assert_text_encode<T: ToPostgresValue>(value: T, expected: &[u8]) {
         let mut buf = BytesMut::new();

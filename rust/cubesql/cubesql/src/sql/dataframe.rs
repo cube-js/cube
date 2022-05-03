@@ -1,7 +1,9 @@
 use chrono::{
-    format::Numeric::{Day, Hour, Minute, Month, Second, Year},
-    format::Pad::Zero,
-    format::{Fixed, Item},
+    format::{
+        Fixed, Item,
+        Numeric::{Day, Hour, Minute, Month, Second, Year},
+        Pad::Zero,
+    },
     prelude::*,
 };
 use chrono_tz::Tz;
@@ -18,8 +20,10 @@ use datafusion::arrow::{
     record_batch::RecordBatch,
     temporal_conversions,
 };
-use std::fmt::{self, Debug, Formatter};
-use std::io;
+use std::{
+    fmt::{self, Debug, Formatter},
+    io,
+};
 
 use super::{ColumnFlags, ColumnType};
 

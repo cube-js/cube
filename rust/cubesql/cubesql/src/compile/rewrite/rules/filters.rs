@@ -1,43 +1,32 @@
-use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::TimeDimensionDateRange;
-use crate::compile::rewrite::TimeDimensionDateRangeReplacerDateRange;
-use crate::compile::rewrite::TimeDimensionDateRangeReplacerMember;
-use crate::compile::rewrite::TimeDimensionGranularity;
-use crate::compile::rewrite::TimeDimensionName;
-use crate::compile::rewrite::{between_expr, FilterMemberMember};
-use crate::compile::rewrite::{
-    binary_expr, column_expr, cube_scan, cube_scan_filters, filter, filter_member, filter_op,
-    filter_op_filters, filter_replacer, literal_expr, rewrite, transforming_rewrite,
+use crate::{
+    compile::{
+        engine::provider::CubeContext,
+        rewrite::{
+            analysis::LogicalPlanAnalysis, between_expr, binary_expr, cast_expr, column_expr,
+            cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
+            dimension_expr, filter, filter_cast_unwrap_replacer, filter_member, filter_op,
+            filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
+            not_expr, projection, rewrite, rewriter::RewriteRules, scalar_fun_expr_args,
+            scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
+            time_dimension_expr, transforming_rewrite, BetweenExprNegated, BinaryExprOp,
+            ColumnExprColumn, CubeScanLimit, FilterMemberMember, FilterMemberOp,
+            FilterMemberValues, FilterReplacerCube, InListExprNegated, LimitN, LiteralExprValue,
+            LogicalPlanLanguage, SegmentMemberMember, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
+        },
+    },
+    transport::{ext::V1CubeMetaExt, MemberType},
+    var, var_iter,
 };
-use crate::compile::rewrite::{cast_expr, FilterReplacerCube};
-use crate::compile::rewrite::{
-    cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
-    time_dimension_date_range_replacer, time_dimension_expr, BetweenExprNegated,
-};
-use crate::compile::rewrite::{filter_cast_unwrap_replacer, InListExprNegated};
-use crate::compile::rewrite::{fun_expr, LogicalPlanLanguage};
-use crate::compile::rewrite::{fun_expr_var_arg, scalar_fun_expr_args, LimitN};
-use crate::compile::rewrite::{inlist_expr, BinaryExprOp};
-use crate::compile::rewrite::{is_not_null_expr, is_null_expr, ColumnExprColumn};
-use crate::compile::rewrite::{limit, CubeScanLimit};
-use crate::compile::rewrite::{literal_string, TableScanSourceTableName};
-use crate::compile::rewrite::{not_expr, SegmentMemberMember};
-use crate::compile::rewrite::{projection, FilterMemberValues};
-use crate::compile::rewrite::{scalar_fun_expr_args_empty_tail, LiteralExprValue};
-use crate::compile::rewrite::{segment_member, FilterMemberOp};
-use crate::transport::ext::V1CubeMetaExt;
-use crate::transport::MemberType;
-use crate::var;
-use crate::var_iter;
 use chrono::{SecondsFormat, TimeZone, Utc};
-use datafusion::logical_plan::{Column, Operator};
-use datafusion::scalar::ScalarValue;
+use datafusion::{
+    logical_plan::{Column, Operator},
+    scalar::ScalarValue,
+};
 use egg::{EGraph, Rewrite, Subst};
-use std::fmt::Display;
-use std::ops::Index;
-use std::sync::Arc;
+use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,

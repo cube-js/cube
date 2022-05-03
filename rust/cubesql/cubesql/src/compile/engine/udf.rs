@@ -1,9 +1,7 @@
-use std::any::type_name;
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use chrono::{Duration, NaiveDateTime};
 use datafusion::{
-    arrow::datatypes::UInt32Type,
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
@@ -14,7 +12,7 @@ use datafusion::{
         compute::{cast, concat},
         datatypes::{
             DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
-            TimeUnit, TimestampNanosecondType, UInt64Type,
+            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
         },
     },
     error::{DataFusionError, Result},

@@ -1,6 +1,5 @@
 use crate::compile::rewrite::LogicalPlanLanguage;
-use egg::Language;
-use egg::{CostFunction, Id};
+use egg::{CostFunction, Id, Language};
 
 pub struct BestCubePlan;
 

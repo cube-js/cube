@@ -28,10 +28,8 @@ use log::SetLoggerError;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
 use sqlparser::parser::ParserError;
-use std::backtrace::Backtrace;
-use std::num::ParseIntError;
-use tokio::sync::mpsc::error::SendError;
-use tokio::time::error::Elapsed;
+use std::{backtrace::Backtrace, num::ParseIntError};
+use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 
 pub mod compile;
 pub mod config;
