@@ -179,9 +179,9 @@ export async function startBirdBoxFromContainer(
     };
   }
 
-  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
-    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
-  }
+  // if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
+  //   process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
+  // }
 
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';

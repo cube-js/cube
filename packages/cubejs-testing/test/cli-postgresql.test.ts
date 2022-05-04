@@ -6,6 +6,5 @@ createBirdBoxTestCase('postgresql', () => startBirdBoxFromCli({
   schemaDir: 'postgresql/schema',
   cubejsConfig: 'postgresql/single/cube.js',
   loadScript: 'postgres-load-events.sh',
-  // useCubejsServerBinary:
-  //   process.env.USE_LOCAL_CUBEJS_BINARY === 'true',
+  useCubejsServerBinary: process.env.USE_LOCAL_CUBEJS_BINARY === 'true',
 }));

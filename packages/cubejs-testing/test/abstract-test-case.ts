@@ -110,7 +110,6 @@ export function createBirdBoxTestCase(
 
     // eslint-disable-next-line consistent-return
     afterAll(async () => {
-      process.stdout.write('AAA\n');
       await wsTransport.close();
       await birdbox.stop();
     });
