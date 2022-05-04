@@ -3339,6 +3339,31 @@ mod tests {
     }
 
     #[test]
+    fn tableau_having_count_on_cube_without_count() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(DISTINCT \"Logs\".\"agentCount\") AS \"sum:count:ok\" FROM \"public\".\"Logs\" \"Logs\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["Logs.agentCount".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
     fn tableau_boolean_filter_inplace_where() {
         init_logger();
 

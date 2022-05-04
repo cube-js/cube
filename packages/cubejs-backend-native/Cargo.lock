@@ -1905,9 +1905,11 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 name = "pg-srv"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bytes 0.5.6",
  "log",
+ "thiserror",
  "tokio",
 ]
 

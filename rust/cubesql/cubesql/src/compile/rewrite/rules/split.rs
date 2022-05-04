@@ -387,7 +387,25 @@ impl RewriteRules for SplitRules {
                     "?cube",
                 ),
                 agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
-                self.transform_inner_measure("?cube", "?column"),
+                self.transform_inner_measure("?cube", Some("?column")),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-inner-replacer-simple-count",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                self.transform_inner_measure("?cube", None),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-inner-replacer-missing-count",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                aggr_aggr_expr_empty_tail(),
+                self.transform_inner_measure_missing_count("?cube"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-replacer",
@@ -399,6 +417,7 @@ impl RewriteRules for SplitRules {
                 "?alias".to_string(),
                 self.transform_outer_projection_aggr_fun("?cube", "?expr", "?column", "?alias"),
             ),
+            // TODO handle simple counts
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-aggr-replacer",
                 outer_aggregate_split_replacer("?expr", "?cube"),
@@ -420,6 +439,15 @@ impl RewriteRules for SplitRules {
                     "?outer_alias",
                     "?output_fun",
                 ),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-outer-aggr-replacer-missing-count",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                self.transform_outer_aggr_fun_missing_count("?cube", "?fun"),
             ),
             // TODO It replaces aggregate function with scalar one. This breaks Aggregate consistency.
             // Works because push down aggregate rule doesn't care about if it's in group by or aggregate.
@@ -574,10 +602,10 @@ impl SplitRules {
     fn transform_inner_measure(
         &self,
         cube_expr_var: &'static str,
-        column_var: &'static str,
+        column_var: Option<&'static str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for cube in var_iter!(
@@ -587,10 +615,43 @@ impl SplitRules {
             .cloned()
             {
                 if let Some(cube) = meta.find_cube_with_name(cube) {
-                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
-                        if cube.lookup_measure(&column.name).is_some() {
+                    for column in column_var
+                        .map(|column_var| {
+                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                .map(|c| c.name.to_string())
+                                .collect()
+                        })
+                        .unwrap_or(vec![MemberRules::default_count_measure_name()])
+                    {
+                        if cube.lookup_measure(&column).is_some() {
                             return true;
                         }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_inner_measure_missing_count(
+        &self,
+        cube_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_expr_var = var!(cube_expr_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for cube in var_iter!(
+                egraph[subst[cube_expr_var]],
+                InnerAggregateSplitReplacerCube
+            )
+            .cloned()
+            {
+                if let Some(cube) = meta.find_cube_with_name(cube) {
+                    if cube
+                        .lookup_measure(&MemberRules::default_count_measure_name())
+                        .is_none()
+                    {
+                        return true;
                     }
                 }
             }
@@ -746,6 +807,35 @@ impl SplitRules {
                                     );
                                     return true;
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    pub fn transform_outer_aggr_fun_missing_count(
+        &self,
+        cube_var: &'static str,
+        fun_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = var!(cube_var);
+        let fun_expr_var = var!(fun_expr_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
+                if fun == &AggregateFunction::Count || fun == &AggregateFunction::Sum {
+                    for cube in
+                        var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+                    {
+                        if let Some(cube) = meta.find_cube_with_name(cube) {
+                            if cube
+                                .lookup_measure(&MemberRules::default_count_measure_name())
+                                .is_none()
+                            {
+                                return true;
                             }
                         }
                     }

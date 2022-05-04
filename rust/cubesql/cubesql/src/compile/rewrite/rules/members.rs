@@ -1145,7 +1145,7 @@ impl MemberRules {
                         .map(|c| c.name.to_string())
                         .collect()
                 })
-                .unwrap_or(vec!["count".to_string()])
+                .unwrap_or(vec![Self::default_count_measure_name()])
             {
                 for cube_name in var_iter!(egraph[subst[var]], TableScanSourceTableName) {
                     if let Some(cube) = meta_context
@@ -1251,6 +1251,10 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    pub fn default_count_measure_name() -> String {
+        "count".to_string()
     }
 }
 
