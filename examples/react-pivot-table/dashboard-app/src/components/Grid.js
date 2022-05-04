@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCubeQuery } from '@cubejs-client/react';
-import { Button, Space, Layout } from 'antd';
+import { Layout } from 'antd';
 import { AgGridColumn, AgGridReact } from 'ag-grid-react';
 import 'ag-grid-enterprise';
 import 'ag-grid-community/dist/styles/ag-grid.css';
