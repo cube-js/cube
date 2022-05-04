@@ -318,6 +318,9 @@ export async function startBirdBoxFromCli(
   let db: StartedTestContainer;
   let cli: ChildProcess;
 
+  if (!options.schemaDir) {
+    options.schemaDir = 'postgresql/schema';
+  }
   if (!options.cubejsConfig) {
     options.cubejsConfig = 'postgresql/single/cube.js';
   }
