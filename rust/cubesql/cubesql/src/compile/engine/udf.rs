@@ -1371,6 +1371,36 @@ pub fn create_pg_type_is_visible() -> ScalarUDF {
     )
 }
 
+pub fn create_get_constraintdef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(_oid) => Some("PRIMARY KEY (oid)".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_get_constraintdef",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Boolean]),
+                TypeSignature::Exact(vec![DataType::UInt32]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_measure_udaf() -> AggregateUDF {
     create_udaf(
         "measure",
