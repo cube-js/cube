@@ -1,5 +1,5 @@
 import { createBirdBoxTestCase } from './abstract-test-case';
-import { startBirdBoxFromCli, startBirdBoxFromContainer } from '../src';
+import { startBirdBoxFromContainer } from '../src';
 
 createBirdBoxTestCase('postgresql', () => startBirdBoxFromContainer({
   type: 'postgresql',
