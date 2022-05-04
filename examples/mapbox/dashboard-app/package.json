@@ -11,7 +11,7 @@
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.1",
     "axios": "^0.19.2",
-    "cube-example-wrapper": "^1.0.23",
+    "cube-example-wrapper": "^1.0.26",
     "deck.gl": "^8.1.9",
     "less": "^3.11.3",
     "less-loader": "^6.1.1",
@@ -35,7 +35,8 @@
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

@@ -18,7 +18,7 @@
     "apollo-client": "^2.6.10",
     "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
-    "cube-example-wrapper": "^1.0.23",
+    "cube-example-wrapper": "^1.0.26",
     "graphql": "^15.3.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^5.0.0",
@@ -41,7 +41,8 @@
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

@@ -7,7 +7,7 @@
     "@cubejs-client/react": "^0.23.6",
     "antd": "^3.20.3",
     "bizcharts": "^3.5.4",
-    "cube-example-wrapper": "^1.0.25",
+    "cube-example-wrapper": "^1.0.26",
     "moment": "^2.24.0",
     "numeral": "^2.0.6",
     "react": "^16.8.6",
@@ -22,7 +22,8 @@
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

@@ -12,7 +12,7 @@
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.4",
-    "cube-example-wrapper": "^1.0.22",
+    "cube-example-wrapper": "^1.0.26",
     "fontsource-roboto": "^2.1.4",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
@@ -23,11 +23,12 @@
     "recharts": "^1.8.5"
   },
   "scripts": {
-    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts --openssl-legacy-provider start",
+    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts --openssl-legacy-provider build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

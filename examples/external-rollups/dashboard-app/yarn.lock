@@ -4487,10 +4487,10 @@ csstype@^3.0.2:
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.0.4.tgz#b156d7be03b84ff425c9a0a4b1e5f4da9c5ca888"
   integrity sha512-xc8DUsCLmjvCfoD7LTGE0ou2MIWLx0K9RCZwSHMOdynqRsP4MtUcLeqh1HcQ2dInwDTqn+3CE0/FZh1et+p4jA==
 
-cube-example-wrapper@^1.0.25:
-  version "1.0.25"
-  resolved "https://registry.yarnpkg.com/cube-example-wrapper/-/cube-example-wrapper-1.0.25.tgz#3a8597e57f8dedcdaea409b559983eedeba8c292"
-  integrity sha512-fCKaNptyK95diee77vCWmDv6UB9CQwl4qSlaIJTI9Uzm0+ONTpZzr1mbS/dvpBNfF9GwI8CUf6yqQH/Zi2VCZg==
+cube-example-wrapper@^1.0.26:
+  version "1.0.26"
+  resolved "https://registry.yarnpkg.com/cube-example-wrapper/-/cube-example-wrapper-1.0.26.tgz#f3082cb65bad2ccf09988f8b04ca3a4c9f817cca"
+  integrity sha512-iz1TUPgnw7Fkb61+L26VdLmpl0Gf9EsS/4NgQ17he5lqp2lB8IfxA2RacUgJqi8cq4kVPACGyeGol+uj/uQWIg==
   dependencies:
     "@cubejs-client/core" "^0.29.33"
     cubedev-tracking "^1.1.0"

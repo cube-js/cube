@@ -4806,10 +4806,10 @@ csstype@^2.2.0:
   resolved "https://registry.yarnpkg.com/csstype/-/csstype-2.6.11.tgz#452f4d024149ecf260a852b025e36562a253ffc5"
   integrity sha512-l8YyEC9NBkSm783PFTvh0FmJy7s5pFKrDp49ZL7zBGX3fWkO+N4EEyan1qqp8cwPLDcD0OSdyY6hAMoxp34JFw==
 
-cube-example-wrapper@^1.0.23:
-  version "1.0.23"
-  resolved "https://registry.yarnpkg.com/cube-example-wrapper/-/cube-example-wrapper-1.0.23.tgz#bf134bb39d7ad14c24dc2ad7c5910193e0eb19b9"
-  integrity sha512-sB6INMI1XCMFOYybxZPvpnwAMYHuLJ7RsoE1fFItPY/Up+KEbeSPav5xLjBzMY8gVUdzReuICtzdr0koMWeu/g==
+cube-example-wrapper@^1.0.26:
+  version "1.0.26"
+  resolved "https://registry.yarnpkg.com/cube-example-wrapper/-/cube-example-wrapper-1.0.26.tgz#f3082cb65bad2ccf09988f8b04ca3a4c9f817cca"
+  integrity sha512-iz1TUPgnw7Fkb61+L26VdLmpl0Gf9EsS/4NgQ17he5lqp2lB8IfxA2RacUgJqi8cq4kVPACGyeGol+uj/uQWIg==
   dependencies:
     "@cubejs-client/core" "^0.29.33"
     cubedev-tracking "^1.1.0"

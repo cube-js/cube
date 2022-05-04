@@ -8,7 +8,8 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist/dashboard-app"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist/dashboard-app",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir dist/dashboard-app"
   },
   "private": true,
   "dependencies": {
@@ -25,7 +26,7 @@
     "@cubejs-client/core": "^0.21.1",
     "@cubejs-client/ngx": "^0.21.1",
     "chart.js": "^2.9.3",
-    "cube-example-wrapper": "^1.0.23",
+    "cube-example-wrapper": "^1.0.26",
     "ng2-charts": "^2.4.2",
     "ngx-countup": "^7.3.3",
     "rxjs": "~6.6.0",
