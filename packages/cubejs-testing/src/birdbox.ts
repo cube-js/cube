@@ -420,7 +420,7 @@ export async function startBirdBoxFromCli(
   process.stdout.write(`QQQ\n${JSON.stringify(env, null, 4)}\n`);
 
   try {
-    process.stdout.write('QQQ 000');
+    process.stdout.write(`QQQ 000 ${process.cwd()}`);
     cli = spawn(
       options.useCubejsServerBinary
         ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
