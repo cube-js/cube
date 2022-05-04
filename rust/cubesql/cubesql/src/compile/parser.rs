@@ -49,6 +49,8 @@ pub fn parse_sql_to_statement(
     let query = query.replace("SIGNED INTEGER", "bigint");
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
+    // TODO support type + rewrite
+    let query = query.replace("'pg_class'::regclass", "1259");
 
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
