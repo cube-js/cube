@@ -7,6 +7,7 @@
     "@cubejs-client/react": "^0.23.6",
     "antd": "^3.20.3",
     "bizcharts": "^3.5.4",
+    "cube-example-wrapper": "^1.0.25",
     "moment": "^2.24.0",
     "numeral": "^2.0.6",
     "react": "^16.8.6",

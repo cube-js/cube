@@ -11,6 +11,7 @@
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.1",
     "axios": "^0.19.2",
+    "cube-example-wrapper": "^1.0.23",
     "deck.gl": "^8.1.9",
     "less": "^3.11.3",
     "less-loader": "^6.1.1",

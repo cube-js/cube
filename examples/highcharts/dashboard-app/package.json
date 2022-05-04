@@ -18,6 +18,7 @@
     "apollo-client": "^2.6.10",
     "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
+    "cube-example-wrapper": "^1.0.23",
     "graphql": "^15.3.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^5.0.0",
