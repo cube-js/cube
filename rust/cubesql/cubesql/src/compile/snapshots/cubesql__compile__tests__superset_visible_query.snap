@@ -1,0 +1,7 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    t.typname as \"name\",\n                    pg_catalog.pg_type_is_visible(t.oid) as \"visible\",\n                    n.nspname as \"schema\",\n                    e.enumlabel as \"label\"\n                FROM pg_catalog.pg_type t\n                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace\n                LEFT JOIN pg_catalog.pg_enum e ON t.oid = e.enumtypid\n                WHERE t.typtype = 'e'\n                ORDER BY\n                    \"schema\",\n                    \"name\",\n                    e.oid\n                ;\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
+++
+++
+++
