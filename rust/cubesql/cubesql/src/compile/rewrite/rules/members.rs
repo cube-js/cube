@@ -9,7 +9,7 @@ use crate::{
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
             measure_expr, member_replacer, projection, projection_expr, projection_expr_empty_tail,
-            rewrite, rewriter::RewriteRules, sort_expr, table_scan, time_dimension_expr,
+            rewrite, rewriter::RewriteRules, table_scan, time_dimension_expr,
             transforming_chain_rewrite, transforming_rewrite, udaf_expr,
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
             ColumnAliasReplacerAliases, ColumnAliasReplacerTableName, ColumnExprColumn,
@@ -536,12 +536,6 @@ impl RewriteRules for MemberRules {
                 "alias-replacer-tail",
                 column_alias_replacer(cube_scan_members_empty_tail(), "?aliases", "?cube"),
                 cube_scan_members_empty_tail(),
-            ),
-            transforming_rewrite(
-                "sort-expr-column-name",
-                sort_expr("?expr", "?asc", "?nulls_first"),
-                sort_expr("?alias", "?asc", "?nulls_first"),
-                Self::transform_original_expr_alias("?expr", "?alias"),
             ),
             rewrite(
                 "binary-expr-addition-assoc",
