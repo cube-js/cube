@@ -32,9 +32,10 @@ use super::information_schema::postgres::{
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
-    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogIndexProvider,
-    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
+    PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 
 use crate::{
@@ -314,6 +315,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_depend".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogAmProvider>() {
             "pg_catalog.pg_am".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogEnumProvider>() {
+            "pg_catalog.pg_enum".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else {
@@ -435,6 +438,7 @@ impl DatabaseProtocol {
                 "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
+                "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
                 _ => return None,
             },
             _ => return None,
