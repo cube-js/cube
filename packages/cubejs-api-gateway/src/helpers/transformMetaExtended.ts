@@ -1,4 +1,4 @@
-function stringifyMemberSql(sql: any) {
+function stringifyMemberSql(sql?: () => string) {
   if (!sql) {
     return undefined;
   }
@@ -26,7 +26,7 @@ function handleDimensionCaseCondition(caseCondition: any) {
 
   return {
     ...caseCondition,
-    when: caseCondition?.when?.map((item) => ({
+    when: Object.values(caseCondition?.when)?.map((item: any) => ({
       ...item,
       sql: stringifyMemberSql(item.sql),
       label: item?.label?.sql ? stringifyMemberSql(item.label.sql) : item?.label,
@@ -55,10 +55,11 @@ function transformMeasure(measure: any, cubeDefinitions: any) {
 
 function transformDimension(dimension: any, cubeDefinitions: any) {
   const { cubeName, memberName } = getMemberPath(dimension.name);
+
   return {
     ...dimension,
     sql: stringifyMemberSql(cubeDefinitions[cubeName]?.dimensions?.[memberName]?.sql),
-    case: handleDimensionCaseCondition(cubeDefinitions[cubeName]?.dimension?.[memberName]?.case),
+    case: handleDimensionCaseCondition(cubeDefinitions[cubeName]?.dimensions?.[memberName]?.case),
   };
 }
 
@@ -98,6 +99,9 @@ function transformPreAggregations(preAggregations: any) {
 }
 
 export {
+  getMemberPath,
+  handleDimensionCaseCondition,
+  stringifyMemberSql,
   transformCube,
   transformMeasure,
   transformDimension,
