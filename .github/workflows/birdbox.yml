@@ -13,10 +13,13 @@ on:
   push:
     paths:
       - '.github/workflows/birdbox.yml'
-      # TODO: REMOVEME. Temporary, to validate CI passes.
-      - 'packages/cubejs-testing/**'
     branches:
       - 'master'
+  # TODO: REMOVEME. Temporary, to validate CI.
+  pull_request:
+    paths:
+      - 'packages/cubejs-testing/**'
+
 
 jobs:
   cli:
