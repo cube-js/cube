@@ -62,11 +62,12 @@ By default local dir are not persisted. You can enable persistance on router and
 
 ### Image parameters
 
-| Name               | Description                                          | Value              |
-| ------------------ | ---------------------------------------------------- | ------------------ |
-| `image.repository` | Cubestore image repository                           | `cubejs/cubestore` |
-| `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`          |
-| `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent`     |
+| Name                | Description                                                                             | Value              |
+| ------------------- | --------------------------------------------------------------------------------------- | ------------------ |
+| `image.repository`  | Cubestore image repository                                                              | `cubejs/cubestore` |
+| `image.tag`         | Cubestore image tag (immutable tags are recommended)                                    | `0.28.26`          |
+| `image.pullPolicy`  | Cubestore image pull policy                                                             | `IfNotPresent`     |
+| `image.pullSecrets` | If defined, uses a Secret to pull an image from a private Docker registry or repository | `[]`               |
 
 ### Global parameters
 

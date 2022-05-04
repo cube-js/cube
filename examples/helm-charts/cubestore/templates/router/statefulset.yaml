@@ -23,6 +23,10 @@ spec:
         app.kubernetes.io/component: router
         {{- include "cubestore.selectorLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cubestore
           {{- if .Values.image.tag }}
