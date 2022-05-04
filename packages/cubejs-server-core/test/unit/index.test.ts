@@ -100,7 +100,7 @@ describe('index.test', () => {
       await driverFactory('mongo');
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, dbType must return string (dataSource: "mongo"), actual: null');
     }
   });
@@ -115,7 +115,7 @@ describe('index.test', () => {
       await driverFactory('default');
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, driverFactory must return driver (dataSource: "default"), actual: null');
     }
   });
@@ -130,7 +130,7 @@ describe('index.test', () => {
       await orchestratorOptions.externalDriverFactory();
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, externalDriverFactory must return driver, actual: null');
     }
   });
