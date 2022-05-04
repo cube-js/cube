@@ -42,16 +42,16 @@ use self::{
             create_current_schemas_udf, create_current_timestamp, create_current_user_udf,
             create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf,
-            create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
-            create_pg_backend_pid, create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
-            create_pg_get_expr_udf, create_pg_get_userbyid, create_pg_get_userbyid_udf,
-            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-            create_pg_table_is_visible, create_pg_type_is_visible, create_quarter_udf,
-            create_second_udf, create_str_to_date, create_time_format_udf, create_timediff_udf,
-            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
-            create_year_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf,
+            create_get_constraintdef_udf, create_hour_udf, create_if_udf, create_instr_udf,
+            create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid,
+            create_pg_datetime_precision_udf, create_pg_expandarray_udtf, create_pg_get_expr_udf,
+            create_pg_get_userbyid, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+            create_pg_numeric_scale_udf, create_pg_table_is_visible, create_pg_type_is_visible,
+            create_quarter_udf, create_second_udf, create_str_to_date, create_time_format_udf,
+            create_timediff_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
+            create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2307,6 +2307,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_table_is_visible());
         ctx.register_udf(create_pg_get_userbyid());
         ctx.register_udf(create_pg_type_is_visible());
+        ctx.register_udf(create_get_constraintdef_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -6535,6 +6536,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_pg_get_constraintdef_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_get_constraintdef_1",
+            execute_query(
+                "select pg_catalog.pg_get_constraintdef(r.oid, true) from pg_catalog.pg_constraint r;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "pg_get_constraintdef_2",
+            execute_query(
+                "select pg_catalog.pg_get_constraintdef(r.oid) from pg_catalog.pg_constraint r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 
@@ -6585,6 +6610,34 @@ mod tests {
                     "name",
                     e.oid
                 ;
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn superset_conname_query() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "superset_conname_query",
+            execute_query(
+                r#"SELECT r.conname,
+                pg_catalog.pg_get_constraintdef(r.oid, true) as condef,
+                n.nspname as conschema
+                FROM  pg_catalog.pg_constraint r,
+                pg_namespace n,
+                pg_class c
+                WHERE r.conrelid = 13449 AND
+                r.contype = 'f' AND
+                c.oid = confrelid AND
+                n.oid = c.relnamespace
+                ORDER BY 1
                 "#
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
