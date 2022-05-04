@@ -355,24 +355,25 @@ export async function startBirdBoxFromCli(
       }
       await db.stop();
       process.stderr.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished with error: ${
-          exitCode
-        }\n`
+        `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
       );
       process.exit(1);
     }
     if (options.log === Log.PIPE) {
       process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished successfully\n`
+        `[Birdbox] Script ${loadScript} finished successfully\n`
       );
     }
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
+
+  if (!options.useCubejsServerBinary) {
+    // cli mode, using a project created via cli
+    if (!fs.existsSync(testDir)) {
+      execInDir('.', 'npx cubejs-cli create birdbox-test-project -d postgres');
+    }
+  }
 
   // Do not remove whole dir as it contains node_modules
   if (fs.existsSync(path.join(testDir, '.env'))) {
@@ -382,6 +383,12 @@ export async function startBirdBoxFromCli(
   if (fs.existsSync(path.join(testDir, '.cubestore'))) {
     fs.removeSync(path.join(testDir, '.cubestore'));
   }
+
+  // Ignored if not explicitly required by a schema file.
+  fs.copySync(
+    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', 'dbt-project'),
+    path.join(testDir, 'dbt-project')
+  );
 
   if (options.schemaDir) {
     fs.copySync(
@@ -417,10 +424,7 @@ export async function startBirdBoxFromCli(
       }
   };
 
-  process.stdout.write(`QQQ\n${JSON.stringify(env, null, 4)}\n`);
-
   try {
-    process.stdout.write(`QQQ 000 ${process.cwd()}`);
     cli = spawn(
       options.useCubejsServerBinary
         ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
@@ -450,16 +454,12 @@ export async function startBirdBoxFromCli(
         process.stdout.write(msg);
       });
     }
-    process.stdout.write('QQQ 000\n');
     await pausePromise(10 * 1000);
-    process.stdout.write('QQQ 111\n');
   } catch (e) {
     process.stdout.write(`Error spawning cube: ${e}`);
     // @ts-ignore
     db.stop();
   }
-
-  process.stdout.write('QQQ 222\n');
 
   return {
     stop: async () => {
