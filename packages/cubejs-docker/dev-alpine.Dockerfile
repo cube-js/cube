@@ -50,6 +50,7 @@ COPY packages/cubejs-mssql-driver/package.json packages/cubejs-mssql-driver/pack
 COPY packages/cubejs-mysql-driver/package.json packages/cubejs-mysql-driver/package.json
 COPY packages/cubejs-cubestore-driver/package.json packages/cubejs-cubestore-driver/package.json
 COPY packages/cubejs-oracle-driver/package.json packages/cubejs-oracle-driver/package.json
+COPY packages/cubejs-redshift-driver/package.json packages/cubejs-redshift-driver/package.json
 COPY packages/cubejs-postgres-driver/package.json packages/cubejs-postgres-driver/package.json
 COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/package.json
 COPY packages/cubejs-materialize-driver/package.json packages/cubejs-materialize-driver/package.json
@@ -103,6 +104,7 @@ COPY packages/cubejs-mssql-driver/ packages/cubejs-mssql-driver/
 COPY packages/cubejs-mysql-driver/ packages/cubejs-mysql-driver/
 COPY packages/cubejs-cubestore-driver/ packages/cubejs-cubestore-driver/
 COPY packages/cubejs-oracle-driver/ packages/cubejs-oracle-driver/
+COPY packages/cubejs-redshift-driver/ packages/cubejs-redshift-driver/
 COPY packages/cubejs-postgres-driver/ packages/cubejs-postgres-driver/
 COPY packages/cubejs-questdb-driver/ packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/ packages/cubejs-materialize-driver/
