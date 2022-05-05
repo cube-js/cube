@@ -941,8 +941,6 @@ impl Config {
         self.injector.clone()
     }
 
-
-
     pub async fn configure_internal_services(&self) {
         let (event_sender, _) = broadcast::channel(10000); // TODO config
         let event_sender_to_move = event_sender.clone();
