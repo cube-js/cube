@@ -6787,8 +6787,10 @@ mod tests {
                             AND n.nspname <> 'information_schema' )
                        OR ( c.relkind = 'v'
                             AND n.nspname <> 'pg_catalog'
-                            AND n.nspname <> 'information_schema' ) );"
-                    .to_string(),
+                            AND n.nspname <> 'information_schema' ) )
+            ORDER BY TABLE_SCHEM ASC, TABLE_NAME ASC
+            ;"
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
