@@ -242,6 +242,24 @@ define_pg_types![
         typstorage: "p",
     },
 
+    PGCLASS (83) {
+        typname: "pg_class",
+        typnamespace: 11,
+        typowner: 10,
+        typlen: -1,
+        typbyval: false,
+        typtype: "c",
+        typcategory: "C",
+        typisprefered: false,
+        typisdefined: true,
+        typrelid: 1259,
+        typsubscript: "-",
+        typelem: 0,
+        typarray: 273,
+        typalign: "d",
+        typstorage: "x",
+    },
+
     FLOAT4 (700) {
         typname: "float4",
         typnamespace: 11,
