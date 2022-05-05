@@ -19,9 +19,14 @@ const Wrapper = styled.div`
   overflow: hidden;
 
   .graphiql-container {
+    box-sizing: initial;
+
+    * {
+      box-sizing: initial;
+    }
+
     .topBar {
       background: none;
-      padding: 24px 0 24px;
     }
 
     .docExplorerShow {
@@ -33,7 +38,7 @@ const Wrapper = styled.div`
     .CodeMirror-lines {
       background: white;
     }
-    
+
     .doc-explorer-title-bar {
       height: 50px;
     }
@@ -53,7 +58,7 @@ export default function GraphiQLSandbox({
 }: GraphiQLSandboxProps) {
   const { token: securityContextToken } = useSecurityContext();
   const playgroundToken = useToken();
-  
+
   const token = securityContextToken || playgroundToken;
 
   const fetcher = useMemo(() => {

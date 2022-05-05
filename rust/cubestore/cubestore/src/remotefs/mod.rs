@@ -439,29 +439,32 @@ mod tests {
             assert!(local_dir.join(filename).is_file());
         }
 
-        remote_fs
-            .list(&name_maker.name("test-"))
-            .await
-            .unwrap()
+        let mut remote_list = remote_fs.list(&name_maker.name("test-")).await.unwrap();
+        remote_list.sort();
+        remote_list
             .iter()
             .zip(root_files.iter())
             .for_each(|(list_name, origin_name)| {
                 assert_eq!(list_name, origin_name);
             });
-        remote_fs
-            .list(&name_maker.name("subdir/"))
-            .await
-            .unwrap()
+
+        let mut remote_list = remote_fs.list(&name_maker.name("subdir/")).await.unwrap();
+        remote_list.sort();
+        remote_list
             .iter()
             .zip(subdir_files.iter())
             .for_each(|(list_name, origin_name)| {
                 assert_eq!(list_name, origin_name);
             });
 
-        remote_fs
+        let mut remote_list = remote_fs
             .list_with_metadata(&name_maker.name("test"))
             .await
-            .unwrap()
+            .unwrap();
+
+        remote_list.sort_by(|a, b| a.remote_path().partial_cmp(b.remote_path()).unwrap());
+
+        remote_list
             .iter()
             .zip(root_files.iter())
             .for_each(|(list_file, origin_name)| {

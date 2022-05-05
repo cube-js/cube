@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.54](https://github.com/cube-js/cube.js/compare/v0.29.53...v0.29.54) (2022-05-03)
+
+
+### Features
+
+* Detailed client TS types ([#4446](https://github.com/cube-js/cube.js/issues/4446)) Thanks [@reify-thomas-smith](https://github.com/reify-thomas-smith) ! ([977cce0](https://github.com/cube-js/cube.js/commit/977cce0c440bc73c0e6b5ad0c10af926b7386873)), closes [#4202](https://github.com/cube-js/cube.js/issues/4202)
+
+
+
+
+
+## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** Correct LogicalAndFilter/LogicalOrFilter types: allow any filter types in and / or ([#4343](https://github.com/cube-js/cube.js/issues/4343)) Thanks [@tchell](https://github.com/tchell) ! ([699a2f4](https://github.com/cube-js/cube.js/commit/699a2f45910785fb62d4abbeffff35b0b9708dd5))
+* **@cubejs-client/core:** fix HTTP poll not working if Cube API stops and recovers ([#3506](https://github.com/cube-js/cube.js/issues/3506)) Thanks [@rongfengliang](https://github.com/rongfengliang) ! ([c207c3c](https://github.com/cube-js/cube.js/commit/c207c3c9e22242e8a4c6e01a2f60d10949a75366))
+
+
+### Features
+
+* **@cubejs-client/core:** Accept immutable queries ([#4366](https://github.com/cube-js/cube.js/issues/4366)) Thanks [@reify-thomas-smith](https://github.com/reify-thomas-smith)! ([19b1514](https://github.com/cube-js/cube.js/commit/19b1514d75cc47e0f081dd02e8de0a34aed118bb)), closes [#4160](https://github.com/cube-js/cube.js/issues/4160)
+* **client-core:** Add HTTP status code to RequestError ([#4412](https://github.com/cube-js/cube.js/issues/4412)) ([6ec4fdf](https://github.com/cube-js/cube.js/commit/6ec4fdf6921db90bd64cb29f466fa1680f3b7eb4))
+
+
+
+
+
 ## [0.29.51](https://github.com/cube-js/cube.js/compare/v0.29.50...v0.29.51) (2022-04-22)
 
 

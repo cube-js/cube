@@ -1,10 +1,11 @@
-use cubesql::config::{Config, CubeServices};
-use cubesql::telemetry::{track_event, ReportingLogger};
+use cubesql::{
+    config::{Config, CubeServices},
+    telemetry::{track_event, ReportingLogger},
+};
 
 use log::Level;
 use simple_logger::SimpleLogger;
-use std::collections::HashMap;
-use std::env;
+use std::{collections::HashMap, env};
 
 use tokio::runtime::Builder;
 

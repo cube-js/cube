@@ -5,23 +5,25 @@ pub mod language;
 mod rewriter;
 mod rules;
 
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::CubeError;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::{Column, ExprRewritable, ExprRewriter};
-use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::functions::BuiltinScalarFunction;
-use datafusion::physical_plan::window_functions::WindowFunction;
-use datafusion::scalar::ScalarValue;
-use egg::{rewrite, Applier, Pattern, PatternAst, SearchMatches, Searcher, Subst, Symbol, Var};
-use egg::{EGraph, Id, Rewrite};
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::slice::Iter;
-use std::str::FromStr;
+use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
+use datafusion::{
+    arrow::datatypes::DataType,
+    error::DataFusionError,
+    logical_plan::{
+        window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
+        JoinConstraint, JoinType, Operator,
+    },
+    physical_plan::{
+        aggregates::AggregateFunction, functions::BuiltinScalarFunction,
+        window_functions::WindowFunction,
+    },
+    scalar::ScalarValue,
+};
+use egg::{
+    rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
+    Symbol, Var,
+};
+use std::{collections::HashMap, fmt::Display, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -207,6 +209,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
             table_name: String,
+            split: bool,
         },
         Measure {
             name: String,
@@ -257,6 +260,9 @@ crate::plan_to_language! {
             filters: Vec<LogicalPlan>,
             cube: Option<String>,
         },
+        FilterCastUnwrapReplacer {
+            filters: Vec<LogicalPlan>,
+        },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
@@ -269,12 +275,15 @@ crate::plan_to_language! {
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
         OuterProjectionSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
         OuterAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
+            cube: String,
         },
     }
 }
@@ -374,6 +383,28 @@ where
     Rewrite::new(
         name.to_string(),
         searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
+    )
+    .unwrap()
+}
+
+pub fn transforming_rewrite_with_root<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
         TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
@@ -401,7 +432,9 @@ where
                 .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
                 .collect(),
         },
-        TransformingPattern::new(applier.as_str(), transform_fn),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
     )
     .unwrap()
 }
@@ -423,11 +456,19 @@ fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarFunctionExpr {} {})",
-        fun_name,
-        list_expr("ScalarFunctionExprArgs", args)
-    )
+    fun_expr_var_arg(fun_name, list_expr("ScalarFunctionExprArgs", args))
+}
+
+fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    format!("(ScalarFunctionExpr {} {})", fun_name, arg_list)
+}
+
+fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarFunctionExprArgs {} {})", left, right)
+}
+
+fn scalar_fun_expr_args_empty_tail() -> String {
+    "ScalarFunctionExprArgs".to_string()
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
@@ -512,6 +553,14 @@ fn between_expr(
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
 }
 
+fn negative_expr(expr: impl Display) -> String {
+    format!("(NegativeExpr {})", expr)
+}
+
+fn not_expr(expr: impl Display) -> String {
+    format!("(NotExpr {})", expr)
+}
+
 fn is_null_expr(expr: impl Display) -> String {
     format!("(IsNullExpr {})", expr)
 }
@@ -583,16 +632,20 @@ fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
 }
 
-fn inner_aggregate_split_replacer(members: impl Display) -> String {
-    format!("(InnerAggregateSplitReplacer {})", members)
+fn filter_cast_unwrap_replacer(members: impl Display) -> String {
+    format!("(FilterCastUnwrapReplacer {})", members)
 }
 
-fn outer_projection_split_replacer(members: impl Display) -> String {
-    format!("(OuterProjectionSplitReplacer {})", members)
+fn inner_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(InnerAggregateSplitReplacer {} {})", members, cube)
 }
 
-fn outer_aggregate_split_replacer(members: impl Display) -> String {
-    format!("(OuterAggregateSplitReplacer {})", members)
+fn outer_projection_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(OuterProjectionSplitReplacer {} {})", members, cube)
+}
+
+fn outer_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
+    format!("(OuterAggregateSplitReplacer {} {})", members, cube)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
@@ -681,11 +734,23 @@ fn cube_scan(
     offset: impl Display,
     aliases: impl Display,
     table_name: impl Display,
+    split: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset, aliases, table_name
+        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
+        source_table_name, members, filters, orders, limit, offset, aliases, table_name, split
     )
+}
+
+pub fn original_expr_name(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+) -> Option<String> {
+    egraph[id]
+        .data
+        .original_expr
+        .as_ref()
+        .map(|e| e.name(&DFSchema::empty()).unwrap())
 }
 
 pub struct ChainSearcher {
@@ -793,7 +858,7 @@ impl ChainSearcher {
 
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -801,7 +866,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -813,7 +878,7 @@ where
 
 impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
@@ -824,7 +889,7 @@ where
         rule_name: Symbol,
     ) -> Vec<Id> {
         let mut new_subst = subst.clone();
-        if (self.vars_to_substitute)(egraph, &mut new_subst) {
+        if (self.vars_to_substitute)(egraph, eclass, &mut new_subst) {
             self.pattern
                 .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
         } else {

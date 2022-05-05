@@ -1,6 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"explain KibanaSampleDataEcommerce;\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+assertion_line: 5589
+expression: "execute_query(\"explain KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+------+-----+---------+-------+
 | Field              | Type         | Null | Key | Default | Extra |
@@ -12,6 +13,7 @@ expression: "execute_query(\"explain KibanaSampleDataEcommerce;\".to_string(),\n
 | order_date         | datetime     | YES  |     | NULL    |       |
 | customer_gender    | varchar(255) | YES  |     | NULL    |       |
 | taxful_total_price | numeric      | YES  |     | NULL    |       |
-| is_male            | boolean      | NO   |     | NULL    |       |
-| is_female          | boolean      | NO   |     | NULL    |       |
+| has_subscription   | tinyint(1)   | YES  |     | NULL    |       |
+| is_male            | tinyint(1)   | NO   |     | NULL    |       |
+| is_female          | tinyint(1)   | NO   |     | NULL    |       |
 +--------------------+--------------+------+-----+---------+-------+

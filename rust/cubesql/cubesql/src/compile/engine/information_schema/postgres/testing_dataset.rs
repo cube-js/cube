@@ -1,10 +1,9 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
-use datafusion::arrow::array::UInt32Builder;
 use datafusion::{
     arrow::{
-        array::{Array, StringBuilder},
+        array::{Array, StringBuilder, UInt32Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },

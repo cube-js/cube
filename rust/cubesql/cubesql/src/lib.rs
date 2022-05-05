@@ -28,10 +28,8 @@ use log::SetLoggerError;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
 use sqlparser::parser::ParserError;
-use std::backtrace::Backtrace;
-use std::num::ParseIntError;
-use tokio::sync::mpsc::error::SendError;
-use tokio::time::error::Elapsed;
+use std::{backtrace::Backtrace, num::ParseIntError};
+use tokio::{sync::mpsc::error::SendError, time::error::Elapsed};
 
 pub mod compile;
 pub mod config;
@@ -39,13 +37,11 @@ pub mod sql;
 pub mod telemetry;
 pub mod transport;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
 pub struct CubeError {
     pub message: String,
     pub cause: CubeErrorCauseType,
 }
-
-impl std::error::Error for CubeError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CubeErrorCauseType {

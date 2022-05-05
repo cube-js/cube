@@ -11,6 +11,7 @@
     "@testing-library/jest-dom": "^5.11.9",
     "@testing-library/react": "^11.2.5",
     "@testing-library/user-event": "^12.8.3",
+    "ag-grid-community": "^25.1.0",
     "ag-grid-enterprise": "^25.1.0",
     "ag-grid-react": "^25.1.0",
     "antd": "^4.14.0",
@@ -18,6 +19,7 @@
     "apollo-client": "^2.6.10",
     "apollo-link-schema": "^1.2.5",
     "bizcharts": "^4.1.7",
+    "cube-example-wrapper": "^1.0.26",
     "graphql": "^15.5.0",
     "graphql-tag": "^2.12.3",
     "graphql-tools": "^5.0.0",
@@ -36,7 +38,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": [
@@ -62,5 +66,8 @@
     "bizcharts-charts": "0.0.1",
     "antd-tables": "0.0.1",
     "react-credentials": "0.0.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }

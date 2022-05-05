@@ -1,6 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"show create table KibanaSampleDataEcommerce;\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+assertion_line: 4955
+expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+--------------------------------------------+
 | Table                     | Create Table                               |
@@ -13,7 +14,8 @@ expression: "execute_query(\"show create table KibanaSampleDataEcommerce;\".to_s
 |                           |   `order_date` datetime NOT NULL,          |
 |                           |   `customer_gender` varchar(255) NOT NULL, |
 |                           |   `taxful_total_price` numeric NOT NULL,   |
-|                           |   `is_male` boolean,                       |
-|                           |   `is_female` boolean                      |
+|                           |   `has_subscription` tinyint(1) NOT NULL,  |
+|                           |   `is_male` tinyint(1),                    |
+|                           |   `is_female` tinyint(1)                   |
 |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4    |
 +---------------------------+--------------------------------------------+

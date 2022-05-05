@@ -1,0 +1,15 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5854
+expression: "execute_query(\"SELECT generate_subscripts(r.a, 1) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------------------+
+| generate_subscripts(r.a,Int64(1)) |
++-----------------------------------+
+| 1                                 |
+| 2                                 |
+| 3                                 |
+| 1                                 |
+| 2                                 |
+| 3                                 |
++-----------------------------------+

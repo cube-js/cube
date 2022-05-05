@@ -808,6 +808,36 @@ declare module '@cubejs-client/core' {
     total?: boolean;
   }
 
+  export type QueryRecordType<T extends DeeplyReadonly<Query | Query[]>> =
+    T extends DeeplyReadonly<Query[]> ? QueryArrayRecordType<T> :
+    T extends DeeplyReadonly<Query> ? SingleQueryRecordType<T> :
+    never;
+
+  type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
+    T extends readonly [infer First, ...infer Rest]
+      ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest>
+      : never;
+
+  // If we can't infer any members at all, then return any.
+  type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
+    ? any
+    : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
+
+  type ExtractMembers<T extends DeeplyReadonly<Query>> =
+    | ( T extends { dimensions: readonly (infer Names)[]; } ? Names : never )
+    | ( T extends { measures: readonly (infer Names)[]; } ? Names : never )
+    | ( T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never );
+
+  type ExtractTimeMembers<T> =
+    T extends readonly [infer First, ...infer Rest]
+      ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
+      : never;
+
+  type ExtractTimeMember<T> =
+    T extends { dimension: infer Dimension, granularity: infer Granularity }
+      ? Dimension | `${Dimension & string}.${Granularity & string}`
+      : never;
+
   export class ProgressResult {
     stage(): string;
     timeElapsed(): string;
@@ -983,7 +1013,10 @@ declare module '@cubejs-client/core' {
    * @order 2
    */
   export class CubejsApi {
-    load(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<ResultSet>;
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options?: LoadMethodOptions,
+    ): Promise<ResultSet<QueryRecordType<QueryType>>>;
     /**
      * Fetch data for the passed `query`.
      *
@@ -1008,13 +1041,18 @@ declare module '@cubejs-client/core' {
      * ```
      * @param query - [Query object](query-format)
      */
-    load(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<ResultSet>): void;
-    load(
-      query: DeeplyReadonly<Query | Query[]>,
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options?: LoadMethodOptions,
+      callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+    ): void;
+
+    load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet>,
       responseFormat?: string
-    ): Promise<ResultSet>;
+    ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
     /**
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
@@ -1040,7 +1078,11 @@ declare module '@cubejs-client/core' {
      * );
      * ```
      */
-    subscribe(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions | null, callback: LoadMethodCallback<ResultSet>): void;
+    subscribe<QueryType extends DeeplyReadonly<Query | Query[]>>(
+      query: QueryType,
+      options: LoadMethodOptions | null,
+      callback: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+    ): void;
 
     sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
