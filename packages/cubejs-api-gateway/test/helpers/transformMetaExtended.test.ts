@@ -16,9 +16,12 @@ import {
   transformCube,
   transformDimension,
   transformMeasure,
+  transformSegment,
+  transformJoins,
+  transformPreAggregations,
 } from '../../src/helpers/transformMetaExtended';
 
-const MockUsersCube = {
+const MOCK_USERS_CUBE = {
   measures: {
     count: {
       sql: () => 'id',
@@ -63,6 +66,42 @@ const MockUsersCube = {
     },
   },
   segments: {
+    testSegment: {
+      // eslint-disable-next-line quotes
+      sql: () => `testName IS NULL`,
+    },
+  },
+  joins: {
+    PlaygroundUsers: {
+      relationship: 'belongsTo',
+      // eslint-disable-next-line quotes
+      sql: () => `{CUBE}.id = {PlaygroundUsers.anonymous}`,
+    },
+    IpEnrich: {
+      relationship: 'belongsTo',
+      // eslint-disable-next-line quotes
+      sql: () => `{CUBE.email} = {IpEnrich.email}`,
+    },
+  },
+  preAggregations: {
+    main: {
+      granularity: 'day',
+      refreshKey: {
+        every: '0 5 * * *',
+        timezone: 'America/Los_Angeles',
+      },
+      type: 'rollup',
+      scheduledRefresh: true,
+    },
+    eventsByType: {
+      granularity: 'day',
+      refreshKey: {
+        every: '0 5 * * *',
+        timezone: 'America/Los_Angeles',
+      },
+      type: 'rollup',
+      scheduledRefresh: true,
+    },
   },
   refreshKey: {
     every: '1 hour',
@@ -73,7 +112,7 @@ const MockUsersCube = {
   fileName: 'MockUsersCube.js',
 };
 
-const MockDimensionCaseResult = {
+const MOCK_DIMENSION_CASE_RESULT = {
   when: [
     {
       sql: '`tenantEnterpriseFlag = true`',
@@ -89,11 +128,18 @@ const MockDimensionCaseResult = {
   }
 };
 
+const MOCK_SEGMENT = {
+  name: 'MockUsersCube.testSegment',
+  title: 'MockUsersCube Test Segment',
+  shortTitle: 'Test Segment',
+  isVisible: true,
+};
+
 describe('transformMetaExtended helpers', () => {
   test('stringifyMemberSql', () => {
     expect(stringifyMemberSql(undefined)).toBeUndefined();
-    expect(stringifyMemberSql(MockUsersCube.sql)).toBeDefined();
-    expect(stringifyMemberSql(MockUsersCube.sql)).toBe('`SELECT * FROM MockUsers`');
+    expect(stringifyMemberSql(MOCK_USERS_CUBE.sql)).toBeDefined();
+    expect(stringifyMemberSql(MOCK_USERS_CUBE.sql)).toBe('`SELECT * FROM MockUsers`');
   });
 
   test('getMemberPath', () => {
@@ -103,13 +149,13 @@ describe('transformMetaExtended helpers', () => {
 
   test('handleDimensionCaseCondition', () => {
     expect(handleDimensionCaseCondition(undefined)).toBeUndefined();
-    const handledCaseCondition = handleDimensionCaseCondition(MockUsersCube.dimensions.plan.case);
+    const handledCaseCondition = handleDimensionCaseCondition(MOCK_USERS_CUBE.dimensions.plan.case);
     expect(handledCaseCondition).toBeDefined();
-    expect(handledCaseCondition).toEqual(MockDimensionCaseResult);
+    expect(handledCaseCondition).toEqual(MOCK_DIMENSION_CASE_RESULT);
   });
 
   test('transformCube', () => {
-    const handledCube = transformCube(MockUsersCube, MockUsersCube);
+    const handledCube = transformCube(MOCK_USERS_CUBE, MOCK_USERS_CUBE);
     expect(handledCube).toBeDefined();
     expect(handledCube).toMatchObject({ name: 'MockUsersCube' });
     expect(handledCube).toHaveProperty('measures');
@@ -117,15 +163,33 @@ describe('transformMetaExtended helpers', () => {
   });
 
   test('transformDimension', () => {
-    const handledDimension = transformDimension(MockUsersCube.dimensions.id, MockUsersCube);
+    const handledDimension = transformDimension(MOCK_USERS_CUBE.dimensions.id, MOCK_USERS_CUBE);
     expect(handledDimension).toBeDefined();
     expect(handledDimension).toHaveProperty('sql');
   });
 
   test('transformMeasure', () => {
-    const handledMeasure = transformMeasure(MockUsersCube.measures.count, MockUsersCube);
+    const handledMeasure = transformMeasure(MOCK_USERS_CUBE.measures.count, MOCK_USERS_CUBE);
     expect(handledMeasure).toBeDefined();
     expect(handledMeasure).toHaveProperty('sql');
     expect(handledMeasure).toMatchObject({ type: 'count' });
+  });
+
+  test('transformSegment', () => {
+    const handledSegment = transformSegment(MOCK_SEGMENT, MOCK_USERS_CUBE);
+    expect(handledSegment).toBeDefined();
+    expect(handledSegment).toHaveProperty('sql');
+  });
+
+  test('transformJoins', () => {
+    const handledJoins = transformJoins(MOCK_USERS_CUBE.joins);
+    expect(handledJoins).toBeDefined();
+    expect(handledJoins?.length).toBe(2);
+  });
+
+  test('transformPreAggregations', () => {
+    const handledPreAggregations = transformPreAggregations(MOCK_USERS_CUBE.preAggregations);
+    expect(handledPreAggregations).toBeDefined();
+    expect(handledPreAggregations?.length).toBe(2);
   });
 });
