@@ -289,9 +289,9 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            chunk_size,
             config,
             memory_chunks: RwLock::new(HashMap::new()),
+            chunk_size,
         };
 
         Arc::new(store)
