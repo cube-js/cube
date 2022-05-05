@@ -855,7 +855,7 @@ impl Config {
         self.local_dir().join("metastore")
     }
 
-    async fn configure_remote_fs(&self) {
+    pub async fn configure_remote_fs(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
@@ -941,10 +941,6 @@ impl Config {
         self.injector.clone()
     }
 
-    pub async fn configure_injector(&self) {
-        self.configure_remote_fs().await;
-        self.configure_internal_services().await;
-    }
 
 
     pub async fn configure_internal_services(&self) {
@@ -1175,6 +1171,11 @@ impl Config {
                 })
                 .await;
         }
+    }
+
+    pub async fn configure_injector(&self) {
+        self.configure_remote_fs().await;
+        self.configure_internal_services().await;
     }
 
     pub async fn cube_services(&self) -> CubeServices {
