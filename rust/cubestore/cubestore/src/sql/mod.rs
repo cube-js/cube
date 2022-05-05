@@ -1972,8 +1972,8 @@ mod tests {
                     path
                 };
 
-                services
-                    .remote_fs
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                remote_fs
                     .upload_file(
                         path.to_str().unwrap(),
                         &chunk.get_row().get_full_name(chunk.get_id()),
@@ -2426,8 +2426,8 @@ mod tests {
                 // Wait for GC tasks to drop files
                 Delay::new(Duration::from_millis(3000)).await;
 
-                let files = services
-                    .remote_fs
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                let files = remote_fs
                     .list("")
                     .await
                     .unwrap()
@@ -2757,7 +2757,8 @@ mod tests {
 
                 file.shutdown().await.unwrap();
 
-                services.remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
 
                 vec!["temp://foo-3.csv.gz".to_string()]
             };

@@ -55,7 +55,7 @@ pub struct CubeServices {
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
-    pub remote_fs: Arc<QueueRemoteFs>,
+    //pub remote_fs: Arc<QueueRemoteFs>,
 }
 
 #[derive(Clone)]
@@ -92,7 +92,7 @@ impl CubeServices {
         futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
-        let remote_fs = self.remote_fs.clone();
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
@@ -154,7 +154,8 @@ impl CubeServices {
         #[cfg(not(target_os = "windows"))]
         self.cluster.stop_processing_loops().await?;
 
-        self.remote_fs.stop_processing_loops()?;
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
+        remote_fs.stop_processing_loops()?;
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;
         }
@@ -920,6 +921,15 @@ impl Config {
             }
             FileStoreProvider::Local => unimplemented!(), // TODO
         };
+
+        self.injector
+            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
+                QueueRemoteFs::new(
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                    i.get_service("original_remote_fs").await,
+                )
+            })
+            .await;
     }
 
     async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
@@ -933,16 +943,11 @@ impl Config {
 
     pub async fn configure_injector(&self) {
         self.configure_remote_fs().await;
+        self.configure_internal_services().await;
+    }
 
-        self.injector
-            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
-                QueueRemoteFs::new(
-                    i.get_service_typed::<dyn ConfigObj>().await,
-                    i.get_service("original_remote_fs").await,
-                )
-            })
-            .await;
 
+    pub async fn configure_internal_services(&self) {
         let (event_sender, _) = broadcast::channel(10000); // TODO config
         let event_sender_to_move = event_sender.clone();
 
@@ -1184,7 +1189,7 @@ impl Config {
             },
             meta_store: self.injector.get_service_typed().await,
             cluster: self.injector.get_service_typed().await,
-            remote_fs: self.injector.get_service_typed().await,
+            //remote_fs: self.injector.get_service_typed().await,
         }
     }
 
