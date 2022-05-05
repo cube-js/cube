@@ -14,6 +14,7 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 25    | text                       | pg_catalog         | true       |
 | 26    | oid                        | pg_catalog         | true       |
 | 27    | tid                        | pg_catalog         | true       |
+| 83    | pg_class                   | pg_catalog         | true       |
 | 700   | float4                     | pg_catalog         | true       |
 | 701   | float8                     | pg_catalog         | true       |
 | 790   | money                      | pg_catalog         | true       |

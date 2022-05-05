@@ -62,6 +62,7 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
         session::DatabaseProtocol,
+        statement::CastReplacer,
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -2369,8 +2370,10 @@ pub fn convert_statement_to_cube_query(
     meta: Arc<MetaContext>,
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
+    let stmt = CastReplacer::new().replace(stmt);
+
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(stmt)
+    planner.plan(&stmt)
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -6691,6 +6694,91 @@ mod tests {
                     ON ( d.adrelid = a.attrelid AND d.adnum = a.attnum )
                 JOIN (SELECT 2615 AS oid, 2 AS attnum UNION ALL SELECT 1259, 2 UNION ALL SELECT 2609, 4) vals
                 ON ( c.oid = vals.oid AND a.attnum = vals.attnum );"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tableau_regclass_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "tableau_regclass_query",
+            execute_query(
+                "SELECT NULL          AS TABLE_CAT,
+                n.nspname     AS TABLE_SCHEM,
+                c.relname     AS TABLE_NAME,
+                CASE n.nspname ~ '^pg_'
+                      OR n.nspname = 'information_schema'
+                  WHEN true THEN
+                    CASE
+                      WHEN n.nspname = 'pg_catalog'
+                            OR n.nspname = 'information_schema' THEN
+                        CASE c.relkind
+                          WHEN 'r' THEN 'SYSTEM TABLE'
+                          WHEN 'v' THEN 'SYSTEM VIEW'
+                          WHEN 'i' THEN 'SYSTEM INDEX'
+                          ELSE NULL
+                        end
+                      WHEN n.nspname = 'pg_toast' THEN
+                        CASE c.relkind
+                          WHEN 'r' THEN 'SYSTEM TOAST TABLE'
+                          WHEN 'i' THEN 'SYSTEM TOAST INDEX'
+                          ELSE NULL
+                        end
+                      ELSE
+                        CASE c.relkind
+                          WHEN 'r' THEN 'TEMPORARY TABLE'
+                          WHEN 'p' THEN 'TEMPORARY TABLE'
+                          WHEN 'i' THEN 'TEMPORARY INDEX'
+                          WHEN 'S' THEN 'TEMPORARY SEQUENCE'
+                          WHEN 'v' THEN 'TEMPORARY VIEW'
+                          ELSE NULL
+                        end
+                    end
+                  WHEN false THEN
+                    CASE c.relkind
+                      WHEN 'r' THEN 'TABLE'
+                      WHEN 'p' THEN 'PARTITIONED TABLE'
+                      WHEN 'i' THEN 'INDEX'
+                      WHEN 'P' THEN 'PARTITIONED INDEX'
+                      WHEN 'S' THEN 'SEQUENCE'
+                      WHEN 'v' THEN 'VIEW'
+                      WHEN 'c' THEN 'TYPE'
+                      WHEN 'f' THEN 'FOREIGN TABLE'
+                      WHEN 'm' THEN 'MATERIALIZED VIEW'
+                      ELSE NULL
+                    end
+                  ELSE NULL
+                end           AS TABLE_TYPE,
+                d.description AS REMARKS,
+                ''            AS TYPE_CAT,
+                ''            AS TYPE_SCHEM,
+                ''            AS TYPE_NAME,
+                ''            AS SELF_REFERENCING_COL_NAME,
+                ''            AS REF_GENERATION
+            FROM   pg_catalog.pg_namespace n,
+                pg_catalog.pg_class c
+                LEFT JOIN pg_catalog.pg_description d
+                       ON ( c.oid = d.objoid
+                            AND d.objsubid = 0
+                            AND d.classoid = 'pg_class' :: regclass )
+            WHERE  c.relnamespace = n.oid
+                AND ( false
+                       OR ( c.relkind = 'f' )
+                       OR ( c.relkind = 'm' )
+                       OR ( c.relkind = 'p'
+                            AND n.nspname !~ '^pg_'
+                            AND n.nspname <> 'information_schema' )
+                       OR ( c.relkind = 'r'
+                            AND n.nspname !~ '^pg_'
+                            AND n.nspname <> 'information_schema' )
+                       OR ( c.relkind = 'v'
+                            AND n.nspname <> 'pg_catalog'
+                            AND n.nspname <> 'information_schema' ) );"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
