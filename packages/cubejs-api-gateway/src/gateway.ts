@@ -424,13 +424,13 @@ class ApiGateway {
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
-          measures: cube.measures.filter(visibilityFilter).map((measure) => ({
+          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
             ...transformMeasure(measure, cubeDefinitions),
           })),
-          dimensions: cube.dimensions.filter(visibilityFilter).map((dimension) => ({
+          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
             ...transformDimension(dimension, cubeDefinitions),
           })),
-          segments: cube.segments.map((segment) => ({
+          segments: cube.segments?.map((segment) => ({
             ...transformSegment(segment, cubeDefinitions),
           })),
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),

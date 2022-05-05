@@ -182,12 +182,14 @@ describe('transformMetaExtended helpers', () => {
   });
 
   test('transformJoins', () => {
+    expect(transformJoins(undefined)).toBeUndefined();
     const handledJoins = transformJoins(MOCK_USERS_CUBE.joins);
     expect(handledJoins).toBeDefined();
     expect(handledJoins?.length).toBe(2);
   });
 
   test('transformPreAggregations', () => {
+    expect(transformPreAggregations(undefined)).toBeUndefined();
     const handledPreAggregations = transformPreAggregations(MOCK_USERS_CUBE.preAggregations);
     expect(handledPreAggregations).toBeDefined();
     expect(handledPreAggregations?.length).toBe(2);
