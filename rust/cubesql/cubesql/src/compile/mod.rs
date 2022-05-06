@@ -9,8 +9,8 @@ use datafusion::{
         SessionContext as DFSessionContext,
     },
     logical_plan::{
-        plan::{Extension, Projection},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+        plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
+        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, ToDFSchema,
     },
     prelude::*,
     scalar::ScalarValue,
@@ -1690,7 +1690,15 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
+            (
+                ast::Statement::Explain {
+                    statement,
+                    verbose,
+                    analyze,
+                    ..
+                },
+                _,
+            ) => self.explain_to_plan(&statement, *verbose, *analyze),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -2071,23 +2079,56 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn explain_to_plan(
         &self,
         statement: &Box<ast::Statement>,
+        verbose: bool,
+        analyze: bool,
     ) -> Result<QueryPlan, CompilationError> {
         let plan = self.plan(&statement)?;
 
-        return Ok(QueryPlan::MetaTabular(
-            StatusFlags::empty(),
-            Box::new(dataframe::DataFrame::new(
-                vec![dataframe::Column::new(
-                    "Execution Plan".to_string(),
-                    ColumnType::String,
-                    ColumnFlags::empty(),
-                )],
-                vec![dataframe::Row::new(vec![dataframe::TableValue::String(
-                    plan.print(true)
-                        .map_err(|error| CompilationError::internal(error.message))?,
-                )])],
+        match plan {
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Box::new(dataframe::DataFrame::new(
+                    vec![dataframe::Column::new(
+                        "Execution Plan".to_string(),
+                        ColumnType::String,
+                        ColumnFlags::empty(),
+                    )],
+                    vec![dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "This query doesnt have a plan, because it already has values for response"
+                            .to_string(),
+                    )])],
+                )),
             )),
-        ));
+            QueryPlan::DataFusionSelect(flags, plan, context) => {
+                let plan = Arc::new(plan);
+                let schema = LogicalPlan::explain_schema();
+                let schema = schema.to_dfschema_ref().map_err(|err| {
+                    CompilationError::internal(format!(
+                        "Unable to get DF schema for explain plan: {}",
+                        err
+                    ))
+                })?;
+
+                let explain_plan = if analyze {
+                    LogicalPlan::Analyze(Analyze {
+                        verbose,
+                        input: plan,
+                        schema,
+                    })
+                } else {
+                    let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
+
+                    LogicalPlan::Explain(Explain {
+                        verbose,
+                        plan,
+                        stringified_plans,
+                        schema,
+                    })
+                };
+
+                Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
+            }
+        }
     }
 
     fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
@@ -5762,19 +5803,34 @@ mod tests {
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
-            execute_query("explain select 1+1;".to_string(), DatabaseProtocol::MySQL).await?
+            execute_query("EXPLAIN SELECT 1+1;".to_string(), DatabaseProtocol::MySQL).await?
         );
+
+        insta::assert_snapshot!(
+            execute_query(
+                "EXPLAIN VERBOSE SELECT 1+1;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        // Execute without asserting with fixture, because metrics can change
+        execute_query(
+            "EXPLAIN ANALYZE SELECT 1+1;".to_string(),
+            DatabaseProtocol::MySQL,
+        )
+        .await?;
 
         // SELECT with table and specific columns
         execute_query(
-            "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string(),
+            "EXPLAIN SELECT count, avgPrice FROM KibanaSampleDataEcommerce;".to_string(),
             DatabaseProtocol::MySQL,
         )
         .await?;
 
         // EXPLAIN for Postgres
         execute_query(
-            "explain select 1+1;".to_string(),
+            "EXPLAIN SELECT 1+1;".to_string(),
             DatabaseProtocol::PostgreSQL,
         )
         .await?;
