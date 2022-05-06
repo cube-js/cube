@@ -754,13 +754,11 @@ describe('Refresh Scheduler', () => {
       throwErrors: true
     });
   });
-});
 
-describe('abc', () => {
-  test('rollupJoin', async () => {
+  test('rollupJoin scheduledRefresh', async () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
-      refreshScheduler, mockDriver,
+      refreshScheduler
     } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     const queryIteratorState = {};
