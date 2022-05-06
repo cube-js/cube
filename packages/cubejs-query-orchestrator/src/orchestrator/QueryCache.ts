@@ -231,17 +231,19 @@ export class QueryCache {
             ...q
           });
           return client.query(q.query, q.values, q);
-        }, {
+        },
+        {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          // Centralized continueWaitTimeout that can be overridden in
+          // queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
+          ...(typeof this.options.queueOptions === 'function'
+            ? this.options.queueOptions(dataSource)
+            : this.options.queueOptions
           )
-        }
+        },
       );
     }
     return this.queue[dataSource];
@@ -262,7 +264,8 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          // Centralized continueWaitTimeout that can be overridden in
+          // queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           skipQueue: this.options.skipExternalCacheAndQueue,
           ...this.options.externalQueueOptions
@@ -278,37 +281,40 @@ export class QueryCache {
     executeFn: (client: BaseDriver, q: any) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
-    const queue: any = new QueryQueue(redisPrefix, {
-      getQueueEventsBus: options.getQueueEventsBus,
-      queryHandlers: {
-        query: async (q, setCancelHandle) => {
-          const client = await clientFactory();
-          const resultPromise = executeFn(client, q);
-          let handle;
-          if (resultPromise.cancel) {
-            queue.cancelHandlerCounter += 1;
-            handle = queue.cancelHandlerCounter;
-            queue.handles[handle] = resultPromise;
-            await setCancelHandle(handle);
+    const queue: any = new QueryQueue(
+      redisPrefix,
+      {
+        getQueueEventsBus: options.getQueueEventsBus,
+        queryHandlers: {
+          query: async (q, setCancelHandle) => {
+            const client = await clientFactory();
+            const resultPromise = executeFn(client, q);
+            let handle;
+            if (resultPromise.cancel) {
+              queue.cancelHandlerCounter += 1;
+              handle = queue.cancelHandlerCounter;
+              queue.handles[handle] = resultPromise;
+              await setCancelHandle(handle);
+            }
+            const result = await resultPromise;
+            if (handle) {
+              delete queue.handles[handle];
+            }
+            return result;
           }
-          const result = await resultPromise;
-          if (handle) {
-            delete queue.handles[handle];
+        },
+        cancelHandlers: {
+          query: async (q) => {
+            if (q.cancelHandler && queue.handles[q.cancelHandler]) {
+              await queue.handles[q.cancelHandler].cancel();
+              delete queue.handles[q.cancelHandler];
+            }
           }
-          return result;
-        }
-      },
-      cancelHandlers: {
-        query: async (q) => {
-          if (q.cancelHandler && queue.handles[q.cancelHandler]) {
-            await queue.handles[q.cancelHandler].cancel();
-            delete queue.handles[q.cancelHandler];
-          }
-        }
-      },
-      logger: (msg, params) => options.logger(msg, params),
-      ...options
-    });
+        },
+        logger: (msg, params) => options.logger(msg, params),
+        ...options
+      }
+    );
     queue.cancelHandlerCounter = 0;
     queue.handles = {};
     return queue;

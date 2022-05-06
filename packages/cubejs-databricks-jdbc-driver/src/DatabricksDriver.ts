@@ -96,6 +96,18 @@ export class DatabricksDriver extends JDBCDriver {
    * CUBEJS_SCHEDULED_REFRESH_CONCURRENCY environment variable.
    */
   public static DEFAULT_SCHEDULED_REFRESH_CONCURRENCY = 4;
+
+  /**
+   * Static propery that Handlers/RefreshScheduler uses to calculate
+   * how many queries from the queue every workers will proceed. If
+   * this property is not implemented and queryCacheOptions and/or
+   * preAggregationsOptions concurrency is not setted in cube.js,
+   * only two queries will be proceed by single worker. Otherwise,
+   * specified value will be used by the default, which can be overriden
+   * by the queryCacheOptions and/or preAggregationsOptions concurrency
+   * parameter fron the cube.js
+   */
+  public static DEFAULT_QUERY_CACHE_QUEUE_CONCURRENCY = 4;
   
   protected readonly config: DatabricksDriverConfiguration;
 
