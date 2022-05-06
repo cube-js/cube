@@ -1,19 +1,33 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4455
-expression: "execute_query(\"explain select count, avgPrice from KibanaSampleDataEcommerce;\".to_string()).await?"
-
+assertion_line: 5809
+expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
-+--------------------------------------------------------------------------------------------------------+
-| Execution Plan                                                                                         |
-+--------------------------------------------------------------------------------------------------------+
-| Projection: #KibanaSampleDataEcommerce.count AS count, #KibanaSampleDataEcommerce.avgPrice AS avgPrice |
-|   CubeScan: request={                                                                                  |
-|   "measures": [                                                                                        |
-|     "KibanaSampleDataEcommerce.count",                                                                 |
-|     "KibanaSampleDataEcommerce.avgPrice"                                                               |
-|   ],                                                                                                   |
-|   "dimensions": [],                                                                                    |
-|   "segments": []                                                                                       |
-| }                                                                                                      |
-+--------------------------------------------------------------------------------------------------------+
++-------------------------------------------------------+--------------------------------------+
+| plan_type                                             | plan                                 |
++-------------------------------------------------------+--------------------------------------+
+| initial_logical_plan                                  | Projection: Int64(2)                 |
+|                                                       |   EmptyRelation                      |
+| logical_plan after simplify_expressions               | SAME TEXT AS ABOVE                   |
+| logical_plan after eliminate_filter                   | SAME TEXT AS ABOVE                   |
+| logical_plan after common_sub_expression_eliminate    | SAME TEXT AS ABOVE                   |
+| logical_plan after eliminate_limit                    | SAME TEXT AS ABOVE                   |
+| logical_plan after projection_push_down               | SAME TEXT AS ABOVE                   |
+| logical_plan after filter_push_down                   | SAME TEXT AS ABOVE                   |
+| logical_plan after limit_push_down                    | SAME TEXT AS ABOVE                   |
+| logical_plan after SingleDistinctAggregationToGroupBy | SAME TEXT AS ABOVE                   |
+| logical_plan after ToApproxPerc                       | SAME TEXT AS ABOVE                   |
+| logical_plan                                          | Projection: Int64(2)                 |
+|                                                       |   EmptyRelation                      |
+| initial_physical_plan                                 | ProjectionExec: expr=[2 as Int64(2)] |
+|                                                       |   EmptyExec: produce_one_row=true    |
+|                                                       |                                      |
+| physical_plan after aggregate_statistics              | SAME TEXT AS ABOVE                   |
+| physical_plan after hash_build_probe_order            | SAME TEXT AS ABOVE                   |
+| physical_plan after coalesce_batches                  | SAME TEXT AS ABOVE                   |
+| physical_plan after repartition                       | SAME TEXT AS ABOVE                   |
+| physical_plan after add_merge_exec                    | SAME TEXT AS ABOVE                   |
+| physical_plan                                         | ProjectionExec: expr=[2 as Int64(2)] |
+|                                                       |   EmptyExec: produce_one_row=true    |
+|                                                       |                                      |
++-------------------------------------------------------+--------------------------------------+
