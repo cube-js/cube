@@ -84,19 +84,6 @@ cube('Foo', {
         incremental: true
       }
     },
-    noRefresh: {
-      type: 'rollup',
-      measureReferences: [count],
-      timeDimensionReference: time,
-      granularity: 'hour',
-      partitionGranularity: 'day',
-      scheduledRefresh: false,
-      refreshKey: {
-        every: '1 hour',
-        updateWindow: '1 day',
-        incremental: true
-      }
-    },
   }
 });
 
