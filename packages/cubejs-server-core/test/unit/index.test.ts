@@ -2,8 +2,9 @@
 
 import { withTimeout } from '@cubejs-backend/shared';
 
-import { CreateOptions, CubejsServerCore, ServerCoreInitializedOptions } from '../../src';
+import { CreateOptions, CubejsServerCore, SchemaFileRepository, ServerCoreInitializedOptions } from '../../src';
 import { DatabaseType } from '../../src/core/types';
+import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
@@ -18,6 +19,32 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
   public createOrchestratorApi = super.createOrchestratorApi;
 }
+
+const repositoryWithoutPreAggregations: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+  
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  }
+});
+`,
+    },
+  ]),
+};
 
 describe('index.test', () => {
   beforeEach(() => {
@@ -271,6 +298,30 @@ describe('index.test', () => {
     expect(compilerApi.options.allowNodeRequire).toStrictEqual(false);
 
     await cubejsServerCore.releaseConnections();
+  });
+
+  describe('CompilerApi', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(repositoryWithoutPreAggregations, <any>'mysql', { logger });
+    const metaConfigSpy = jest.spyOn(compilerApi, 'metaConfig');
+    const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
+
+    test('CompilerApi metaConfig', async () => {
+      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      expect(metaConfig?.length).toBeGreaterThan(0);
+      expect(metaConfig[0]).toHaveProperty('config');
+      expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfigExtended', async () => {
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtendedSpy).toHaveBeenCalled();
+      metaConfigExtendedSpy.mockClear();
+    });
   });
 
   test('Should create instance of CubejsServerCore, dbType from process.env.CUBEJS_DB_TYPE', () => {
