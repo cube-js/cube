@@ -84,6 +84,19 @@ cube('Foo', {
         incremental: true
       }
     },
+    noRefresh: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'hour',
+      partitionGranularity: 'day',
+      scheduledRefresh: false,
+      refreshKey: {
+        every: '1 hour',
+        updateWindow: '1 day',
+        incremental: true
+      }
+    },
   }
 });
 
@@ -125,6 +138,89 @@ const repositoryWithPreAggregations: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
     { fileName: 'main.js', content: schemaContent },
+  ]),
+};
+
+const repositoryWithRollupJoin: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    { fileName: 'main.js', content: `
+      cube(\`Users\`, {
+          sql: \`SELECT * FROM public.users\`,
+        
+          preAggregations: {
+            usersRollup: {
+              dimensions: [CUBE.id],
+            },
+          },
+        
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+        
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+            
+            name: {
+              sql: \`name\`,
+              type: \`string\`,
+            },
+          },
+        });
+        
+        cube('Orders', {
+          sql: \`SELECT * FROM orders\`,
+        
+          preAggregations: {
+            ordersRollup: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.userId, CUBE.status],
+            },
+            
+            ordersRollupJoin: {
+              type: \`rollupJoin\`,
+              measures: [CUBE.count],
+              dimensions: [Users.name],
+              rollups: [Users.usersRollup, CUBE.ordersRollup],
+            },
+          },
+        
+          joins: {
+            Users: {
+              relationship: \`belongsTo\`,
+              sql: \`\${CUBE.userId} = \${Users.id}\`,
+            },
+          },
+        
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+        
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            userId: {
+              sql: \`user_id\`,
+              type: \`number\`,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+          },
+        });
+    ` },
   ]),
 };
 
@@ -670,5 +766,27 @@ describe('Refresh Scheduler', () => {
       workerIndices: [0],
       throwErrors: true
     });
+  });
+});
+
+describe('abc', () => {
+  test('rollupJoin', async () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const {
+      refreshScheduler, mockDriver,
+    } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const queryIteratorState = {};
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
+        concurrency: 1,
+        workerIndices: [0],
+        throwErrors: true,
+        queryIteratorState
+      });
+      if (refreshResult.finished) {
+        break;
+      }
+    }
   });
 });

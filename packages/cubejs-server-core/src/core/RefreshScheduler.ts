@@ -177,10 +177,9 @@ export class RefreshScheduler {
           securityContext: context.securityContext,
           requestId: context.requestId
         });
-      }
-
-      if (options.throwErrors) {
-        throw e;
+        if (options.throwErrors) {
+          throw e;
+        }
       }
     }
     return { finished: false };
@@ -248,9 +247,7 @@ export class RefreshScheduler {
       const { timezones } = queryingOptions;
       const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
-      const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
-
-      const queriesForPreAggregation: RefreshQueries[] = !isRollupJoin && (await Promise.all(
+      const queriesForPreAggregation: RefreshQueries[] = await Promise.all(
         timezones.map(async timezone => this.refreshQueriesForPreAggregation(
           context,
           compilerApi,
@@ -267,7 +264,7 @@ export class RefreshScheduler {
             }
           }
         ))
-      )) || [];
+      );
 
       const partitionsWithDependencies = queriesForPreAggregation
         .map(query => {
