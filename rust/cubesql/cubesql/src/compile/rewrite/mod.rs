@@ -197,7 +197,7 @@ crate::plan_to_language! {
         WildcardExpr {},
         GetIndexedFieldExpr {
             expr: Box<Expr>,
-            key: ScalarValue,
+            key: Box<Expr>,
         },
 
         CubeScan {
