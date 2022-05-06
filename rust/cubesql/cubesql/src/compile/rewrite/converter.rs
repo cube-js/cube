@@ -1266,6 +1266,16 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
+                        if query_measures.len() == 0
+                            && query_dimensions.len() == 0
+                            && query_time_dimensions.len() == 0
+                        {
+                            return Err(CubeError::internal(
+                                "Can't detect Cube query and it may be not supported yet"
+                                    .to_string(),
+                            ));
+                        }
+
                         query.measures = Some(query_measures.into_iter().unique().collect());
                         query.dimensions = Some(query_dimensions.into_iter().unique().collect());
                         query.time_dimensions = if query_time_dimensions.len() > 0 {

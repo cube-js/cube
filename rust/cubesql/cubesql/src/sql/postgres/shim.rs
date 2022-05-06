@@ -554,7 +554,11 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
+            let result = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone());
+            if let Err(_) = &result {
+                log::error!("Failed SQL: {}", parse.query);
+            }
+            let plan = result?;
             let fields: Vec<protocol::RowDescriptionField> =
                 self.query_plan_to_row_description(&plan).await?;
             let description = if fields.len() > 0 {
@@ -615,6 +619,7 @@ impl AsyncPostgresShim {
         debug!("Query: {}", query);
 
         if let Err(err) = self.execute_query(&query).await {
+            log::error!("Failed SQL: {}", query);
             self.handle_connection_error(err).await?;
         };
 

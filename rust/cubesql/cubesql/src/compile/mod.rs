@@ -70,7 +70,7 @@ use crate::{
         df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
         V1CubeMetaSegmentExt,
     },
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 
 pub mod builder;
@@ -2336,7 +2336,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
 
         let plan = df_query_planner
-            .statement_to_plan(DFStatement::Statement(Box::new(stmt)))
+            .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
                 CompilationError::internal(format!("Initial planning error: {}", err))
             })?;
@@ -2349,11 +2349,23 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
         let root = converter
             .add_logical_plan(&optimized_plan)
-            .map_err(|e| CompilationError::User(e.to_string()))?;
-        let rewrite_plan = converter
+            .map_err(|e| CompilationError::internal(e.to_string()))?;
+        let result = converter
             .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
-            .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
+            .map_err(|e| match &e.cause {
+                CubeErrorCauseType::Internal => CompilationError::internal(format!(
+                    "Error during rewrite: {}. Please check logs for additional information.",
+                    e.message
+                )),
+                CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
+            });
+        if let Err(_) = &result {
+            log::debug!("Can't rewrite AST: {:#?}", stmt);
+            log::error!("Can't rewrite plan: {:#?}", optimized_plan);
+            log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.")
+        }
+        let rewrite_plan = result?;
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
 
