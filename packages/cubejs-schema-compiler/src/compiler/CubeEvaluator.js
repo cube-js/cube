@@ -148,9 +148,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   scheduledPreAggregations() {
-    return this.preAggregations({
-      scheduled: true
-    });
+    return this.preAggregations({ scheduled: true });
   }
 
   cubeNames() {
