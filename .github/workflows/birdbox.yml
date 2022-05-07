@@ -15,11 +15,6 @@ on:
       - '.github/workflows/birdbox.yml'
     branches:
       - 'master'
-  # TODO: REMOVEME. Temporary, to validate CI.
-  pull_request:
-    paths:
-      - 'packages/cubejs-testing/**'
-
 
 jobs:
   cli:

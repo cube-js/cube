@@ -455,7 +455,7 @@ export async function startBirdBoxFromCli(
     }
     await pausePromise(10 * 1000);
   } catch (e) {
-    process.stdout.write(`Error spawning cube: ${e}`);
+    process.stdout.write(`Error spawning cube: ${e}\n`);
     // @ts-ignore
     db.stop();
   }
