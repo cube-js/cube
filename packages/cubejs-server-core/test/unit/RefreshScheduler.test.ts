@@ -761,17 +761,19 @@ describe('Refresh Scheduler', () => {
       refreshScheduler
     } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
-    const queryIteratorState = {};
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 1,
         workerIndices: [0],
-        throwErrors: true,
-        queryIteratorState
       });
       if (refreshResult.finished) {
         break;
       }
     }
+    await refreshScheduler.runScheduledRefresh(ctx, {
+      concurrency: 1,
+      workerIndices: [0],
+      throwErrors: true
+    });
   });
 });

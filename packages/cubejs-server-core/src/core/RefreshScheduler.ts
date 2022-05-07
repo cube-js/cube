@@ -239,7 +239,7 @@ export class RefreshScheduler {
       return obj;
     }, {});
 
-    const preAggregations = await compilerApi.scheduledPreAggregations({
+    const preAggregations = await compilerApi.preAggregations({
       preAggregationIds: Object.keys(preAggregationsQueryingOptions)
     });
 

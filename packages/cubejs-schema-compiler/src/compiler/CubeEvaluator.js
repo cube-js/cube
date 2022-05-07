@@ -147,9 +147,8 @@ export class CubeEvaluator extends CubeSymbols {
       .reduce((a, b) => a.concat(b), []);
   }
 
-  scheduledPreAggregations(filter) {
+  scheduledPreAggregations() {
     return this.preAggregations({
-      ...filter,
       scheduled: true
     });
   }
