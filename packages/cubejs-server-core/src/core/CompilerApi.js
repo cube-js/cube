@@ -141,9 +141,9 @@ export class CompilerApi {
     return cubeEvaluator.preAggregations(filter);
   }
 
-  async scheduledPreAggregations() {
+  async scheduledPreAggregations(filter) {
     const { cubeEvaluator } = await this.getCompilers();
-    return cubeEvaluator.scheduledPreAggregations();
+    return cubeEvaluator.scheduledPreAggregations(filter);
   }
 
   createQueryByDataSource(compilers, query, dataSource) {

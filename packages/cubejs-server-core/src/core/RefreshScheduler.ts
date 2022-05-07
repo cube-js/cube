@@ -129,7 +129,7 @@ export class RefreshScheduler {
       };
     } else {
       throw new Error(
-        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName}`
+        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName} ${JSON.stringify(preAggregation)}`
       );
     }
   }
@@ -239,7 +239,7 @@ export class RefreshScheduler {
       return obj;
     }, {});
 
-    const preAggregations = await compilerApi.preAggregations({
+    const preAggregations = await compilerApi.scheduledPreAggregations({
       preAggregationIds: Object.keys(preAggregationsQueryingOptions)
     });
 
