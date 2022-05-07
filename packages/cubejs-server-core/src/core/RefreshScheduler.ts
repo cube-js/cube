@@ -129,7 +129,7 @@ export class RefreshScheduler {
       };
     } else {
       throw new Error(
-        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName} ${JSON.stringify(preAggregation)}`
+        `Scheduled refresh is unsupported for ${preAggregation.preAggregation.type} of ${preAggregation.preAggregationName}`
       );
     }
   }
@@ -178,6 +178,7 @@ export class RefreshScheduler {
           requestId: context.requestId
         });
       }
+
       if (options.throwErrors) {
         throw e;
       }
@@ -247,7 +248,9 @@ export class RefreshScheduler {
       const { timezones } = queryingOptions;
       const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
-      const queriesForPreAggregation: RefreshQueries[] = await Promise.all(
+      const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
+
+      const queriesForPreAggregation: RefreshQueries[] = !isRollupJoin && (await Promise.all(
         timezones.map(async timezone => this.refreshQueriesForPreAggregation(
           context,
           compilerApi,
@@ -264,7 +267,7 @@ export class RefreshScheduler {
             }
           }
         ))
-      );
+      )) || [];
 
       const partitionsWithDependencies = queriesForPreAggregation
         .map(query => {
