@@ -177,9 +177,9 @@ export class RefreshScheduler {
           securityContext: context.securityContext,
           requestId: context.requestId
         });
-        if (options.throwErrors) {
-          throw e;
-        }
+      }
+      if (options.throwErrors) {
+        throw e;
       }
     }
     return { finished: false };
