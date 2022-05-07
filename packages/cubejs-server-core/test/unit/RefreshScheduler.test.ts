@@ -762,18 +762,21 @@ describe('Refresh Scheduler', () => {
     } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
-        concurrency: 1,
-        workerIndices: [0],
-      });
-      if (refreshResult.finished) {
+      try {
+        const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          throwErrors: true,
+        });
         break;
+      } catch (e) {
+        if (e.error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
       }
     }
-    await refreshScheduler.runScheduledRefresh(ctx, {
-      concurrency: 1,
-      workerIndices: [0],
-      throwErrors: true
-    });
   });
 });
