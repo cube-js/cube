@@ -28,7 +28,7 @@
     "gatsby-transformer-sharp": "^2.2.19",
     "gatsby-plugin-snowplow-tracker": "^1.0.1",
     "guides-base": "file:../guides-base",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.21",
     "moment": "^2.24.0",
     "prismjs": "^1.16.0",
     "react": "^16.10.1",
