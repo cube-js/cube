@@ -46,6 +46,11 @@ cube('Bar', {
   ]),
 };
 
+const repositoryWithoutContent: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
+};
+
 describe('index.test', () => {
   beforeEach(() => {
     delete process.env.CUBEJS_EXT_DB_TYPE;
@@ -318,7 +323,32 @@ describe('index.test', () => {
     test('CompilerApi metaConfigExtended', async () => {
       const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtendedSpy).toHaveBeenCalled();
+      metaConfigExtendedSpy.mockClear();
+    });
+  });
+
+  describe('CompilerApi with empty cube on input', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(repositoryWithoutContent, <any>'mysql', { logger });
+    const metaConfigSpy = jest.spyOn(compilerApi, 'metaConfig');
+    const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
+
+    test('CompilerApi metaConfig', async () => {
+      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      expect(metaConfig).toEqual([]);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfigExtended', async () => {
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended.metaConfig).toEqual([]);
+      expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtended.cubeDefinitions).toEqual({});
       expect(metaConfigExtendedSpy).toHaveBeenCalled();
       metaConfigExtendedSpy.mockClear();
     });
