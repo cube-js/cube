@@ -128,12 +128,13 @@ databases [in this guide][link-connecting-to-db].
 ## Export Bucket
 
 | Environment variable                 | Description                                                                                  | Possible Values                                                  |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+|--------------------------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------|
 | `CUBEJS_DB_EXPORT_BUCKET`            | The name of a bucket in cloud storage                                                        | `exports-20210505`                                               |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE`       | The cloud provider where the bucket is hosted                                                | `gcp`, `s3`                                                      |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`    | The AWS Access Key ID to use for the export bucket                                           | A valid AWS Access Key ID                                        |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET` | The AWS Secret Access Key to use for the export bucket                                       | A valid AWS Secret Access Key                                    |
 | `CUBEJS_DB_EXPORT_BUCKET_AWS_REGION` | The AWS region of the export bucket                                                          | [A valid AWS region][link-aws-regions]                           |
+| `CUBEJS_DB_REDSHIFT_UNLOAD_ARN`      | ARN of iam_role with permission to write to the provided `bucket`                            | A valid ARN to an IAM Role associated to the target Redshift DB  |
 | `CUBEJS_DB_EXPORT_GCS_CREDENTIALS`   | A Base64 encoded JSON key file for connecting to Google Cloud                                | A valid Google Cloud JSON key file encoded as a Base64 string    |
 | `CUBEJS_DB_EXPORT_INTEGRATION`       | The name of the integration used in the database. Only required when using Snowflake and GCS | A valid string matching the name of the integration in Snowflake |
 
