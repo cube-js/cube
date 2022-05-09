@@ -1427,6 +1427,12 @@ impl QueryPlanner {
             }
         };
 
+        if select.into.is_some() {
+            return Err(CompilationError::Unsupported(
+                "Unsupported query type: SELECT INTO".to_string(),
+            ));
+        }
+
         let from_table = if select.from.len() == 1 {
             &select.from[0]
         } else {
@@ -2365,6 +2371,18 @@ WHERE `TABLE_SCHEMA` = '{}'",
     }
 
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+        match &stmt {
+            ast::Statement::Query(query) => match &query.body {
+                ast::SetExpr::Select(select) if select.into.is_some() => {
+                    return Err(CompilationError::Unsupported(
+                        "Unsupported query type: SELECT INTO".to_string(),
+                    ))
+                }
+                _ => (),
+            },
+            _ => (),
+        }
+
         let ctx = self.create_execution_ctx();
 
         let df_state = Arc::new(ctx.state.write().clone());
@@ -6853,5 +6871,40 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn tableau_temporary_tables() {
+        let create_query = convert_sql_to_cube_query(
+            &"
+            CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (
+                \"COL\" INTEGER
+            ) ON COMMIT PRESERVE ROWS
+            ".to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL),
+        );
+        match create_query {
+            Err(CompilationError::Unsupported(msg)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
+        };
+
+        let select_into_query = convert_sql_to_cube_query(
+            &"
+            SELECT *
+            INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\"
+            FROM (SELECT 1 AS COL) AS CHECKTEMP
+            LIMIT 1
+            "
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL),
+        );
+        match select_into_query {
+            Err(CompilationError::Unsupported(msg)) => {
+                assert_eq!(msg, "Unsupported query type: SELECT INTO")
+            }
+            _ => panic!("SELECT INTO should throw CompilationError::Unsupported"),
+        }
     }
 }
