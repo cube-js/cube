@@ -5,12 +5,22 @@ import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 
-interface RedshiftDriverExportAWS {
+interface RedshiftDriverExportRequiredAWS {
   bucketType: 's3',
   bucketName: string,
-  keyId: string,
-  secretKey: string,
   region: string,
+}
+
+interface RedshiftDriverExportArnAWS extends RedshiftDriverExportRequiredAWS{
+  unloadArn?: string,
+}
+
+interface RedshiftDriverExportKeySecretAWS extends RedshiftDriverExportRequiredAWS{
+  keyId?: string,
+  secretKey?: string,
+}
+
+interface RedshiftDriverExportAWS extends RedshiftDriverExportArnAWS, RedshiftDriverExportKeySecretAWS {
 }
 
 export interface RedshiftDriverConfiguration extends PostgresDriverConfiguration {
@@ -31,31 +41,49 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   }
 
   protected getExportBucket(): RedshiftDriverExportAWS | undefined {
-    const exportBucket: Partial<RedshiftDriverExportAWS> = {
+    const supportedBucketTypes = ['s3'];
+
+    const requiredExportBucket: Partial<RedshiftDriverExportRequiredAWS> = {
       bucketType: getEnv('dbExportBucketType', {
-        supported: ['s3']
+        supported: supportedBucketTypes
       }),
       bucketName: getEnv('dbExportBucket'),
-      keyId: getEnv('dbExportBucketAwsKey'),
-      secretKey: getEnv('dbExportBucketAwsSecret'),
       region: getEnv('dbExportBucketAwsRegion'),
     };
 
-    if (exportBucket.bucketType) {
-      const supportedBucketTypes = ['s3'];
+    const exportBucket: Partial<RedshiftDriverExportAWS> = {
+      ...requiredExportBucket,
+      keyId: getEnv('dbExportBucketAwsKey'),
+      secretKey: getEnv('dbExportBucketAwsSecret'),
+      unloadArn: getEnv('redshiftBucketUnloadArn')
+    };
 
+    if (exportBucket.bucketType) {
       if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
         throw new Error(
           `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
         );
       }
 
-      const emptyKeys = Object.keys(exportBucket)
-        .filter((key: string) => exportBucket[<keyof RedshiftDriverExportAWS>key] === undefined);
-      if (emptyKeys.length) {
+      // Make sure the required keys are set
+      const emptyRequiredKeys = Object.keys(requiredExportBucket)
+        .filter((key: string) => requiredExportBucket[<keyof RedshiftDriverExportRequiredAWS>key] === undefined);
+      if (emptyRequiredKeys.length) {
         throw new Error(
-          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyKeys.join(',')}`
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyRequiredKeys.join(',')}`
         );
+      }
+      // If unload ARN is not set, secret and key id must be set for Redshift
+      if (!exportBucket.unloadArn) {
+        // Make sure the required keys are set
+        const emptySecretKeys = Object.keys(exportBucket)
+          .filter((key: string) => key === 'unloadArn')
+          .filter((key: string) => exportBucket[<keyof RedshiftDriverExportAWS>key] === undefined);
+        if (emptySecretKeys.length) {
+          throw new Error(
+            `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyRequiredKeys.join(',')}`
+          );
+        }
       }
 
       return <RedshiftDriverExportAWS>exportBucket;
@@ -81,7 +109,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       throw new Error('Unload is not configured');
     }
 
-    const { bucketType, bucketName, keyId, secretKey, region } = this.config.exportBucket;
+    const { bucketType, bucketName, region, unloadArn, keyId, secretKey } = this.config.exportBucket;
 
     const conn = await this.pool.connect();
 
@@ -122,13 +150,16 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         }
       });
 
+      const baseQuery = `UNLOAD ('SELECT * FROM ${table}') TO '${bucketType}://${bucketName}/${exportPathName}/'`;
+      const credentialQuery = unloadArn ?
+        `iam_role '${unloadArn}'` : `CREDENTIALS 'aws_access_key_id=${keyId};aws_secret_access_key=${secretKey}'`;
+      const unloadQuery = `${baseQuery} ${credentialQuery} ${optionsPart}`;
+
       // Unable to extract number of extracted rows, because it's done in protocol notice
       await conn.query({
-        text: (
-          `UNLOAD ('SELECT * FROM ${table}') TO '${bucketType}://${bucketName}/${exportPathName}/' ` +
-          `CREDENTIALS 'aws_access_key_id=${keyId};aws_secret_access_key=${secretKey}' ${optionsPart}`
-        ),
+        text: unloadQuery,
       });
+
       if (unloadTotalRows === 0) {
         return {
           csvFile: [],
@@ -136,10 +167,10 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       }
 
       const client = new S3({
-        credentials: {
+        credentials: (keyId && secretKey) ? {
           accessKeyId: keyId,
           secretAccessKey: secretKey,
-        },
+        } : undefined,
         region,
       });
       const list = await client.listObjectsV2({
