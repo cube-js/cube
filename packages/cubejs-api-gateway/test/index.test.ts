@@ -339,6 +339,30 @@ describe('API Gateway', () => {
     expect(res.body.query.measures).toStrictEqual(['Foo.bar']);
   });
 
+  test('meta endpoint to get schema information', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+  });
+
+  test('meta endpoint extended to get schema information with additional data', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+  });
+
   describe('multi query support', () => {
     const searchParams = new URLSearchParams({
       query: JSON.stringify({
