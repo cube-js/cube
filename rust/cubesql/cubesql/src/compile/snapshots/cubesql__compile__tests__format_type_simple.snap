@@ -1,9 +1,0 @@
----
-source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT format_type(19, NULL);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
----
-+-----------------------------------+
-| format_type(Int64(19),Utf8(NULL)) |
-+-----------------------------------+
-| name                              |
-+-----------------------------------+

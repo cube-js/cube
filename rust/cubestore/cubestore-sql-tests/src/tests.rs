@@ -4752,7 +4752,7 @@ async fn panic_worker(service: Box<dyn SqlClient>) {
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
-fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
         .iter()

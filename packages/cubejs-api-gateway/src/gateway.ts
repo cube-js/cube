@@ -69,6 +69,14 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
+import {
+  transformCube,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
+  transformJoins,
+  transformPreAggregations,
+} from './helpers/transformMetaExtended';
 
 /**
  * API gateway server class.
@@ -215,10 +223,17 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      await this.meta({
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
+      if (req.query.hasOwnProperty('extended')) {
+        await this.metaExtended({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      } else {
+        await this.meta({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
@@ -380,6 +395,46 @@ class ApiGateway {
           ...cube,
           measures: cube.measures.filter(visibilityFilter),
           dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
+    try {
+      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
+        requestId: context.requestId,
+      });
+      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...transformCube(cube, cubeDefinitions),
+          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
+            ...transformMeasure(measure, cubeDefinitions),
+          })),
+          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
+            ...transformDimension(dimension, cubeDefinitions),
+          })),
+          segments: cube.segments?.map((segment) => ({
+            ...transformSegment(segment, cubeDefinitions),
+          })),
+          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {
@@ -738,14 +793,14 @@ class ApiGateway {
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
-  
+
           this.log({
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
             query: normalizedQueries[index],
             sqlQuery
           }, context);
-  
+
           return sqlQuery;
         }
       )
@@ -816,16 +871,16 @@ class ApiGateway {
     sqlQuery: any,
     annotation: {
       measures: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       dimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       segments: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       timeDimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
     },
     response: any,
@@ -848,7 +903,7 @@ class ApiGateway {
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
-        context.signedWithPlaygroundAuthSecret
+          context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
@@ -962,8 +1017,7 @@ class ApiGateway {
         props.queryType == null
       ) {
         throw new UserError(
-          `'${
-            queryType
+          `'${queryType
           }' query type is not supported by the client.` +
           'Please update the client.'
         );

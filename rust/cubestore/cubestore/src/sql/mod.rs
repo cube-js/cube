@@ -68,6 +68,7 @@ use crate::{
 };
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use std::mem::take;
 
 pub mod cache;
@@ -513,6 +514,7 @@ impl SqlServiceImpl {
             vec![Row::new(vec![TableValue::String(dump_dir)])],
         )))
     }
+
     async fn explain(
         &self,
         statement: Statement,
@@ -541,7 +543,11 @@ impl SqlServiceImpl {
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
                 let res = if !analyze {
-                    let logical_plan = serialized.logical_plan(HashMap::new(), HashMap::new())?;
+                    let logical_plan = serialized.logical_plan(
+                        HashMap::new(),
+                        HashMap::new(),
+                        NoopParquetMetadataCache::new(),
+                    )?;
 
                     DataFrame::new(
                         vec![Column::new(
