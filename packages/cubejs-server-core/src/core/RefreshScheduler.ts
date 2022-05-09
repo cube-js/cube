@@ -142,28 +142,13 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
-    // @ts-ignore
-    const opts = this.serverCore.options;
-    let concurrency = 1;
-    if (opts.dbType) {
-      const Driver = opts.driverFactory({
-        // @ts-ignore
-        dbType: opts.dbType
-      }).constructor;
-      // @ts-ignore
-      if (Driver.DEFAULT_SCHEDULED_REFRESH_CONCURRENCY) {
-        // @ts-ignore
-        concurrency = Driver.DEFAULT_SCHEDULED_REFRESH_CONCURRENCY;
-      }
-    }
-
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
-      concurrency: options.concurrency || concurrency,
+      concurrency: options.concurrency || 1,
       workerIndices:
         options.workerIndices ||
-        R.range(0, options.concurrency || concurrency),
+        R.range(0, options.concurrency || 1),
       contextSymbols: {
         securityContext: context.securityContext,
       },

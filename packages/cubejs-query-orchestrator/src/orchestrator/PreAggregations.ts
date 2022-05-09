@@ -12,13 +12,16 @@ import {
   BUILD_RANGE_END_LOCAL,
   utcToLocalTimeZone
 } from '@cubejs-backend/shared';
-
+import {
+  DriverFactory,
+  DriverFactoryByDataSource,
+  getConcurrencyFn,
+} from './DriverFactory';
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
-import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { BaseDriver, DownloadTableData, StreamOptions, UnloadOptions } from '../driver';
 import { QueryQueue } from './QueryQueue';
@@ -1395,7 +1398,9 @@ export class PreAggregations {
 
   private cacheDriver: CacheDriverInterface;
 
-  public externalDriverFactory: any;
+  public externalDriverFactory: DriverFactory;
+
+  public getExternalConcurrency: getConcurrencyFn;
 
   public structureVersionPersistTime: any;
 
@@ -1412,9 +1417,10 @@ export class PreAggregations {
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactoryByDataSource,
+    protected readonly getConcurrency: getConcurrencyFn,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
-    options
+    options,
   ) {
     this.options = options || {};
 
@@ -1423,6 +1429,7 @@ export class PreAggregations {
       new LocalCacheDriver();
 
     this.externalDriverFactory = options.externalDriverFactory;
+    this.getExternalConcurrency = options.getExternalConcurrency;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
@@ -1585,6 +1592,7 @@ export class PreAggregations {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
+        () => this.getConcurrency(dataSource),
         (client, q) => {
           const {
             preAggregation,
@@ -1641,6 +1649,7 @@ export class PreAggregations {
         `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => <BaseDriver> {},
+        () => this.getConcurrency(dataSource),
         (_, q) => {
           const {
             preAggregation,

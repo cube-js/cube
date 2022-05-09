@@ -13,9 +13,17 @@ import {
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
-import type { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import type {
+  BaseDriver,
+  DriverFactoryByDataSource,
+  getConcurrencyFn,
+} from '@cubejs-backend/query-orchestrator';
 import type { Constructor, Required } from '@cubejs-backend/shared';
-import type { CubeStoreDevDriver, CubeStoreHandler, isCubeStoreSupported } from '@cubejs-backend/cubestore-driver';
+import type {
+  CubeStoreDevDriver,
+  CubeStoreHandler,
+  isCubeStoreSupported,
+} from '@cubejs-backend/cubestore-driver';
 
 import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
@@ -39,7 +47,7 @@ import type {
   RequestContext,
   DriverContext,
   LoggerFn,
-  SystemOptions
+  SystemOptions,
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
@@ -50,7 +58,7 @@ export type ServerCoreInitializedOptions = Required<
   // This fields are required, because we add default values in constructor
   'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'dashboardAppPath' | 'dashboardAppPort' |
   'driverFactory' | 'dialectFactory' |
-  'externalDriverFactory' | 'externalDialectFactory' |
+  'externalDriverFactory' | 'externalDialectFactory' | 'getExternalConcurrency' |
   'scheduledRefreshContexts'
 >;
 
@@ -184,7 +192,9 @@ export class CubejsServerCore {
           coreServerVersion: this.coreServerVersion,
           dockerVersion: getEnv('dockerImageVersion'),
           isDocker: isDocker(),
-          internalExceptions: internalExceptionsEnv !== 'false' ? internalExceptionsEnv : undefined,
+          internalExceptions: internalExceptionsEnv !== 'false'
+            ? internalExceptionsEnv
+            : undefined,
           ...props
         });
       } catch (e) {
@@ -299,6 +309,27 @@ export class CubejsServerCore {
   // eslint-disable-next-line import/no-extraneous-dependencies
   private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
+  /**
+   * Calculate concurrency parameters based on driver's `concurrency`.
+   */
+  private calcConcurrency(val?: number) {
+    return {
+      poolSize: val || 10,
+      workersNumber: val || 10,
+      queriesNumber: val || 10,
+    };
+  }
+
+  // public getConcurrency(context: RequestContext) {
+  //   const dbType = this.contextToDbType(context);
+  //   const Driver =
+  //     CubejsServerCore.lookupDriverClass(dbType);
+  //   const concurrency = Driver.concurrency
+  //     ? Driver.concurrency()
+  //     : undefined;
+  //   return this.calcConcurrency(concurrency);
+  // }
+
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [
       // Default EXT_DB variables
@@ -334,9 +365,20 @@ export class CubejsServerCore {
       })
     );
 
-    let externalDialectFactory = () => typeof externalDbType === 'string' &&
-      CubejsServerCore.lookupDriverClass(externalDbType).dialectClass &&
-      CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
+    let externalDialectFactory = () => typeof externalDbType === 'string'
+      && CubejsServerCore.lookupDriverClass(externalDbType).dialectClass
+      && CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
+
+    const getExternalConcurrency: getConcurrencyFn = externalDbType && (
+      () => {
+        const Driver =
+          CubejsServerCore.lookupDriverClass(externalDbType);
+        const concurrency = Driver.concurrency
+          ? Driver.concurrency()
+          : undefined;
+        return this.calcConcurrency(concurrency);
+      }
+    );
 
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
@@ -407,10 +449,12 @@ export class CubejsServerCore {
           `Unexpected return type, dbType must return string (dataSource: "${ctx.dataSource}"), actual: ${getRealType(dbType)}`
         );
       },
-      dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
+      dialectFactory:
+        (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
         CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
       externalDriverFactory,
       externalDialectFactory,
+      getExternalConcurrency,
       apiSecret: process.env.CUBEJS_API_SECRET,
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
@@ -695,42 +739,54 @@ export class CubejsServerCore {
           }
         })();
       },
+      (dataSource = 'default') => {
+        const dbType = this.contextToDbType({ ...context, dataSource });
+        const Driver =
+          CubejsServerCore.lookupDriverClass(dbType);
+        const concurrency = Driver.concurrency
+          ? Driver.concurrency()
+          : undefined;
+        return this.calcConcurrency(concurrency);
+      },
       {
-        externalDriverFactory: this.options.externalDriverFactory && (async () => {
-          if (externalPreAggregationsDriverPromise) {
-            return externalPreAggregationsDriverPromise;
-          }
+        externalDriverFactory:
+          this.options.externalDriverFactory &&
+          (async () => {
+            if (externalPreAggregationsDriverPromise) {
+              return externalPreAggregationsDriverPromise;
+            }
 
-          // eslint-disable-next-line no-return-assign
-          return externalPreAggregationsDriverPromise = (async () => {
-            let driver: BaseDriver | null = null;
+            // eslint-disable-next-line no-return-assign
+            return externalPreAggregationsDriverPromise = (async () => {
+              let driver: BaseDriver | null = null;
 
-            try {
-              driver = await this.options.externalDriverFactory(context);
-              if (typeof driver === 'object' && driver != null) {
-                if (driver.setLogger) {
-                  driver.setLogger(this.logger);
+              try {
+                driver = await this.options.externalDriverFactory(context);
+                if (typeof driver === 'object' && driver != null) {
+                  if (driver.setLogger) {
+                    driver.setLogger(this.logger);
+                  }
+
+                  await driver.testConnection();
+
+                  return driver;
                 }
 
-                await driver.testConnection();
+                throw new Error(
+                  `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
+                );
+              } catch (e) {
+                externalPreAggregationsDriverPromise = null;
 
-                return driver;
+                if (driver) {
+                  await driver.release();
+                }
+
+                throw e;
               }
-
-              throw new Error(
-                `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
-              );
-            } catch (e) {
-              externalPreAggregationsDriverPromise = null;
-
-              if (driver) {
-                await driver.release();
-              }
-
-              throw e;
-            }
-          })();
-        }),
+            })();
+          }),
+        getExternalConcurrency: this.options.getExternalConcurrency,
         contextToDbType: this.contextToDbType.bind(this),
         contextToExternalDbType: this.contextToExternalDbType.bind(this),
         redisPrefix: orchestratorId,
@@ -774,12 +830,14 @@ export class CubejsServerCore {
 
   protected createOrchestratorApi(
     getDriver: DriverFactoryByDataSource,
+    getConcurrency: getConcurrencyFn,
     options: OrchestratorApiOptions
   ): OrchestratorApi {
     return new OrchestratorApi(
       getDriver,
+      getConcurrency,
       this.logger,
-      options
+      options,
     );
   }
 
@@ -867,7 +925,10 @@ export class CubejsServerCore {
     return new (CubejsServerCore.lookupDriverClass(dbType))();
   }
 
-  protected static lookupDriverClass(dbType): Constructor<BaseDriver> & { dialectClass?: () => any; } {
+  protected static lookupDriverClass(dbType): Constructor<BaseDriver> & {
+    dialectClass?: () => any;
+    concurrency?: () => number;
+  } {
     // eslint-disable-next-line global-require,import/no-dynamic-require
     const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));
     if (module.default) {

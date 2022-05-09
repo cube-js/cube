@@ -7,9 +7,14 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
-import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
+import {
+  DriverFactory,
+  DriverFactoryByDataSource,
+  getConcurrencyFn,
+  concurrencyFactoryFn,
+} from './DriverFactory';
 
 type QueryOptions = {
   external?: boolean;
@@ -47,11 +52,13 @@ export class QueryCache {
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
+    protected readonly getConcurrency: getConcurrencyFn,
     protected readonly logger: any,
     public readonly options: {
       refreshKeyRenewalThreshold?: number;
       externalQueueOptions?: any;
       externalDriverFactory?: DriverFactory;
+      getExternalConcurrency?: getConcurrencyFn;
       backgroundRenew?: Boolean;
       queueOptions?: object | ((dataSource: String) => object);
       redisPool?: any;
@@ -226,6 +233,7 @@ export class QueryCache {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
+        () => this.getConcurrency(dataSource),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -236,8 +244,7 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          // Centralized continueWaitTimeout that can be overridden in
-          // queueOptions
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           ...(typeof this.options.queueOptions === 'function'
             ? this.options.queueOptions(dataSource)
@@ -254,6 +261,7 @@ export class QueryCache {
       this.externalQueue = QueryCache.createQueue(
         `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.options.externalDriverFactory,
+        this.options.getExternalConcurrency,
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -264,8 +272,7 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
-          // Centralized continueWaitTimeout that can be overridden in
-          // queueOptions
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           skipQueue: this.options.skipExternalCacheAndQueue,
           ...this.options.externalQueueOptions
@@ -278,12 +285,14 @@ export class QueryCache {
   public static createQueue(
     redisPrefix: string,
     clientFactory: DriverFactory,
+    concurrencyFactory: concurrencyFactoryFn,
     executeFn: (client: BaseDriver, q: any) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
     const queue: any = new QueryQueue(
       redisPrefix,
       {
+        concurrencyFactory,
         getQueueEventsBus: options.getQueueEventsBus,
         queryHandlers: {
           query: async (q, setCancelHandle) => {

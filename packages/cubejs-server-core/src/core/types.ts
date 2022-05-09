@@ -7,7 +7,12 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
+import {
+  BaseDriver,
+  RedisPoolOptions,
+  CacheAndQueryDriverType,
+  getConcurrencyFn,
+} from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import type { SchemaFileRepository } from './FileRepository';
 
@@ -110,6 +115,7 @@ export interface CreateOptions {
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;
   externalDialectFactory?: ExternalDialectFactoryFn;
+  getExternalConcurrency?: getConcurrencyFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;

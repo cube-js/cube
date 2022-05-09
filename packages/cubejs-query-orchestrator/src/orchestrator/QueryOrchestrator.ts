@@ -1,10 +1,18 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
-import { QueryCache } from './QueryCache';
-import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
+import {
+  PreAggregations,
+  PreAggregationDescription,
+  getLastUpdatedAtTimestamp,
+} from './PreAggregations';
+import {
+  DriverFactory,
+  DriverFactoryByDataSource,
+  getConcurrencyFn,
+} from './DriverFactory';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
-import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { QueryCache } from './QueryCache';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
@@ -12,6 +20,7 @@ export type CacheAndQueryDriverType = 'redis' | 'memory';
 
 export interface QueryOrchestratorOptions {
   externalDriverFactory?: DriverFactory;
+  getExternalConcurrency?: getConcurrencyFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: any;
@@ -37,6 +46,7 @@ export class QueryOrchestrator {
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
+    protected readonly getConcurrency: getConcurrencyFn,
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
@@ -55,14 +65,21 @@ export class QueryOrchestrator {
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
-    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+    const {
+      externalDriverFactory,
+      getExternalConcurrency,
+      continueWaitTimeout,
+      skipExternalCacheAndQueue,
+    } = options;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
       driverFactory,
+      getConcurrency,
       this.logger,
       {
         externalDriverFactory,
+        getExternalConcurrency,
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
@@ -70,15 +87,24 @@ export class QueryOrchestrator {
         ...options.queryCacheOptions,
       }
     );
+
     this.preAggregations = new PreAggregations(
-      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.getConcurrency,
+      this.logger,
+      this.queryCache,
+      {
         externalDriverFactory,
+        getExternalConcurrency,
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
+        getQueueEventsBus:
+          getEnv('preAggregationsQueueEventsBus') &&
+          this.getQueueEventsBus.bind(this)
       }
     );
   }

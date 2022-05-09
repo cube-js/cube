@@ -5,9 +5,13 @@ import {
   ContinueWaitError,
   DriverFactoryByDataSource,
   QueryOrchestratorOptions,
+  getConcurrencyFn,
 } from '@cubejs-backend/query-orchestrator';
-
-import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
+import {
+  DbTypeFn,
+  ExternalDbTypeFn,
+  RequestContext
+} from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: DbTypeFn;
@@ -24,6 +28,7 @@ export class OrchestratorApi {
 
   public constructor(
     protected readonly driverFactory: DriverFactoryByDataSource,
+    protected readonly getConcurrency: getConcurrencyFn,
     protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
@@ -32,8 +37,9 @@ export class OrchestratorApi {
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
       driverFactory,
+      getConcurrency,
       logger,
-      options
+      options,
     );
   }
 
