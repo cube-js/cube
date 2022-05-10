@@ -999,6 +999,7 @@ class ApiGateway {
           isPlayground: Boolean(
             context.signedWithPlaygroundAuthSecret
           ),
+          queries: results.length,
           queriesWithPreAggregations:
             results.filter(
               (r: any) => Object.keys(
