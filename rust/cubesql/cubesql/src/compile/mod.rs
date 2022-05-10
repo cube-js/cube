@@ -4156,6 +4156,36 @@ mod tests {
     }
 
     #[test]
+    fn test_date_part_quarter_granularity() {
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT CAST(TRUNC(EXTRACT(QUARTER FROM KibanaSampleDataEcommerce.order_date)) AS INTEGER)
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            ".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[test]
     fn test_where_filter_daterange() {
         init_logger();
 
@@ -6628,6 +6658,32 @@ mod tests {
             execute_query(
                 "select pg_catalog.pg_get_constraintdef(r.oid) from pg_catalog.pg_constraint r;"
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_date_part_quarter() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "date_part_quarter",
+            execute_query(
+                "
+                SELECT
+                    t.d,
+                    date_part('quarter', t.d) q
+                FROM (
+                    SELECT TIMESTAMP '2000-01-05 00:00:00+00:00' d UNION ALL
+                    SELECT TIMESTAMP '2005-05-20 00:00:00+00:00' d UNION ALL
+                    SELECT TIMESTAMP '2010-08-02 00:00:00+00:00' d UNION ALL
+                    SELECT TIMESTAMP '2020-10-01 00:00:00+00:00' d
+                ) t
+                ORDER BY t.d ASC
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
