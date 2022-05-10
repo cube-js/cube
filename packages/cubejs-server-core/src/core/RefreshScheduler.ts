@@ -142,13 +142,24 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
+    if (!this.serverCore.getConcurrency().workersNumber) {
+      await this.serverCore.updateWorkersNumber(
+        this.serverCore.getCompilerApi(context),
+      );
+    }
+
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
-      concurrency: options.concurrency || 1,
+      concurrency:
+        options.concurrency ||
+        this.serverCore.getConcurrency().workersNumber,
       workerIndices:
         options.workerIndices ||
-        R.range(0, options.concurrency || 1),
+        R.range(
+          0, options.concurrency ||
+          this.serverCore.getConcurrency().workersNumber
+        ),
       contextSymbols: {
         securityContext: context.securityContext,
       },

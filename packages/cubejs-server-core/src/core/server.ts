@@ -310,25 +310,75 @@ export class CubejsServerCore {
   private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
   /**
-   * Calculate concurrency parameters based on driver's `concurrency`.
+   * Refresh scheduler concurrency value.
    */
-  private calcConcurrency(val?: number) {
+  private workersNumber: number;
+
+  /**
+   * Calculate workers number based on the driver's concurrency.
+   */
+  private calcWorkersNumber(val?: number): number {
+    return val ? Math.round(val / 10) : 4;
+  }
+
+  /**
+   * Updates the value of the workers number based on the stored cubes
+   * configurations.
+   */
+  public async updateWorkersNumber(compilerApi: CompilerApi) {
+    let result = 999999;
+    const compilers = await compilerApi.getCompilers({
+      requestId: 'calcWorkersNumber',
+    });
+    const { cubeEvaluator } = compilers;
+    cubeEvaluator.cubeNames().forEach((name) => {
+      const dbType = compilerApi.getDbType(
+        cubeEvaluator.cubeFromPath(name).dataSource ?? 'default',
+      );
+      const Driver = CubejsServerCore.lookupDriverClass(dbType);
+      const concurrency = Driver.concurrency
+        ? Driver.concurrency()
+        : undefined;
+      const workersNumber = this.calcWorkersNumber(concurrency);
+      result = result > workersNumber ? workersNumber : result;
+    });
+    this.workersNumber = result;
+  }
+
+  /**
+   * Calculate concurrency parameters based on the driver's
+   * `concurrency`.
+   */
+  private calcConcurrency(val?: number): {
+    poolSize: number;
+    queriesNumber: number;
+    workersNumber: number;
+  } {
     return {
       poolSize: val || 10,
-      workersNumber: val || 10,
       queriesNumber: val || 10,
+      workersNumber: this.workersNumber,
     };
   }
 
-  // public getConcurrency(context: RequestContext) {
-  //   const dbType = this.contextToDbType(context);
-  //   const Driver =
-  //     CubejsServerCore.lookupDriverClass(dbType);
-  //   const concurrency = Driver.concurrency
-  //     ? Driver.concurrency()
-  //     : undefined;
-  //   return this.calcConcurrency(concurrency);
-  // }
+  /**
+   * Returns concurrency object for specified dbType.
+   */
+  public getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
+    poolSize: number;
+    queriesNumber: number;
+    workersNumber: number;
+  } {
+    let concurrency: number;
+    if (dbType) {
+      const Driver =
+        CubejsServerCore.lookupDriverClass(dbType);
+      concurrency = Driver.concurrency
+        ? Driver.concurrency()
+        : undefined;
+    }
+    return this.calcConcurrency(concurrency);
+  }
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [
@@ -370,14 +420,7 @@ export class CubejsServerCore {
       && CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
     const getExternalConcurrency: getConcurrencyFn = externalDbType && (
-      () => {
-        const Driver =
-          CubejsServerCore.lookupDriverClass(externalDbType);
-        const concurrency = Driver.concurrency
-          ? Driver.concurrency()
-          : undefined;
-        return this.calcConcurrency(concurrency);
-      }
+      () => this.getConcurrency(externalDbType)
     );
 
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
@@ -664,6 +707,7 @@ export class CubejsServerCore {
       );
 
       this.compilerCache.set(appId, compilerApi);
+      this.updateWorkersNumber(compilerApi);
     }
 
     compilerApi.schemaVersion = currentSchemaVersion;
@@ -740,13 +784,11 @@ export class CubejsServerCore {
         })();
       },
       (dataSource = 'default') => {
-        const dbType = this.contextToDbType({ ...context, dataSource });
-        const Driver =
-          CubejsServerCore.lookupDriverClass(dbType);
-        const concurrency = Driver.concurrency
-          ? Driver.concurrency()
-          : undefined;
-        return this.calcConcurrency(concurrency);
+        const dbType = this.contextToDbType({
+          ...context,
+          dataSource,
+        });
+        return this.getConcurrency(dbType);
       },
       {
         externalDriverFactory:
