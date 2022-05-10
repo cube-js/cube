@@ -1,0 +1,2 @@
+#https://docs.netlify.com/routing/redirects/
+/*   https://cube.dev/blog/angular-dashboard-with-material  301!

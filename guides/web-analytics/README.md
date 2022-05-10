@@ -3,7 +3,7 @@
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
 # D3 Dashboard Guide
-You will learn how to build a D3 dashboard with React, Material UI and Cube.js.  The guide covers setting up dashboard with Postgres, Cube.js, React and D3.js.
-You can also check out a [live demo here](https://d3-dashboard-demo.cube.dev/).
+You will learn how to build open source Google Analytics alternative with Cube. The guide covers setting up dashboard with Snowplow, Athena, MySQL, Cube, React, Material UI and Recharts.
+You can also check out a [live demo here](https://web-analytics-demo.cube.dev/#/).
 
-[The guide is available here.](https://d3-dashboard.cube.dev/)
+[The guide is available here.](https://web-analytics.cube.dev/)
