@@ -1,6 +1,8 @@
 cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
-  preAggregations: {// Pre-Aggregations definitions go here
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
 
     /**
@@ -22,7 +24,7 @@ cube(`Orders`, {
   },
   joins: {
     /**
-     * Demo 2
+     * Demo 1
      * Joins
      * An "Order" belongs to a "User"
      */
@@ -51,6 +53,7 @@ cube(`Orders`, {
   //     sql: `${CUBE}.status = 'completed'`
   //   },
   // },
+  
   measures: {
     count: {
       type: `count`,
