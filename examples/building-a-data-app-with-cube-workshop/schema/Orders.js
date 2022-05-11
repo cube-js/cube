@@ -5,10 +5,10 @@ cube(`Orders`, {
     // Pre-Aggregations definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started  
 
-    /**
-     * Demo 5
-     * Pre-aggregations
-     */
+    // /**
+    //  * Demo 5
+    //  * Pre-aggregations
+    //  */
     // dailyOrdersByCompany: {
     //   measures: [Orders.count],
     //   dimensions: [Suppliers.company],
