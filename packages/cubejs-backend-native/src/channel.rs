@@ -95,7 +95,7 @@ where
             // @todo Optimize? Into?
             Ok(buffer_as_str) => match serde_json::from_str::<R>(&buffer_as_str) {
                 Ok(json) => Ok(json),
-                Err(err) => Err(CubeError::from_error(err)),
+                Err(err) => Err(CubeError::internal(err.to_string())),
             },
             Err(err) => Err(CubeError::internal(err.to_string())),
         };
