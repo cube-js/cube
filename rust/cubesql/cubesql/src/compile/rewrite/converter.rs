@@ -6,15 +6,15 @@ use crate::{
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, BetweenExprNegated,
             BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
             CubeScanTableName, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, GetIndexedFieldExprKey,
-            InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanLimit, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
+            JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::auth_service::AuthContext,
@@ -285,7 +285,7 @@ impl LogicalPlanToLanguageConverter {
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
                 let expr = self.add_expr(expr)?;
-                let key = add_data_node!(self, key, GetIndexedFieldExprKey);
+                let key = self.add_expr(key)?;
                 self.graph
                     .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
             }
@@ -775,7 +775,7 @@ pub fn node_to_expr(
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
         LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
             let expr = Box::new(to_expr(params[0])?);
-            let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
+            let key = Box::new(to_expr(params[1])?);
             Expr::GetIndexedField { expr, key }
         }
         x => panic!("Unexpected expression node: {:?}", x),
