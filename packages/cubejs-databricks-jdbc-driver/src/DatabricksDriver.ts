@@ -91,17 +91,20 @@ export class DatabricksDriver extends JDBCDriver {
     return 4;
   }
 
-  public static calcConcurrency(mono: number, forcePreaggs = false): {
+  public static calcConcurrency(
+    monoConcurrency: number,
+    forcePreaggs = false,
+  ): {
     maxpool: number;
     queries: number;
     preaggs: number;
   } {
-    switch (mono) {
+    switch (monoConcurrency) {
       default:
         return {
-          maxpool: 8,
-          queries: 2,
-          preaggs: forcePreaggs ? 6 : 2,
+          maxpool: 10,
+          queries: 6,
+          preaggs: forcePreaggs ? 6 : 3,
         };
     }
   }

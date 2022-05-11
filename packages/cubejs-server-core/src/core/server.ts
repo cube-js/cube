@@ -118,6 +118,122 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
+  /**
+   * ServerCore.upgradeConcurrency() promise holder.
+   * @private
+   */
+  private static concurrencyPromise: Promise<void>;
+
+  /**
+   * System pre-aggs concurrency value.
+   * @private
+   */
+  private static preaggs: number;
+
+  /**
+   * Returns mono concurrency value.
+   * @private
+   */
+  private static getMonoConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): number {
+    if (process.env.CUBEJS_MONO_CONCURRENCY) {
+      return parseInt(process.env.CUBEJS_MONO_CONCURRENCY, 10);
+    } else if (dbType) {
+      const Driver = CubejsServerCore.lookupDriverClass(dbType);
+      return Driver.monoConcurrencyDefault
+        ? Driver.monoConcurrencyDefault()
+        : 1;
+    } else {
+      return 1;
+    }
+  }
+
+  /**
+   * Returns concurrency object.
+   * @private
+   */
+  private static calcConcurrency(opt: {
+    dbType?: DatabaseType | ExternalDbTypeFn,
+    monoConcurrency: number,
+    forcePreaggs?: boolean,
+  }): {
+    maxpool: number;
+    queries: number;
+    preaggs: number;
+  } {
+    if (
+      opt.dbType &&
+      CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency
+    ) {
+      return CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency(
+        opt.monoConcurrency,
+        opt.forcePreaggs,
+      );
+    } else {
+      switch (opt.monoConcurrency) {
+        default:
+          return {
+            maxpool: 4,
+            queries: 2,
+            preaggs: undefined,
+          };
+      }
+    }
+  }
+
+  /**
+   * Returns concurrency object for specified dbType.
+   */
+  public static getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
+    maxpool: number;
+    queries: number;
+    preaggs: number;
+  } {
+    return {
+      ...CubejsServerCore.calcConcurrency({
+        dbType,
+        monoConcurrency: CubejsServerCore.getMonoConcurrency(dbType),
+        forcePreaggs: false,
+      }),
+      preaggs: CubejsServerCore.preaggs,
+    };
+  }
+
+  /**
+   * Updates the value of the workers number based on the stored cubes
+   * configurations.
+   */
+  public static async upgradeConcurrency(compilerApi: CompilerApi) {
+    if (!CubejsServerCore.concurrencyPromise) {
+      CubejsServerCore.concurrencyPromise = new Promise((resolve) => {
+        let result: number;
+        compilerApi
+          .getCompilers({ requestId: 'upgrade.concurrency' })
+          .then((compilers) => {
+            const { cubeEvaluator } = compilers;
+            cubeEvaluator.cubeNames().forEach((name) => {
+              const dbType = compilerApi.getDbType(
+                cubeEvaluator.cubeFromPath(name).dataSource ?? 'default',
+              );
+              const monoConcurrency = CubejsServerCore.getMonoConcurrency(dbType);
+              const { preaggs } = CubejsServerCore.calcConcurrency({
+                dbType,
+                monoConcurrency,
+                forcePreaggs: false,
+              });
+              // eslint-disable-next-line no-nested-ternary
+              result = typeof result === 'number'
+                ? result > preaggs ? preaggs : result
+                : preaggs;
+            });
+            CubejsServerCore.preaggs = result;
+            CubejsServerCore.concurrencyPromise = undefined;
+            resolve();
+          });
+      });
+    }
+    return CubejsServerCore.concurrencyPromise;
+  }
+
   public constructor(opts: CreateOptions = {}, protected readonly systemOptions?: SystemOptions) {
     optionsValidate(opts);
 
@@ -309,108 +425,6 @@ export class CubejsServerCore {
   // requireFromPackage was used here. Removed as it wasn't necessary check and conflicts with local E2E test running.
   // eslint-disable-next-line import/no-extraneous-dependencies
   private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
-
-  /**
-   * System pre-aggs concurrency value.
-   */
-  private static preaggs: number;
-
-  /**
-   * Returns mono concurrency value based on the driver type and
-   * CUBEJS_CONCURRENCY environment variable. If CUBEJS_CONCURRENCY doesn't
-   * specified and Driver.defaultConcurrency method is not implemented, returns
-   * 1.
-   * @private
-   */
-  private static getMonoConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): number {
-    if (process.env.CUBEJS_MONO_CONCURRENCY) {
-      return parseInt(process.env.CUBEJS_MONO_CONCURRENCY, 10);
-    } else if (dbType) {
-      const Driver = CubejsServerCore.lookupDriverClass(dbType);
-      return Driver.monoConcurrencyDefault
-        ? Driver.monoConcurrencyDefault()
-        : 1;
-    } else {
-      return 1;
-    }
-  }
-
-  /**
-   * Returns concurrency object.
-   * @private
-   */
-  private static calcConcurrency(opt: {
-    dbType?: DatabaseType | ExternalDbTypeFn,
-    monoConcurrency: number,
-    forcePreaggs?: boolean,
-  }): {
-    maxpool: number;
-    queries: number;
-    preaggs: number;
-  } {
-    if (
-      opt.dbType &&
-      CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency
-    ) {
-      return CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency(
-        opt.monoConcurrency,
-        opt.forcePreaggs,
-      );
-    } else {
-      switch (opt.monoConcurrency) {
-        default:
-          return {
-            maxpool: 4,
-            queries: 2,
-            preaggs: opt.forcePreaggs ? 6 : 2,
-          };
-      }
-    }
-  }
-
-  /**
-   * Updates the value of the workers number based on the stored cubes
-   * configurations.
-   */
-  public static async upgradeConcurrency(compilerApi: CompilerApi) {
-    let result: number;
-    const compilers = await compilerApi.getCompilers({
-      requestId: 'upgrade.concurrency',
-    });
-    const { cubeEvaluator } = compilers;
-    cubeEvaluator.cubeNames().forEach((name) => {
-      const dbType = compilerApi.getDbType(
-        cubeEvaluator.cubeFromPath(name).dataSource ?? 'default',
-      );
-      const monoConcurrency = CubejsServerCore.getMonoConcurrency(dbType);
-      const { preaggs } = CubejsServerCore.calcConcurrency({
-        dbType,
-        monoConcurrency,
-        forcePreaggs: false,
-      });
-      // eslint-disable-next-line no-nested-ternary
-      result = typeof result === 'number'
-        ? result > preaggs ? preaggs : result
-        : preaggs;
-    });
-    CubejsServerCore.preaggs = result;
-  }
-
-  /**
-   * Returns concurrency object for specified dbType.
-   */
-  public static getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
-    maxpool: number;
-    queries: number;
-    preaggs: number;
-  } {
-    const monoConcurrency = CubejsServerCore.getMonoConcurrency(dbType);
-    return CubejsServerCore.calcConcurrency({
-      dbType,
-      monoConcurrency,
-      forcePreaggs: false,
-    });
-  }
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [

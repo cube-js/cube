@@ -13,7 +13,6 @@ import {
   DriverFactory,
   DriverFactoryByDataSource,
   getConcurrencyFn,
-  concurrencyFactoryFn,
 } from './DriverFactory';
 
 type QueryOptions = {
@@ -268,7 +267,7 @@ export class QueryCache {
           return client.query(q.query, q.values, q);
         },
         {
-          concurrency: this.options.getExternalConcurrency(),
+          concurrency: this.options.getExternalConcurrency().queries,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
