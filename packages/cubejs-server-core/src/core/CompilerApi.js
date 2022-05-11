@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { createQuery, compile, PreAggregations } from '@cubejs-backend/schema-compiler';
+import R from 'ramda';
+import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 
 export class CompilerApi {
   constructor(repository, dbType, options) {
@@ -46,17 +47,30 @@ export class CompilerApi {
         version: compilerVersion,
         requestId
       });
-      // TODO check if saving this promise can produce memory leak?
-      this.compilers = compile(this.repository, {
+      this.compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-        standalone: this.standalone
+        standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
+      this.queryFactory = await this.createQueryFactory(this.compilers);
     }
 
     return this.compilers;
+  }
+
+  async createQueryFactory(compilers) {
+    const { cubeEvaluator } = compilers;
+    const cubeToQueryClass = R.fromPairs(
+      cubeEvaluator.cubeNames().map(cube => {
+        const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+        const dbType = this.getDbType(dataSource);
+        const dialectClass = this.getDialectClass(dataSource, dbType);
+        return [cube, queryClass(dbType, dialectClass)];
+      })
+    );
+    return new QueryFactory(cubeToQueryClass);
   }
 
   getDbType(dataSource = 'default') {
@@ -141,19 +155,29 @@ export class CompilerApi {
   createQuery(compilers, dbType, dialectClass, query) {
     return createQuery(
       compilers,
-      dbType, {
+      dbType,
+      {
         ...query,
         dialectClass,
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
+        queryFactory: this.queryFactory,
       }
     );
   }
 
   async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
+  }
+
+  async metaConfigExtended(options) {
+    const { metaTransformer } = await this.getCompilers(options);
+    return {
+      metaConfig: metaTransformer?.cubes,
+      cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
+    };
   }
 
   canUsePreAggregationForTransformedQuery(transformedQuery, refs) {

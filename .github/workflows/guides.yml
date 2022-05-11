@@ -7,9 +7,77 @@ on:
       - '.github/actions/deploy-guide.sh'
       - 'guides/**'
     branches:
-      - master
+      - 'master'
 
 jobs:
+  react-pivot-table:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,.github/actions/deploy-guide.sh,guides/react-pivot-table/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-guide.sh
+        env:
+          GUIDE_SLUG: react-pivot-table
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  multi-tenant-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,.github/actions/deploy-guide.sh,guides/multi-tenant-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-guide.sh
+        env:
+          GUIDE_SLUG: multi-tenant-analytics
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  bigquery-public-datasets:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/guides.yml,.github/actions/deploy-guide.sh,guides/bigquery-public-datasets/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-guide.sh
+        env:
+          GUIDE_SLUG: bigquery-public-datasets
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   angular-dashboard:
     runs-on: ubuntu-20.04

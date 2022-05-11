@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.29.52",
+  "version": "0.29.54",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -26,8 +26,6 @@
     "birdbox:postgresql-pre-aggregations:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-pre-aggregations.test.js",
     "birdbox:postgresql-cubestore": "jest --verbose -i dist/test/birdbox-postgresql-cubestore.test.js",
     "birdbox:postgresql-cubestore:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgresql-cubestore.test.js",
-    "birdbox:questdb": "jest --verbose -i dist/test/birdbox-questdb.test.js",
-    "birdbox:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-questdb.test.js",
     "birdbox:cli:postgresql": "jest --verbose -i dist/test/cli-postgresql.test.js",
     "birdbox:cli:postgresql:snapshot": "jest --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "birdbox:local:postgresql": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose -i dist/test/cli-postgresql.test.js",
@@ -36,8 +34,6 @@
     "birdbox:local:postgresql-pre-aggregations:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js",
-    "birdbox:postgre": "jest --verbose -i dist/test/birdbox-postgre.test.js",
-    "birdbox:postgre:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-postgre.test.js",
     "birdbox:athena": "jest --verbose -i dist/test/birdbox-athena.test.js",
     "birdbox:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/birdbox-athena.test.js",
     "birdbox:bigquery": "jest --verbose -i dist/test/birdbox-bigquery.test.js",
@@ -49,7 +45,13 @@
     "driver:postgres": "jest --verbose -i dist/test/driver-postgres.test.js",
     "driver:postgres:snap": "jest --verbose --updateSnapshot -i dist/test/driver-postgres.test.js",
     "driver:questdb": "jest --verbose -i dist/test/driver-questdb.test.js",
-    "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js"
+    "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
+    "smoke:materialize": "jest --verbose -i dist/test/smoke-materialize.test.js",
+    "smoke:materialize:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-materialize.test.js",
+    "smoke:questdb": "jest --verbose -i dist/test/smoke-questdb.test.js",
+    "smoke:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-questdb.test.js",
+    "smoke:multidb": "jest --verbose -i dist/test/smoke-multidb.test.js",
+    "smoke:multidb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-multidb.test.js"
   },
   "files": [
     "dist/src",
@@ -58,10 +60,10 @@
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.29.51",
-    "@cubejs-backend/schema-compiler": "^0.29.52",
+    "@cubejs-backend/schema-compiler": "^0.29.54",
     "@cubejs-backend/shared": "^0.29.51",
-    "@cubejs-backend/testing-shared": "^0.29.52",
-    "@cubejs-client/ws-transport": "^0.29.51",
+    "@cubejs-backend/testing-shared": "^0.29.54",
+    "@cubejs-client/ws-transport": "^0.29.54",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
@@ -73,7 +75,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.29.23",
-    "@cubejs-client/core": "^0.29.51",
+    "@cubejs-client/core": "^0.29.54",
     "@jest/globals": "^26.6.2",
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",

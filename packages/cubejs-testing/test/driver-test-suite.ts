@@ -1752,9 +1752,10 @@ export function executeTestSuiteFor(type: string) {
           expect(response.rawData()).toMatchSnapshot('query');
         }
       );
-      test(
-        'querying ECommerce: total quantity, avg discount, total sales, ' +
-        'total profit by product + order + total',
+      test.skip(
+        'querying ECommerce: total quantity, avg discount, total ' +
+        'sales, total profit by product + order + total -- noisy ' +
+        'test',
         async () => {
           let err;
           try {

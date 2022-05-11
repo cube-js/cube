@@ -236,6 +236,7 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
       timeDimensionReference: Joi.func().required(),
       rollupReferences: Joi.func().required(),
@@ -246,6 +247,7 @@ const RollUpJoinSchema = condition(
     // RollupJoin without references
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
       timeDimension: Joi.func().required(),
       rollups: Joi.func().required(),
@@ -258,6 +260,7 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       rollupReferences: Joi.func().required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
@@ -268,6 +271,7 @@ const RollUpJoinSchema = condition(
       (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollupJoin').required(),
+        scheduledRefresh: Joi.boolean().valid(false),
         rollups: Joi.func().required(),
         measures: Joi.func(),
         dimensions: Joi.func(),

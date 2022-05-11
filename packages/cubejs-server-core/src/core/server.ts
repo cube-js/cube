@@ -754,7 +754,7 @@ export class CubejsServerCore {
       preAggregationsSchema: options.preAggregationsSchema,
       allowUngroupedWithoutPrimaryKey:
           this.options.allowUngroupedWithoutPrimaryKey ||
-          getEnv("allowUngroupedWithoutPrimaryKey"),
+          getEnv('allowUngroupedWithoutPrimaryKey'),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,

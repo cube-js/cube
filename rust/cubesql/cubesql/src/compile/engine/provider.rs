@@ -32,23 +32,29 @@ use super::information_schema::postgres::{
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
-    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogIndexProvider,
-    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
+    PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 
-use crate::compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider;
-use crate::compile::engine::information_schema::postgres::PgCatalogAmProvider;
-use crate::sql::ColumnType;
-use crate::transport::V1CubeMetaExt;
-use crate::CubeError;
+use crate::{
+    compile::engine::information_schema::postgres::{
+        testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    },
+    sql::ColumnType,
+    transport::V1CubeMetaExt,
+    CubeError,
+};
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMeta;
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::Expr;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{
+    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    datasource::TableProvider,
+    error::DataFusionError,
+    logical_plan::Expr,
+    physical_plan::ExecutionPlan,
+};
 use std::any::Any;
 
 #[derive(Clone)]
@@ -309,6 +315,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_depend".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogAmProvider>() {
             "pg_catalog.pg_am".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogEnumProvider>() {
+            "pg_catalog.pg_enum".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else {
@@ -430,6 +438,7 @@ impl DatabaseProtocol {
                 "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
+                "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
                 _ => return None,
             },
             _ => return None,

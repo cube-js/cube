@@ -23,8 +23,13 @@ metadata:
   {{- end }}
 spec:
   accessModes:
-    - ReadWriteMany
+  {{- range .Values.remoteDir.persistence.accessModes }}
+    - {{ . | quote }}
+  {{- end }}  
   resources:
     requests:
       storage: {{ .Values.remoteDir.persistence.size }}
+  {{- if .Values.remoteDir.persistence.storageClass }}
+  storageClassName: {{ .Values.remoteDir.persistence.storageClass }}
+  {{- end }}
 {{- end }}

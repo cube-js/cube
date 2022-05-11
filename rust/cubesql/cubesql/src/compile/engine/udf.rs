@@ -1,20 +1,19 @@
-use std::any::type_name;
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use chrono::{Duration, NaiveDateTime};
 use datafusion::{
-    arrow::datatypes::UInt32Type,
     arrow::{
         array::{
-            new_null_array, Array, ArrayRef, BooleanArray, BooleanBuilder, Float64Array,
-            GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, TimestampNanosecondArray, UInt32Builder,
+            new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
+            Float64Array, GenericStringArray, Int32Array, Int64Array, Int64Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
+            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampNanosecondArray,
+            UInt32Array, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
             DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
-            TimeUnit, TimestampNanosecondType, UInt64Type,
+            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -31,6 +30,7 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
+use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
@@ -172,21 +172,20 @@ pub fn create_current_schema_udf() -> ScalarUDF {
     )
 }
 
-#[allow(unused_macros)]
 macro_rules! downcast_boolean_arr {
-    ($ARG:expr) => {{
+    ($ARG:expr, $NAME:expr) => {{
         $ARG.as_any()
             .downcast_ref::<BooleanArray>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast to {}",
+                    "could not cast {}, to {}",
+                    $NAME,
                     type_name::<BooleanArray>()
                 ))
             })?
     }};
 }
 
-#[allow(unused_macros)]
 macro_rules! downcast_primitive_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
@@ -201,7 +200,6 @@ macro_rules! downcast_primitive_arg {
     }};
 }
 
-#[allow(unused_macros)]
 macro_rules! downcast_string_arg {
     ($ARG:expr, $NAME:expr, $T:ident) => {{
         $ARG.as_any()
@@ -213,6 +211,14 @@ macro_rules! downcast_string_arg {
                     type_name::<GenericStringArray<$T>>()
                 ))
             })?
+    }};
+}
+
+macro_rules! downcast_list_arg {
+    ($ARG:expr, $NAME:expr) => {{
+        $ARG.as_any().downcast_ref::<ListArray>().ok_or_else(|| {
+            DataFusionError::Internal(format!("could not cast {} to ArrayList", $NAME))
+        })?
     }};
 }
 
@@ -999,6 +1005,21 @@ pub fn create_str_to_date() -> ScalarUDF {
     )
 }
 
+pub fn create_current_timestamp() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "current_timestamp",
+        &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_current_schemas_udf() -> ScalarUDF {
     let current_schemas = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
@@ -1006,7 +1027,7 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
         let primitive_builder = StringBuilder::new(2);
         let mut builder = ListBuilder::new(primitive_builder);
 
-        let including_implicit = downcast_boolean_arr!(&args[0]).value(0);
+        let including_implicit = downcast_boolean_arr!(&args[0], "implicit").value(0);
         if including_implicit {
             builder.values().append_value("pg_catalog").unwrap();
         }
@@ -1031,42 +1052,43 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 
 pub fn create_format_type_udf(name: &str) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2);
+        let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let typemods = args[1].as_any().downcast_ref::<Int32Array>().unwrap();
 
-        let oid = downcast_primitive_arg!(&args[0], "oid", Int64Type).value(0);
-        let mut typemod = if args[1].is_null(0) {
-            None
-        } else {
-            Some(downcast_primitive_arg!(&args[1], "mod", Int64Type).value(0))
-        };
+        let result = oids
+            .iter()
+            .zip(typemods.iter())
+            .map(|args| match args {
+                (Some(oid), typemod) => {
+                    let typemod_str = typemod.map_or("".to_string(), |typemod| {
+                        let typemod = match typemod {
+                            // character varying returns length lowered by 4
+                            1043 => typemod - 4,
+                            _ => typemod,
+                        };
 
-        // character varying returns length lowered by 4
-        if oid == 1043 && typemod.is_some() {
-            typemod = Some(typemod.unwrap() - 4);
-        }
+                        match typemod {
+                            0.. => format!("({})", typemod),
+                            _ => "".to_string(),
+                        }
+                    });
 
-        let mut builder = StringBuilder::new(1);
+                    Some(match oid {
+                        0 => "-".to_string(),
+                        19 => format!("name{}", typemod_str),
+                        23 => "integer".to_string(),
+                        1043 => format!("character varying{}", typemod_str),
+                        1184 => format!("timestamp{} with time zone", typemod_str),
+                        13408 => format!("information_schema.character_data{}", typemod_str),
+                        13410 => format!("information_schema.sql_identifier{}", typemod_str),
+                        _ => "???".to_string(),
+                    })
+                }
+                _ => None,
+            })
+            .collect::<StringArray>();
 
-        let typemod_str = match typemod {
-            None => "".to_string(),
-            Some(typemod) if typemod < 0 => "".to_string(),
-            Some(typemod) => format!("({})", typemod),
-        };
-
-        let type_str = match oid {
-            0 => "-".to_string(),
-            19 => format!("name{}", typemod_str),
-            23 => "integer".to_string(),
-            1043 => format!("character varying{}", typemod_str),
-            1184 => format!("timestamp{} with time zone", typemod_str),
-            13408 => format!("information_schema.character_data{}", typemod_str),
-            13410 => format!("information_schema.sql_identifier{}", typemod_str),
-            _ => "???".to_string(),
-        };
-
-        builder.append_value(type_str).unwrap();
-
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+        Ok(Arc::new(result))
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
@@ -1257,7 +1279,7 @@ pub fn create_pg_get_expr_udf() -> ScalarUDF {
     )
 }
 
-pub fn pg_table_is_visible() -> ScalarUDF {
+pub fn create_pg_table_is_visible() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
@@ -1287,7 +1309,7 @@ pub fn pg_table_is_visible() -> ScalarUDF {
     )
 }
 
-pub fn pg_get_userbyid() -> ScalarUDF {
+pub fn create_pg_get_userbyid() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
@@ -1310,6 +1332,70 @@ pub fn pg_get_userbyid() -> ScalarUDF {
         "pg_catalog.pg_get_userbyid",
         &Signature::one_of(
             vec![TypeSignature::Exact(vec![DataType::UInt32])],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_type_is_visible() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(oid) => {
+                    if oid >= 18000 {
+                        return Some(true);
+                    }
+
+                    match PgTypeId::from_oid(oid)?.to_type().typnamespace {
+                        11 | 2200 => Some(true),
+                        _ => Some(false),
+                    }
+                }
+                None => None,
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_type_is_visible",
+        &Signature::exact(vec![DataType::UInt32], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_get_constraintdef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let result = oids_arr
+            .iter()
+            .map(|oid| match oid {
+                Some(_oid) => Some("PRIMARY KEY (oid)".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_catalog.pg_get_constraintdef",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Boolean]),
+                TypeSignature::Exact(vec![DataType::UInt32]),
+            ],
             Volatility::Immutable,
         ),
         &return_type,
@@ -1475,6 +1561,138 @@ pub fn create_unnest_udtf() -> TableUDF {
     TableUDF::new(
         "unnest",
         &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// generate_subscripts is a convenience function that generates the set of valid subscripts for the specified dimension of the given array.
+pub fn create_generate_subscripts_udtf() -> TableUDF {
+    let fun = make_table_function(move |args: &[ArrayRef]| {
+        assert!(args.len() <= 3);
+
+        let input_arr = downcast_list_arg!(args[0], "anyarray");
+        let step_arr = downcast_primitive_arg!(args[1], "dim", Int64Type);
+        let reverse_arr = if args.len() == 3 {
+            Some(downcast_boolean_arr!(args[2], "reverse"))
+        } else {
+            None
+        };
+
+        let mut result = Int64Builder::new(0);
+        let mut section_sizes: Vec<usize> = Vec::new();
+
+        for i in 0..input_arr.len() {
+            let current_row = input_arr.value(i);
+
+            let (mut current_step, reverse) = if reverse_arr.is_some() {
+                if reverse_arr.unwrap().value(i) {
+                    (current_row.len() as i64, true)
+                } else {
+                    (1_i64, false)
+                }
+            } else {
+                (1_i64, false)
+            };
+
+            for _ in 0..current_row.len() {
+                result.append_value(current_step)?;
+
+                if reverse {
+                    current_step -= step_arr.value(i);
+                } else {
+                    current_step += step_arr.value(i);
+                }
+            }
+
+            section_sizes.push(current_row.len());
+        }
+
+        Ok((Arc::new(result.finish()) as ArrayRef, section_sizes))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_tp| Ok(Arc::new(DataType::Int64)));
+
+    TableUDF::new(
+        "generate_subscripts",
+        &Signature::one_of(
+            vec![
+                // array anyarray, dim integer
+                TypeSignature::Any(2),
+                // array anyarray, dim integer, reverse boolean
+                TypeSignature::Any(3),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_expandarray_udtf() -> TableUDF {
+    let fields = || {
+        vec![
+            Field::new("x", DataType::Int64, true),
+            Field::new("n", DataType::Int64, false),
+        ]
+    };
+
+    let fun = make_table_function(move |args: &[ArrayRef]| {
+        let arr = &args[0].as_any().downcast_ref::<ListArray>();
+        if arr.is_none() {
+            return Err(DataFusionError::Execution(format!("Unsupported type")));
+        }
+        let arr = arr.unwrap();
+
+        let mut value_builder = Int64Builder::new(1);
+        let mut index_builder = Int64Builder::new(1);
+
+        let mut section_sizes: Vec<usize> = Vec::new();
+        let mut total_count: usize = 0;
+
+        for i in 0..arr.len() {
+            let values = arr.value(i);
+            let values_arr = values.as_any().downcast_ref::<Int64Array>();
+            if values_arr.is_none() {
+                return Err(DataFusionError::Execution(format!("Unsupported type")));
+            }
+            let values_arr = values_arr.unwrap();
+
+            for j in 0..values_arr.len() {
+                value_builder.append_value(values_arr.value(j)).unwrap();
+                index_builder.append_value((j + 1) as i64).unwrap();
+            }
+
+            section_sizes.push(values_arr.len());
+            total_count += values_arr.len()
+        }
+
+        let field_builders = vec![
+            Box::new(value_builder) as Box<dyn ArrayBuilder>,
+            Box::new(index_builder) as Box<dyn ArrayBuilder>,
+        ];
+
+        let mut builder = StructBuilder::new(fields(), field_builders);
+        for _ in 0..total_count {
+            builder.append(true).unwrap();
+        }
+
+        Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes))
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Struct(fields()))));
+
+    TableUDF::new(
+        "information_schema._pg_expandarray",
+        &Signature::exact(
+            vec![DataType::List(Box::new(Field::new(
+                "item",
+                DataType::Int64,
+                true,
+            )))],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )

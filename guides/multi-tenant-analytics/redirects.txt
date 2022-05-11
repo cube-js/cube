@@ -1,0 +1,2 @@
+#https://docs.netlify.com/routing/redirects/
+/*   https://cube.dev/blog/multi-tenant-analytics-with-auth0  301!

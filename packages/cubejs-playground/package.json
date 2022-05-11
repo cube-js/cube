@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.51",
+  "version": "0.29.54",
   "engines": {},
   "repository": {
     "type": "git",
@@ -34,8 +34,8 @@
   "license": "MIT",
   "dependencies": {
     "@ant-design/icons": "^4.1.0",
-    "@cubejs-client/core": "^0.29.51",
-    "@cubejs-client/react": "^0.29.51",
+    "@cubejs-client/core": "^0.29.54",
+    "@cubejs-client/react": "^0.29.54",
     "@graphiql/toolkit": "^0.4.3",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
@@ -61,7 +61,6 @@
     "react-hotkeys-hook": "^3.3.0",
     "react-is": "^16.8.4",
     "react-responsive": "^8.0.1",
-    "react-router": "^5.1.2",
     "react-router-dom": "^5.1.2",
     "react-scripts": "4.0.3",
     "react-source-render": "4.0.0-1",

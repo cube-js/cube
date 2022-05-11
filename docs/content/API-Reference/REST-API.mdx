@@ -40,13 +40,18 @@ curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ### <--{"id" : "Prerequisites"}--> Continue wait
 
 If the request takes too long to be processed, Cube.js Backend responds with
-`{ "error": "Continue wait" }` and 200 status code. To get the data requested,
-simply retry your request a bit later.
+`{ "error": "Continue wait" }` and 200 status code. 
+This is how the long polling mechanism in Cube is implemented.
+Clients should continuously retry the same query in a loop until they get a successful result.
+Subsequent calls to the Cube endpoints are idempotent and don't lead to scheduling new database queries if not required by `refreshKey`.
+Also, receiving `Continue wait` doesn't mean the database query has been canceled, and it's actually still being processed by the Cube.
+Database queries that weren't started and are no longer waited by the client's long polling loop will be marked as orphaned and removed from the querying queue.
 
 Possible reasons of **Continue wait**:
 
-- The query requested is heavy and it takes some time for the database to
-  process it.
+- The query requested is heavy, and it takes some time for the database to
+  process it. Clients should wait for its completion, continuously sending the same REST API request.
+  [continueWaitTimeout](config#queue-options) can be adjusted in order to change the time Cube waits before returning `Continue wait` message.
 - There are many queries requested and Cube.js backend queues them to save
   database from overloading.
 

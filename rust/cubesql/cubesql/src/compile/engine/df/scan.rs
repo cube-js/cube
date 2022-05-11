@@ -27,9 +27,10 @@ use log::{error, warn};
 
 use crate::{sql::AuthContext, transport::TransportService};
 use chrono::{TimeZone, Utc};
-use datafusion::arrow::array::TimestampNanosecondBuilder;
-use datafusion::arrow::datatypes::TimeUnit;
-use datafusion::execution::context::TaskContext;
+use datafusion::{
+    arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
+    execution::context::TaskContext,
+};
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {

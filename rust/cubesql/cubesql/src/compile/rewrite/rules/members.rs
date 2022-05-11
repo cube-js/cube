@@ -1,52 +1,34 @@
-use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::table_scan;
-use crate::compile::rewrite::AggregateFunctionExprDistinct;
-use crate::compile::rewrite::AggregateFunctionExprFun;
-use crate::compile::rewrite::AliasExprAlias;
-use crate::compile::rewrite::ColumnAliasReplacerAliases;
-use crate::compile::rewrite::ColumnAliasReplacerTableName;
-use crate::compile::rewrite::ColumnExprColumn;
-use crate::compile::rewrite::CubeScanAliases;
-use crate::compile::rewrite::CubeScanLimit;
-use crate::compile::rewrite::CubeScanTableName;
-use crate::compile::rewrite::DimensionName;
-use crate::compile::rewrite::LimitN;
-use crate::compile::rewrite::LiteralExprValue;
-use crate::compile::rewrite::LogicalPlanLanguage;
-use crate::compile::rewrite::MeasureName;
-use crate::compile::rewrite::MemberErrorError;
-use crate::compile::rewrite::ProjectionAlias;
-use crate::compile::rewrite::TableScanSourceTableName;
-use crate::compile::rewrite::TableScanTableName;
-use crate::compile::rewrite::TimeDimensionDateRange;
-use crate::compile::rewrite::TimeDimensionGranularity;
-use crate::compile::rewrite::TimeDimensionName;
-use crate::compile::rewrite::{
-    agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
-    aggr_group_expr_empty_tail, aggregate, alias_expr, column_alias_replacer,
-    column_name_to_member_name, cube_scan_members_empty_tail, expr_column_name,
-    expr_column_name_with_relation, fun_expr, limit, member_replacer, projection, projection_expr,
-    projection_expr_empty_tail, sort_expr, udaf_expr, WithColumnRelation,
+use crate::{
+    compile::{
+        engine::provider::CubeContext,
+        rewrite::{
+            agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
+            aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
+            binary_expr, cast_expr, column_alias_replacer, column_expr, column_name_to_member_name,
+            cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
+            cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
+            expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
+            measure_expr, member_replacer, projection, projection_expr, projection_expr_empty_tail,
+            rewrite, rewriter::RewriteRules, table_scan, time_dimension_expr,
+            transforming_chain_rewrite, transforming_rewrite, udaf_expr,
+            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
+            ColumnAliasReplacerAliases, ColumnAliasReplacerTableName, ColumnExprColumn,
+            CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName, LimitN,
+            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError, ProjectionAlias,
+            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+        },
+    },
+    transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
+    var, var_iter, CubeError,
 };
-use crate::compile::rewrite::{
-    binary_expr, column_expr, cube_scan, literal_expr, rewrite, transforming_rewrite,
+use datafusion::{
+    logical_plan::{Column, DFSchema},
+    physical_plan::aggregates::AggregateFunction,
+    scalar::ScalarValue,
 };
-use crate::compile::rewrite::{
-    cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, measure_expr,
-    time_dimension_expr,
-};
-use crate::compile::rewrite::{cube_scan_order_empty_tail, transforming_chain_rewrite};
-use crate::transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt};
-use crate::var_iter;
-use crate::{var, CubeError};
-use datafusion::logical_plan::{Column, DFSchema};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::scalar::ScalarValue;
 use egg::{EGraph, Id, Rewrite, Subst};
-use std::ops::Index;
-use std::sync::Arc;
+use std::{ops::Index, sync::Arc};
 
 pub struct MemberRules {
     cube_context: Arc<CubeContext>,
@@ -73,6 +55,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "CubeScanAliases:None",
                     "?cube_table_name",
+                    "CubeScanSplit:false",
                 ),
                 self.transform_table_scan("?source_table_name", "?table_name", "?cube_table_name"),
             ),
@@ -90,6 +73,30 @@ impl RewriteRules for MemberRules {
                 "dimension-replacer-tail-proj",
                 member_replacer(projection_expr_empty_tail(), "?source_table_name"),
                 cube_scan_members_empty_tail(),
+            ),
+            rewrite(
+                "member-replacer-aggr",
+                member_replacer(aggr_aggr_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
+            ),
+            rewrite(
+                "member-replacer-group",
+                member_replacer(aggr_group_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
+            ),
+            rewrite(
+                "member-replacer-projection",
+                member_replacer(projection_expr("?left", "?right"), "?source_table_name"),
+                cube_scan_members(
+                    member_replacer("?left", "?source_table_name"),
+                    member_replacer("?right", "?source_table_name"),
+                ),
             ),
             self.measure_rewrite(
                 "simple-count",
@@ -115,16 +122,10 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "projection-columns-with-alias",
                 member_replacer(
-                    projection_expr(
-                        alias_expr(column_expr("?column"), "?alias"),
-                        "?tail_group_expr",
-                    ),
+                    alias_expr(column_expr("?column"), "?alias"),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    "?member",
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
+                "?member".to_string(),
                 self.transform_projection_member(
                     "?source_table_name",
                     "?column",
@@ -134,14 +135,8 @@ impl RewriteRules for MemberRules {
             ),
             transforming_rewrite(
                 "projection-columns",
-                member_replacer(
-                    projection_expr(column_expr("?column"), "?tail_group_expr"),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    "?member",
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
+                member_replacer(column_expr("?column"), "?source_table_name"),
+                "?member".to_string(),
                 self.transform_projection_member("?source_table_name", "?column", None, "?member"),
             ),
             transforming_rewrite(
@@ -153,6 +148,7 @@ impl RewriteRules for MemberRules {
                 member_replacer("?tail_group_expr", "?source_table_name"),
                 self.transform_segment("?source_table_name", "?column"),
             ),
+            // TODO this rule only for group by segment error
             transforming_chain_rewrite(
                 "member-replacer-dimension",
                 member_replacer(
@@ -174,26 +170,54 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "date-trunc",
                 member_replacer(
-                    aggr_group_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?tail_group_expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                ),
+            ),
+            // TODO make cast split work
+            transforming_rewrite(
+                "date-trunc-unwrap-cast",
+                member_replacer(
+                    cast_expr(
                         fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
+                        "?date_type",
                     ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
+                    "?source_table_name",
+                ),
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
+                    ),
                 ),
                 self.transform_time_dimension(
                     "?source_table_name",
@@ -208,65 +232,26 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "date-trunc-alias",
                 member_replacer(
-                    aggr_group_expr(
-                        alias_expr(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), column_expr("?column")],
-                            ),
-                            "?alias",
+                    alias_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
-                        "?tail_group_expr",
+                        "?alias",
                     ),
                     "?source_table_name",
                 ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
-                        alias_expr(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), column_expr("?column")],
-                            ),
-                            "?alias",
-                        ),
-                    ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
-                ),
-                self.transform_time_dimension(
-                    "?source_table_name",
-                    "?column",
+                time_dimension_expr(
                     "?time_dimension_name",
-                    "?granularity",
                     "?time_dimension_granularity",
                     "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "date-trunc-projection",
-                member_replacer(
-                    projection_expr(
+                    alias_expr(
                         fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
-                        "?tail_group_expr",
+                        "?alias",
                     ),
-                    "?source_table_name",
-                ),
-                cube_scan_members(
-                    time_dimension_expr(
-                        "?time_dimension_name",
-                        "?time_dimension_granularity",
-                        "?date_range",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                    ),
-                    member_replacer("?tail_group_expr", "?source_table_name"),
                 ),
                 self.transform_time_dimension(
                     "?source_table_name",
@@ -317,6 +302,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -333,6 +319,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
             ),
             rewrite(
@@ -348,6 +335,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?alias",
                 ),
@@ -360,6 +348,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
             ),
             transforming_rewrite(
@@ -375,6 +364,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?cube_aliases",
                         "?table_name",
+                        "?split",
                     ),
                     "?alias",
                 ),
@@ -387,6 +377,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?cube_aliases",
                     "?new_table_name",
+                    "?split",
                 ),
                 self.push_down_projection(
                     "?expr",
@@ -412,6 +403,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
+                        "?split",
                     ),
                 ),
                 cube_scan(
@@ -423,6 +415,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
+                    "?split",
                 ),
                 self.push_down_limit("?limit", "?new_limit"),
             ),
@@ -543,12 +536,6 @@ impl RewriteRules for MemberRules {
                 "alias-replacer-tail",
                 column_alias_replacer(cube_scan_members_empty_tail(), "?aliases", "?cube"),
                 cube_scan_members_empty_tail(),
-            ),
-            transforming_rewrite(
-                "sort-expr-column-name",
-                sort_expr("?expr", "?asc", "?nulls_first"),
-                sort_expr("?alias", "?asc", "?nulls_first"),
-                Self::transform_original_expr_alias("?expr", "?alias"),
             ),
             rewrite(
                 "binary-expr-addition-assoc",
@@ -1115,15 +1102,9 @@ impl MemberRules {
     ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
         transforming_chain_rewrite(
             &format!("measure-{}", name),
-            member_replacer(
-                aggr_aggr_expr("?aggr_expr", "?tail_aggr_expr"),
-                "?source_table_name",
-            ),
+            member_replacer("?aggr_expr", "?source_table_name"),
             vec![("?aggr_expr", aggr_expr)],
-            cube_scan_members(
-                "?measure",
-                member_replacer("?tail_aggr_expr", "?source_table_name"),
-            ),
+            "?measure".to_string(),
             self.transform_measure(
                 "?source_table_name",
                 measure_var,
@@ -1158,7 +1139,7 @@ impl MemberRules {
                         .map(|c| c.name.to_string())
                         .collect()
                 })
-                .unwrap_or(vec!["count".to_string()])
+                .unwrap_or(vec![Self::default_count_measure_name()])
             {
                 for cube_name in var_iter!(egraph[subst[var]], TableScanSourceTableName) {
                     if let Some(cube) = meta_context
@@ -1264,6 +1245,10 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    pub fn default_count_measure_name() -> String {
+        "count".to_string()
     }
 }
 

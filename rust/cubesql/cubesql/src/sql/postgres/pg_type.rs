@@ -1,8 +1,7 @@
 use datafusion::arrow::datatypes::DataType;
-use pg_srv::PgTypeId;
-use std::io;
+use pg_srv::{protocol, PgTypeId, ProtocolError};
 
-pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
+pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
     match dt {
         DataType::Boolean => Ok(PgTypeId::BOOL),
         DataType::Int16 => Ok(PgTypeId::INT2),
@@ -20,28 +19,30 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, io::Error> {
         },
         DataType::Null => Ok(PgTypeId::BOOL),
         DataType::List(field) => match field.data_type() {
-            DataType::Boolean => Ok(PgTypeId::ArrayBool),
-            DataType::Int8 => Ok(PgTypeId::ArrayInt2),
-            DataType::Int16 => Ok(PgTypeId::ArrayInt2),
-            DataType::Int32 => Ok(PgTypeId::ArrayInt4),
-            DataType::Int64 => Ok(PgTypeId::ArrayInt8),
-            DataType::UInt8 => Ok(PgTypeId::ArrayInt2),
-            DataType::UInt16 => Ok(PgTypeId::ArrayInt2),
-            DataType::UInt32 => Ok(PgTypeId::ArrayInt4),
-            DataType::UInt64 => Ok(PgTypeId::ArrayInt8),
-            DataType::Float16 => Ok(PgTypeId::ArrayFloat4),
-            DataType::Float32 => Ok(PgTypeId::ArrayFloat4),
-            DataType::Float64 => Ok(PgTypeId::ArrayFloat8),
-            DataType::Binary => Ok(PgTypeId::ArrayBytea),
-            DataType::Utf8 => Ok(PgTypeId::ArrayText),
-            dt => Err(io::Error::new(
-                io::ErrorKind::Other,
+            DataType::Boolean => Ok(PgTypeId::ARRAYBOOL),
+            DataType::Int8 => Ok(PgTypeId::ARRAYINT2),
+            DataType::Int16 => Ok(PgTypeId::ARRAYINT2),
+            DataType::Int32 => Ok(PgTypeId::ARRAYINT4),
+            DataType::Int64 => Ok(PgTypeId::ARRAYINT8),
+            DataType::UInt8 => Ok(PgTypeId::ARRAYINT2),
+            DataType::UInt16 => Ok(PgTypeId::ARRAYINT2),
+            DataType::UInt32 => Ok(PgTypeId::ARRAYINT4),
+            DataType::UInt64 => Ok(PgTypeId::ARRAYINT8),
+            DataType::Float16 => Ok(PgTypeId::ARRAYFLOAT4),
+            DataType::Float32 => Ok(PgTypeId::ARRAYFLOAT4),
+            DataType::Float64 => Ok(PgTypeId::ARRAYFLOAT8),
+            DataType::Binary => Ok(PgTypeId::ARRAYBYTEA),
+            DataType::Utf8 => Ok(PgTypeId::ARRAYTEXT),
+            dt => Err(protocol::ErrorResponse::error(
+                protocol::ErrorCode::FeatureNotSupported,
                 format!("Unsupported data type in List for pg-wire: {:?}", dt),
-            )),
+            )
+            .into()),
         },
-        dt => Err(io::Error::new(
-            io::ErrorKind::Other,
+        dt => Err(protocol::ErrorResponse::error(
+            protocol::ErrorCode::FeatureNotSupported,
             format!("Unsupported data type for pg-wire: {:?}", dt),
-        )),
+        )
+        .into()),
     }
 }

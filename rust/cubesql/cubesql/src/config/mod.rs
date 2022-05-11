@@ -1,14 +1,19 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::config::injection::{DIService, Injector};
-use crate::config::processing_loop::ProcessingLoop;
-use crate::sql::{
-    MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+use crate::{
+    config::{
+        injection::{DIService, Injector},
+        processing_loop::ProcessingLoop,
+    },
+    sql::{
+        MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
+        SqlAuthService,
+    },
+    telemetry::{start_track_event_loop, stop_track_event_loop},
+    transport::{HttpTransport, TransportService},
+    CubeError,
 };
-use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
-use crate::transport::{HttpTransport, TransportService};
-use crate::CubeError;
 use futures::future::join_all;
 use log::error;
 

@@ -41,7 +41,7 @@ export class PrestodbQuery extends BaseQuery {
   }
 
   timeStampCast(value) {
-    return `CAST(${value} as TIMESTAMP)`; // TODO
+    return `from_iso8601_timestamp(${value})`;
   }
 
   dateTimeCast(value) {

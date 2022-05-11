@@ -1,14 +1,11 @@
 use async_trait::async_trait;
-use cubeclient::apis::{
-    configuration::Configuration as ClientConfiguration, default_api as cube_api,
+use cubeclient::{
+    apis::{configuration::Configuration as ClientConfiguration, default_api as cube_api},
+    models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
 };
-use cubeclient::models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse};
 
-use std::fmt::Debug;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::RwLock as RwLockAsync;
-use tokio::time::Instant;
+use std::{fmt::Debug, sync::Arc, time::Duration};
+use tokio::{sync::RwLock as RwLockAsync, time::Instant};
 
 use crate::{compile::MetaContext, sql::AuthContext, CubeError};
 

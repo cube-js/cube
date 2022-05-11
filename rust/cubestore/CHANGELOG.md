@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.29.56](https://github.com/cube-js/cube.js/compare/v0.29.55...v0.29.56) (2022-05-06)
+
+
+### Features
+
+* **cubestore:** Wires ParquetMetadataCache ([#4297](https://github.com/cube-js/cube.js/issues/4297)) ([e20f0e7](https://github.com/cube-js/cube.js/commit/e20f0e78435c97a2b3cbaa7cb9c035d63f05ee18))
+
+
+
+
+
+## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Index selection for different permutations of columns in a group by omits sorted indexes ([#4455](https://github.com/cube-js/cube.js/issues/4455)) ([fb31edd](https://github.com/cube-js/cube.js/commit/fb31edd7ed86c9b3ef6a5e1391d47c670bd6560e))
+
+
+
+
+
 ## [0.29.52](https://github.com/cube-js/cube.js/compare/v0.29.51...v0.29.52) (2022-04-23)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

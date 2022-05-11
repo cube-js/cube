@@ -48,6 +48,7 @@ use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 use datafusion::logical_plan;
 use datafusion::optimizer::utils::expr_to_columns;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
@@ -112,6 +113,7 @@ pub async fn choose_index_ext(
     for (c, inputs) in collector.constraints.iter().zip(tables) {
         candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
     }
+
     // We pick partitioned index only when all tables request the same one.
     let mut indices: Vec<_> = match all_have_same_partitioned_index(&candidates) {
         true => candidates
@@ -450,6 +452,7 @@ impl ChooseIndex<'_> {
                     // Filled by workers
                     HashMap::new(),
                     Vec::new(),
+                    NoopParquetMetadataCache::new(),
                 )?);
 
                 let index_schema = source.schema();
@@ -494,8 +497,10 @@ async fn pick_index(
 
         // Skipping default index
         let filtered_by_sort_on = indices.iter().skip(1).filter(|i| {
-            if let Some((join_on_columns, _)) = sort_on.as_ref() {
-                // TODO: join_on_columns may be larger than sort_key_size of the index.
+            if let Some((join_on_columns, required)) = sort_on.as_ref() {
+                if i.get_row().sort_key_size() < (join_on_columns.len() as u64) {
+                    return false;
+                }
                 let join_columns_in_index = join_on_columns
                     .iter()
                     .map(|c| {
@@ -510,13 +515,18 @@ async fn pick_index(
                     None => return false,
                     Some(c) => c,
                 };
-                let join_columns_indices = CubeTable::project_to_index_positions(
+                let mut join_columns_indices = CubeTable::project_to_index_positions(
                     &join_columns_in_index
                         .iter()
                         .map(|c| c.get_name().to_string())
                         .collect(),
                     &i,
                 );
+
+                //TODO We are not touching indexes for join yet, because they should be the same sorted for different tables.
+                if !required {
+                    join_columns_indices.sort();
+                }
 
                 let matches = join_columns_indices
                     .iter()
@@ -593,6 +603,15 @@ async fn pick_index(
 
     let schema = Arc::new(schema);
     let create_snapshot = |index: &IdRow<Index>| {
+        let index_sort_on = sort_on.map(|sc| {
+            index
+                .get_row()
+                .columns()
+                .iter()
+                .take(sc.0.len())
+                .map(|c| c.get_name().clone())
+                .collect::<Vec<_>>()
+        });
         IndexSnapshot {
             index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
@@ -600,7 +619,7 @@ async fn pick_index(
                 table: table.clone(),
                 schema: schema.clone(),
             },
-            sort_on: sort_on.as_ref().map(|(cols, _)| (*cols).clone()),
+            sort_on: index_sort_on,
         }
     };
     Ok(IndexCandidate {
@@ -1027,7 +1046,76 @@ pub mod tests {
            \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
         );
 
-        // Should prefer a non-default index for joins.
+        let plan = initial_plan(
+            "SELECT order_customer, order_id \
+             FROM s.Orders \
+             GROUP BY order_customer, order_id
+             ",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
+                       \n  Aggregate\
+                       \n    ClusterSend, indices: [[2]]\
+                       \n      Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
+        let plan = initial_plan(
+            "SELECT order_customer, order_id \
+             FROM s.Orders \
+             GROUP BY order_id, order_customer
+             ",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
+
+        let plan = initial_plan(
+            "SELECT order_customer, order_id \
+             FROM s.Orders \
+             WHERE order_customer = 'ffff'
+             GROUP BY order_customer, order_id
+             ",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
+                       \n  Aggregate\
+                       \n    ClusterSend, indices: [[3]]\
+                       \n      Filter\
+                       \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
+
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
+
+        let plan = initial_plan(
+            "SELECT order_customer, order_id \
+             FROM s.Orders \
+             WHERE order_customer = 'ffff'
+             GROUP BY order_id, order_customer
+             ",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
+
+        let plan = initial_plan(
+            "SELECT order_customer, order_id \
+             FROM s.Orders \
+             WHERE order_customer = 'ffff'
+             GROUP BY order_id, order_customer, order_product
+             ",
+            &indices,
+        );
+        let plan = choose_index(&plan, &indices).await.unwrap().0;
+
+        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
+                       \n  Aggregate\
+                       \n    ClusterSend, indices: [[2]]\
+                       \n      Filter\
+                       \n        Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer, order_product]), fields: [order_id, order_customer, order_product]";
+
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
+
+        //Should prefer a non-default index for joins.
         let plan = initial_plan(
             "SELECT order_id, order_amount, customer_name \
              FROM s.Orders \
@@ -1072,7 +1160,7 @@ pub mod tests {
                                   \n      Join on: [#s.Orders.order_customer = #c1.customer_id]\
                                   \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
                                   \n        Filter\
-                                  \n          Scan c1, source: CubeTable(index: default:0:[]), fields: [customer_id, customer_name]\
+                                  \n          Scan c1, source: CubeTable(index: default:0:[]:sort_on[customer_id, customer_name]), fields: [customer_id, customer_name]\
                                   \n      Scan c2, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]");
     }
 
@@ -1443,6 +1531,7 @@ pub mod tests {
             None,
             None,
         ));
+
         i.indices.push(
             Index::try_new(
                 "by_customer".to_string(),

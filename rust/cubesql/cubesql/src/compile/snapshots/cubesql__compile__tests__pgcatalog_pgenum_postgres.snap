@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_enum\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+-----------+---------------+-----------+
+| oid | enumtypid | enumsortorder | enumlabel |
++-----+-----------+---------------+-----------+
++-----+-----------+---------------+-----------+

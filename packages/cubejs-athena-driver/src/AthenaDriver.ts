@@ -130,7 +130,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       credentials: this.config.credentials,
       region: this.config.region,
     });
-
     const { bucket, prefix } = AthenaDriver.splitS3Path(path);
     const list = await client.listObjectsV2({
       Bucket: bucket,
@@ -138,7 +137,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       Prefix: prefix.slice(1),
     });
     if (list.Contents === undefined) {
-      throw new Error(`Unable to UNLOAD table ${path}`);
+      return {
+        csvFile: [],
+        types,
+      };
     }
     const csvFile = await Promise.all(
       list.Contents.map(async (file) => {
@@ -171,15 +173,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
       } : s))
     );
-
-    const { QueryExecutionId } = await this.athena.startQueryExecution({
+    const request = {
       QueryString: queryString,
       WorkGroup: this.config.workGroup,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       }
-    });
-
+    };
+    const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
   }
 
