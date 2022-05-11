@@ -121,11 +121,23 @@ impl CompilationError {
             CompilationError::Unsupported(_) => None,
         }
     }
+
+    pub fn to_backtrace(self) -> Option<Backtrace> {
+        match self {
+            CompilationError::Internal(_, bt) => Some(bt),
+            CompilationError::User(_) => None,
+            CompilationError::Unsupported(_) => None,
+        }
+    }
 }
 
 impl CompilationError {
     pub fn internal(message: String) -> Self {
         Self::Internal(message, Backtrace::capture())
+    }
+
+    pub fn internal_with_bt(message: String, bt: Backtrace) -> Self {
+        Self::Internal(message, bt)
     }
 }
 
@@ -2413,10 +2425,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
             .map_err(|e| match &e.cause {
-                CubeErrorCauseType::Internal => CompilationError::internal(format!(
-                    "Error during rewrite: {}. Please check logs for additional information.",
-                    e.message
-                )),
+                CubeErrorCauseType::Internal => CompilationError::internal_with_bt(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
+                ),
                 CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
             });
         if let Err(_) = &result {
