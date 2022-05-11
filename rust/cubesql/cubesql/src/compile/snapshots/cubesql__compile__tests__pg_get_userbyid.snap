@@ -1,0 +1,23 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT pg_get_userbyid(t.id)\n                FROM information_schema.testing_dataset t\n                WHERE t.id < 15;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------+
+| pg_get_userbyid(t.id) |
++-----------------------+
+| unknown (OID=0)       |
+| unknown (OID=1)       |
+| unknown (OID=2)       |
+| unknown (OID=3)       |
+| unknown (OID=4)       |
+| unknown (OID=5)       |
+| unknown (OID=6)       |
+| unknown (OID=7)       |
+| unknown (OID=8)       |
+| unknown (OID=9)       |
+| ovr                   |
+| unknown (OID=11)      |
+| unknown (OID=12)      |
+| unknown (OID=13)      |
+| unknown (OID=14)      |
++-----------------------+

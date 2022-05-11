@@ -39,19 +39,19 @@ use self::{
         provider::CubeContext,
         udf::{
             create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
-            create_current_schemas_udf, create_current_timestamp, create_current_user_udf,
+            create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
             create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_get_constraintdef_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf, create_pg_get_expr_udf,
-            create_pg_get_userbyid, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-            create_pg_numeric_scale_udf, create_pg_table_is_visible, create_pg_type_is_visible,
-            create_quarter_udf, create_second_udf, create_str_to_date, create_time_format_udf,
-            create_timediff_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
-            create_version_udf, create_year_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf, create_hour_udf,
+            create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf,
+            create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
+            create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+            create_pg_numeric_scale_udf, create_pg_table_is_visible_udf,
+            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
+            create_str_to_date_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2329,7 +2329,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
         ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
-        ctx.register_udf(create_pg_backend_pid(self.state.clone()));
+        ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
         ctx.register_udf(create_user_udf(self.state.clone()));
         ctx.register_udf(create_current_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
@@ -2353,28 +2353,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_dayofyear_udf());
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
-        ctx.register_udf(create_str_to_date());
-        ctx.register_udf(create_current_timestamp());
+        ctx.register_udf(create_str_to_date_udf());
+        ctx.register_udf(create_current_timestamp_udf());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
-        ctx.register_udf(create_format_type_udf("format_type"));
-        ctx.register_udf(create_format_type_udf("pg_catalog.format_type"));
+        ctx.register_udf(create_format_type_udf());
         ctx.register_udf(create_pg_datetime_precision_udf());
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         ctx.register_udf(create_pg_get_expr_udf());
-        ctx.register_udf(create_pg_table_is_visible());
-        ctx.register_udf(create_pg_get_userbyid());
-        ctx.register_udf(create_pg_type_is_visible());
-        ctx.register_udf(create_get_constraintdef_udf());
+        ctx.register_udf(create_pg_table_is_visible_udf());
+        ctx.register_udf(create_pg_type_is_visible_udf());
+        ctx.register_udf(create_pg_get_constraintdef_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
 
         // udtf
-        ctx.register_udtf(create_generate_series_udtf(true));
-        ctx.register_udtf(create_generate_series_udtf(false));
+        ctx.register_udtf(create_generate_series_udtf());
         ctx.register_udtf(create_unnest_udtf());
         ctx.register_udtf(create_generate_subscripts_udtf());
         ctx.register_udtf(create_pg_expandarray_udtf());
@@ -6460,18 +6457,14 @@ ORDER BY \"COUNT(count)\" DESC"
     #[tokio::test]
     async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "pg_get_userbyid_main",
+            "pg_get_userbyid",
             execute_query(
-                "SELECT pg_get_userbyid(10);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "pg_get_userbyid_invalid",
-            execute_query(
-                "SELECT pg_get_userbyid(0);".to_string(),
+                "
+                SELECT pg_get_userbyid(t.id)
+                FROM information_schema.testing_dataset t
+                WHERE t.id < 15;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6757,6 +6750,20 @@ ORDER BY \"COUNT(count)\" DESC"
                 ORDER BY t.d ASC
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_catalog_udf_search_path() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_catalog_udf_search_path",
+            execute_query(
+                "SELECT version() UNION ALL SELECT pg_catalog.version();".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
