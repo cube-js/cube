@@ -9,8 +9,8 @@ use datafusion::{
         SessionContext as DFSessionContext,
     },
     logical_plan::{
-        plan::{Extension, Projection},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+        plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
+        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, ToDFSchema,
     },
     prelude::*,
     scalar::ScalarValue,
@@ -70,7 +70,7 @@ use crate::{
         df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
         V1CubeMetaSegmentExt,
     },
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 
 pub mod builder;
@@ -121,11 +121,23 @@ impl CompilationError {
             CompilationError::Unsupported(_) => None,
         }
     }
+
+    pub fn to_backtrace(self) -> Option<Backtrace> {
+        match self {
+            CompilationError::Internal(_, bt) => Some(bt),
+            CompilationError::User(_) => None,
+            CompilationError::Unsupported(_) => None,
+        }
+    }
 }
 
 impl CompilationError {
     pub fn internal(message: String) -> Self {
         Self::Internal(message, Backtrace::capture())
+    }
+
+    pub fn internal_with_bt(message: String, bt: Backtrace) -> Self {
+        Self::Internal(message, bt)
     }
 }
 
@@ -1427,6 +1439,12 @@ impl QueryPlanner {
             }
         };
 
+        if select.into.is_some() {
+            return Err(CompilationError::Unsupported(
+                "Unsupported query type: SELECT INTO".to_string(),
+            ));
+        }
+
         let from_table = if select.from.len() == 1 {
             &select.from[0]
         } else {
@@ -1690,7 +1708,15 @@ impl QueryPlanner {
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
                 self.explain_table_to_plan(&table_name)
             }
-            (ast::Statement::Explain { statement, .. }, _) => self.explain_to_plan(&statement),
+            (
+                ast::Statement::Explain {
+                    statement,
+                    verbose,
+                    analyze,
+                    ..
+                },
+                _,
+            ) => self.explain_to_plan(&statement, *verbose, *analyze),
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -2071,23 +2097,56 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn explain_to_plan(
         &self,
         statement: &Box<ast::Statement>,
+        verbose: bool,
+        analyze: bool,
     ) -> Result<QueryPlan, CompilationError> {
         let plan = self.plan(&statement)?;
 
-        return Ok(QueryPlan::MetaTabular(
-            StatusFlags::empty(),
-            Box::new(dataframe::DataFrame::new(
-                vec![dataframe::Column::new(
-                    "Execution Plan".to_string(),
-                    ColumnType::String,
-                    ColumnFlags::empty(),
-                )],
-                vec![dataframe::Row::new(vec![dataframe::TableValue::String(
-                    plan.print(true)
-                        .map_err(|error| CompilationError::internal(error.message))?,
-                )])],
+        match plan {
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
+                StatusFlags::empty(),
+                Box::new(dataframe::DataFrame::new(
+                    vec![dataframe::Column::new(
+                        "Execution Plan".to_string(),
+                        ColumnType::String,
+                        ColumnFlags::empty(),
+                    )],
+                    vec![dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "This query doesnt have a plan, because it already has values for response"
+                            .to_string(),
+                    )])],
+                )),
             )),
-        ));
+            QueryPlan::DataFusionSelect(flags, plan, context) => {
+                let plan = Arc::new(plan);
+                let schema = LogicalPlan::explain_schema();
+                let schema = schema.to_dfschema_ref().map_err(|err| {
+                    CompilationError::internal(format!(
+                        "Unable to get DF schema for explain plan: {}",
+                        err
+                    ))
+                })?;
+
+                let explain_plan = if analyze {
+                    LogicalPlan::Analyze(Analyze {
+                        verbose,
+                        input: plan,
+                        schema,
+                    })
+                } else {
+                    let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
+
+                    LogicalPlan::Explain(Explain {
+                        verbose,
+                        plan,
+                        stringified_plans,
+                        schema,
+                    })
+                };
+
+                Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
+            }
+        }
     }
 
     fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
@@ -2324,6 +2383,18 @@ WHERE `TABLE_SCHEMA` = '{}'",
     }
 
     fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+        match &stmt {
+            ast::Statement::Query(query) => match &query.body {
+                ast::SetExpr::Select(select) if select.into.is_some() => {
+                    return Err(CompilationError::Unsupported(
+                        "Unsupported query type: SELECT INTO".to_string(),
+                    ))
+                }
+                _ => (),
+            },
+            _ => (),
+        }
+
         let ctx = self.create_execution_ctx();
 
         let df_state = Arc::new(ctx.state.write().clone());
@@ -2336,7 +2407,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
 
         let plan = df_query_planner
-            .statement_to_plan(DFStatement::Statement(Box::new(stmt)))
+            .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
                 CompilationError::internal(format!("Initial planning error: {}", err))
             })?;
@@ -2349,11 +2420,26 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
         let root = converter
             .add_logical_plan(&optimized_plan)
-            .map_err(|e| CompilationError::User(e.to_string()))?;
-        let rewrite_plan = converter
+            .map_err(|e| CompilationError::internal(e.to_string()))?;
+        let result = converter
             .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
-            .map_err(|e| CompilationError::User(e.to_string()))?; // TODO error
+            .map_err(|e| match &e.cause {
+                CubeErrorCauseType::Internal => CompilationError::internal_with_bt(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
+                ),
+                CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
+            });
+        if let Err(_) = &result {
+            log::debug!("Can't rewrite AST: {:#?}", stmt);
+            log::error!("Can't rewrite plan: {:#?}", optimized_plan);
+            log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.")
+        }
+        let rewrite_plan = result?;
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
 
@@ -5750,19 +5836,34 @@ mod tests {
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
-            execute_query("explain select 1+1;".to_string(), DatabaseProtocol::MySQL).await?
+            execute_query("EXPLAIN SELECT 1+1;".to_string(), DatabaseProtocol::MySQL).await?
         );
+
+        insta::assert_snapshot!(
+            execute_query(
+                "EXPLAIN VERBOSE SELECT 1+1;".to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        // Execute without asserting with fixture, because metrics can change
+        execute_query(
+            "EXPLAIN ANALYZE SELECT 1+1;".to_string(),
+            DatabaseProtocol::MySQL,
+        )
+        .await?;
 
         // SELECT with table and specific columns
         execute_query(
-            "explain select count, avgPrice from KibanaSampleDataEcommerce;".to_string(),
+            "EXPLAIN SELECT count, avgPrice FROM KibanaSampleDataEcommerce;".to_string(),
             DatabaseProtocol::MySQL,
         )
         .await?;
 
         // EXPLAIN for Postgres
         execute_query(
-            "explain select 1+1;".to_string(),
+            "EXPLAIN SELECT 1+1;".to_string(),
             DatabaseProtocol::PostgreSQL,
         )
         .await?;
@@ -6176,36 +6277,13 @@ mod tests {
     #[tokio::test]
     async fn test_format_type_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "format_type_simple",
+            "format_type",
             execute_query(
-                "SELECT format_type(19, NULL);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_mod",
-            execute_query(
-                "SELECT format_type(1184, 5);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_unknown",
-            execute_query(
-                "SELECT format_type(1, NULL);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "format_type_none",
-            execute_query(
-                "SELECT format_type(0, NULL);".to_string(),
+                "
+                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f
+                FROM pg_catalog.pg_type t;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6618,6 +6696,26 @@ mod tests {
             .await?
         );
 
+        insta::assert_snapshot!(
+            "superset_attype_query",
+            execute_query(
+                r#"SELECT
+                    t.typname as "name",
+                    pg_catalog.format_type(t.typbasetype, t.typtypmod) as "attype",
+                    not t.typnotnull as "nullable",
+                    t.typdefault as "default",
+                    pg_catalog.pg_type_is_visible(t.oid) as "visible",
+                    n.nspname as "schema"
+                FROM pg_catalog.pg_type t
+                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+                WHERE t.typtype = 'd'
+                ;"#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -6778,13 +6876,50 @@ mod tests {
                             AND n.nspname <> 'information_schema' )
                        OR ( c.relkind = 'v'
                             AND n.nspname <> 'pg_catalog'
-                            AND n.nspname <> 'information_schema' ) );"
-                    .to_string(),
+                            AND n.nspname <> 'information_schema' ) )
+            ORDER BY TABLE_SCHEM ASC, TABLE_NAME ASC
+            ;"
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn tableau_temporary_tables() {
+        let create_query = convert_sql_to_cube_query(
+            &"
+            CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (
+                \"COL\" INTEGER
+            ) ON COMMIT PRESERVE ROWS
+            ".to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL),
+        );
+        match create_query {
+            Err(CompilationError::Unsupported(msg)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
+        };
+
+        let select_into_query = convert_sql_to_cube_query(
+            &"
+            SELECT *
+            INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\"
+            FROM (SELECT 1 AS COL) AS CHECKTEMP
+            LIMIT 1
+            "
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL),
+        );
+        match select_into_query {
+            Err(CompilationError::Unsupported(msg)) => {
+                assert_eq!(msg, "Unsupported query type: SELECT INTO")
+            }
+            _ => panic!("SELECT INTO should throw CompilationError::Unsupported"),
+        }
     }
 }

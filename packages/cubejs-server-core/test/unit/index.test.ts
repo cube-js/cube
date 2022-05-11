@@ -2,8 +2,9 @@
 
 import { withTimeout } from '@cubejs-backend/shared';
 
-import { CreateOptions, CubejsServerCore, ServerCoreInitializedOptions } from '../../src';
+import { CreateOptions, CubejsServerCore, SchemaFileRepository, ServerCoreInitializedOptions } from '../../src';
 import { DatabaseType } from '../../src/core/types';
+import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
@@ -18,6 +19,37 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
   public createOrchestratorApi = super.createOrchestratorApi;
 }
+
+const repositoryWithoutPreAggregations: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+  
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
+const repositoryWithoutContent: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
+};
 
 describe('index.test', () => {
   beforeEach(() => {
@@ -100,7 +132,7 @@ describe('index.test', () => {
       await driverFactory('mongo');
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, dbType must return string (dataSource: "mongo"), actual: null');
     }
   });
@@ -115,7 +147,7 @@ describe('index.test', () => {
       await driverFactory('default');
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, driverFactory must return driver (dataSource: "default"), actual: null');
     }
   });
@@ -130,7 +162,7 @@ describe('index.test', () => {
       await orchestratorOptions.externalDriverFactory();
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('Unexpected return type, externalDriverFactory must return driver, actual: null');
     }
   });
@@ -271,6 +303,55 @@ describe('index.test', () => {
     expect(compilerApi.options.allowNodeRequire).toStrictEqual(false);
 
     await cubejsServerCore.releaseConnections();
+  });
+
+  describe('CompilerApi', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(repositoryWithoutPreAggregations, <any>'mysql', { logger });
+    const metaConfigSpy = jest.spyOn(compilerApi, 'metaConfig');
+    const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
+
+    test('CompilerApi metaConfig', async () => {
+      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      expect(metaConfig?.length).toBeGreaterThan(0);
+      expect(metaConfig[0]).toHaveProperty('config');
+      expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfigExtended', async () => {
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
+      expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtendedSpy).toHaveBeenCalled();
+      metaConfigExtendedSpy.mockClear();
+    });
+  });
+
+  describe('CompilerApi with empty cube on input', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(repositoryWithoutContent, <any>'mysql', { logger });
+    const metaConfigSpy = jest.spyOn(compilerApi, 'metaConfig');
+    const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
+
+    test('CompilerApi metaConfig', async () => {
+      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      expect(metaConfig).toEqual([]);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
+    test('CompilerApi metaConfigExtended', async () => {
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended.metaConfig).toEqual([]);
+      expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtended.cubeDefinitions).toEqual({});
+      expect(metaConfigExtendedSpy).toHaveBeenCalled();
+      metaConfigExtendedSpy.mockClear();
+    });
   });
 
   test('Should create instance of CubejsServerCore, dbType from process.env.CUBEJS_DB_TYPE', () => {

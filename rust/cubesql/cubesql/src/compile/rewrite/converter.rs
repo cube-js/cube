@@ -774,7 +774,7 @@ pub fn node_to_expr(
         }
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
         LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
-            let expr = Box::new(to_expr(params[0]).clone()?);
+            let expr = Box::new(to_expr(params[0])?);
             let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
             Expr::GetIndexedField { expr, key }
         }
@@ -1266,6 +1266,16 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
+                        if query_measures.len() == 0
+                            && query_dimensions.len() == 0
+                            && query_time_dimensions.len() == 0
+                        {
+                            return Err(CubeError::internal(
+                                "Can't detect Cube query and it may be not supported yet"
+                                    .to_string(),
+                            ));
+                        }
+
                         query.measures = Some(query_measures.into_iter().unique().collect());
                         query.dimensions = Some(query_dimensions.into_iter().unique().collect());
                         query.time_dimensions = if query_time_dimensions.len() > 0 {
@@ -1296,16 +1306,26 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
+
                         if let Some(aliases) = aliases {
+                            let mut new_fields = Vec::with_capacity(aliases.len());
+
                             // Aliases serve solely column ordering purpose as fields generally not ordered
-                            let new_fields = aliases
-                                .iter()
-                                .map(|a| {
-                                    fields.iter().find(|(f, _)| f.name() == a).unwrap().clone()
-                                })
-                                .collect();
+                            for alias in aliases.iter() {
+                                let field_for_alias = fields
+                                    .iter()
+                                    .find(|(f, _)| f.name() == alias)
+                                    .ok_or(CubeError::internal(format!(
+                                        "Unable to find field for alias {}",
+                                        alias
+                                    )))?;
+
+                                new_fields.push(field_for_alias.clone());
+                            }
+
                             fields = new_fields;
                         }
+
                         let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(

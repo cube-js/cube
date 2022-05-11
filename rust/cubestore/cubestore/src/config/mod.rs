@@ -25,11 +25,13 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -344,6 +346,10 @@ pub trait ConfigObj: DIService {
 
     fn max_cached_queries(&self) -> usize;
 
+    fn metadata_cache_max_capacity_bytes(&self) -> u64;
+
+    fn metadata_cache_time_to_idle_secs(&self) -> u64;
+
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
@@ -384,6 +390,8 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
+    pub metadata_cache_max_capacity_bytes: u64,
+    pub metadata_cache_time_to_idle_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -515,6 +523,12 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
+    fn metadata_cache_max_capacity_bytes(&self) -> u64 {
+        self.metadata_cache_max_capacity_bytes
+    }
+    fn metadata_cache_time_to_idle_secs(&self) -> u64 {
+        self.metadata_cache_time_to_idle_secs
+    }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
@@ -537,7 +551,7 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-fn env_parse<T>(name: &str, default: T) -> T
+pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
@@ -656,6 +670,14 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                metadata_cache_max_capacity_bytes: env_parse(
+                    "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
+                    0,
+                ),
+                metadata_cache_time_to_idle_secs: env_parse(
+                    "CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS",
+                    0,
+                ),
             }),
         }
     }
@@ -704,6 +726,8 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                metadata_cache_max_capacity_bytes: 0,
+                metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
@@ -1022,6 +1046,21 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
+                let c = i.get_service_typed::<dyn ConfigObj>().await;
+                CubestoreParquetMetadataCacheImpl::new(
+                    match c.metadata_cache_max_capacity_bytes() {
+                        0 => NoopParquetMetadataCache::new(),
+                        max_cached_metadata => LruParquetMetadataCache::new(
+                            max_cached_metadata,
+                            Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
+                        ),
+                    },
+                )
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
                 CompactionServiceImpl::new(
                     i.get_service_typed().await,
@@ -1072,8 +1111,8 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn QueryExecutor, _, _, _>(async move |_| {
-                Arc::new(QueryExecutorImpl)
+            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                QueryExecutorImpl::new(i.get_service_typed().await)
             })
             .await;
 

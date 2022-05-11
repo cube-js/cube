@@ -25,7 +25,6 @@ use core::fmt;
 use cubeclient::apis::default_api::{LoadV1Error, MetaV1Error};
 use datafusion::arrow;
 use log::SetLoggerError;
-use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::{Debug, Formatter};
 use sqlparser::parser::ParserError;
 use std::{backtrace::Backtrace, num::ParseIntError};
@@ -37,13 +36,14 @@ pub mod sql;
 pub mod telemetry;
 pub mod transport;
 
-#[derive(thiserror::Error, Debug, Clone, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug)]
 pub struct CubeError {
     pub message: String,
     pub cause: CubeErrorCauseType,
+    pub backtrace: Option<Backtrace>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum CubeErrorCauseType {
     User,
     Internal,
@@ -54,6 +54,7 @@ impl CubeError {
         CubeError {
             message,
             cause: CubeErrorCauseType::User,
+            backtrace: Some(Backtrace::capture()),
         }
     }
 
@@ -61,21 +62,26 @@ impl CubeError {
         CubeError {
             message,
             cause: CubeErrorCauseType::Internal,
+            backtrace: Some(Backtrace::capture()),
         }
     }
 
-    pub fn from_error<E: fmt::Display>(error: E) -> CubeError {
+    pub fn internal_with_bt(message: String, backtrace: Option<Backtrace>) -> CubeError {
         CubeError {
-            message: format!("{}\n{}", error, Backtrace::capture()),
+            message,
             cause: CubeErrorCauseType::Internal,
+            backtrace,
         }
     }
+}
 
-    fn from_debug_error<E: Debug>(error: E) -> CubeError {
-        CubeError {
-            message: format!("{:?}\n{}", error, Backtrace::capture()),
-            cause: CubeErrorCauseType::Internal,
-        }
+impl CubeError {
+    pub fn backtrace(&self) -> Option<&Backtrace> {
+        self.backtrace.as_ref()
+    }
+
+    pub fn to_backtrace(self) -> Option<Backtrace> {
+        self.backtrace
     }
 }
 
@@ -122,13 +128,13 @@ impl From<cubeclient::apis::Error<MetaV1Error>> for CubeError {
 
 impl From<crate::compile::CompilationError> for CubeError {
     fn from(v: crate::compile::CompilationError) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal_with_bt(v.to_string(), v.to_backtrace())
     }
 }
 
 impl From<std::io::Error> for CubeError {
     fn from(v: std::io::Error) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal(v.to_string())
     }
 }
 
@@ -149,7 +155,7 @@ where
     T: Debug,
 {
     fn from(v: SendError<T>) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal(v.to_string())
     }
 }
 
@@ -167,19 +173,19 @@ impl From<Elapsed> for CubeError {
 
 impl From<tokio::sync::broadcast::error::RecvError> for CubeError {
     fn from(v: tokio::sync::broadcast::error::RecvError) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<arrow::error::ArrowError> for CubeError {
     fn from(v: arrow::error::ArrowError) -> Self {
-        CubeError::internal(format!("{:?}\n{}", v, Backtrace::capture()))
+        CubeError::internal(v.to_string())
     }
 }
 
@@ -197,65 +203,65 @@ impl From<std::string::FromUtf8Error> for CubeError {
 
 impl From<tokio::sync::oneshot::error::RecvError> for CubeError {
     fn from(v: tokio::sync::oneshot::error::RecvError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for CubeError {
     fn from(v: Box<bincode::ErrorKind>) -> Self {
-        CubeError::from_debug_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
     fn from(v: tokio::sync::watch::error::SendError<bool>) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<tokio::sync::watch::error::RecvError> for CubeError {
     fn from(v: tokio::sync::watch::error::RecvError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 impl From<ParseIntError> for CubeError {
     fn from(v: ParseIntError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<reqwest::Error> for CubeError {
     fn from(v: reqwest::Error) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<SetLoggerError> for CubeError {
     fn from(v: SetLoggerError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<serde_json::Error> for CubeError {
     fn from(v: serde_json::Error) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<std::num::ParseFloatError> for CubeError {
     fn from(v: std::num::ParseFloatError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<base64::DecodeError> for CubeError {
     fn from(v: base64::DecodeError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }
 
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
-        CubeError::from_error(v)
+        CubeError::internal(v.to_string())
     }
 }

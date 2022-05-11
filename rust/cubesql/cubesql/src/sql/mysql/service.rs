@@ -82,7 +82,14 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                error!("Error during processing {}: {}", query, e.to_string());
+                error!("Error during processing MySQL {}: {}", query, e.to_string());
+
+                if let Some(bt) = e.backtrace() {
+                    trace!("{}", bt);
+                } else {
+                    trace!("Backtrace: not found");
+                }
+
                 results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
 
                 Ok(())

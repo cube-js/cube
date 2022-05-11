@@ -172,6 +172,14 @@ export class CompilerApi {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 
+  async metaConfigExtended(options) {
+    const { metaTransformer } = await this.getCompilers(options);
+    return {
+      metaConfig: metaTransformer?.cubes,
+      cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
+    };
+  }
+
   canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(transformedQuery, refs);
   }

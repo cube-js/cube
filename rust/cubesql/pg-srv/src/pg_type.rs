@@ -16,6 +16,7 @@ pub struct PgType<'a> {
     pub typarray: u32,
     pub typalign: &'static str,
     pub typstorage: &'static str,
+    pub typbasetype: u32,
 }
 
 macro_rules! define_pg_types {
@@ -77,6 +78,7 @@ const UNSPECIFIED: &PgType = &PgType {
     typarray: 0,
     typalign: "-",
     typstorage: "-",
+    typbasetype: 0,
 };
 
 define_pg_types![
@@ -96,6 +98,7 @@ define_pg_types![
         typarray: 0,
         typalign: "c",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     BYTEA (17) {
@@ -114,6 +117,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     NAME (19) {
@@ -132,6 +136,7 @@ define_pg_types![
         typarray: 0,
         typalign: "c",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INT8 (20) {
@@ -150,6 +155,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INT2 (21) {
@@ -168,6 +174,7 @@ define_pg_types![
         typarray: 0,
         typalign: "s",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INT4 (23) {
@@ -186,6 +193,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TEXT (25) {
@@ -204,6 +212,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     OID (26) {
@@ -222,6 +231,7 @@ define_pg_types![
         typarray: 1028,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TID (27) {
@@ -240,6 +250,7 @@ define_pg_types![
         typarray: 1010,
         typalign: "s",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     PGCLASS (83) {
@@ -258,6 +269,7 @@ define_pg_types![
         typarray: 273,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     FLOAT4 (700) {
@@ -276,6 +288,7 @@ define_pg_types![
         typarray: 1021,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     FLOAT8 (701) {
@@ -294,6 +307,7 @@ define_pg_types![
         typarray: 1022,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     MONEY (790) {
@@ -312,6 +326,7 @@ define_pg_types![
         typarray: 791,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INET (869) {
@@ -330,6 +345,7 @@ define_pg_types![
         typarray: 1041,
         typalign: "i",
         typstorage: "m",
+        typbasetype: 0,
     },
 
     ARRAYBOOL (1000) {
@@ -348,6 +364,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYBYTEA (1001) {
@@ -366,6 +383,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYINT2 (1005) {
@@ -384,6 +402,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYINT4 (1007) {
@@ -402,6 +421,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYTEXT (1009) {
@@ -420,6 +440,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYINT8 (1016) {
@@ -438,6 +459,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYFLOAT4 (1021) {
@@ -456,6 +478,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ARRAYFLOAT8 (1022) {
@@ -474,6 +497,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     BPCHAR (1042) {
@@ -492,6 +516,7 @@ define_pg_types![
         typarray: 1014,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     VARCHAR (1043) {
@@ -510,6 +535,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     DATE (1082) {
@@ -528,6 +554,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TIME (1083) {
@@ -546,6 +573,7 @@ define_pg_types![
         typarray: 1183,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TIMESTAMP (1114) {
@@ -564,6 +592,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TIMESTAMPTZ (1184) {
@@ -582,6 +611,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INTERVAL (1186) {
@@ -600,6 +630,7 @@ define_pg_types![
         typarray: 1187,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     TIMETZ (1266) {
@@ -618,6 +649,7 @@ define_pg_types![
         typarray: 1270,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     NUMERIC (1700) {
@@ -636,6 +668,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "m",
+        typbasetype: 0,
     },
 
     RECORD (2249) {
@@ -654,6 +687,7 @@ define_pg_types![
         typarray: 2287,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ANYARRAY (2277) {
@@ -672,6 +706,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     ANYELEMENT (2283) {
@@ -690,6 +725,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     INT4RANGE (3904) {
@@ -708,6 +744,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     NUMRANGE (3906) {
@@ -726,6 +763,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     TSRANGE (3908) {
@@ -744,6 +782,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     PGLSN (3220) {
@@ -762,6 +801,7 @@ define_pg_types![
         typarray: 3221,
         typalign: "d",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     ANYENUM (3500) {
@@ -780,6 +820,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "p",
+        typbasetype: 0,
     },
 
     ANYRANGE (3831) {
@@ -798,6 +839,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     TSTZRANGE (3910) {
@@ -816,6 +858,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     DATERANGE (3912) {
@@ -834,6 +877,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     INT8RANGE (3926) {
@@ -852,6 +896,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     NUMMULTIRANGE (4532) {
@@ -870,6 +915,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     TSMULTIRANGE (4533) {
@@ -888,6 +934,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     DATEMULTIRANGE (4535) {
@@ -906,6 +953,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     INT8MULTIRANGE (4536) {
@@ -924,6 +972,7 @@ define_pg_types![
         typarray: 0,
         typalign: "d",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     INT4MULTIRANGE (4451) {
@@ -942,6 +991,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 0,
     },
 
     CHARACTERDATA (13408) {
@@ -960,6 +1010,7 @@ define_pg_types![
         typarray: 0,
         typalign: "i",
         typstorage: "x",
+        typbasetype: 1043,
     },
 
     SQLIDENTIFIER (13410) {
@@ -978,6 +1029,7 @@ define_pg_types![
         typarray: 0,
         typalign: "c",
         typstorage: "p",
+        typbasetype: 19,
     },
 ];
 

@@ -178,7 +178,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             filter_multiple_in_for_decimal,
         ),
         t("panic_worker", panic_worker),
-        t("filter_index_selection", filter_index_selection),
+        t("planning_filter_index_selection", planning_filter_index_selection),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2909,7 +2909,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     );
 }
 
-async fn filter_index_selection(service: Box<dyn SqlClient>) {
+async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.Orders(a int, b int, c int, d int, amount int)")
@@ -4752,7 +4752,7 @@ async fn panic_worker(service: Box<dyn SqlClient>) {
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
-fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
         .iter()
