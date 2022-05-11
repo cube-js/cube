@@ -24,7 +24,7 @@ cube(`Suppliers`, {
       primaryKey: true,
       /**
        * Demo 4
-       * Multitenancy
+       * Multi-tenancy
        */
       shown: true
     },
