@@ -24,6 +24,7 @@ import { downloadJDBCDriver } from './installer';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
+    maxpool?: number,
     readOnly?: boolean,
     // common bucket config
     bucketType?: string,
@@ -86,8 +87,23 @@ async function resolveJDBCDriver(): Promise<string> {
 }
 
 export class DatabricksDriver extends JDBCDriver {
-  public static concurrency(): number {
-    return 20;
+  public static monoConcurrencyDefault(): number {
+    return 4;
+  }
+
+  public static calcConcurrency(mono: number, forcePreaggs = false): {
+    maxpool: number;
+    queries: number;
+    preaggs: number;
+  } {
+    switch (mono) {
+      default:
+        return {
+          maxpool: 8,
+          queries: 2,
+          preaggs: forcePreaggs ? 6 : 2,
+        };
+    }
   }
 
   public static dialectClass() {

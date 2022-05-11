@@ -3,12 +3,12 @@ import type { BaseDriver } from '../driver';
 export type DriverFactory = () => (Promise<BaseDriver> | BaseDriver);
 export type DriverFactoryByDataSource = (dataSource: string) => (Promise<BaseDriver> | BaseDriver);
 export type getConcurrencyFn = (dataSource?: string) => {
-  poolSize: number,
-  workersNumber: number,
-  queriesNumber: number,
+  maxpool: number;
+  queries: number;
+  preaggs: number;
 };
 export type concurrencyFactoryFn = () => {
-  poolSize: number,
-  workersNumber: number,
-  queriesNumber: number,
+  maxpool: number;
+  queries: number;
+  preaggs: number;
 };

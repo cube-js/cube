@@ -1592,7 +1592,6 @@ export class PreAggregations {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
-        () => this.getConcurrency(dataSource),
         (client, q) => {
           const {
             preAggregation,
@@ -1625,7 +1624,7 @@ export class PreAggregations {
           )(client);
         },
         {
-          concurrency: 1,
+          concurrency: this.getConcurrency(dataSource).queries,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
@@ -1649,7 +1648,6 @@ export class PreAggregations {
         `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => <BaseDriver> {},
-        () => this.getConcurrency(dataSource),
         (_, q) => {
           const {
             preAggregation,
@@ -1669,7 +1667,7 @@ export class PreAggregations {
         },
         {
           getQueueEventsBus: this.getQueueEventsBus,
-          concurrency: 4,
+          concurrency: this.getConcurrency(dataSource).queries,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,

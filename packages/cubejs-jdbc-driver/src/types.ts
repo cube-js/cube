@@ -5,4 +5,5 @@ export type JDBCDriverConfiguration = {
   drivername: string,
   customClassPath?: string,
   properties: Record<string, any>,
+  maxpool?: number,
 };

@@ -351,9 +351,9 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
   const orchestratorApi = new OrchestratorApi(
     () => mockDriver,
     () => ({
-      poolSize: 1,
-      workersNumber: 1,
-      queriesNumber: 1,
+      maxpool: 1,
+      preaggs: 1,
+      queries: 1,
     }),
     (msg, params) => console.log(msg, params),
     {

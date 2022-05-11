@@ -8,9 +8,8 @@ import { LocalQueueDriver } from './LocalQueueDriver';
 
 export class QueryQueue {
   constructor(redisQueuePrefix, options) {
-    const { queriesNumber } = options.concurrencyFactory();
     this.redisQueuePrefix = redisQueuePrefix;
-    this.concurrency = options.concurrency || queriesNumber || 2;
+    this.concurrency = options.concurrency || 2;
     this.continueWaitTimeout = options.continueWaitTimeout || 5;
     this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;

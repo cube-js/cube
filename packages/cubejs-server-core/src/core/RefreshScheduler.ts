@@ -142,8 +142,8 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
-    if (!this.serverCore.getConcurrency().workersNumber) {
-      await this.serverCore.updateWorkersNumber(
+    if (!CubejsServerCore.getConcurrency().preaggs) {
+      await CubejsServerCore.upgradeConcurrency(
         this.serverCore.getCompilerApi(context),
       );
     }
@@ -153,12 +153,12 @@ export class RefreshScheduler {
       ...options,
       concurrency:
         options.concurrency ||
-        this.serverCore.getConcurrency().workersNumber,
+        CubejsServerCore.getConcurrency().preaggs,
       workerIndices:
         options.workerIndices ||
         R.range(
           0, options.concurrency ||
-          this.serverCore.getConcurrency().workersNumber
+          CubejsServerCore.getConcurrency().preaggs
         ),
       contextSymbols: {
         securityContext: context.securityContext,

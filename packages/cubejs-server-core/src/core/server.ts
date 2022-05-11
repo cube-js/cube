@@ -4,14 +4,22 @@ import fs from 'fs-extra';
 import path from 'path';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
-
-import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import {
+  ApiGateway,
+  UserBackgroundContext,
+} from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval, displayCLIWarning, formatDuration, getAnonymousId,
-  getEnv, getRealType, internalExceptions, isDockerImage, requireFromPackage, track,
+  createCancelableInterval,
+  displayCLIWarning,
+  formatDuration,
+  getAnonymousId,
+  getEnv,
+  getRealType,
+  internalExceptions,
+  isDockerImage,
+  track,
 } from '@cubejs-backend/shared';
-
 import type { Application as ExpressApplication } from 'express';
 import type {
   BaseDriver,
@@ -19,12 +27,6 @@ import type {
   getConcurrencyFn,
 } from '@cubejs-backend/query-orchestrator';
 import type { Constructor, Required } from '@cubejs-backend/shared';
-import type {
-  CubeStoreDevDriver,
-  CubeStoreHandler,
-  isCubeStoreSupported,
-} from '@cubejs-backend/cubestore-driver';
-
 import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -35,7 +37,6 @@ import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import DriverDependencies from './DriverDependencies';
 import optionsValidate from './optionsValidate';
-
 import type {
   ContextToAppIdFn,
   CreateOptions,
@@ -310,74 +311,105 @@ export class CubejsServerCore {
   private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
   /**
-   * Refresh scheduler concurrency value.
+   * System pre-aggs concurrency value.
    */
-  private workersNumber: number;
+  private static preaggs: number;
 
   /**
-   * Calculate workers number based on the driver's concurrency.
+   * Returns mono concurrency value based on the driver type and
+   * CUBEJS_CONCURRENCY environment variable. If CUBEJS_CONCURRENCY doesn't
+   * specified and Driver.defaultConcurrency method is not implemented, returns
+   * 1.
+   * @private
    */
-  private calcWorkersNumber(val?: number): number {
-    return val ? Math.round(val / 10) : 4;
+  private static getMonoConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): number {
+    if (process.env.CUBEJS_MONO_CONCURRENCY) {
+      return parseInt(process.env.CUBEJS_MONO_CONCURRENCY, 10);
+    } else if (dbType) {
+      const Driver = CubejsServerCore.lookupDriverClass(dbType);
+      return Driver.monoConcurrencyDefault
+        ? Driver.monoConcurrencyDefault()
+        : 1;
+    } else {
+      return 1;
+    }
+  }
+
+  /**
+   * Returns concurrency object.
+   * @private
+   */
+  private static calcConcurrency(opt: {
+    dbType?: DatabaseType | ExternalDbTypeFn,
+    monoConcurrency: number,
+    forcePreaggs?: boolean,
+  }): {
+    maxpool: number;
+    queries: number;
+    preaggs: number;
+  } {
+    if (
+      opt.dbType &&
+      CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency
+    ) {
+      return CubejsServerCore.lookupDriverClass(opt.dbType).calcConcurrency(
+        opt.monoConcurrency,
+        opt.forcePreaggs,
+      );
+    } else {
+      switch (opt.monoConcurrency) {
+        default:
+          return {
+            maxpool: 4,
+            queries: 2,
+            preaggs: opt.forcePreaggs ? 6 : 2,
+          };
+      }
+    }
   }
 
   /**
    * Updates the value of the workers number based on the stored cubes
    * configurations.
    */
-  public async updateWorkersNumber(compilerApi: CompilerApi) {
-    let result = 999999;
+  public static async upgradeConcurrency(compilerApi: CompilerApi) {
+    let result: number;
     const compilers = await compilerApi.getCompilers({
-      requestId: 'calcWorkersNumber',
+      requestId: 'upgrade.concurrency',
     });
     const { cubeEvaluator } = compilers;
     cubeEvaluator.cubeNames().forEach((name) => {
       const dbType = compilerApi.getDbType(
         cubeEvaluator.cubeFromPath(name).dataSource ?? 'default',
       );
-      const Driver = CubejsServerCore.lookupDriverClass(dbType);
-      const concurrency = Driver.concurrency
-        ? Driver.concurrency()
-        : undefined;
-      const workersNumber = this.calcWorkersNumber(concurrency);
-      result = result > workersNumber ? workersNumber : result;
+      const monoConcurrency = CubejsServerCore.getMonoConcurrency(dbType);
+      const { preaggs } = CubejsServerCore.calcConcurrency({
+        dbType,
+        monoConcurrency,
+        forcePreaggs: false,
+      });
+      // eslint-disable-next-line no-nested-ternary
+      result = typeof result === 'number'
+        ? result > preaggs ? preaggs : result
+        : preaggs;
     });
-    this.workersNumber = result;
-  }
-
-  /**
-   * Calculate concurrency parameters based on the driver's
-   * `concurrency`.
-   */
-  private calcConcurrency(val?: number): {
-    poolSize: number;
-    queriesNumber: number;
-    workersNumber: number;
-  } {
-    return {
-      poolSize: val || 10,
-      queriesNumber: val || 10,
-      workersNumber: this.workersNumber,
-    };
+    CubejsServerCore.preaggs = result;
   }
 
   /**
    * Returns concurrency object for specified dbType.
    */
-  public getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
-    poolSize: number;
-    queriesNumber: number;
-    workersNumber: number;
+  public static getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
+    maxpool: number;
+    queries: number;
+    preaggs: number;
   } {
-    let concurrency: number;
-    if (dbType) {
-      const Driver =
-        CubejsServerCore.lookupDriverClass(dbType);
-      concurrency = Driver.concurrency
-        ? Driver.concurrency()
-        : undefined;
-    }
-    return this.calcConcurrency(concurrency);
+    const monoConcurrency = CubejsServerCore.getMonoConcurrency(dbType);
+    return CubejsServerCore.calcConcurrency({
+      dbType,
+      monoConcurrency,
+      forcePreaggs: false,
+    });
   }
 
   protected handleConfiguration(opts: CreateOptions): ServerCoreInitializedOptions {
@@ -420,7 +452,7 @@ export class CubejsServerCore {
       && CubejsServerCore.lookupDriverClass(externalDbType).dialectClass();
 
     const getExternalConcurrency: getConcurrencyFn = externalDbType && (
-      () => this.getConcurrency(externalDbType)
+      () => CubejsServerCore.getConcurrency(externalDbType)
     );
 
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
@@ -707,7 +739,7 @@ export class CubejsServerCore {
       );
 
       this.compilerCache.set(appId, compilerApi);
-      this.updateWorkersNumber(compilerApi);
+      CubejsServerCore.upgradeConcurrency(compilerApi);
     }
 
     compilerApi.schemaVersion = currentSchemaVersion;
@@ -788,7 +820,7 @@ export class CubejsServerCore {
           ...context,
           dataSource,
         });
-        return this.getConcurrency(dbType);
+        return CubejsServerCore.getConcurrency(dbType);
       },
       {
         externalDriverFactory:
@@ -964,12 +996,19 @@ export class CubejsServerCore {
   }
 
   public static createDriver(dbType: DatabaseType): BaseDriver {
-    return new (CubejsServerCore.lookupDriverClass(dbType))();
+    return new (CubejsServerCore.lookupDriverClass(dbType))({
+      maxpool: CubejsServerCore.getConcurrency(dbType).maxpool,
+    });
   }
 
   protected static lookupDriverClass(dbType): Constructor<BaseDriver> & {
     dialectClass?: () => any;
-    concurrency?: () => number;
+    monoConcurrencyDefault?: () => number;
+    calcConcurrency?: (mono: number, forcePreaggs: boolean) => {
+      maxpool: number;
+      queries: number;
+      preaggs: number;
+    }
   } {
     // eslint-disable-next-line global-require,import/no-dynamic-require
     const module = require(CubejsServerCore.driverDependencies(dbType || process.env.CUBEJS_DB_TYPE));

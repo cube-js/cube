@@ -233,7 +233,6 @@ export class QueryCache {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
-        () => this.getConcurrency(dataSource),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -241,6 +240,7 @@ export class QueryCache {
           return client.query(q.query, q.values, q);
         },
         {
+          concurrency: this.getConcurrency(dataSource).queries,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
@@ -261,7 +261,6 @@ export class QueryCache {
       this.externalQueue = QueryCache.createQueue(
         `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.options.externalDriverFactory,
-        this.options.getExternalConcurrency,
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
@@ -269,6 +268,7 @@ export class QueryCache {
           return client.query(q.query, q.values, q);
         },
         {
+          concurrency: this.options.getExternalConcurrency(),
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
@@ -285,14 +285,12 @@ export class QueryCache {
   public static createQueue(
     redisPrefix: string,
     clientFactory: DriverFactory,
-    concurrencyFactory: concurrencyFactoryFn,
     executeFn: (client: BaseDriver, q: any) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
     const queue: any = new QueryQueue(
       redisPrefix,
       {
-        concurrencyFactory,
         getQueueEventsBus: options.getQueueEventsBus,
         queryHandlers: {
           query: async (q, setCancelHandle) => {
