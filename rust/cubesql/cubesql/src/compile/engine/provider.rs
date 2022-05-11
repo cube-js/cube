@@ -1,15 +1,27 @@
-use std::sync::Arc;
+use std::{any::Any, collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
+use cubeclient::models::V1CubeMeta;
 use datafusion::{
-    datasource,
+    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    datasource::{self, TableProvider},
+    error::DataFusionError,
     execution::context::SessionState as DFSessionState,
-    physical_plan::{udaf::AggregateUDF, udf::ScalarUDF},
+    logical_plan::Expr,
+    physical_plan::{udaf::AggregateUDF, udf::ScalarUDF, udtf::TableUDF, ExecutionPlan},
     sql::planner::ContextProvider,
 };
 
 use crate::{
-    compile::MetaContext,
-    sql::{session::DatabaseProtocol, SessionManager, SessionState},
+    compile::{
+        engine::information_schema::postgres::{
+            testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+        },
+        MetaContext,
+    },
+    sql::{session::DatabaseProtocol, ColumnType, SessionManager, SessionState},
+    transport::V1CubeMetaExt,
+    CubeError,
 };
 
 use super::information_schema::mysql::{
@@ -37,25 +49,6 @@ use super::information_schema::postgres::{
     PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
     PgCatalogTypeProvider,
 };
-
-use crate::{
-    compile::engine::information_schema::postgres::{
-        testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-    },
-    sql::ColumnType,
-    transport::V1CubeMetaExt,
-    CubeError,
-};
-use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
-use datafusion::{
-    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
-    datasource::TableProvider,
-    error::DataFusionError,
-    logical_plan::Expr,
-    physical_plan::ExecutionPlan,
-};
-use std::any::Any;
 
 #[derive(Clone)]
 pub struct CubeContext {
@@ -90,6 +83,14 @@ impl CubeContext {
             .protocol
             .table_name_by_table_provider(table_provider)
     }
+
+    pub fn get_function<T>(&self, name: &str, udfs: &HashMap<String, Arc<T>>) -> Option<Arc<T>> {
+        if name.starts_with("pg_catalog.") {
+            return udfs.get(&format!("{}", &name[11..name.len()])).cloned();
+        }
+
+        udfs.get(name).cloned()
+    }
 }
 
 impl ContextProvider for CubeContext {
@@ -101,29 +102,15 @@ impl ContextProvider for CubeContext {
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
-        self.state
-            .scalar_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+        self.get_function(name, &self.state.scalar_functions)
     }
 
     fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
-        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
-        self.state
-            .aggregate_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+        self.get_function(name, &self.state.aggregate_functions)
     }
 
-    fn get_table_function_meta(
-        &self,
-        name: &str,
-    ) -> Option<Arc<datafusion::physical_plan::udtf::TableUDF>> {
-        self.state
-            .table_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+    fn get_table_function_meta(&self, name: &str) -> Option<Arc<TableUDF>> {
+        self.get_function(name, &self.state.table_functions)
     }
 
     fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
