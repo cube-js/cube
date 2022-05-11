@@ -1,4 +1,4 @@
-import { setLogLevel, registerInterface, SqlInterfaceInstance } from '@cubejs-backend/native';
+import { setupLogger, registerInterface, SqlInterfaceInstance } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
@@ -20,7 +20,8 @@ export class SQLServer {
   public constructor(
     protected readonly apiGateway: ApiGateway,
   ) {
-    setLogLevel(
+    setupLogger(
+      ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
   }

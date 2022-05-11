@@ -1141,7 +1141,8 @@ class ApiGateway {
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
-      ...extensions
+      ...extensions,
+      ...(!req.meta ? undefined : req.meta)
     };
   }
 
@@ -1531,7 +1532,9 @@ class ApiGateway {
       ...restParams,
       ...(!context ? undefined : {
         securityContext: context.securityContext,
-        requestId: context.requestId
+        requestId: context.requestId,
+        ...(!context.appName ? undefined : { appName: context.appName }),
+        ...(!context.protocol ? undefined : { protocol: context.protocol }),
       })
     });
   }

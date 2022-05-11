@@ -217,6 +217,8 @@ export class CubejsServerCore {
           msg === 'Slow Query Warning'
         ) {
           this.event(msg, { error: params.error });
+        } else if (params.apiType === 'sql') {
+          this.event(msg, params);
         }
         oldLogger(msg, params);
       });
@@ -231,6 +233,9 @@ export class CubejsServerCore {
       this.logger = ((msg, params) => {
         if (msg === 'Load Request Success') {
           loadRequestCount++;
+        }
+        if (params.apiType === 'sql') {
+          this.event(msg, params);
         }
         oldLogger(msg, params);
       });

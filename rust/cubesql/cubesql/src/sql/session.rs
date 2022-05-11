@@ -17,6 +17,15 @@ pub enum DatabaseProtocol {
     PostgreSQL,
 }
 
+impl DatabaseProtocol {
+    pub fn to_string(&self) -> String {
+        match &self {
+            DatabaseProtocol::PostgreSQL => "postgres".to_string(),
+            DatabaseProtocol::MySQL => "mysql".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SessionProperties {
     user: Option<String>,

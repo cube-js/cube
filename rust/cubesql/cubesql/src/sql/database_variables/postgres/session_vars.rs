@@ -42,5 +42,41 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
 
+    variables.insert(
+        "transaction_isolation".to_string(),
+        DatabaseVariable::system(
+            "transaction_isolation".to_string(),
+            ScalarValue::Utf8(Some("read committed".to_string())),
+            None,
+        ),
+    );
+
+    variables.insert(
+        "max_allowed_packet".to_string(),
+        DatabaseVariable::system(
+            "max_allowed_packet".to_string(),
+            ScalarValue::UInt32(Some(67108864)),
+            None,
+        ),
+    );
+
+    variables.insert(
+        "max_index_keys".to_string(),
+        DatabaseVariable::system(
+            "max_index_keys".to_string(),
+            ScalarValue::UInt32(Some(32)),
+            None,
+        ),
+    );
+
+    variables.insert(
+        "lc_collate".to_string(),
+        DatabaseVariable::system(
+            "lc_collate".to_string(),
+            ScalarValue::Utf8(Some("en_US.utf8".to_string())),
+            None,
+        ),
+    );
+
     variables
 }

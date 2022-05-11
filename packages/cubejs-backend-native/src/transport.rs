@@ -6,7 +6,7 @@ use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResp
 use cubesql::{
     di_service,
     sql::AuthContext,
-    transport::{MetaContext, TransportService},
+    transport::{MetaContext, TransportService, TransportServiceMetaFields},
     CubeError,
 };
 use serde_derive::Serialize;
@@ -54,6 +54,7 @@ impl TransportService for NodeBridgeTransport {
         let extra = serde_json::to_string(&MetaRequest {
             request: TransportRequest {
                 id: format!("{}-span-1", request_id),
+                meta: None,
             },
             user: Some(ctx.access_token.clone()),
         })?;
@@ -74,6 +75,7 @@ impl TransportService for NodeBridgeTransport {
         &self,
         query: V1LoadRequestQuery,
         ctx: Arc<AuthContext>,
+        meta_fields: TransportServiceMetaFields,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
@@ -84,6 +86,7 @@ impl TransportService for NodeBridgeTransport {
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
                     id: format!("{}-span-{}", request_id, span_counter),
+                    meta: meta_fields.clone(),
                 },
                 user: Some(ctx.access_token.clone()),
                 query: query.clone(),

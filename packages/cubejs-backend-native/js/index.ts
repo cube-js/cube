@@ -13,7 +13,8 @@ export interface CheckAuthPayload {
 export interface LoadPayload {
     request: Request,
     user: string,
-    query: any
+    query: any,
+    meta?: Map<string, string>,
 }
 
 export interface MetaPayload {
@@ -64,7 +65,11 @@ function wrapNativeFunctionWithChannelCallback(
                 });
             }
 
-            channel.resolve(JSON.stringify(result));
+            if (!result) {
+                channel.resolve("");
+            } else {
+                channel.resolve(JSON.stringify(result));
+            }
           } catch (e: any) {
             channel.reject(e.message || 'Unknown JS exception');
 
@@ -79,10 +84,10 @@ function wrapNativeFunctionWithChannelCallback(
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
-export const setLogLevel = (level: LogLevel): void => {
+export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
     const native = loadNative();
-    native.setLogLevel(level);
-};
+    native.setupLogger({logger: wrapNativeFunctionWithChannelCallback(logger), logLevel});
+}
 
 export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
 

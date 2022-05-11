@@ -19,6 +19,8 @@ interface RequestContext {
   securityContext: any;
   requestId: string;
   signedWithPlaygroundAuthSecret?: boolean;
+  appName?: string,
+  protocol?: string,
 }
 
 /**
@@ -48,6 +50,8 @@ interface Request extends ExpressRequest {
    * @todo Maybe we can add type limitations?
    */
   securityContext?: any,
+
+  meta?: any,
 
   /**
    * @deprecated

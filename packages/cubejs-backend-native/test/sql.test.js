@@ -4,7 +4,10 @@ const util = require('util');
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
-native.setLogLevel('trace');
+native.setupLogger(
+  ({ event }) => console.log(event),
+  'trace',
+);
 
 describe('SQLInteface', () => {
   jest.setTimeout(10 * 1000);
@@ -74,7 +77,8 @@ describe('SQLInteface', () => {
         expect(checkAuth.mock.calls.length).toEqual(1);
         expect(checkAuth.mock.calls[0][0]).toEqual({
           request: {
-            id: expect.any(String)
+            id: expect.any(String),
+            meta: null,
           },
           user: user || null,
         });
@@ -124,7 +128,8 @@ describe('SQLInteface', () => {
       expect(checkAuth.mock.calls.length).toEqual(1);
       expect(checkAuth.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
         user: 'allowed_user',
       });
@@ -132,7 +137,8 @@ describe('SQLInteface', () => {
       expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
         user: 'allowed_user',
       });

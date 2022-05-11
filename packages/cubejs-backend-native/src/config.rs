@@ -40,6 +40,7 @@ impl NodeConfig {
         auth: Arc<NodeBridgeAuthService>,
     ) -> CubeServices {
         let injector = self.config.injector();
+
         self.config.configure_injector().await;
 
         injector
