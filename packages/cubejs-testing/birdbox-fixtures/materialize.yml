@@ -5,13 +5,13 @@ services:
     container_name: birdbox-cube
     image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
     environment:
-      CUBEJS_DB_TYPE: questdb
+      CUBEJS_DB_TYPE: materialize
 
       CUBEJS_DB_HOST: host.docker.internal
-      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT:-8812}
-      CUBEJS_DB_NAME: ${CUBEJS_DB_NAME:-qdb}
-      CUBEJS_DB_USER: ${CUBEJS_DB_USER:-admin}
-      CUBEJS_DB_PASS: ${CUBEJS_DB_PASS:-quest}
+      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT:-6875}
+      CUBEJS_DB_NAME: ${CUBEJS_DB_NAME:-materialize}
+      CUBEJS_DB_USER: ${CUBEJS_DB_USER:-materialize}
+      CUBEJS_DB_PASS: ${CUBEJS_DB_PASS:-materialize}
 
       CUBEJS_DEV_MODE: "true"
       CUBEJS_WEB_SOCKETS: "true"

@@ -15,6 +15,7 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET',
     'CUBEJS_DB_BQ_CREDENTIALS',
   ],
+  materialize: [],
   multidb: [],
   questdb: [],
   postgres: [],
