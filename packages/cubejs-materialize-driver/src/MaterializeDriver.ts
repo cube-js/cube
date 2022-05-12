@@ -96,7 +96,11 @@ export class MaterializeDriver extends PostgresDriver {
         rowStream,
         types: this.mapFields(fields),
         release: async () => {
-          await conn.release();
+          try {
+            await conn.query('COMMIT;', []);
+          } finally {
+            await conn.release();
+          }
         }
       };
     } catch (e) {
