@@ -18,9 +18,6 @@ cube('Orders', {
       sql: 'amount',
       type: 'sum',
     },
-    toRemove: {
-      type: 'count',
-    },
   },
   dimensions: {
     status: {

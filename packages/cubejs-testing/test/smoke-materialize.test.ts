@@ -67,7 +67,7 @@ describe('materialize', () => {
 
       expect(response.rawData()).toMatchSnapshot('dimensions');
     };
-    queryDimensions();
+    await queryDimensions();
 
     /**
      * Running a query with 2 seconds delay
@@ -75,8 +75,8 @@ describe('materialize', () => {
      * Gives times to trigger the action if hasn't been triggered yet.
      */
     await new Promise((res) => {
-      setTimeout(() => {
-        queryDimensions();
+      setTimeout(async () => {
+        await queryDimensions();
         res('End.');
       }, 2000);
     });
