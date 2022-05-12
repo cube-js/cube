@@ -1,0 +1,2 @@
+#https://docs.netlify.com/routing/redirects/
+/*   https://cube.dev/blog/building-web-analytics-platform  301!
