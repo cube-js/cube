@@ -3,6 +3,7 @@ import { MaterializeDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
+import { pausePromise } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
 
 describe('materialize', () => {
@@ -74,11 +75,7 @@ describe('materialize', () => {
      * preAggregation has 1 second in the refreshKey
      * Gives times to trigger the action if hasn't been triggered yet.
      */
-    await new Promise((res) => {
-      setTimeout(async () => {
-        await queryDimensions();
-        res('End.');
-      }, 2000);
-    });
+    await pausePromise(2000);
+    await queryDimensions();
   });
 });

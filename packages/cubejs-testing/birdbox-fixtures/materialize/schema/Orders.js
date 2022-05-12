@@ -27,7 +27,7 @@ cube('Orders', {
   },
   preAggregations: {
     orderStatus: {
-      measures: [CUBE.count, CUBE.totalAmount, CUBE.toRemove],
+      measures: [CUBE.count, CUBE.totalAmount],
       dimensions: [CUBE.status],
       refreshKey: {
         every: '1 second',
