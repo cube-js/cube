@@ -32,7 +32,7 @@ describe('materialize', () => {
         CUBEJS_ROLLUP_ONLY: 'false',
       },
       {
-        schemaDir: 'smoke/schema',
+        schemaDir: 'materialize/schema',
       }
     );
     client = cubejs(async () => 'test', {
@@ -52,5 +52,33 @@ describe('materialize', () => {
       ],
     });
     expect(response.rawData()).toMatchSnapshot('query');
+  });
+
+  test('query dimensions', async () => {
+    const queryDimensions = async () => {
+      const response = await client.load({
+        measures: [
+          'Orders.totalAmount',
+        ],
+        dimensions: [
+          'Orders.status',
+        ],
+      });
+
+      expect(response.rawData()).toMatchSnapshot('query');
+    };
+    queryDimensions();
+
+    /**
+     * Running a query with 2 seconds delay
+     * preAggregation has 1 second in the refreshKey
+     * Gives times to trigger the action if hasn't been triggered yet.
+     */
+    await new Promise((res) => {
+      setTimeout(() => {
+        queryDimensions();
+        res('End.');
+      }, 2000);
+    });
   });
 });
