@@ -1,5 +1,5 @@
 import Joi from '@hapi/joi';
-import DriverDependencies from './DriverDependencies';
+import { DriverDependencies } from './services/DriverLookup';
 
 const schemaQueueOptions = Joi.object().keys({
   concurrency: Joi.number().min(1).integer(),

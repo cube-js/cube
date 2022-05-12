@@ -6,6 +6,7 @@ import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
 import { RequestContext } from './types';
+import * as ConcurrencySvc from './services/Concurrency';
 
 export interface ScheduledRefreshOptions {
   timezone?: string,
@@ -142,8 +143,8 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
-    if (!CubejsServerCore.getConcurrency().preaggs) {
-      await CubejsServerCore.upgradeConcurrency(
+    if (!ConcurrencySvc.getConcurrency().preaggs) {
+      await ConcurrencySvc.upgradeConcurrency(
         this.serverCore.getCompilerApi(context),
       );
     }
@@ -153,12 +154,12 @@ export class RefreshScheduler {
       ...options,
       concurrency:
         options.concurrency ||
-        CubejsServerCore.getConcurrency().preaggs,
+        ConcurrencySvc.getConcurrency().preaggs,
       workerIndices:
         options.workerIndices ||
         R.range(
           0, options.concurrency ||
-          CubejsServerCore.getConcurrency().preaggs
+          ConcurrencySvc.getConcurrency().preaggs
         ),
       contextSymbols: {
         securityContext: context.securityContext,

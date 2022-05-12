@@ -66,12 +66,12 @@ const create = async (projectName, options) => {
   await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
+    const { DriverDependencies } = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/services/DriverLookup.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
       message: 'Select database',
-      choices: Object.keys(Drivers)
+      choices: Object.keys(DriverDependencies)
     }]);
 
     options.dbType = prompt.dbType;

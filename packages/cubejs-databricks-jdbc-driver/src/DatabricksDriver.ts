@@ -87,10 +87,22 @@ async function resolveJDBCDriver(): Promise<string> {
 }
 
 export class DatabricksDriver extends JDBCDriver {
+  /**
+   * Returns default mono concurrency value for the driver. This value
+   * can be overriden by the CUBEJS_MONO_CONCURRENCY environment variable.
+   */
   public static monoConcurrencyDefault(): number {
     return 4;
   }
 
+  /**
+   * Returns an object with the configuration parameters for the max DB pool
+   * size, the number of pre-aggregations refresh workers which will build in
+   * parallel and maximum number of queries to be processed simultaneosly for
+   * the driver. These values could be overriden by the CUBEJS_DB_MAX_POOL,
+   * CUBEJS_SCHEDULED_REFRESH_CONCURRENCY or cube.js queueOptions.concurrency
+   * variables.
+   */
   public static calcConcurrency(
     monoConcurrency: number,
     forcePreaggs = false,

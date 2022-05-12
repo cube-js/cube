@@ -18,7 +18,7 @@ import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
 import { ExternalDbTypeFn } from './types';
-import DriverDependencies from './DriverDependencies';
+import { DriverDependencies } from './services/DriverLookup';
 
 const repo = {
   owner: 'cube-js',
@@ -262,11 +262,11 @@ export class DevServer {
     app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
       const { driver } = req.query;
 
-      if (!driver || !DriverDependencies[driver]) {
+      if (!driver || !DriverDependencies[driver as string]) {
         return res.status(400).json('Wrong driver');
       }
 
-      if (packageExists(DriverDependencies[driver])) {
+      if (packageExists(DriverDependencies[driver as string])) {
         return res.json({ status: 'installed' });
       } else if (driverPromise) {
         return res.json({ status: 'installing' });
