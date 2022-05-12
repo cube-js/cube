@@ -65,7 +65,7 @@ describe('materialize', () => {
         ],
       });
 
-      expect(response.rawData()).toMatchSnapshot('query');
+      expect(response.rawData()).toMatchSnapshot('dimensions');
     };
     queryDimensions();
 

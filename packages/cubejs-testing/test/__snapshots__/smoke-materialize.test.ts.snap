@@ -1,5 +1,22 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`materialize query dimensions: dimensions 1`] = `
+Array [
+  Object {
+    "Orders.status": "processed",
+    "Orders.totalAmount": "800",
+  },
+  Object {
+    "Orders.status": "shipped",
+    "Orders.totalAmount": "600",
+  },
+  Object {
+    "Orders.status": "new",
+    "Orders.totalAmount": "300",
+  },
+]
+`;
+
 exports[`materialize query measure: query 1`] = `
 Array [
   Object {
