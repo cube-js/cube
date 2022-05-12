@@ -44,7 +44,7 @@ function getMonoConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): number {
 function calcConcurrency(opt: {
   dbType?: DatabaseType | ExternalDbTypeFn,
   monoConcurrency: number,
-  forcePreaggs?: boolean,
+  preaggsWarmUp?: boolean,
 }): {
   maxpool: number;
   queries: number;
@@ -56,7 +56,7 @@ function calcConcurrency(opt: {
   ) {
     return lookupDriverClass(opt.dbType).calcConcurrency(
       opt.monoConcurrency,
-      opt.forcePreaggs,
+      opt.preaggsWarmUp,
     );
   } else {
     switch (opt.monoConcurrency) {
@@ -82,7 +82,7 @@ export function getConcurrency(dbType?: DatabaseType | ExternalDbTypeFn): {
     ...calcConcurrency({
       dbType,
       monoConcurrency: getMonoConcurrency(dbType),
-      forcePreaggs: false,
+      preaggsWarmUp: false,
     }),
     preaggs: _preaggs,
   };
@@ -108,7 +108,7 @@ export async function upgradeConcurrency(compilerApi: CompilerApi) {
             const { preaggs } = calcConcurrency({
               dbType,
               monoConcurrency,
-              forcePreaggs: false,
+              preaggsWarmUp: false,
             });
             // eslint-disable-next-line no-nested-ternary
             result = typeof result === 'number'

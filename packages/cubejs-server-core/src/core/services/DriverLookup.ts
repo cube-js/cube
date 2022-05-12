@@ -60,7 +60,7 @@ export function driverDependencies(dbType: DatabaseType): string {
 export function lookupDriverClass(dbType): Constructor<BaseDriver> & {
   dialectClass?: () => any;
   monoConcurrencyDefault?: () => number;
-  calcConcurrency?: (mono: number, forcePreaggs: boolean) => {
+  calcConcurrency?: (mono: number, preaggsWarmUp: boolean) => {
     maxpool: number;
     queries: number;
     preaggs: number;

@@ -105,7 +105,7 @@ export class DatabricksDriver extends JDBCDriver {
    */
   public static calcConcurrency(
     monoConcurrency: number,
-    forcePreaggs = false,
+    preaggsWarmUp = false,
   ): {
     maxpool: number;
     queries: number;
@@ -116,7 +116,7 @@ export class DatabricksDriver extends JDBCDriver {
         return {
           maxpool: 10,
           queries: 6,
-          preaggs: forcePreaggs ? 6 : 3,
+          preaggs: preaggsWarmUp ? 6 : 3,
         };
     }
   }
