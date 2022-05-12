@@ -72,6 +72,14 @@ export class MaterializeDriver extends PostgresDriver {
     }
   }
 
+  private async releaseStream(conn: PoolClient): Promise<void> {
+    try {
+      await conn.query('COMMIT;', []);
+    } finally {
+      await conn.release();
+    }
+  }
+
   public async stream(
     query: string,
     values: unknown[],
@@ -95,17 +103,10 @@ export class MaterializeDriver extends PostgresDriver {
       return {
         rowStream,
         types: this.mapFields(fields),
-        release: async () => {
-          try {
-            await conn.query('COMMIT;', []);
-          } finally {
-            await conn.release();
-          }
-        }
+        release: () => this.releaseStream(conn)
       };
     } catch (e) {
-      await conn.release();
-
+      this.releaseStream(conn);
       throw e;
     }
   }
