@@ -2435,7 +2435,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
             });
         if let Err(_) = &result {
-            log::debug!("Can't rewrite AST: {:#?}", stmt);
             log::error!("Can't rewrite plan: {:#?}", optimized_plan);
             log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.")
         }

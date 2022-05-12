@@ -8,15 +8,16 @@ use crate::{
             cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
-            measure_expr, member_replacer, projection, projection_expr, projection_expr_empty_tail,
-            rewrite, rewriter::RewriteRules, table_scan, time_dimension_expr,
-            transforming_chain_rewrite, transforming_rewrite, udaf_expr,
+            measure_expr, member_replacer, original_expr_name, projection, projection_expr,
+            projection_expr_empty_tail, rewrite, rewriter::RewriteRules, table_scan,
+            time_dimension_expr, transforming_chain_rewrite, transforming_rewrite, udaf_expr,
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
             ColumnAliasReplacerAliases, ColumnAliasReplacerTableName, ColumnExprColumn,
             CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError, ProjectionAlias,
-            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
+            MemberErrorPriority, ProjectionAlias, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -132,6 +133,12 @@ impl RewriteRules for MemberRules {
                     Some("?alias"),
                     "?member",
                 ),
+            ),
+            transforming_rewrite(
+                "default-member-error",
+                member_replacer("?expr", "?source_table_name"),
+                "?member_error".to_string(),
+                self.transform_default_member_error("?source_table_name", "?expr", "?member_error"),
             ),
             transforming_rewrite(
                 "projection-columns",
@@ -836,6 +843,27 @@ impl MemberRules {
         }
     }
 
+    fn transform_default_member_error(
+        &self,
+        cube_var: &'static str,
+        expr_var: &'static str,
+        member_error_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_var = var!(expr_var);
+        let cube_var = var!(cube_var);
+        let member_error_var = var!(member_error_var);
+        move |egraph, subst| {
+            for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName).cloned() {
+                if let Some(expr_name) = original_expr_name(egraph, subst[expr_var]) {
+                    let member_error = add_member_error(egraph, format!("'{}' expression can't be coerced to any members of '{}' cube. It may be this type of expression is not supported. Please check logs for additional information.", expr_name, cube_name), 0);
+                    subst.insert(member_error_var, member_error);
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
     fn transform_projection_member(
         &self,
         cube_var: &'static str,
@@ -1007,6 +1035,7 @@ impl MemberRules {
                                         "Unable to use segment '{}' in GROUP BY",
                                         s.get_real_name()
                                     ),
+                                    1,
                                 ),
                             );
 
@@ -1202,7 +1231,7 @@ impl MemberRules {
                                                 measure.get_real_name(),
                                                 measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
                                                 call_agg_type.unwrap().to_uppercase(),
-                                            )),
+                                            ), 1),
                                         );
                                     } else {
                                         let measure_name =
@@ -1233,7 +1262,7 @@ impl MemberRules {
                                             "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                                             dimension.get_real_name(),
                                             call_agg_type.unwrap().to_uppercase(),
-                                        )),
+                                        ), 1),
                                     );
 
                                     return true;
@@ -1255,10 +1284,18 @@ impl MemberRules {
 pub fn add_member_error(
     egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     member_error: String,
+    priority: usize,
 ) -> Id {
     let member_error = egraph.add(LogicalPlanLanguage::MemberErrorError(MemberErrorError(
         member_error,
     )));
 
-    egraph.add(LogicalPlanLanguage::MemberError([member_error]))
+    let member_priority = egraph.add(LogicalPlanLanguage::MemberErrorPriority(
+        MemberErrorPriority(priority),
+    ));
+
+    egraph.add(LogicalPlanLanguage::MemberError([
+        member_error,
+        member_priority,
+    ]))
 }
