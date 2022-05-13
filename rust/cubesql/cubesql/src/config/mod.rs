@@ -169,12 +169,11 @@ impl Config {
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                bind_address: Some(env::var("CUBESQL_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESQL_PORT")
-                            .ok()
-                            .map(|v| v.parse::<u16>().unwrap())
-                            .unwrap_or(3306u16)),
-                )),
+                bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
+                    env::var("CUBESQL_PORT")
+                        .ok()
+                        .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
+                }),
                 postgres_bind_address: env::var("CUBESQL_PG_PORT")
                     .ok()
                     .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
