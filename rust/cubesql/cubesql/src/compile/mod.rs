@@ -6576,8 +6576,18 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "pg_get_expr_1",
             execute_query(
-                "SELECT pg_catalog.pg_get_expr(adbin, adrelid) FROM pg_catalog.pg_attrdef;"
-                    .to_string(),
+                "
+                SELECT
+                    attrelid,
+                    attname,
+                    pg_catalog.pg_get_expr(attname, attrelid) default
+                FROM pg_catalog.pg_attribute
+                ORDER BY
+                    attrelid ASC,
+                    attname ASC
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6585,8 +6595,18 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "pg_get_expr_2",
             execute_query(
-                "SELECT pg_catalog.pg_get_expr(adbin, adrelid, true) FROM pg_catalog.pg_attrdef;"
-                    .to_string(),
+                "
+                SELECT
+                    attrelid,
+                    attname,
+                    pg_catalog.pg_get_expr(attname, attrelid, true) default
+                FROM pg_catalog.pg_attribute
+                ORDER BY
+                    attrelid ASC,
+                    attname ASC
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

@@ -43,7 +43,7 @@ use crate::{
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         builder.append_value(v.to_string()).unwrap();
 
@@ -55,14 +55,14 @@ pub fn create_version_udf(v: String) -> ScalarUDF {
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     let db_state = state.database().unwrap_or("db".to_string());
 
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         builder.append_value(db_state.clone()).unwrap();
 
@@ -74,12 +74,12 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
             builder.append_value(user.clone() + "@127.0.0.1").unwrap();
@@ -95,12 +95,12 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
             builder.append_value(user.clone() + "@%").unwrap();
@@ -116,12 +116,12 @@ pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
         builder.append_value(state.connection_id).unwrap();
 
@@ -133,12 +133,12 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
         vec![],
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_pg_backend_pid(state: Arc<SessionState>) -> ScalarUDF {
-    let version = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
         builder.append_value(state.connection_id).unwrap();
 
@@ -150,12 +150,12 @@ pub fn create_pg_backend_pid(state: Arc<SessionState>) -> ScalarUDF {
         vec![],
         Arc::new(DataType::UInt32),
         Volatility::Immutable,
-        version,
+        fun,
     )
 }
 
 pub fn create_current_schema_udf() -> ScalarUDF {
-    let current_schema = make_scalar_function(move |_args: &[ArrayRef]| {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
 
         builder.append_value("public").unwrap();
@@ -168,7 +168,7 @@ pub fn create_current_schema_udf() -> ScalarUDF {
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        current_schema,
+        fun,
     )
 }
 
@@ -324,8 +324,11 @@ pub fn create_isnull_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let mut builder = BooleanBuilder::new(1);
-        builder.append_value(args[0].is_null(0))?;
+        let len = args[0].len();
+        let mut builder = BooleanBuilder::new(len);
+        for i in 0..len {
+            builder.append_value(args[0].is_null(i))?;
+        }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -1034,12 +1037,14 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
         let primitive_builder = StringBuilder::new(2);
         let mut builder = ListBuilder::new(primitive_builder);
 
-        let including_implicit = downcast_boolean_arr!(&args[0], "implicit").value(0);
-        if including_implicit {
-            builder.values().append_value("pg_catalog").unwrap();
+        let including_implicit = downcast_boolean_arr!(&args[0], "implicit");
+        for i in 0..including_implicit.len() {
+            if including_implicit.value(i) {
+                builder.values().append_value("pg_catalog").unwrap();
+            }
+            builder.values().append_value("public").unwrap();
+            builder.append(true).unwrap();
         }
-        builder.values().append_value("public").unwrap();
-        builder.append(true).unwrap();
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -1269,10 +1274,15 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
 }
 
 pub fn create_pg_get_expr_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
-        builder.append_null().unwrap();
-        Ok(Arc::new(builder.finish()))
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let inputs = args[0].as_any().downcast_ref::<StringArray>().unwrap();
+
+        let result = inputs
+            .iter()
+            .map::<Option<String>, _>(|_| None)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
