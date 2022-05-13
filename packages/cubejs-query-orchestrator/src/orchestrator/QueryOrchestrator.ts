@@ -93,6 +93,13 @@ export class QueryOrchestrator {
     return this.queueEventsBus;
   }
 
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    await this.queryCache.forceReconcile(datasource);
+  }
+
   public async fetchQuery(queryBody: any): Promise<any> {
     const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
