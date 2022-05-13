@@ -3,6 +3,7 @@ import { MaterializeDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
+import { pausePromise } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
 
 describe('materialize', () => {
@@ -32,7 +33,7 @@ describe('materialize', () => {
         CUBEJS_ROLLUP_ONLY: 'false',
       },
       {
-        schemaDir: 'smoke/schema',
+        schemaDir: 'materialize/schema',
       }
     );
     client = cubejs(async () => 'test', {
@@ -52,5 +53,29 @@ describe('materialize', () => {
       ],
     });
     expect(response.rawData()).toMatchSnapshot('query');
+  });
+
+  test('query dimensions', async () => {
+    const queryDimensions = async () => {
+      const response = await client.load({
+        measures: [
+          'Orders.totalAmount',
+        ],
+        dimensions: [
+          'Orders.status',
+        ],
+      });
+
+      expect(response.rawData()).toMatchSnapshot('dimensions');
+    };
+    await queryDimensions();
+
+    /**
+     * Running a query with 2 seconds delay
+     * preAggregation has 1 second in the refreshKey
+     * Gives times to trigger the action if hasn't been triggered yet.
+     */
+    await pausePromise(2000);
+    await queryDimensions();
   });
 });
