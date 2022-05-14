@@ -315,6 +315,14 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  pgSqlPort: () => {
+    const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
   sqlNonce: () => {
     if (process.env.CUBEJS_SQL_NONCE) {
       if (process.env.CUBEJS_SQL_NONCE.length < 14) {
