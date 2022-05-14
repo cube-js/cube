@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+
+### Bug Fixes
+
+* **materialize-driver:** commit cursor on release ([#4526](https://github.com/cube-js/cube.js/issues/4526)) ([441581c](https://github.com/cube-js/cube.js/commit/441581cb38406e74081c0a06fe747dd8efb8cb8d))
+
+
+### Features
+
+* **cubesql:** Add CUBEJS_PG_SQL_PORT env support and SQL API reference docs ([#4531](https://github.com/cube-js/cube.js/issues/4531)) ([de60d71](https://github.com/cube-js/cube.js/commit/de60d71c360be47e3231e7eafa349b9a0fddd244))
+* **cubesql:** Provide specific error messages for not matched expressions ([e035780](https://github.com/cube-js/cube.js/commit/e0357801bd39269585dd31d6ad932b32287a05af))
+* **cubesql:** Support `quarter` field in `date_part` SQL function ([7fdf4ac](https://github.com/cube-js/cube.js/commit/7fdf4acf6ce60387d3fa716c572e1611a77c205b))
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 
