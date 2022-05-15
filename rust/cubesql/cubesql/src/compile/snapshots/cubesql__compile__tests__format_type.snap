@@ -1,17 +1,18 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 6349
 expression: "execute_query(\"\n                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f\n                FROM pg_catalog.pg_type t;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+----------------------------+-----------------------------------+
 | oid   | typname                    | f                                 |
 +-------+----------------------------+-----------------------------------+
-| 16    | bool                       | ???                               |
+| 16    | bool                       | boolean                           |
 | 17    | bytea                      | ???                               |
 | 19    | name                       | name                              |
-| 20    | int8                       | ???                               |
+| 20    | int8                       | bigint                            |
 | 21    | int2                       | ???                               |
 | 23    | int4                       | integer                           |
-| 25    | text                       | ???                               |
+| 25    | text                       | text                              |
 | 26    | oid                        | ???                               |
 | 27    | tid                        | ???                               |
 | 83    | pg_class                   | ???                               |
@@ -31,11 +32,11 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, format_t
 | 1043  | varchar                    | character varying                 |
 | 1082  | date                       | ???                               |
 | 1083  | time                       | ???                               |
-| 1114  | timestamp                  | ???                               |
+| 1114  | timestamp                  | timestamp                         |
 | 1184  | timestamptz                | timestamp with time zone          |
 | 1186  | interval                   | ???                               |
 | 1266  | timetz                     | ???                               |
-| 1700  | numeric                    | ???                               |
+| 1700  | numeric                    | numeric                           |
 | 2249  | record                     | ???                               |
 | 2277  | anyarray                   | ???                               |
 | 2283  | anyelement                 | ???                               |
