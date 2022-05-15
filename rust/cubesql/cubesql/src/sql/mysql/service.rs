@@ -1,16 +1,12 @@
-use std::collections::HashMap;
-use std::io;
+use std::{collections::HashMap, error::Error, io};
 
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
 
 use async_trait::async_trait;
 
 use datafusion::prelude::DataFrame as DFDataFrame;
 
-use log::debug;
-use log::error;
-use log::trace;
+use log::{debug, error, trace};
 
 //use msql_srv::*;
 use msql_srv::{
@@ -18,22 +14,25 @@ use msql_srv::{
     QueryResultWriter, StatementMetaWriter,
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::{watch, RwLock};
-
-use crate::compile::convert_sql_to_cube_query;
-use crate::compile::parser::parse_sql_to_statement;
-use crate::config::processing_loop::ProcessingLoop;
-
-use crate::sql::session::DatabaseProtocol;
-use crate::sql::statement::{StatementParamsBinder, StatementParamsFinder};
-use crate::sql::Session;
-use crate::sql::SessionManager;
-use crate::sql::{
-    dataframe::{self, batch_to_dataframe},
-    AuthContext, ColumnFlags, ColumnType, QueryResponse, StatusFlags,
+use tokio::{
+    net::TcpListener,
+    sync::{watch, RwLock},
 };
-use crate::CubeError;
+
+use crate::{
+    compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
+    config::processing_loop::ProcessingLoop,
+};
+
+use crate::{
+    sql::{
+        dataframe::{self, batch_to_dataframe},
+        session::DatabaseProtocol,
+        statement::{StatementParamsBinder, StatementParamsFinder},
+        AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
+    },
+    CubeError,
+};
 use msql_srv::ColumnType as MySQLColumnType;
 use pg_srv::BindValue;
 use sqlparser::ast;
@@ -83,7 +82,14 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                error!("Error during processing {}: {}", query, e.to_string());
+                error!("Error during processing MySQL {}: {}", query, e.to_string());
+
+                if let Some(bt) = e.backtrace() {
+                    trace!("{}", bt);
+                } else {
+                    trace!("Backtrace: not found");
+                }
+
                 results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
 
                 Ok(())
@@ -508,7 +514,11 @@ impl ProcessingLoop for MySqlServer {
                 .await
                 {
                     error!("Error during processing MySQL connection: {}", e);
-                    trace!("Details: {:?}", e);
+                    if let Some(bt) = e.backtrace() {
+                        trace!("{}", bt.to_string());
+                    } else {
+                        trace!("Backtrace: not found");
+                    }
                 }
             });
         }

@@ -167,7 +167,7 @@ export class CubejsServerCore {
             .update(JSON.stringify(fs.readJsonSync('package.json')))
             .digest('hex');
         } catch (e) {
-          internalExceptions(e);
+          internalExceptions(e as Error);
         }
       }
 
@@ -188,7 +188,7 @@ export class CubejsServerCore {
           ...props
         });
       } catch (e) {
-        internalExceptions(e);
+        internalExceptions(e as Error);
       }
     };
 
@@ -335,7 +335,9 @@ export class CubejsServerCore {
 
     if (!devServer && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
-        'Cube Store is not found. Please follow this documentation to configure Cube Store https://cube.dev/docs/caching/running-in-production'
+        'Cube Store is not found. Please follow this documentation ' +
+        'to configure Cube Store ' +
+        'https://cube.dev/docs/caching/running-in-production'
       );
     }
 
@@ -754,7 +756,7 @@ export class CubejsServerCore {
       preAggregationsSchema: options.preAggregationsSchema,
       allowUngroupedWithoutPrimaryKey:
           this.options.allowUngroupedWithoutPrimaryKey ||
-          getEnv("allowUngroupedWithoutPrimaryKey"),
+          getEnv('allowUngroupedWithoutPrimaryKey'),
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,

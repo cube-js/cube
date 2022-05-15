@@ -1,86 +1,43 @@
-use crate::compile::engine::df::scan::CubeScanNode;
-use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::rewriter::Rewriter;
-use crate::compile::rewrite::AggregateFunctionExprDistinct;
-use crate::compile::rewrite::AggregateFunctionExprFun;
-use crate::compile::rewrite::AggregateUDFExprFun;
-use crate::compile::rewrite::AliasExprAlias;
-use crate::compile::rewrite::BetweenExprNegated;
-use crate::compile::rewrite::BinaryExprOp;
-use crate::compile::rewrite::CastExprDataType;
-use crate::compile::rewrite::ColumnExprColumn;
-use crate::compile::rewrite::CubeScanAliases;
-use crate::compile::rewrite::CubeScanLimit;
-use crate::compile::rewrite::CubeScanTableName;
-use crate::compile::rewrite::DimensionName;
-use crate::compile::rewrite::EmptyRelationProduceOneRow;
-use crate::compile::rewrite::FilterMemberMember;
-use crate::compile::rewrite::FilterMemberOp;
-use crate::compile::rewrite::FilterMemberValues;
-use crate::compile::rewrite::FilterOpOp;
-use crate::compile::rewrite::GetIndexedFieldExprKey;
-use crate::compile::rewrite::InListExprNegated;
-use crate::compile::rewrite::JoinJoinConstraint;
-use crate::compile::rewrite::JoinJoinType;
-use crate::compile::rewrite::JoinLeftOn;
-use crate::compile::rewrite::JoinRightOn;
-use crate::compile::rewrite::LimitN;
-use crate::compile::rewrite::LiteralExprValue;
-use crate::compile::rewrite::LogicalPlanLanguage;
-use crate::compile::rewrite::MeasureName;
-use crate::compile::rewrite::MemberErrorError;
-use crate::compile::rewrite::OrderAsc;
-use crate::compile::rewrite::OrderMember;
-use crate::compile::rewrite::OuterColumnExprColumn;
-use crate::compile::rewrite::OuterColumnExprDataType;
-use crate::compile::rewrite::ProjectionAlias;
-use crate::compile::rewrite::ScalarFunctionExprFun;
-use crate::compile::rewrite::ScalarUDFExprFun;
-use crate::compile::rewrite::ScalarVariableExprDataType;
-use crate::compile::rewrite::ScalarVariableExprVariable;
-use crate::compile::rewrite::SegmentMemberMember;
-use crate::compile::rewrite::SortExprAsc;
-use crate::compile::rewrite::SortExprNullsFirst;
-use crate::compile::rewrite::TableScanLimit;
-use crate::compile::rewrite::TableScanProjection;
-use crate::compile::rewrite::TableScanSourceTableName;
-use crate::compile::rewrite::TableScanTableName;
-use crate::compile::rewrite::TableUDFExprFun;
-use crate::compile::rewrite::TimeDimensionDateRange;
-use crate::compile::rewrite::TimeDimensionGranularity;
-use crate::compile::rewrite::TimeDimensionName;
-use crate::compile::rewrite::TryCastExprDataType;
-use crate::compile::rewrite::UnionAlias;
-use crate::compile::rewrite::WindowFunctionExprFun;
-use crate::compile::rewrite::WindowFunctionExprWindowFrame;
-use crate::sql::auth_service::AuthContext;
-use crate::CubeError;
+use crate::{
+    compile::{
+        engine::{df::scan::CubeScanNode, provider::CubeContext},
+        rewrite::{
+            analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, BetweenExprNegated,
+            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
+            CubeScanTableName, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
+            JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+        },
+    },
+    sql::auth_service::AuthContext,
+    CubeError,
+};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
-use datafusion::arrow::datatypes::{DataType, TimeUnit};
-use datafusion::catalog::TableReference;
-use datafusion::logical_plan::build_table_udf_schema;
-use datafusion::logical_plan::plan::Filter;
-use datafusion::logical_plan::plan::Join;
-use datafusion::logical_plan::plan::Projection;
-use datafusion::logical_plan::plan::Sort;
-use datafusion::logical_plan::plan::{Aggregate, Window};
-use datafusion::logical_plan::plan::{Extension, TableUDFs};
-use datafusion::logical_plan::Union;
-use datafusion::logical_plan::{
-    build_join_schema, exprlist_to_fields, normalize_cols, DFField, DFSchema, DFSchemaRef, Expr,
-    LogicalPlan, LogicalPlanBuilder,
+use datafusion::{
+    arrow::datatypes::{DataType, TimeUnit},
+    catalog::TableReference,
+    logical_plan::{
+        build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
+        plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
+        CrossJoin, DFField, DFSchema, DFSchemaRef, EmptyRelation, Expr, Limit, LogicalPlan,
+        LogicalPlanBuilder, TableScan, Union,
+    },
+    physical_plan::planner::DefaultPhysicalPlanner,
+    sql::planner::ContextProvider,
 };
-use datafusion::logical_plan::{CrossJoin, EmptyRelation, Limit, TableScan};
-use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-use datafusion::sql::planner::ContextProvider;
 use egg::{EGraph, Id, RecExpr};
 use itertools::Itertools;
-use std::collections::HashMap;
-use std::ops::Index;
-use std::sync::Arc;
+use std::{collections::HashMap, ops::Index, sync::Arc};
 
 macro_rules! add_data_node {
     ($converter:expr, $value_expr:expr, $field_variant:ident) => {
@@ -328,7 +285,7 @@ impl LogicalPlanToLanguageConverter {
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
                 let expr = self.add_expr(expr)?;
-                let key = add_data_node!(self, key, GetIndexedFieldExprKey);
+                let key = self.add_expr(key)?;
                 self.graph
                     .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
             }
@@ -817,8 +774,8 @@ pub fn node_to_expr(
         }
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
         LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
-            let expr = Box::new(to_expr(params[0]).clone()?);
-            let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
+            let expr = Box::new(to_expr(params[0])?);
+            let key = Box::new(to_expr(params[1])?);
             Expr::GetIndexedField { expr, key }
         }
         x => panic!("Unexpected expression node: {:?}", x),
@@ -1292,11 +1249,7 @@ impl LanguageToLogicalPlanConverter {
                             None
                         };
 
-                        query.segments = if segments.len() > 0 {
-                            Some(segments)
-                        } else {
-                            None
-                        };
+                        query.segments = Some(segments);
 
                         for o in order {
                             let order_params = match_params!(o, Order);
@@ -1311,6 +1264,16 @@ impl LanguageToLogicalPlanConverter {
                                     "desc".to_string()
                                 },
                             ])
+                        }
+
+                        if query_measures.len() == 0
+                            && query_dimensions.len() == 0
+                            && query_time_dimensions.len() == 0
+                        {
+                            return Err(CubeError::internal(
+                                "Can't detect Cube query and it may be not supported yet"
+                                    .to_string(),
+                            ));
                         }
 
                         query.measures = Some(query_measures.into_iter().unique().collect());
@@ -1332,7 +1295,6 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.segments = Some(Vec::new());
                         query.limit =
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| n as i32);
@@ -1344,16 +1306,26 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
+
                         if let Some(aliases) = aliases {
+                            let mut new_fields = Vec::with_capacity(aliases.len());
+
                             // Aliases serve solely column ordering purpose as fields generally not ordered
-                            let new_fields = aliases
-                                .iter()
-                                .map(|a| {
-                                    fields.iter().find(|(f, _)| f.name() == a).unwrap().clone()
-                                })
-                                .collect();
+                            for alias in aliases.iter() {
+                                let field_for_alias = fields
+                                    .iter()
+                                    .find(|(f, _)| f.name() == alias)
+                                    .ok_or(CubeError::internal(format!(
+                                        "Unable to find field for alias {}",
+                                        alias
+                                    )))?;
+
+                                new_fields.push(field_for_alias.clone());
+                            }
+
                             fields = new_fields;
                         }
+
                         let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(

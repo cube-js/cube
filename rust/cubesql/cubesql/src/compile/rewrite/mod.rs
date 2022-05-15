@@ -5,23 +5,25 @@ pub mod language;
 mod rewriter;
 mod rules;
 
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::CubeError;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::{Column, ExprRewritable, ExprRewriter};
-use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::functions::BuiltinScalarFunction;
-use datafusion::physical_plan::window_functions::WindowFunction;
-use datafusion::scalar::ScalarValue;
-use egg::{rewrite, Applier, Pattern, PatternAst, SearchMatches, Searcher, Subst, Symbol, Var};
-use egg::{EGraph, Id, Rewrite};
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::slice::Iter;
-use std::str::FromStr;
+use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
+use datafusion::{
+    arrow::datatypes::DataType,
+    error::DataFusionError,
+    logical_plan::{
+        window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
+        JoinConstraint, JoinType, Operator,
+    },
+    physical_plan::{
+        aggregates::AggregateFunction, functions::BuiltinScalarFunction,
+        window_functions::WindowFunction,
+    },
+    scalar::ScalarValue,
+};
+use egg::{
+    rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
+    Symbol, Var,
+};
+use std::{collections::HashMap, fmt::Display, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -195,7 +197,7 @@ crate::plan_to_language! {
         WildcardExpr {},
         GetIndexedFieldExpr {
             expr: Box<Expr>,
-            key: ScalarValue,
+            key: Box<Expr>,
         },
 
         CubeScan {
@@ -231,6 +233,7 @@ crate::plan_to_language! {
         },
         MemberError {
             error: String,
+            priority: usize,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
@@ -549,6 +552,10 @@ fn between_expr(
     high: impl Display,
 ) -> String {
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
+}
+
+fn negative_expr(expr: impl Display) -> String {
+    format!("(NegativeExpr {})", expr)
 }
 
 fn not_expr(expr: impl Display) -> String {

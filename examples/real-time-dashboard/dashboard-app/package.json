@@ -9,6 +9,7 @@
     "antd": "^3.24.3",
     "chart.js": "^2.9.1",
     "component-cookie": "^1.1.4",
+    "cube-example-wrapper": "^1.0.26",
     "fetch": "^1.1.0",
     "moment": "^2.24.0",
     "prop-types": "^15.7.2",
@@ -26,7 +27,8 @@
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

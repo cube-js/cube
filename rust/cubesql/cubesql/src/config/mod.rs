@@ -1,14 +1,19 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::config::injection::{DIService, Injector};
-use crate::config::processing_loop::ProcessingLoop;
-use crate::sql::{
-    MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+use crate::{
+    config::{
+        injection::{DIService, Injector},
+        processing_loop::ProcessingLoop,
+    },
+    sql::{
+        MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
+        SqlAuthService,
+    },
+    telemetry::{start_track_event_loop, stop_track_event_loop},
+    transport::{HttpTransport, TransportService},
+    CubeError,
 };
-use crate::telemetry::{start_track_event_loop, stop_track_event_loop};
-use crate::transport::{HttpTransport, TransportService};
-use crate::CubeError;
 use futures::future::join_all;
 use log::error;
 
@@ -164,12 +169,11 @@ impl Config {
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                bind_address: Some(env::var("CUBESQL_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESQL_PORT")
-                            .ok()
-                            .map(|v| v.parse::<u16>().unwrap())
-                            .unwrap_or(3306u16)),
-                )),
+                bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
+                    env::var("CUBESQL_PORT")
+                        .ok()
+                        .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
+                }),
                 postgres_bind_address: env::var("CUBESQL_PG_PORT")
                     .ok()
                     .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),

@@ -125,11 +125,17 @@ export class CubeSymbols {
       }
 
       if (preAggregation.scheduledRefresh === undefined) {
-        preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        if (preAggregation.type === 'rollupJoin') {
+          preAggregation.scheduledRefresh = false;
+        } else {
+          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        }
       }
 
       if (preAggregation.external === undefined) {
-        preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+        preAggregation.external =
+          ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
+          getEnv('externalDefault');
       }
     }
   }

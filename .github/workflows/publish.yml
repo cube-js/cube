@@ -481,7 +481,8 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            compress: true
+            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v2

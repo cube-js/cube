@@ -1,7 +1,7 @@
 .root {
   background-color: var(--color-bg);
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 3fr min-content;
   min-height: 100vh;
 }
 
@@ -33,8 +33,8 @@
 }
 
 .sidebar {
-  background-color: var(--color-bg-sidebar);
-  padding: 0 48px;
+  background-color: var(--color-bg);
+  padding: 3.2rem 48px;
   min-width: 350px;
 }
 

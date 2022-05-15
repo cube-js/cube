@@ -86,6 +86,8 @@ By default local dir are not persisted. You can enable persistance on router and
 | `remoteDir.persistence.resourcePolicy` | Setting it to "keep" to avoid removing PVCs during a helm delete operation | `keep` |
 | `remoteDir.persistence.size`           | Persistent Volume size                                                     | `10Gi` |
 | `remoteDir.persistence.annotations`    | Additional custom annotations for the PVC                                  | `{}`   |
+| `remoteDir.persistence.accessModes`    | Persistent Volume access modes                                             | [`ReadWriteOnce`] |
+| `remoteDir.persistence.storageClass`   | The storage class to use for the remoteDir pvc                             | `""` |
 
 ### Cloud Storage parameters
 
@@ -138,7 +140,7 @@ By default local dir are not persisted. You can enable persistance on router and
 
 | Name                              | Description                                                      | Value             |
 | --------------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `workers.workersCount`            | Number of workers to deploy                                      | `2`               |
+| `workers.workersCount`            | Number of workers to deploy                                      | `1`               |
 | `workers.port`                    | The port for the router node to listen for connections on        | `9001`            |
 | `workers.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
 | `workers.persistance.size`        | Persistent Volume size                                           | `10Gi`            |

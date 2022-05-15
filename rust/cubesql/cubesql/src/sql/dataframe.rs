@@ -1,7 +1,9 @@
 use chrono::{
-    format::Numeric::{Day, Hour, Minute, Month, Second, Year},
-    format::Pad::Zero,
-    format::{Fixed, Item},
+    format::{
+        Fixed, Item,
+        Numeric::{Day, Hour, Minute, Month, Second, Year},
+        Pad::Zero,
+    },
     prelude::*,
 };
 use chrono_tz::Tz;
@@ -18,8 +20,10 @@ use datafusion::arrow::{
     record_batch::RecordBatch,
     temporal_conversions,
 };
-use std::fmt::{self, Debug, Formatter};
-use std::io;
+use std::{
+    fmt::{self, Debug, Formatter},
+    io,
+};
 
 use super::{ColumnFlags, ColumnType};
 
@@ -301,7 +305,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::String),
         DataType::Interval(_) => Ok(ColumnType::String),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Double),
+        DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::List(field) => Ok(ColumnType::List(field)),
         DataType::Int8

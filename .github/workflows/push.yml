@@ -316,6 +316,60 @@ jobs:
         timeout-minutes: 30
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
+  integration-smoke:
+    needs: [ latest-tag-sha ]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+
+    strategy:
+      matrix:
+        node-version: [ 14.x ]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-08
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Run Integration smoke tests
+        timeout-minutes: 30
+        run: |
+          cd packages/cubejs-testing/
+          yarn run smoke:materialize
+          yarn run smoke:questdb
+          yarn run smoke:multidb
+
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
     needs: [lint, latest-tag-sha]
@@ -428,7 +482,6 @@ jobs:
           yarn run dataset:minimal
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations
-          yarn run birdbox:questdb
       # - name: Testing Athena driver (container mode) via BirdBox
       #   env:
       #     CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}

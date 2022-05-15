@@ -50,7 +50,7 @@ type RequireOne<T, K extends keyof T> = {
 export class CubejsServer {
   protected readonly core: CubejsServerCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -65,6 +65,7 @@ export class CubejsServer {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
+      pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
       sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
       http: {
         ...config.http,
@@ -111,7 +112,7 @@ export class CubejsServer {
         this.socketServer.initServer(this.server);
       }
 
-      if (this.config.sqlPort) {
+      if (this.config.sqlPort || this.config.pgSqlPort) {
         this.sqlServer = this.core.initSQLServer();
         await this.sqlServer.init(this.config);
       }

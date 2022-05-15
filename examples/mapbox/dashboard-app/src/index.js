@@ -2,8 +2,25 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
-import * as serviceWorker from './serviceWorker';
 import { HashRouter as Router } from 'react-router-dom';
+
+import createExampleWrapper from 'cube-example-wrapper'
+
+const exampleDescritpion = {
+  title: "Mapbox",
+  text: `
+    <p>This live demo shows a map-based data visualization created with Mapbox, Cube, and React.</p>
+    <p>
+      Follow 
+      the <a href="https://mapbox-guide.cube.dev/">tutorial</a> 
+      or explore 
+      the <a href="https://github.com/cube-js/cube.js/tree/master/guides/mapbox">source code</a> 
+      to learn more.
+    </p>
+  `
+}
+createExampleWrapper(exampleDescritpion)
+
 ReactDOM.render(
   <React.StrictMode>
     <Router>
@@ -11,8 +28,4 @@ ReactDOM.render(
     </Router>
   </React.StrictMode>,
   document.getElementById('root')
-); // If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-
-serviceWorker.unregister();
+);

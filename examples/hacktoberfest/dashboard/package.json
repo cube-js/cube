@@ -10,6 +10,7 @@
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
     "antd": "^4.8.2",
+    "cube-example-wrapper": "^1.0.26",
     "cubedev-tracking": "^1.0.6",
     "moment": "^2.29.1",
     "react": "^17.0.1",
@@ -23,7 +24,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "npm run build && netlify deploy --prod --dir build"
+    "deploy": "npm run build && netlify deploy --prod --dir build",
+    "preview": "npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": [

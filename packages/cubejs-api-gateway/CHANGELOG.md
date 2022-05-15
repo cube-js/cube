@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+
+### Features
+
+* **cubesql:** Add CUBEJS_PG_SQL_PORT env support and SQL API reference docs ([#4531](https://github.com/cube-js/cube.js/issues/4531)) ([de60d71](https://github.com/cube-js/cube.js/commit/de60d71c360be47e3231e7eafa349b9a0fddd244))
+
+
+
+
+
+# [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.29.57](https://github.com/cube-js/cube.js/compare/v0.29.56...v0.29.57) (2022-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.29.56](https://github.com/cube-js/cube.js/compare/v0.29.55...v0.29.56) (2022-05-06)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.29.55](https://github.com/cube-js/cube.js/compare/v0.29.54...v0.29.55) (2022-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.29.54](https://github.com/cube-js/cube.js/compare/v0.29.53...v0.29.54) (2022-05-03)
+
+
+### Bug Fixes
+
+* Make dimensions and measures nullable fields for GraphQL API ([#4477](https://github.com/cube-js/cube.js/issues/4477)) Thanks @MarkLyck ! ([84e298e](https://github.com/cube-js/cube.js/commit/84e298ed06d6aa68735eecc61a311484eb9cf65b)), closes [#4399](https://github.com/cube-js/cube.js/issues/4399)
+
+
+
+
+
 ## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
 
 

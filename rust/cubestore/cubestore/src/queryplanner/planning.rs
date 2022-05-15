@@ -48,6 +48,7 @@ use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
 use datafusion::logical_plan;
 use datafusion::optimizer::utils::expr_to_columns;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
@@ -451,6 +452,7 @@ impl ChooseIndex<'_> {
                     // Filled by workers
                     HashMap::new(),
                     Vec::new(),
+                    NoopParquetMetadataCache::new(),
                 )?);
 
                 let index_schema = source.schema();

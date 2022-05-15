@@ -23,6 +23,7 @@ export interface MetaPayload {
 
 export type SQLInterfaceOptions = {
     port?: number,
+    pgPort?: number,
     nonce?: string,
     checkAuth: (payload: CheckAuthPayload) => unknown | Promise<unknown>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,

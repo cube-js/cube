@@ -103,6 +103,15 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         None
     };
 
+    let pg_port_handle = options.get_value(&mut cx, "pgPort")?;
+    let pg_port = if pg_port_handle.is_a::<JsNumber, _>(&mut cx) {
+        let value = pg_port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+
+        Some(value.value(&mut cx) as u16)
+    } else {
+        None
+    };
+
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
@@ -111,7 +120,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(port, nonce);
+        let config = NodeConfig::new(port, pg_port, nonce);
 
         runtime.block_on(async move {
             let services = Arc::new(

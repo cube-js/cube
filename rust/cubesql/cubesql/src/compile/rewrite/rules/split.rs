@@ -1,29 +1,23 @@
-use crate::compile::engine::provider::CubeContext;
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::compile::rewrite::rewriter::RewriteRules;
-use crate::compile::rewrite::rules::members::MemberRules;
-use crate::compile::rewrite::AggregateFunctionExprFun;
-use crate::compile::rewrite::CubeScanTableName;
-use crate::compile::rewrite::OuterAggregateSplitReplacerCube;
-use crate::compile::rewrite::OuterProjectionSplitReplacerCube;
-use crate::compile::rewrite::ProjectionAlias;
-use crate::compile::rewrite::TableScanSourceTableName;
-use crate::compile::rewrite::{agg_fun_expr, alias_expr, transforming_chain_rewrite};
-use crate::compile::rewrite::{
-    aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr, aggr_group_expr_empty_tail,
-    aggregate, fun_expr, projection, projection_expr,
+use crate::{
+    compile::{
+        engine::provider::CubeContext,
+        rewrite::{
+            agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
+            aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
+            cast_expr, column_expr, cube_scan, fun_expr, inner_aggregate_split_replacer,
+            literal_expr, literal_string, original_expr_name, outer_aggregate_split_replacer,
+            outer_projection_split_replacer, projection, projection_expr,
+            projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
+            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
+            AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanTableName,
+            InnerAggregateSplitReplacerCube, LogicalPlanLanguage, OuterAggregateSplitReplacerCube,
+            OuterProjectionSplitReplacerCube, ProjectionAlias, TableScanSourceTableName,
+        },
+    },
+    transport::V1CubeMetaExt,
+    var, var_iter,
 };
-use crate::compile::rewrite::{cast_expr, projection_expr_empty_tail};
-use crate::compile::rewrite::{column_expr, cube_scan, literal_expr, rewrite};
-use crate::compile::rewrite::{inner_aggregate_split_replacer, outer_projection_split_replacer};
-use crate::compile::rewrite::{literal_string, ColumnExprColumn};
-use crate::compile::rewrite::{original_expr_name, InnerAggregateSplitReplacerCube};
-use crate::compile::rewrite::{outer_aggregate_split_replacer, LogicalPlanLanguage};
-use crate::compile::rewrite::{transforming_rewrite, AliasExprAlias};
-use crate::transport::V1CubeMetaExt;
-use crate::{var, var_iter};
-use datafusion::logical_plan::Column;
-use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
 use egg::{EGraph, Rewrite, Subst};
 use std::sync::Arc;
 
@@ -393,7 +387,25 @@ impl RewriteRules for SplitRules {
                     "?cube",
                 ),
                 agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
-                self.transform_inner_measure("?cube", "?column"),
+                self.transform_inner_measure("?cube", Some("?column")),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-inner-replacer-simple-count",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                self.transform_inner_measure("?cube", None),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-inner-replacer-missing-count",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                aggr_aggr_expr_empty_tail(),
+                self.transform_inner_measure_missing_count("?cube"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-replacer",
@@ -405,6 +417,7 @@ impl RewriteRules for SplitRules {
                 "?alias".to_string(),
                 self.transform_outer_projection_aggr_fun("?cube", "?expr", "?column", "?alias"),
             ),
+            // TODO handle simple counts
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-aggr-replacer",
                 outer_aggregate_split_replacer("?expr", "?cube"),
@@ -426,6 +439,15 @@ impl RewriteRules for SplitRules {
                     "?outer_alias",
                     "?output_fun",
                 ),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-fun-outer-aggr-replacer-missing-count",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                self.transform_outer_aggr_fun_missing_count("?cube", "?fun"),
             ),
             // TODO It replaces aggregate function with scalar one. This breaks Aggregate consistency.
             // Works because push down aggregate rule doesn't care about if it's in group by or aggregate.
@@ -580,10 +602,10 @@ impl SplitRules {
     fn transform_inner_measure(
         &self,
         cube_expr_var: &'static str,
-        column_var: &'static str,
+        column_var: Option<&'static str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for cube in var_iter!(
@@ -593,10 +615,43 @@ impl SplitRules {
             .cloned()
             {
                 if let Some(cube) = meta.find_cube_with_name(cube) {
-                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
-                        if cube.lookup_measure(&column.name).is_some() {
+                    for column in column_var
+                        .map(|column_var| {
+                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                .map(|c| c.name.to_string())
+                                .collect()
+                        })
+                        .unwrap_or(vec![MemberRules::default_count_measure_name()])
+                    {
+                        if cube.lookup_measure(&column).is_some() {
                             return true;
                         }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_inner_measure_missing_count(
+        &self,
+        cube_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_expr_var = var!(cube_expr_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for cube in var_iter!(
+                egraph[subst[cube_expr_var]],
+                InnerAggregateSplitReplacerCube
+            )
+            .cloned()
+            {
+                if let Some(cube) = meta.find_cube_with_name(cube) {
+                    if cube
+                        .lookup_measure(&MemberRules::default_count_measure_name())
+                        .is_none()
+                    {
+                        return true;
                     }
                 }
             }
@@ -752,6 +807,35 @@ impl SplitRules {
                                     );
                                     return true;
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    pub fn transform_outer_aggr_fun_missing_count(
+        &self,
+        cube_var: &'static str,
+        fun_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = var!(cube_var);
+        let fun_expr_var = var!(fun_expr_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
+                if fun == &AggregateFunction::Count || fun == &AggregateFunction::Sum {
+                    for cube in
+                        var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+                    {
+                        if let Some(cube) = meta.find_cube_with_name(cube) {
+                            if cube
+                                .lookup_measure(&MemberRules::default_count_measure_name())
+                                .is_none()
+                            {
+                                return true;
                             }
                         }
                     }

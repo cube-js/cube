@@ -11,7 +11,8 @@ impl CubeColumnMySqlExt for CubeColumn {
             ColumnType::Timestamp => "datetime".to_string(),
             ColumnType::Int64 => "int".to_string(),
             ColumnType::Double => "numeric".to_string(),
-            ColumnType::Blob => "boolean".to_string(),
+            // bool, boolean is an alias for tinyint(1)
+            ColumnType::Boolean => "tinyint(1)".to_string(),
             _ => "varchar".to_string(),
         }
     }
@@ -21,7 +22,8 @@ impl CubeColumnMySqlExt for CubeColumn {
             ColumnType::Timestamp => "datetime".to_string(),
             ColumnType::Int64 => "int".to_string(),
             ColumnType::Double => "numeric".to_string(),
-            ColumnType::Blob => "boolean".to_string(),
+            // bool, boolean is an alias for tinyint(1)
+            ColumnType::Boolean => "tinyint(1)".to_string(),
             _ => "varchar(255)".to_string(),
         }
     }

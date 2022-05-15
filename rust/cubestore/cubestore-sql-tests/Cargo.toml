@@ -35,11 +35,13 @@ base64 = "0.13.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 async-trait = "0.1.36"
 cubestore = { path = "../cubestore" }
+flate2 = "1.0.22"
 futures = "0.3.5"
 itertools = "0.9.0"
 lazy_static = "1.4.0"
 log = "0.4.11"
 pretty_assertions = "0.7.1"
+reqwest = "0.11.10"
 scopeguard = "1.1.0"
 serde = "1.0.115"
 serde_derive = "1.0.115"
@@ -47,3 +49,12 @@ tokio = { version = "1.0", features = ["full", "rt"] }
 futures-timer = "3.0.2"
 indoc = "1.0"
 tempfile = "3.2.0"
+tar = "0.4.38"
+
+[dev-dependencies]
+criterion = { version = "0.3.5", features = ["async_tokio"] }
+rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
+
+[[bench]]
+name = "in_process"
+harness = false

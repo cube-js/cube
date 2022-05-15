@@ -3,6 +3,96 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+
+### Features
+
+* **cubesql:** Add CUBEJS_PG_SQL_PORT env support and SQL API reference docs ([#4531](https://github.com/cube-js/cube.js/issues/4531)) ([de60d71](https://github.com/cube-js/cube.js/commit/de60d71c360be47e3231e7eafa349b9a0fddd244))
+* **cubesql:** Provide specific error messages for not matched expressions ([e035780](https://github.com/cube-js/cube.js/commit/e0357801bd39269585dd31d6ad932b32287a05af))
+* **cubesql:** Support `quarter` field in `date_part` SQL function ([7fdf4ac](https://github.com/cube-js/cube.js/commit/7fdf4acf6ce60387d3fa716c572e1611a77c205b))
+
+
+
+
+
+# [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
+
+
+### Features
+
+* **cubesql:** Support dynamic key in ArrayIndex expression ([#4504](https://github.com/cube-js/cube.js/issues/4504)) ([115dd55](https://github.com/cube-js/cube.js/commit/115dd55ed390b8617d592add832b1aefde636265))
+
+
+
+
+
+## [0.29.57](https://github.com/cube-js/cube.js/compare/v0.29.56...v0.29.57) (2022-05-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix format_type udf usage with tables ([a49b2b4](https://github.com/cube-js/cube.js/commit/a49b2b44c10e4da42443cfd948404d2bc60671ec))
+* **cubesql:** Reject `SELECT INTO` queries gracefully ([8b67ff7](https://github.com/cube-js/cube.js/commit/8b67ff7d0de1c5ca0b3852a342931d348ec2422c))
+
+
+
+
+
+## [0.29.56](https://github.com/cube-js/cube.js/compare/v0.29.55...v0.29.56) (2022-05-06)
+
+
+### Features
+
+* **cubesql:** Correct support for regclass in CAST expr ([#4499](https://github.com/cube-js/cube.js/issues/4499)) ([cdab58a](https://github.com/cube-js/cube.js/commit/cdab58abeb4251c45e0365ff2a8584c9094f6d4d))
+* **cubesql:** More descriptive error messages ([812db77](https://github.com/cube-js/cube.js/commit/812db772a651e0df1f7bc0d1dba97192c65ea834))
+* **cubesql:** Partial support for Tableau's table_cat query ([#4466](https://github.com/cube-js/cube.js/issues/4466)) ([f1956d3](https://github.com/cube-js/cube.js/commit/f1956d3240bf067e1ecbee0997303ae76ab3fcaa))
+* **cubesql:** Support pg_catalog.pg_enum postgres table ([2db445a](https://github.com/cube-js/cube.js/commit/2db445a120832390dd2577192597e30768b29918))
+* **cubesql:** Support pg_get_constraintdef UDF ([#4487](https://github.com/cube-js/cube.js/issues/4487)) ([7a3018d](https://github.com/cube-js/cube.js/commit/7a3018d24326124b5e9257264a11fa09bc565f57))
+* **cubesql:** Support pg_type_is_visible postgres udf ([47fc285](https://github.com/cube-js/cube.js/commit/47fc285c07c9633bee2482ef246f5436dd79dff3))
+
+
+
+
+
+## [0.29.55](https://github.com/cube-js/cube.js/compare/v0.29.54...v0.29.55) (2022-05-04)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct handling for boolean type ([cff6c8b](https://github.com/cube-js/cube.js/commit/cff6c8b4d69c9b8bade7ce1e6e2f2502a44f3918))
+* **cubesql:** Tableau new regclass query fast fix ([2a7ff1e](https://github.com/cube-js/cube.js/commit/2a7ff1e20fc79dccd9cff94e6225d657569ed06e))
+
+
+### Features
+
+* **cubesql:** Tableau cubes without count measure support ([931e2f5](https://github.com/cube-js/cube.js/commit/931e2f5fb5fa29b19347b7858a8b4f892162f169))
+
+
+
+
+
+## [0.29.54](https://github.com/cube-js/cube.js/compare/v0.29.53...v0.29.54) (2022-05-03)
+
+
+### Bug Fixes
+
+* **cubesql:** Using same alias on column yields Option.unwrap() panic ([a674c5f](https://github.com/cube-js/cube.js/commit/a674c5f98f8c643ed407fcf1cac528c797c43746))
+
+
+### Features
+
+* **cubesql:** Tableau boolean filters support ([33aa5f1](https://github.com/cube-js/cube.js/commit/33aa5f138b44ccf60afc6e562b9bf71c2fe6257c))
+* **cubesql:** Tableau cast projection queries support ([71ec644](https://github.com/cube-js/cube.js/commit/71ec64444e182a0a1c92818d655b40f78e463684))
+* **cubesql:** Tableau contains support ([71dcad0](https://github.com/cube-js/cube.js/commit/71dcad091dc8e60958c717bd01e07db050abf8af))
+* **cubesql:** Tableau min max number dimension support ([2abe13e](https://github.com/cube-js/cube.js/commit/2abe13e3155ad03ec3837da38bd465fbee0eb2f9))
+* **cubesql:** Tableau not null filter support ([d48d0e0](https://github.com/cube-js/cube.js/commit/d48d0e03d05559413ddcff0ce980f6cf96cd24bc))
+* **cubesql:** Tableau week support ([6d987ea](https://github.com/cube-js/cube.js/commit/6d987ea6062a90843084b72b254d068f46e26601))
+
+
+
+
+
 ## [0.29.53](https://github.com/cube-js/cube.js/compare/v0.29.52...v0.29.53) (2022-04-29)
 
 
