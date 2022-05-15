@@ -4,45 +4,50 @@ import commonjs from '@rollup/plugin-commonjs';
 import alias from '@rollup/plugin-alias';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
+const extensions = ['.js', '.jsx', '.ts', '.tsx'];
+const basePlugins = [
+  resolve({
+    extensions,
+    mainFields: ['browser', 'module', 'main'],
+  }),
+  commonjs({
+    include: /node_modules/,
+  }),
+  babel({
+    extensions,
+    exclude: '**/node_modules/**',
+    babelHelpers: 'runtime',
+    presets: [
+      '@babel/preset-react',
+      '@babel/preset-typescript',
+      [
+        '@babel/preset-env',
+        {
+          shippedProposals: true,
+          useBuiltIns: 'usage',
+          corejs: 3,
+        },
+      ],
+    ],
+    plugins: [
+      [
+        '@babel/plugin-transform-runtime',
+        {
+          corejs: false,
+          helpers: true,
+          regenerator: true,
+          useESModules: false,
+        },
+      ],
+    ],
+  }),
+];
+
 const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
-      commonjs({
-        extensions: ['.js'],
-      }),
-      resolve({
-        extensions: ['.ts', '.js', '.json'],
-        mainFields: ['browser', 'module', 'main'],
-      }),
-      babel({
-        extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        exclude: ['node_modules/**', /\/core-js\//],
-        babelHelpers: 'runtime',
-        presets: [
-          '@babel/preset-react',
-          '@babel/preset-typescript',
-          [
-            '@babel/preset-env',
-            {
-              shippedProposals: true,
-              useBuiltIns: 'usage',
-              corejs: 3,
-            },
-          ],
-        ],
-        plugins: [
-          [
-            '@babel/plugin-transform-runtime',
-            {
-              corejs: false,
-              helpers: true,
-              regenerator: true,
-              useESModules: false,
-            },
-          ],
-        ],
-      }),
+      ...basePlugins,
       alias({
         entries: {
           '@cubejs-client/core': '../cubejs-client-core/src/index.js',
@@ -60,8 +65,9 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           file: `packages/${name}/dist/${name}.umd.js`,
           format: 'umd',
           name: globalName,
-          exports: 'auto',
+          exports: 'named',
           sourcemap: true,
+          globals,
         },
       ],
     },
@@ -78,39 +84,13 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ...baseConfig,
       plugins: [
         peerDepsExternal(),
-        babel({
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-          exclude: 'node_modules/**',
-          babelHelpers: 'runtime',
-          presets: [
-            '@babel/preset-react',
-            '@babel/preset-typescript',
-            [
-              '@babel/preset-env',
-              {
-                shippedProposals: true,
-                useBuiltIns: 'usage',
-                corejs: 3,
-              },
-            ],
-          ],
-          plugins: [
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                corejs: false,
-                helpers: true,
-                regenerator: true,
-                useESModules: false,
-              },
-            ],
-          ],
-        }),
+        ...basePlugins,
       ],
       output: [
         {
           file: `packages/${name}/dist/${name}.js`,
           format: 'cjs',
+          exports: 'named',
           sourcemap: true,
         }
       ],
@@ -120,34 +100,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ...baseConfig,
       plugins: [
         peerDepsExternal(),
-        babel({
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-          exclude: 'node_modules/**',
-          babelHelpers: 'runtime',
-          presets: [
-            '@babel/preset-react',
-            '@babel/preset-typescript',
-            [
-              '@babel/preset-env',
-              {
-                shippedProposals: true,
-                useBuiltIns: 'usage',
-                corejs: 3,
-              },
-            ],
-          ],
-          plugins: [
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                corejs: false,
-                helpers: true,
-                regenerator: true,
-                useESModules: false,
-              },
-            ],
-          ],
-        }),
+        ...basePlugins,
       ],
       output: [
         {
@@ -180,6 +133,9 @@ export default bundle(
     bundle('cubejs-client-react', 'cubejsReact', {
       input: 'packages/cubejs-client-react/src/index.ts',
       external: ['react', 'prop-types'],
+      globals: {
+        react: 'React',
+      },
     })
   )
   .concat(
