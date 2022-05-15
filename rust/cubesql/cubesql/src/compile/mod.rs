@@ -62,7 +62,7 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
         session::DatabaseProtocol,
-        statement::CastReplacer,
+        statement::{CastReplacer, ToTimestampReplacer},
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -2456,6 +2456,7 @@ pub fn convert_statement_to_cube_query(
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = CastReplacer::new().replace(stmt);
+    let stmt = ToTimestampReplacer::new().replace(&stmt);
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(&stmt)
@@ -3574,6 +3575,48 @@ mod tests {
                     ]))
                 }]),
                 order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[test]
+    fn superset_pg_time_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT DATE_TRUNC('week', \"order_date\") AS __timestamp,
+               count(count) AS \"COUNT(count)\"
+FROM public.\"KibanaSampleDataEcommerce\"
+WHERE \"order_date\" >= TO_TIMESTAMP('2021-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+  AND \"order_date\" < TO_TIMESTAMP('2022-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+GROUP BY DATE_TRUNC('week', \"order_date\")
+ORDER BY \"COUNT(count)\" DESC"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-05-15T00:00:00.000Z".to_string(),
+                        "2022-05-14T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
                 limit: None,
                 offset: None,
                 filters: None,
