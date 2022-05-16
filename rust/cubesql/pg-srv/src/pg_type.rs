@@ -31,6 +31,7 @@ macro_rules! define_pg_types {
         impl PgTypeId {
             pub fn from_oid(oid: u32) -> Option<Self> {
                 match oid {
+                    0 => Some(Self::UNSPECIFIED),
                     $($OID => Some(Self::$NAME),)*
                     _ => None,
                 }
