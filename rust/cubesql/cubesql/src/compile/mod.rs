@@ -6351,8 +6351,18 @@ ORDER BY \"COUNT(count)\" DESC"
             "format_type",
             execute_query(
                 "
-                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f
-                FROM pg_catalog.pg_type t;
+                SELECT
+                    t.oid,
+                    t.typname,
+                    format_type(t.oid, 20::integer) ft20,
+                    format_type(t.oid, 5::integer) ft5,
+                    format_type(t.oid, 4::integer) ft4,
+                    format_type(t.oid, 0::integer) ft0,
+                    format_type(t.oid, -1::integer) ftneg,
+                    format_type(t.oid, NULL::integer) ftnull
+                FROM pg_catalog.pg_type t
+                ORDER BY t.oid ASC
+                ;
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL

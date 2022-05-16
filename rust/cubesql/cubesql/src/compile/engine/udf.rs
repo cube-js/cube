@@ -1071,36 +1071,96 @@ pub fn create_format_type_udf(name: &str) -> ScalarUDF {
             .iter()
             .zip(typemods.iter())
             .map(|args| match args {
-                (Some(oid), typemod) => {
-                    let typemod_str = typemod.map_or("".to_string(), |typemod| {
-                        let typemod = match typemod {
-                            // character varying returns length lowered by 4
-                            1043 => typemod - 4,
-                            _ => typemod,
+                (Some(oid), typemod) => Some(match PgTypeId::from_oid(oid) {
+                    Some(type_id) => {
+                        let typemod_str = || match type_id {
+                            PgTypeId::BPCHAR | PgTypeId::VARCHAR => match typemod {
+                                Some(typemod) if typemod >= 5 => format!("({})", typemod - 4),
+                                _ => "".to_string(),
+                            },
+                            PgTypeId::NUMERIC => match typemod {
+                                Some(typemod) if typemod >= 4 => format!("(0,{})", typemod - 4),
+                                Some(typemod) if typemod >= 0 => {
+                                    format!("(65535,{})", 65532 + typemod)
+                                }
+                                _ => "".to_string(),
+                            },
+                            _ => match typemod {
+                                Some(typemod) if typemod >= 0 => format!("({})", typemod),
+                                _ => "".to_string(),
+                            },
                         };
 
-                        match typemod {
-                            0.. => format!("({})", typemod),
-                            _ => "".to_string(),
+                        match type_id {
+                            PgTypeId::UNSPECIFIED => "-".to_string(),
+                            PgTypeId::BOOL => "boolean".to_string(),
+                            PgTypeId::BYTEA => format!("bytea{}", typemod_str()),
+                            PgTypeId::NAME => format!("name{}", typemod_str()),
+                            PgTypeId::INT8 => "bigint".to_string(),
+                            PgTypeId::INT2 => "smallint".to_string(),
+                            PgTypeId::INT4 => "integer".to_string(),
+                            PgTypeId::TEXT => format!("text{}", typemod_str()),
+                            PgTypeId::OID => format!("oid{}", typemod_str()),
+                            PgTypeId::TID => format!("tid{}", typemod_str()),
+                            PgTypeId::PGCLASS => format!("pg_class{}", typemod_str()),
+                            PgTypeId::FLOAT4 => "real".to_string(),
+                            PgTypeId::FLOAT8 => "double precision".to_string(),
+                            PgTypeId::MONEY => format!("money{}", typemod_str()),
+                            PgTypeId::INET => format!("inet{}", typemod_str()),
+                            PgTypeId::ARRAYBOOL => "boolean[]".to_string(),
+                            PgTypeId::ARRAYBYTEA => format!("bytea{}[]", typemod_str()),
+                            PgTypeId::ARRAYINT2 => "smallint[]".to_string(),
+                            PgTypeId::ARRAYINT4 => "integer[]".to_string(),
+                            PgTypeId::ARRAYTEXT => format!("text{}[]", typemod_str()),
+                            PgTypeId::ARRAYINT8 => "bigint[]".to_string(),
+                            PgTypeId::ARRAYFLOAT4 => "real[]".to_string(),
+                            PgTypeId::ARRAYFLOAT8 => "double precision[]".to_string(),
+                            PgTypeId::BPCHAR => match typemod {
+                                Some(typemod) if typemod < 0 => "bpchar".to_string(),
+                                _ => format!("character{}", typemod_str()),
+                            },
+                            PgTypeId::VARCHAR => format!("character varying{}", typemod_str()),
+                            PgTypeId::DATE => format!("date{}", typemod_str()),
+                            PgTypeId::TIME => format!("time{} without time zone", typemod_str()),
+                            PgTypeId::TIMESTAMP => {
+                                format!("timestamp{} without time zone", typemod_str())
+                            }
+                            PgTypeId::TIMESTAMPTZ => {
+                                format!("timestamp{} with time zone", typemod_str())
+                            }
+                            PgTypeId::INTERVAL => match typemod {
+                                Some(typemod) if typemod >= 0 => "-".to_string(),
+                                _ => "interval".to_string(),
+                            },
+                            PgTypeId::TIMETZ => format!("time{} with time zone", typemod_str()),
+                            PgTypeId::NUMERIC => format!("numeric{}", typemod_str()),
+                            PgTypeId::RECORD => format!("record{}", typemod_str()),
+                            PgTypeId::ANYARRAY => format!("anyarray{}", typemod_str()),
+                            PgTypeId::ANYELEMENT => format!("anyelement{}", typemod_str()),
+                            PgTypeId::PGLSN => format!("pg_lsn{}", typemod_str()),
+                            PgTypeId::ANYENUM => format!("anyenum{}", typemod_str()),
+                            PgTypeId::ANYRANGE => format!("anyrange{}", typemod_str()),
+                            PgTypeId::INT4RANGE => format!("int4range{}", typemod_str()),
+                            PgTypeId::NUMRANGE => format!("numrange{}", typemod_str()),
+                            PgTypeId::TSRANGE => format!("tsrange{}", typemod_str()),
+                            PgTypeId::TSTZRANGE => format!("tstzrange{}", typemod_str()),
+                            PgTypeId::DATERANGE => format!("daterange{}", typemod_str()),
+                            PgTypeId::INT8RANGE => format!("int8range{}", typemod_str()),
+                            PgTypeId::INT4MULTIRANGE => format!("int4multirange{}", typemod_str()),
+                            PgTypeId::NUMMULTIRANGE => format!("nummultirange{}", typemod_str()),
+                            PgTypeId::TSMULTIRANGE => format!("tsmultirange{}", typemod_str()),
+                            PgTypeId::DATEMULTIRANGE => format!("datemultirange{}", typemod_str()),
+                            PgTypeId::INT8MULTIRANGE => format!("int8multirange{}", typemod_str()),
+                            PgTypeId::CHARACTERDATA => {
+                                format!("information_schema.character_data{}", typemod_str())
+                            }
+                            PgTypeId::SQLIDENTIFIER => {
+                                format!("information_schema.sql_identifier{}", typemod_str())
+                            }
                         }
-                    });
-
-                    Some(match oid {
-                        0 => "-".to_string(),
-                        16 => "boolean".to_string(),
-                        19 => format!("name{}", typemod_str),
-                        20 => "bigint".to_string(),
-                        23 => "integer".to_string(),
-                        25 => "text".to_string(),
-                        1043 => format!("character varying{}", typemod_str),
-                        1114 => "timestamp".to_string(),
-                        1184 => format!("timestamp{} with time zone", typemod_str),
-                        1700 => "numeric".to_string(),
-                        13408 => format!("information_schema.character_data{}", typemod_str),
-                        13410 => format!("information_schema.sql_identifier{}", typemod_str),
-                        _ => "???".to_string(),
-                    })
-                }
+                    }
+                    _ => "???".to_string(),
+                }),
                 _ => None,
             })
             .collect::<StringArray>();
