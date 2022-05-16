@@ -293,7 +293,7 @@ export class BaseDriver {
     return 10000;
   }
 
-  async downloadTable(table, _options) {
+  async downloadTable(table, _options, loadSql) {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 

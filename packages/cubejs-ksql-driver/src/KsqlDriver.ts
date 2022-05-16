@@ -150,13 +150,25 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return describe.sourceDescription.fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
+  private getOriginalTableFromLoadSql(loadSql: string): string | null {
+    const match = loadSql?.match(/^.* SELECT \* FROM ([\S]+)$/);
+    return match?.[1] || null;
+  }
+
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
+    const originalTable = this.getOriginalTableFromLoadSql(loadSql);
+    if (originalTable) {
+      return Promise.resolve();
+    }
+
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
 
-  public async downloadTable(table: string, options: any): Promise<any> {
+  public async downloadTable(table: string, options: any, loadSql: string): Promise<any> {
+    const streamingTable = this.getOriginalTableFromLoadSql(loadSql) || this.tableDashName(table);
     return {
-      streamingTable: this.tableDashName(table),
+      types: await this.tableColumnTypes(streamingTable),
+      streamingTable,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',
