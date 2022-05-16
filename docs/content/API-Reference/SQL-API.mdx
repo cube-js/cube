@@ -71,12 +71,57 @@ Now, you can start your Cube instance and connect via the `psql` client with
 provided credentials:
 
 ```bash
-psql -h 127.0.0.1 --port 3306 -U myusername --password
+psql -h 127.0.0.1 --port 5432 -U myusername --password
 ```
 
-## Examples
+## Querying Fundamentals
 
-SQL API exposes cubes as the tables where measures and dimensions are columns.
+Under the hood, SQL API uses [Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution engine.
+It's responsible for query planning and execution.
+As the conversion process from SQL to Cube Query is ambiguous, additional step is done before the query is executed.
+This step is called rewriting.
+During this step, the query plan is being rewritten in a way a maximum number of Cube Queries can be detected within the given query plan.
+Overall, rewriting is a seamless process.
+There're some practical considerations that you should keep in mind while querying, though.
+
+### Cube is a table
+
+In order to simplify interaction with data tools, every cube is represented as a table.
+Measures, dimensions, and segments in this table are columns.
+However, not all queries are possible on these tables.
+In order to be valid, query against cube table should be:
+
+1. valid SQL statement and be compilable to the initial query plan by Datafusion;
+2. one of the supported query types to the cube so it can be converted to Cube Query.
+
+Let's discuss some of the supported query types.
+
+### Aggregated vs Non-aggregated queries
+
+There're two types of queries supported against cube tables: aggregated and non-aggregated.
+Aggregated are those with `GROUP BY` statement, and non-aggregated are those without it.
+Cube Queries issued to your database will always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query or not.
+
+### Filtering
+
+Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
+Cube tries to push down all filters into Cube Query.
+In some cases, SQL filters aren't available in Cube and can be done in a post-processing phase.
+Time dimension filters will be converted to time dimension date ranges whenever it's possible.
+
+### Ordering
+
+Cube tries to push down all `ORDER BY` statements into Cube Query.
+If it can't be done ordering part would be done in a post-processing phase.
+In case there're more than 50k rows in the result set, incorrect results can be received in this case.
+Please use `EXPLAIN` in order to check if it's the case.
+
+### Limit
+
+Limit push down is supported by Cube however, a limit over 50k can't be overridden.
+In future versions, paging and streaming would be used to avoid this limitation.
+
+## Examples
 
 Consider the following schema.
 
@@ -163,7 +208,7 @@ cube=> SELECT status FROM Orders;
 Measures can similarly be queried through Cube SQL.
 
 Because measures are already aggregated in Cube there is no need to apply
-aggregate functions to them in SQL API.
+aggregate functions to them in SQL API if you don't have a `GROUP BY` statement in query.
 
 ```
 cube=> SELECT count FROM Orders;
@@ -173,7 +218,7 @@ cube=> SELECT count FROM Orders;
 (1 row)
 ```
 
-Some of the BI systems may require you to apply aggregate functions. To support
+Some of the BI systems or SQL constraints may require you to apply aggregate functions. To support
 this Cube allows aggregate functions on measures as long as they match the type
 of the measure.
 
@@ -186,6 +231,16 @@ cube=> SELECT COUNT(count) FROM Orders;
  COUNT(Orders.count)
 ---------------------
                43994
+(1 row)
+```
+
+There's also universal aggregate function `MEASURE()` that matches any measure type.
+
+```
+cube=> SELECT MEASURE(count) FROM Orders;
+ measure(Orders.count)
+-----------------------
+                 43994
 (1 row)
 ```
 

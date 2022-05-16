@@ -977,7 +977,14 @@ pub fn create_str_to_date() -> ScalarUDF {
             let format = format
                 .replace("%i", "%M")
                 .replace("%s", "%S")
-                .replace(".%f", "%.f");
+                .replace(".%f", "%.f")
+                .replace("YYYY", "%Y")
+                .replace("DD", "%d")
+                .replace("HH24", "%H")
+                .replace("MI", "%M")
+                .replace("SS", "%S")
+                .replace(".US", "%.f")
+                .replace("MM", "%m");
 
             let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
@@ -1075,10 +1082,15 @@ pub fn create_format_type_udf(name: &str) -> ScalarUDF {
 
                     Some(match oid {
                         0 => "-".to_string(),
+                        16 => "boolean".to_string(),
                         19 => format!("name{}", typemod_str),
+                        20 => "bigint".to_string(),
                         23 => "integer".to_string(),
+                        25 => "text".to_string(),
                         1043 => format!("character varying{}", typemod_str),
+                        1114 => "timestamp".to_string(),
                         1184 => format!("timestamp{} with time zone", typemod_str),
+                        1700 => "numeric".to_string(),
                         13408 => format!("information_schema.character_data{}", typemod_str),
                         13410 => format!("information_schema.sql_identifier{}", typemod_str),
                         _ => "???".to_string(),
