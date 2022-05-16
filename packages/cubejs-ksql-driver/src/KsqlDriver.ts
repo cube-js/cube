@@ -33,6 +33,7 @@ type KsqlShowStreamsResponse = {
 
 type KsqlField = {
   name: string;
+  type?: 'KEY';
   schema: {
     type: string;
   };
@@ -43,6 +44,7 @@ type KsqlDescribeResponse = {
     name: string;
     fields: KsqlField[];
     type: 'STREAM' | 'TABLE';
+    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING'
   }
 };
 
@@ -147,7 +149,22 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public async tableColumnTypes(table: string) {
     const describe = await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(table))}`);
-    return describe.sourceDescription.fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
+
+    let { fields } = describe.sourceDescription;
+    if (describe.sourceDescription.windowType) {
+      const columnsUnderGroupBy = describe.sourceDescription.fields.filter(c => c.type === 'KEY');
+      const columnsRest = describe.sourceDescription.fields.filter(c => c.type !== 'KEY');
+      fields = [
+        ...columnsUnderGroupBy,
+        ...[
+          { name: 'WINDOWSTART', schema: { type: 'INTEGER' } },
+          { name: 'WINDOWEND', schema: { type: 'INTEGER' } },
+        ] as KsqlField[],
+        ...columnsRest
+      ];
+    }
+
+    return fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
   private getOriginalTableFromLoadSql(loadSql: string): string | null {
