@@ -161,42 +161,35 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
   ];
 };
 
-export default bundle(
-  'cubejs-client-core',
-  'cubejs',
-  {
+export default [
+  ...bundle('cubejs-client-core', 'cubejs', {
     input: 'packages/cubejs-client-core/src/index.js',
-  },
-  {
+  }, {
     input: 'packages/cubejs-client-core/src/index.umd.js',
-  }
-)
-  .concat(
-    bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-      input: 'packages/cubejs-client-ws-transport/src/index.ts',
-    })
-  )
-  .concat(
-    bundle('cubejs-client-react', 'cubejsReact', {
-      input: 'packages/cubejs-client-react/src/index.js',
-      external: ['react', 'prop-types'],
-    })
-  )
-  .concat(
-    bundle('cubejs-client-vue', 'cubejsVue', {
-      input: 'packages/cubejs-client-vue/src/index.js',
-      external: ['vue'],
-      globals: {
-        vue: 'Vue',
-      },
-    })
-  )
-  .concat(
-    bundle('cubejs-client-vue3', 'cubejsVue3', {
-      input: 'packages/cubejs-client-vue3/src/index.js',
-      external: ['vue'],
-      globals: {
-        vue: 'Vue',
-      },
-    })
-  );
+  }),
+
+  ...bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
+    input: 'packages/cubejs-client-ws-transport/src/index.ts',
+  }),
+
+  ...bundle('cubejs-client-react', 'cubejsReact', {
+    input: 'packages/cubejs-client-react/src/index.js',
+    external: ['react', 'prop-types'],
+  }),
+
+  ...bundle('cubejs-client-vue', 'cubejsVue', {
+    input: 'packages/cubejs-client-vue/src/index.js',
+    external: ['vue'],
+    globals: {
+      vue: 'Vue',
+    },
+  }),
+
+  ...bundle('cubejs-client-vue3', 'cubejsVue3', {
+    input: 'packages/cubejs-client-vue3/src/index.js',
+    external: ['vue'],
+    globals: {
+      vue: 'Vue',
+    },
+  }),
+];
