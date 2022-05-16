@@ -6792,7 +6792,36 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "superset_subquery",
             execute_query(
-                "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), (SELECT format_type(d.adbin, d.adrelid) FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef) AS DEFAULT, a.attnotnull, a.attnum, a.attrelid as table_oid, pgd.description as comment, a.attgenerated as generated FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_description pgd ON ( pgd.objoid = a.attrelid AND pgd.objsubid = a.attnum) WHERE a.attrelid = 13449 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum;".to_string(),
+                "
+                SELECT
+                    a.attname,
+                    pg_catalog.format_type(a.atttypid, a.atttypmod),
+                    (
+                        SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+                        FROM pg_catalog.pg_attrdef d
+                        WHERE
+                            d.adrelid = a.attrelid AND
+                            d.adnum = a.attnum AND
+                            a.atthasdef
+                    ) AS DEFAULT,
+                    a.attnotnull,
+                    a.attnum,
+                    a.attrelid as table_oid,
+                    pgd.description as comment,
+                    a.attgenerated as generated
+                FROM pg_catalog.pg_attribute a
+                LEFT JOIN pg_catalog.pg_description pgd ON (
+                    pgd.objoid = a.attrelid AND
+                    pgd.objsubid = a.attnum
+                )
+                WHERE
+                    a.attrelid = 18000
+                    AND a.attnum > 0
+                    AND NOT a.attisdropped
+                ORDER BY a.attnum
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
