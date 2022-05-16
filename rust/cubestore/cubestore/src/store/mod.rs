@@ -728,11 +728,9 @@ impl ChunkStore {
         {
             let (columns_again, remaining_rows_again) = cube_ext::spawn_blocking(move || {
                 let sort_key = &columns[0..sort_key_size];
-                println!("r rows: {:?}", &remaining_rows);
                 remaining_rows.sort_unstable_by(|&a, &b| {
                     lexcmp_array_rows(sort_key.iter(), a as usize, b as usize)
                 });
-                println!("r rows_2: {:?}", &remaining_rows);
                 (columns, remaining_rows)
             })
             .await?;
@@ -841,11 +839,6 @@ impl ChunkStore {
         let mut rows = rows.0;
         let mut new_chunks = Vec::new();
         for index in indexes.iter() {
-            println!(
-                "index {:?}  with id {:?} ======= begin",
-                index.get_row().get_name(),
-                index.get_id()
-            );
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
             let columns = columns.to_vec();
@@ -861,7 +854,6 @@ impl ChunkStore {
                     .partition_rows(index.get_id(), remapped, in_memory)
                     .await?,
             );
-            println!("index {:?} ======= end", index.get_row().get_name());
         }
 
         Ok(new_chunks)

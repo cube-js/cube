@@ -211,14 +211,12 @@ impl<'a> CubeStoreParser<'a> {
             let mut indexes = Vec::new();
 
             loop {
-                let is_aggregate = self.parse_custom_token("aggregate");
-
-                if self.parser.parse_keyword(Keyword::INDEX) {
-                    indexes.push(self.parse_with_index(name.clone(), is_aggregate)?);
+                if self.parse_custom_token("aggregate") {
+                    self.parser.expect_keyword(Keyword::INDEX)?;
+                    indexes.push(self.parse_with_index(name.clone(), true)?);
+                } else if self.parser.parse_keyword(Keyword::INDEX) {
+                    indexes.push(self.parse_with_index(name.clone(), false)?);
                 } else {
-                    if is_aggregate {
-                        self.parser.expect_keyword(Keyword::INDEX)?;
-                    }
                     break;
                 }
             }
