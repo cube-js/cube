@@ -152,15 +152,15 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
     let { fields } = describe.sourceDescription;
     if (describe.sourceDescription.windowType) {
-      const columnsUnderGroupBy = describe.sourceDescription.fields.filter(c => c.type === 'KEY');
-      const columnsRest = describe.sourceDescription.fields.filter(c => c.type !== 'KEY');
+      const fieldsUnderGroupBy = describe.sourceDescription.fields.filter(c => c.type === 'KEY');
+      const fieldsRest = describe.sourceDescription.fields.filter(c => c.type !== 'KEY');
       fields = [
-        ...columnsUnderGroupBy,
+        ...fieldsUnderGroupBy,
         ...[
           { name: 'WINDOWSTART', schema: { type: 'INTEGER' } },
           { name: 'WINDOWEND', schema: { type: 'INTEGER' } },
         ] as KsqlField[],
-        ...columnsRest
+        ...fieldsRest
       ];
     }
 
