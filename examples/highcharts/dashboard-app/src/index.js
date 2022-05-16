@@ -2,8 +2,25 @@ import React from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
-import * as serviceWorker from "./serviceWorker";
 import { HashRouter as Router } from "react-router-dom";
+
+import createExampleWrapper from 'cube-example-wrapper'
+
+const exampleDescription = {
+  title: "E-commerce dashboard with Highcharts",
+  text: `
+  <p>This live demo shows a Hightcharts dashboard created with React and Cube.</p>
+  <p>
+    Follow the <a href="https://cube.dev/blog/react-highcharts-example">tutorial</a> 
+    or explore 
+    the <a href="https://github.com/cube-js/cube.js/tree/master/examples/highcharts">source code</a>
+    to learn more.
+  </p>
+  `
+}
+
+createExampleWrapper(exampleDescription)
+
 ReactDOM.render(
   <React.StrictMode>
     <Router>
@@ -11,8 +28,4 @@ ReactDOM.render(
     </Router>
   </React.StrictMode>,
   document.getElementById("root")
-); // If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-
-serviceWorker.unregister();
+);

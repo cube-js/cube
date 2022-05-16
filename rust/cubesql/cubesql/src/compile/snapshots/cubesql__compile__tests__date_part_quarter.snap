@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    t.d,\n                    date_part('quarter', t.d) q\n                FROM (\n                    SELECT TIMESTAMP '2000-01-05 00:00:00+00:00' d UNION ALL\n                    SELECT TIMESTAMP '2005-05-20 00:00:00+00:00' d UNION ALL\n                    SELECT TIMESTAMP '2010-08-02 00:00:00+00:00' d UNION ALL\n                    SELECT TIMESTAMP '2020-10-01 00:00:00+00:00' d\n                ) t\n                ORDER BY t.d ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------+---+
+| d                       | q |
++-------------------------+---+
+| 2000-01-05T00:00:00.000 | 1 |
+| 2005-05-20T00:00:00.000 | 2 |
+| 2010-08-02T00:00:00.000 | 3 |
+| 2020-10-01T00:00:00.000 | 4 |
++-------------------------+---+

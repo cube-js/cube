@@ -3,6 +3,7 @@ import { downloadAndGunzip, streamToArray } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import dedent from 'dedent';
 import { Readable } from 'stream';
+import assert from "assert";
 
 export interface DriverTestsOptions {
   // Athena driver treats all fields as strings.
@@ -51,7 +52,7 @@ export class DriverTests {
 
   public async testQuery() {
     const rows = await this.driver.query(DriverTests.QUERY, []);
-    const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
+    const expectedRows = this.options.expectStringFields ? DriverTests.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
     expect(rows).toEqual(expectedRows);
   }
 
@@ -60,12 +61,40 @@ export class DriverTests {
     const tableData = await this.driver.stream!(DriverTests.QUERY, [], { highWaterMark: 100 });
     expect(tableData.rowStream instanceof Readable);
     const rows = await streamToArray(tableData.rowStream as Readable);
-    const expectedRows = this.options.expectStringFields ? this.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
+    const expectedRows = this.options.expectStringFields ? DriverTests.rowsToString(DriverTests.ROWS) : DriverTests.ROWS;
     expect(rows).toEqual(expectedRows);
   }
 
   public async testUnload() {
-    expect(this.driver.unload).toBeDefined();
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(this.driver.unload);
+    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.csvFile.length).toEqual(1);
+    const string = await downloadAndGunzip(data.csvFile[0]);
+    const expectedRows = this.options.csvNoHeader
+      ? DriverTests.skipFirstLine(DriverTests.CSV_ROWS)
+      : DriverTests.CSV_ROWS;
+    expect(string.trim()).toEqual(expectedRows);
+  }
+
+  public async testUnloadEmpty() {
+    const query = `
+      SELECT 'new' AS orders__status, 100 AS orders__amount  
+      WHERE FALSE  
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(this.driver.unload);
+    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.csvFile.length).toEqual(0);
+  }
+
+  private async createUnloadTable(query: string): Promise<string> {
     const versionEntry = {
       table_name: 'test.orders_order_status',
       structure_version: crypto.randomBytes(10).toString('hex'),
@@ -74,12 +103,6 @@ export class DriverTests {
       naming_version: 2
     };
     const tableName = PreAggregations.targetTableName(versionEntry);
-    const query = `
-      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
-      FROM (${DriverTests.QUERY}) AS orders
-      GROUP BY 1
-      ORDER BY 1
-    `;
     const loadQuery = this.options.wrapLoadQueryWithCtas ? `CREATE TABLE ${tableName} AS ${query}` : query;
     await this.driver.loadPreAggregationIntoTable(
       tableName,
@@ -90,20 +113,14 @@ export class DriverTests {
         targetTableName: tableName,
       }
     );
-    const data = await this.driver.unload!(tableName, { maxFileSize: 64 });
-    expect(data.csvFile.length).toEqual(1);
-    const string = await downloadAndGunzip(data.csvFile[0]);
-    const expectedRows = this.options.csvNoHeader
-      ? this.skipFirstLine(DriverTests.CSV_ROWS)
-      : DriverTests.CSV_ROWS;
-    expect(string.trim()).toEqual(expectedRows);
+    return tableName;
   }
 
-  private skipFirstLine(text: string): string {
+  private static skipFirstLine(text: string): string {
     return text.split('\n').slice(1).join('\n');
   }
 
-  private rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
+  private static rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
     const result: Record<string, string>[] = [];
     for (const row of rows) {
       const newRow: Record<string, string> = {};

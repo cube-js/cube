@@ -114,11 +114,21 @@ pre-aggregation or not.
 
 ### Background Scheduled Refresh
 
-You can configure Cube.js to always keep pre-aggregations up-to-date by
-refreshing them in the background. To enable it we need to add
-`scheduledRefresh: true` to pre-aggregation definition. Without this flag pre-aggregations are always built on-demand.
+By the default, Cube.js is configured to keep pre-aggregations
+up-to-date by refreshing them in the background. An exception from this
+rule is the pre-aggregations with the `originalSql` type, which built
+on-demand by default.
 
-Update your pre-aggregation to enable `scheduledRefresh`.
+To switch the default behavior for non `originalSql` pre-aggregations
+you can set `CUBEJS_SCHEDULED_REFRESH_DEFAULT` environment variable to
+`false`. This variable doesn't affect `originalSql` pre-aggregations.
+
+If you want to switch between "build on-demand" and "scheduled"
+behaviour independently from the pre-aggregations type and/or without
+changing environment variable, you can use `scheduledRefresh` property
+of the pre-aggregation itself.
+
+Update your pre-aggregation `scheduledRefresh`.
 
 ```diff
   preAggregations: {
@@ -131,7 +141,7 @@ Update your pre-aggregation to enable `scheduledRefresh`.
         every: `5 minutes`
       },
       external: true,
-+     scheduledRefresh: true
+-     scheduledRefresh: true
     }
   }
 ```

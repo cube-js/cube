@@ -75,6 +75,7 @@ class SEO extends Component {
         {/* General tags */}
         <meta name="description" content={description} />
         <meta name="image" content={image} />
+        {config.canonicalUrl && config.canonicalUrl !== 'null' && (<link href={config.canonicalUrl} rel="canonical" />)}
 
         {/* Schema.org tags */}
         <script type="application/ld+json">

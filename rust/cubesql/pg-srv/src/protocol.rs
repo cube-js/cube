@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
-use crate::{buffer, BindValue, PgType, PgTypeId};
+use crate::{buffer, BindValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
 
@@ -67,6 +67,7 @@ impl Serialize for StartupMessage {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
 pub struct ErrorResponse {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
     pub severity: ErrorSeverity,
@@ -74,10 +75,32 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+impl Display for ErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ErrorResponse")
+    }
+}
+
 impl ErrorResponse {
     pub fn new(severity: ErrorSeverity, code: ErrorCode, message: String) -> Self {
         Self {
             severity,
+            code,
+            message,
+        }
+    }
+
+    pub fn error(code: ErrorCode, message: String) -> Self {
+        Self {
+            severity: ErrorSeverity::Error,
+            code,
+            message,
+        }
+    }
+
+    pub fn fatal(code: ErrorCode, message: String) -> Self {
+        Self {
+            severity: ErrorSeverity::Fatal,
             code,
             message,
         }
@@ -376,7 +399,7 @@ pub struct PasswordMessage {
 
 #[async_trait]
 impl Deserialize for PasswordMessage {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -399,7 +422,7 @@ pub struct Parse {
 
 #[async_trait]
 impl Deserialize for Parse {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -431,7 +454,7 @@ pub struct Execute {
 
 #[async_trait]
 impl Deserialize for Execute {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -457,18 +480,19 @@ pub struct Close {
 
 #[async_trait]
 impl Deserialize for Close {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
         let typ = match buffer.read_u8().await? {
             b'S' => CloseType::Statement,
             b'P' => CloseType::Portal,
-            t => {
-                return Err(Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Unknown describe code: {}", t),
-                ));
+            code => {
+                return Err(ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unknown close code: {}", code),
+                )
+                .into());
             }
         };
 
@@ -515,7 +539,7 @@ impl Bind {
 
 #[async_trait]
 impl Deserialize for Bind {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -581,18 +605,19 @@ pub struct Describe {
 
 #[async_trait]
 impl Deserialize for Describe {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
         let typ = match buffer.read_u8().await? {
             b'S' => DescribeType::Statement,
             b'P' => DescribeType::Portal,
-            t => {
-                return Err(Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Unknown describe code: {}", t),
-                ));
+            code => {
+                return Err(ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unknown describe code: {}", code),
+                )
+                .into());
             }
         };
         let name = buffer::read_string(&mut buffer).await?;
@@ -608,7 +633,7 @@ pub struct Query {
 
 #[async_trait]
 impl Deserialize for Query {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -658,6 +683,8 @@ pub enum FrontendMessage {
 pub enum ErrorCode {
     // 0A — Feature Not Supported
     FeatureNotSupported,
+    // 8 -  Connection Exception
+    ProtocolViolation,
     // 28 - Invalid Authorization Specification
     InvalidAuthorizationSpecification,
     InvalidPassword,
@@ -675,6 +702,7 @@ impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
             Self::FeatureNotSupported => "0A000",
+            Self::ProtocolViolation => "08P01",
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
@@ -686,6 +714,7 @@ impl Display for ErrorCode {
     }
 }
 
+#[derive(Debug)]
 pub enum ErrorSeverity {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
     Error,
@@ -750,7 +779,7 @@ pub trait Serialize {
 
 #[async_trait]
 pub trait Deserialize {
-    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, Error>
+    async fn deserialize(mut buffer: Cursor<Vec<u8>>) -> Result<Self, ProtocolError>
     where
         Self: Sized;
 }
@@ -758,9 +787,8 @@ pub trait Deserialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::read_message;
+    use crate::{read_message, ProtocolError};
 
-    use std::io;
     use std::io::Cursor;
 
     fn parse_hex_dump(input: String) -> Vec<u8> {
@@ -778,7 +806,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_startup_message_duplex() -> Result<(), io::Error> {
+    async fn test_startup_message_duplex() -> Result<(), ProtocolError> {
         // 00 00 00 4c 00 03 00 00 75 73 65 72 00 74 65 73   ...L....user.tes
         // 74 00 64 61 74 61 62 61 73 65 00 74 65 73 74 00   t.database.test.
         // 61 70 70 6c 69 63 61 74 69 6f 6e 5f 6e 61 6d 65   application_name
@@ -815,7 +843,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_parse() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_parse() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
@@ -850,7 +878,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind_variant1() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_bind_variant1() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
@@ -886,7 +914,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_bind_variant2() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_bind_variant2() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
@@ -917,7 +945,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_describe() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_describe() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             44 00 00 00 08 53 73 30 00                        D....Ss0.          
@@ -944,7 +972,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_password_message() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_password_message() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             70 00 00 00 09 74 65 73 74 00                     p....test.
@@ -970,7 +998,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_execute() -> Result<(), io::Error> {
+    async fn test_frontend_message_execute() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             45 00 00 00 09 00 00 00 00 00                     E.........      
@@ -997,7 +1025,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_parse_sequence_sync() -> Result<(), io::Error> {
+    async fn test_frontend_message_parse_sequence_sync() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
             53 00 00 00 04                                    S....
@@ -1016,7 +1044,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_write_complete_parse() -> Result<(), io::Error> {
+    async fn test_frontend_message_write_complete_parse() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
 
         buffer::write_message(&mut cursor, ParseComplete {}).await?;
@@ -1027,7 +1055,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_frontend_message_write_row_description() -> Result<(), io::Error> {
+    async fn test_frontend_message_write_row_description() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
         let desc = RowDescription::new(vec![
             RowDescriptionField::new("num".to_string(), PgType::get_by_tid(PgTypeId::INT8)),

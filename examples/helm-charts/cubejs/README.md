@@ -177,6 +177,7 @@ cubestore:
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `config.apiPort`                    | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
 | `config.sqlPort`                    | The port for a Cube.js deployment to listen to SQL connections on                                                               |         |
+| `config.pgSqlPort`                  | The port for a Cube.js deployment to listen to Postgres SQL connections on                                                      |         |
 | `config.sqlUser`                    | The username to access the SQL api                                                                                              |         |
 | `config.sqlPassword`                | The password to access the SQL api                                                                                              |         |
 | `config.sqlPasswordFromSecret.name` | The password to access the SQL api (using secret)                                                                               |         |

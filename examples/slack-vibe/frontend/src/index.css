@@ -22,7 +22,7 @@
   --color-fg-link: #7A77FF;
   --color-fg-link-03: rgba(122, 119, 255, 0.3);
   --color-bg: #F3F3FB;
-  --color-bg-sidebar: #fff;
+  --color-bg-card: #fff;
   --color-bg-image: #A1A1B5;
   --color-bg-filter: #43436B;
   --color-bg-link: #EDEDFF;
@@ -80,18 +80,18 @@ p {
   margin: 0.5em 0;
 }
 
-a {
+#root a {
   border-bottom: solid 1px var(--color-fg-link-03);
   color: var(--color-fg-link);
   font-weight: 500;
   text-decoration: none;
 }
 
-a:hover {
+#root a:hover {
   border-bottom: solid 1px var(--color-fg-link);
 }
 
-button {
+#root button {
   background: #fff;
   border: solid var(--border-width) var(--color-border);
   border-radius: 4px;
@@ -105,12 +105,12 @@ button {
   white-space: nowrap;
 }
 
-button:hover {
+#root button:hover {
   border: solid var(--border-width) rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
 
-button:active {
+#root button:active {
   background: #f8f8f8;
   border: solid var(--border-width) rgba(0, 0, 0, 0.3);
 }
