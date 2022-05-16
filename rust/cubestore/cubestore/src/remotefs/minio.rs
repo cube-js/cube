@@ -52,11 +52,12 @@ impl MINIORemoteFs {
         let key_id = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
         let access_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
         let minio_server_endpoint = env::var("CUBESTORE_MINIO_SERVER_ENDPOINT").ok();
+        let s3_region_id = env::var("CUBESTORE_MINIO_REGION").ok();
 
         let credentials =
             Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
         let region = Region::Custom {
-            region: "".to_owned(),
+            region: s3_region_id.as_deref().unwrap_or("").to_string(),
             endpoint: minio_server_endpoint
                 .as_deref()
                 .unwrap_or("localhost:")
