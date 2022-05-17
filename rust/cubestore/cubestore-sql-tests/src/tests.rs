@@ -118,6 +118,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
         t("topk_large_inputs", topk_large_inputs),
         t("partitioned_index", partitioned_index),
+        t("partitioned_index_filter", partitioned_index_filter),
         t(
             "partitioned_index_if_not_exists",
             partitioned_index_if_not_exists,
@@ -2587,6 +2588,63 @@ async fn partitioned_index(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[(0, "a", 10, "Mars"), (2, "c", 30, "Moon")])
+    );
+}
+
+// https://github.com/cube-js/cube.js/issues/3777
+async fn partitioned_index_filter(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(r#"
+            CREATE TABLE s.t1(id int, url text, hits int)
+            ADD TO PARTITIONED INDEX s.ind(id, url)
+        "#)
+        .await
+        .unwrap();
+    service
+        .exec_query(r#"
+            CREATE TABLE s.t2(id2 int, url2 text, location text)
+            ADD TO PARTITIONED INDEX s.ind(id2, url2)
+        "#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"
+            INSERT INTO s.t1(id, url, hits)
+            VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)
+         "#)
+        .await
+        .unwrap();
+    service
+        .exec_query(r#"
+            INSERT INTO s.t2(id2, url2, location)
+            VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')
+        "#)
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(r#"
+            SELECT id, url, hits, location
+            FROM s.t1 `t1`
+            LEFT JOIN s.t2 `t2` ON t1.id = t2.id2 AND t1.url = t2.url2
+            -- WHERE location = 'NONE'
+            ORDER BY 1, 2
+        "#)
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(0), TableValue::String("a".to_string()), TableValue::Int(10), TableValue::String("Mars".to_string())],
+            vec![TableValue::Int(1), TableValue::String("a".to_string()), TableValue::Int(20), TableValue::Null],
+            vec![TableValue::Int(2), TableValue::String("c".to_string()), TableValue::Int(30), TableValue::String("Moon".to_string())],
+        ]
     );
 }
 
