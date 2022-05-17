@@ -16,6 +16,12 @@ export type FireboltDriverConfiguration = {
   readOnly?: boolean;
 };
 
+const FireboltTypeToGeneric: Record<string, string> = {
+  long: 'bigint'
+};
+
+const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
+
 export class FireboltDriver extends BaseDriver implements DriverInterface {
   private readonly connectionParams: ConnectionOptions;
 
@@ -28,7 +34,10 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   public constructor(config: Partial<FireboltDriverConfiguration> = {}) {
     super(config);
 
-    this.config = config;
+    this.config = {
+      readOnly: true,
+      ...config
+    };
 
     this.connectionParams = {
       username: <string>process.env.CUBEJS_DB_USER,
@@ -124,8 +133,9 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       parameters,
     });
 
-    const { data: rowStream, meta } = await statement.streamResult();
-    const types = await meta;
+    const { data: rowStream, meta: metaPromise } = await statement.streamResult();
+    const meta = await metaPromise;
+    const types = meta.map(({ type, name }) => ({ name, type: this.toGenericType(type) }));
 
     return {
       rowStream,
@@ -164,10 +174,33 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     const response = await this.queryResponse(query, values);
     const { data, meta } = response;
     const rows = data as R[];
+    const types = meta.map(({ type, name }) => ({ name, type: this.toGenericType(type) }));
     return {
       rows,
-      types: meta,
+      types,
     };
+  }
+
+  /* eslint-disable camelcase */
+  public async tableColumnTypes(table: string) {
+    const response = await this.query<{ column_name: string; data_type: string }>(`DESCRIBE ${table}`, []);
+    return response.map((row) => ({ name: row.column_name, type: this.toGenericType(row.data_type) }));
+  }
+  /* eslint-enable camelcase */
+
+  public toGenericType(columnType: string) {
+    if (columnType in FireboltTypeToGeneric) {
+      return FireboltTypeToGeneric[columnType];
+    }
+
+    const match = columnType.match(COMPLEX_TYPE);
+    if (match) {
+      const [_, outerType, innerType] = match;
+      if (columnType in FireboltTypeToGeneric) {
+        return FireboltTypeToGeneric[columnType];
+      }
+    }
+    return super.toGenericType(columnType);
   }
 
   public readOnly() {

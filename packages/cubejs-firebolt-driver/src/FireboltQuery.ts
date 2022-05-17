@@ -28,37 +28,4 @@ export class FireboltQuery extends BaseQuery {
       }(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     }
   }
-
-  public escapeColumnName(name: string) {
-    return `"${name}"`;
-  }
-
-  public preAggregationLoadSql(
-    cube: string,
-    preAggregation: any,
-    tableName: string
-  ) {
-    const sqlAndParams = this.preAggregationSql(cube, preAggregation);
-
-    if (tableName.match(/\./)) {
-      const [_, name] = tableName.split('.');
-      tableName = name;
-    }
-
-    return [
-      `CREATE DIMENSION TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`,
-      sqlAndParams[1],
-    ];
-  }
-
-  public preAggregationPreviewSql(tableName: string) {
-    if (tableName.match(/\./)) {
-      const [_, name] = tableName.split('.');
-      tableName = name;
-    }
-
-    return this.paramAllocator.buildSqlAndParams(
-      `SELECT * FROM ${tableName} LIMIT 1000`
-    );
-  }
 }
