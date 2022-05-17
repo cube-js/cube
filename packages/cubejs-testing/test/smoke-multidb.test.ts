@@ -4,7 +4,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import {DEFAULT_CONFIG} from "./smoke-tests";
+import { DEFAULT_CONFIG } from './smoke-tests';
 
 describe('multidb', () => {
   jest.setTimeout(60 * 5 * 1000);
