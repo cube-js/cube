@@ -49,6 +49,10 @@ type KsqlDescribeResponse = {
 };
 
 export class KsqlDriver extends BaseDriver implements DriverInterface {
+  public readOnly() {
+    return true;
+  }
+
   protected readonly config: KsqlDriverOptions;
 
   protected readonly dropTableMutex: Mutex = new Mutex();
@@ -168,16 +172,11 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   private getOriginalTableFromLoadSql(loadSql: string): string | null {
-    const match = loadSql?.match(/^.* SELECT \* FROM ([\S]+)$/);
+    const match = loadSql?.match(/^SELECT \* FROM ([\S]+)$/);
     return match?.[1] || null;
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    const originalTable = this.getOriginalTableFromLoadSql(loadSql);
-    if (originalTable) {
-      return Promise.resolve();
-    }
-
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
 
@@ -196,6 +195,29 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         }
       }
     };
+  }
+
+  /**
+   * @public
+   * @return {Promise<any>}
+   */
+  public async downloadQueryResults(query: string, values: any[], _options: any) {
+    const streamingTable = this.getOriginalTableFromLoadSql(query);
+    console.log({ query, values, streamingTable });
+
+    return streamingTable ? {
+      types: await this.tableColumnTypes(streamingTable!),
+      streamingTable,
+      streamingSource: {
+        name: this.config.streamingSourceName || 'default',
+        type: 'ksql',
+        credentials: {
+          user: this.config.username,
+          password: this.config.password,
+          url: this.config.url
+        }
+      }
+    } : super.downloadQueryResults(query, values, _options);
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {

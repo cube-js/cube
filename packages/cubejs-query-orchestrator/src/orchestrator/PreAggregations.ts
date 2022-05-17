@@ -937,8 +937,7 @@ export class PreAggregationLoader {
           tableData.rowStream = stream;
         }
       } else {
-        const [loadSql] = preAggregation.loadSql;
-        tableData = await saveCancelFn(client.downloadTable(table, capabilities, loadSql));
+        tableData = await saveCancelFn(client.downloadTable(table, capabilities));
       }
 
       if (!tableData.types) {
