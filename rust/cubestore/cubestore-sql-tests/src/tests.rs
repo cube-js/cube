@@ -2633,7 +2633,7 @@ async fn partitioned_index_filter(service: Box<dyn SqlClient>) {
             SELECT id, url, hits, location
             FROM s.t1 `t1`
             LEFT JOIN s.t2 `t2` ON t1.id = t2.id2 AND t1.url = t2.url2
-            -- WHERE location = 'NONE'
+            WHERE location = 'NONE'
             ORDER BY 1, 2
         "#)
         .await
