@@ -22,7 +22,7 @@ export function ExplorePage() {
   const dashboardSource = useMemo(() => new DashboardSource(), []);
   const livePreviewContext = useLivePreviewContext();
 
-  const { apiUrl, token, schemaVersion, setContext, playgroundContext } =
+  const { schemaVersion, setContext, playgroundContext } =
     useAppContext();
   const { token: securityContextToken } = useSecurityContext();
 
@@ -61,8 +61,6 @@ export function ExplorePage() {
 
   return (
     <QueryBuilderContainer
-      apiUrl={apiUrl}
-      token={token}
       schemaVersion={schemaVersion}
       dashboardSource={dashboardSource}
       onVizStateChanged={setQueryParam}
