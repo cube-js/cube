@@ -180,11 +180,9 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
 
-  public async downloadTable(table: string, options: any, loadSql: string): Promise<any> {
-    const streamingTable = this.getOriginalTableFromLoadSql(loadSql) || this.tableDashName(table);
+  public async downloadTable(table: string, options: any): Promise<any> {
     return {
-      types: await this.tableColumnTypes(streamingTable),
-      streamingTable,
+      streamingTable: this.tableDashName(table),
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',
