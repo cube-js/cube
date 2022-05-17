@@ -46,7 +46,7 @@ export class FireboltQuery extends BaseQuery {
     }
 
     return [
-      `CREATE DIMENSION TABLE "${tableName}" ${this.asSyntaxTable} ${sqlAndParams[0]}`,
+      `CREATE DIMENSION TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`,
       sqlAndParams[1],
     ];
   }
@@ -58,7 +58,7 @@ export class FireboltQuery extends BaseQuery {
     }
 
     return this.paramAllocator.buildSqlAndParams(
-      `SELECT * FROM "${tableName}" LIMIT 1000`
+      `SELECT * FROM ${tableName} LIMIT 1000`
     );
   }
 }
