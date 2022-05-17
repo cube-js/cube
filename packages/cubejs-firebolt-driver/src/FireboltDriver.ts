@@ -195,9 +195,9 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     const match = columnType.match(COMPLEX_TYPE);
     if (match) {
-      const [_, outerType, innerType] = match;
+      const [_, _outerType, innerType] = match;
       if (columnType in FireboltTypeToGeneric) {
-        return FireboltTypeToGeneric[columnType];
+        return FireboltTypeToGeneric[innerType];
       }
     }
     return super.toGenericType(columnType);
