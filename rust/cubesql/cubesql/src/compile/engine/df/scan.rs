@@ -574,8 +574,8 @@ mod tests {
 
         #[async_trait]
         impl ContextLogger for TestContextLogger {
-            fn error(&self, message: &str) {
-                log::error!("{}", message);
+            fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
+                log::error!("{} {:?}", message, props.unwrap_or_default());
             }
         }
 

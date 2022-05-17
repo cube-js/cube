@@ -70,6 +70,7 @@ impl ProcessingLoop for PostgresServer {
                 if let Err(e) = AsyncPostgresShim::run_on(socket, session, logger.clone()).await {
                     logger.error(
                         format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                        None,
                     );
                 }
             });

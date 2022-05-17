@@ -86,6 +86,7 @@ impl MySqlConnection {
             Err(e) => {
                 self.logger.error(
                     format!("Error during processing MySQL {}: {}", query, e.to_string()).as_str(),
+                    None,
                 );
 
                 if let Some(bt) = e.backtrace() {
@@ -271,14 +272,17 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
     ) -> Result<(), Self::Error> {
         debug!("[mysql] on_execute: {}", input);
 
-        let mut statement =
-            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
-                Ok(s) => s,
-                Err(e) => {
-                    info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
-                    return Ok(());
-                }
-            };
+        let mut statement = match parse_sql_to_statement(
+            &input.to_string(),
+            DatabaseProtocol::MySQL,
+            self.logger.clone(),
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
+                return Ok(());
+            }
+        };
 
         let stmt_prepare = StatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
@@ -416,6 +420,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
                 if e.message != *"Incorrect user name or password" {
                     self.logger.error(
                         format!("Error during authentication MySQL connection: {}", e).as_str(),
+                        None,
                     );
                 };
 
@@ -525,8 +530,10 @@ impl ProcessingLoop for MySqlServer {
                 )
                 .await
                 {
-                    logger
-                        .error(format!("Error during processing MySQL connection: {}", e).as_str());
+                    logger.error(
+                        format!("Error during processing MySQL connection: {}", e).as_str(),
+                        None,
+                    );
                     if let Some(bt) = e.backtrace() {
                         trace!("{}", bt.to_string());
                     } else {

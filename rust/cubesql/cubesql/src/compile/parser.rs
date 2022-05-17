@@ -1,10 +1,12 @@
+use std::{collections::HashMap, sync::Arc};
+
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
     parser::Parser,
 };
 
-use crate::{compile::CompilationError, sql::session::DatabaseProtocol};
+use crate::{compile::CompilationError, sql::session::DatabaseProtocol, telemetry::ContextLogger};
 
 use super::CompilationResult;
 
@@ -36,6 +38,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
+    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<Vec<Statement>> {
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
@@ -137,8 +140,9 @@ pub fn parse_sql_to_statements(
 pub fn parse_sql_to_statement(
     query: &String,
     protocol: DatabaseProtocol,
+    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<Statement> {
-    match parse_sql_to_statements(query, protocol)? {
+    let result = match parse_sql_to_statements(query, protocol, logger)? {
         stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
@@ -154,18 +158,49 @@ pub fn parse_sql_to_statement(
                 )))
             }
         }
+    };
+
+    if let Err(err) = &result {
+        logger.error(
+            &err.to_string(),
+            Some(HashMap::from([
+                ("query".to_string(), query.clone()),
+                ("stage".to_string(), "parsing".to_string()),
+            ])),
+        );
     }
+
+    result
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use async_trait::async_trait;
+
     use super::*;
+
+    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
+        #[derive(Debug)]
+        struct TestContextLogger {}
+
+        #[async_trait]
+        impl ContextLogger for TestContextLogger {
+            fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
+                log::error!("{} {:?}", message, props.unwrap_or_default());
+            }
+        }
+
+        Arc::new(TestContextLogger {})
+    }
 
     #[test]
     fn test_no_statements_mysql() {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::MySQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -182,6 +217,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::MySQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -207,6 +243,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::MySQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => {}
@@ -219,6 +256,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::PostgreSQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -235,6 +273,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::PostgreSQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -260,6 +299,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
+            get_test_context_logger(),
         );
         match result {
             Ok(_) => {}

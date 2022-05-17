@@ -87,7 +87,7 @@ impl Log for ReportingLogger {
 }
 
 pub trait ContextLogger: Send + Sync + Debug {
-    fn error(&self, message: &str);
+    fn error(&self, message: &str, props: Option<HashMap<String, String>>);
 }
 
 #[derive(Debug)]
@@ -117,12 +117,10 @@ impl SessionLogger {
 }
 
 impl ContextLogger for SessionLogger {
-    fn error(&self, message: &str) {
-        self.log(
-            "Cube SQL Error",
-            HashMap::from([("error".to_string(), message.to_string())]),
-            Level::Error,
-        );
+    fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
+        let mut properties = HashMap::from([("error".to_string(), message.to_string())]);
+        properties.extend(props.unwrap_or_default());
+        self.log("Cube SQL Error", properties, Level::Error);
     }
 }
 
