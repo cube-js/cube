@@ -10,7 +10,6 @@ export class WebSocketConnection {
   private url: string;
 
   public constructor(url: string) {
-    console.log('QQQ', url);
     this.url = url;
     this.messageCounter = 1;
   }
@@ -147,7 +146,6 @@ export class WebSocketConnection {
   }
 
   public async query(query: string, queryTracingObj?: any): Promise<any[]> {
-    console.log('MMM', query);
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;
