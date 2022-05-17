@@ -15,7 +15,7 @@ Click the “How to connect” link on the Overview page, navigate to the REST A
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/image1.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-1.png"
     style="border: none"
     width="80%"
   />
@@ -33,7 +33,7 @@ Copy and paste the REST API URL and the Authorization token to create a new data
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/image2.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-2.png"
     style="border: none"
     width="80%"
   />
@@ -45,7 +45,7 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/image3.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-3.png"
     style="border: none"
     width="80%"
   />
@@ -55,7 +55,7 @@ Create a POST request, paste the JSON Query in the Body and hit Run.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/image4.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-4.png"
     style="border: none"
     width="80%"
   />
@@ -67,7 +67,7 @@ You have many options to display the data in Appsmith. For instance, you can dis
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/image5.png"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-5.png"
     style="border: none"
     width="80%"
   />
