@@ -190,14 +190,14 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async downloadQueryResults(query: string, values: any[], _options: any) {
+  public async downloadQueryResults(query: string) {
     const streamingTable = this.getOriginalTableFromQuery(query);
     if (!streamingTable) {
-      return super.downloadQueryResults(query, values, _options);
+      throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
     
     return {
-      types: await this.tableColumnTypes(streamingTable!),
+      types: await this.tableColumnTypes(streamingTable),
       streamingTable,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
