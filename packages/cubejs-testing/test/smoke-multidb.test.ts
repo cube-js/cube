@@ -4,6 +4,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
+import {DEFAULT_CONFIG} from "./smoke-tests";
 
 describe('multidb', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -33,12 +34,7 @@ describe('multidb', () => {
         CUBEJS_DB_USER2: 'root',
         CUBEJS_DB_PASS2: 'Test1test',
 
-        CUBEJS_DEV_MODE: 'true',
-        CUBEJS_WEB_SOCKETS: 'false',
-        CUBEJS_EXTERNAL_DEFAULT: 'true',
-        CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
-        CUBEJS_REFRESH_WORKER: 'true',
-        CUBEJS_ROLLUP_ONLY: 'true',
+        ...DEFAULT_CONFIG,
       },
       {
         schemaDir: 'multidb/schema',

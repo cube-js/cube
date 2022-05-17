@@ -2,18 +2,18 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import {DEFAULT_CONFIG, testQueryMeasure} from './smoke-tests';
+import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
-describe('redshift', () => {
+describe('athena', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
   let client: CubejsApi;
 
   beforeAll(async () => {
     birdbox = await getBirdbox(
-      'redshift',
+      'athena',
       {
-        CUBEJS_DB_TYPE: 'redshift',
+        CUBEJS_DB_TYPE: 'athena',
 
         ...DEFAULT_CONFIG,
       },
