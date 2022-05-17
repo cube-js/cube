@@ -647,10 +647,6 @@ impl SqlService for SqlServiceImpl {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        info!("QQQ SLEEPING 10 {}", query);
-        // sleep(Duration::from_secs(10)).await;
-        info!("QQQ AWOKE");
-
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
