@@ -171,11 +171,6 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
-  private getOriginalTableFromLoadSql(loadSql: string): string | null {
-    const match = loadSql?.match(/^SELECT \* FROM ([\S]+)$/);
-    return match?.[1] || null;
-  }
-
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
@@ -195,15 +190,13 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  /**
-   * @public
-   * @return {Promise<any>}
-   */
   public async downloadQueryResults(query: string, values: any[], _options: any) {
-    const streamingTable = this.getOriginalTableFromLoadSql(query);
-    console.log({ query, values, streamingTable });
-
-    return streamingTable ? {
+    const streamingTable = this.getOriginalTableFromQuery(query);
+    if (!streamingTable) {
+      return super.downloadQueryResults(query, values, _options);
+    }
+    
+    return {
       types: await this.tableColumnTypes(streamingTable!),
       streamingTable,
       streamingSource: {
@@ -215,7 +208,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
           url: this.config.url
         }
       }
-    } : super.downloadQueryResults(query, values, _options);
+    };
+  }
+
+  private getOriginalTableFromQuery(query: string): string | null {
+    const match = query?.match(/^SELECT \* FROM ([\S]+)$/);
+    return match?.[1] || null;
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {
