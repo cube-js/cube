@@ -31,6 +31,12 @@ trait Visitor<'ast> {
                 self.visit_expr(&mut *low);
                 self.visit_expr(&mut *high);
             }
+            Expr::AnyOp(expr) => {
+                self.visit_expr(expr);
+            }
+            Expr::AllOp(expr) => {
+                self.visit_expr(expr);
+            }
             Expr::BinaryOp { left, op: _, right } => {
                 self.visit_expr(&mut *left);
                 self.visit_expr(&mut *right);
