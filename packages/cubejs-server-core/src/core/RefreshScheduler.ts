@@ -196,12 +196,13 @@ export class RefreshScheduler {
   ) {
     const compilers = await compilerApi.getCompilers();
     const { cubeEvaluator } = compilers;
+    const processed = [];
     await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
-      await this.serverCore
-        .getOrchestratorApi(context)
-        .forceReconcile(
-          cubeEvaluator.cubeFromPath(name).dataSource ?? 'default'
-        );
+      const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
+      if (processed.indexOf(ds) === -1) {
+        processed.push(ds);
+        await this.serverCore.getOrchestratorApi(context).forceReconcile(ds);
+      }
     }));
   }
 

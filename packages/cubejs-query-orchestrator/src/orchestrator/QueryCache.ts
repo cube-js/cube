@@ -73,8 +73,10 @@ export class QueryCache {
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
-    if (this.getExternalQueue()) {
-      await this.getExternalQueue().reconcileQueue();
+    if (!this.externalQueue) {
+      // We don't need to reconcile external queue, because Cube Store
+      // uses its internal queue which managed separately.
+      return;
     }
     if (this.getQueue(datasource)) {
       await this.getQueue(datasource).reconcileQueue();
