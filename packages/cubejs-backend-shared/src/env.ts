@@ -174,7 +174,7 @@ const variables: Record<string, (...args: any) => any> = {
   dbExportBucketAzureKey:
     () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
   // Redshift Driver
-  redshiftBucketUnloadArn: () => get('CUBEJS_DB_REDSHIFT_UNLOAD_ARN')
+  dbExportBucketRedshiftArn: () => get('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN')
     .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')

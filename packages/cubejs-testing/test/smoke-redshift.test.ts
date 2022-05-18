@@ -58,5 +58,5 @@ describe('redshift (S3 key_id/secret)', reusableSuite({
 // Use an iam_role arn for unload and export
 describe('redshift (unload arn)', reusableSuite({
   ...baseS3Env,
-  CUBEJS_DB_REDSHIFT_UNLOAD_ARN: 'bogus_arn'
+  CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN: 'bogus_arn'
 }));

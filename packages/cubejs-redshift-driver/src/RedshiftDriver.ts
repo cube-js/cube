@@ -55,7 +55,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       ...requiredExportBucket,
       keyId: getEnv('dbExportBucketAwsKey'),
       secretKey: getEnv('dbExportBucketAwsSecret'),
-      unloadArn: getEnv('redshiftBucketUnloadArn')
+      unloadArn: getEnv('dbExportBucketRedshiftArn')
     };
 
     if (exportBucket.bucketType) {
