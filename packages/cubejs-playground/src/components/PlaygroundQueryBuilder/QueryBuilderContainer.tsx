@@ -6,7 +6,7 @@ import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
+import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {
@@ -29,29 +29,21 @@ const StyledCard = styled(Card)`
   }
 `;
 
-type QueryBuilderContainerProps = {
-  apiUrl: string | null;
-  token: string | null;
-} & Pick<
+type QueryBuilderContainerProps = Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
   | 'dashboardSource'
+  | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
-  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
-export function QueryBuilderContainer({
-  apiUrl,
-  token,
-  ...props
-}: QueryBuilderContainerProps) {
-  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
-
-  const currentToken = securityContextToken || token;
+export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
+  const { apiUrl } = useAppContext();
+  const { currentToken, token: securityContextToken, setIsModalOpen } = useSecurityContext();
 
   useLayoutEffect(() => {
     if (apiUrl && currentToken) {
