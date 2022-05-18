@@ -3,5 +3,5 @@ import {
 } from 'typedoc';
 
 export function memberSymbol(this: DeclarationReflection) {
-  return '>';
+  return '```';
 }
