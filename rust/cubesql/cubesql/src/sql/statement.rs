@@ -679,6 +679,14 @@ impl SensitiveDataSanitizer {
     pub fn new() -> Self {
         Self {}
     }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
 }
 
 impl<'ast> Visitor<'ast> for SensitiveDataSanitizer {

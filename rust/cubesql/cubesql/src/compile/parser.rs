@@ -163,9 +163,10 @@ pub fn parse_sql_to_statement(
     if let Err(err) = &result {
         logger.error(
             &err.to_string(),
-            Some(HashMap::from([
-                ("stage".to_string(), "parsing".to_string()),
-            ])),
+            Some(HashMap::from([(
+                "stage".to_string(),
+                "parsing".to_string(),
+            )])),
         );
     }
 
