@@ -7085,4 +7085,20 @@ ORDER BY \"COUNT(count)\" DESC"
             _ => panic!("SELECT INTO should throw CompilationError::Unsupported"),
         }
     }
+
+    #[tokio::test]
+    async fn df_is_boolean() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_is_boolean",
+            execute_query(
+                "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
+                 FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
