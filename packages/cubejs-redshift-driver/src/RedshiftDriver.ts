@@ -77,11 +77,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       if (!exportBucket.unloadArn) {
         // Make sure the required keys are set
         const emptySecretKeys = Object.keys(exportBucket)
-          .filter((key: string) => key === 'unloadArn')
+          .filter((key: string) => key !== 'unloadArn')
           .filter((key: string) => exportBucket[<keyof RedshiftDriverExportAWS>key] === undefined);
         if (emptySecretKeys.length) {
           throw new Error(
-            `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyRequiredKeys.join(',')}`
+            `Unsupported configuration exportBucket, some configuration keys are empty: ${emptySecretKeys.join(',')}`
           );
         }
       }
