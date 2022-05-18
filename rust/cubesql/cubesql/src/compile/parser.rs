@@ -164,7 +164,6 @@ pub fn parse_sql_to_statement(
         logger.error(
             &err.to_string(),
             Some(HashMap::from([
-                ("query".to_string(), query.clone()),
                 ("stage".to_string(), "parsing".to_string()),
             ])),
         );
