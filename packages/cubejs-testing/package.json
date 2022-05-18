@@ -39,6 +39,7 @@
     "driver:bigquery": "jest --verbose -i dist/test/driver-bigquery.test.js",
     "driver:bigquery:snap": "jest --verbose --updateSnapshot -i dist/test/driver-bigquery.test.js",
     "driver:firebolt": "jest --verbose -i dist/test/driver-firebolt.test.js",
+    "driver:firebolt:snap": "jest --verbose --updateSnapshot dist/test/driver-firebolt.test.js",
     "driver:postgres": "jest --verbose -i dist/test/driver-postgres.test.js",
     "driver:postgres:snap": "jest --verbose --updateSnapshot -i dist/test/driver-postgres.test.js",
     "driver:questdb": "jest --verbose -i dist/test/driver-questdb.test.js",
