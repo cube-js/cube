@@ -711,6 +711,7 @@ export class PreAggregationLoader {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
         const readOnly =
+          this.preAggregation.readOnly ||
           client.config && client.config.readOnly ||
           client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
         refreshStrategy = readOnly ?
@@ -862,7 +863,7 @@ export class PreAggregationLoader {
       params, {
         ...queryOptions,
         ...capabilities,
-        ...this.getStreamingOptions(),
+        ...this.getStreamingOptions(preAggregation),
       }
     )).catch((error: any) => {
       this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
@@ -888,8 +889,9 @@ export class PreAggregationLoader {
     };
   }
 
-  protected getStreamingOptions(): StreamOptions {
+  protected getStreamingOptions(preAggregation): StreamOptions {
     return {
+      selectAllStreamingTable: preAggregation.selectAllStreamingTable,
       // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
       highWaterMark: 10000
     };
@@ -923,7 +925,7 @@ export class PreAggregationLoader {
         tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
       } else if (capabilities.streamImport && client.stream) {
         tableData = await saveCancelFn(
-          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
+          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions(preAggregation))
         );
 
         if (client.unload) {

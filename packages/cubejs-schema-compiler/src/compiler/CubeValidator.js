@@ -178,6 +178,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
   buildRangeEnd: {
     sql: Joi.func().required()
   },
+  readOnly: Joi.boolean().strict(),
 };
 
 const BasePreAggregation = {

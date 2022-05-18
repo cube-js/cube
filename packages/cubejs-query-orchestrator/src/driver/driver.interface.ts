@@ -74,7 +74,8 @@ export interface ExternalDriverCompatibilities {
   streamImport?: true,
 }
 export type StreamOptions = {
-  highWaterMark: number
+  selectAllStreamingTable?: string;
+  highWaterMark: number;
 };
 
 export interface DownloadQueryResultsBase {

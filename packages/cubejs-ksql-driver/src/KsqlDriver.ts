@@ -49,10 +49,6 @@ type KsqlDescribeResponse = {
 };
 
 export class KsqlDriver extends BaseDriver implements DriverInterface {
-  public readOnly() {
-    return true;
-  }
-
   protected readonly config: KsqlDriverOptions;
 
   protected readonly dropTableMutex: Mutex = new Mutex();
@@ -176,26 +172,19 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public async downloadTable(table: string, options: any): Promise<any> {
-    return {
-      streamingTable: this.tableDashName(table),
-      streamingSource: {
-        name: this.config.streamingSourceName || 'default',
-        type: 'ksql',
-        credentials: {
-          user: this.config.username,
-          password: this.config.password,
-          url: this.config.url
-        }
-      }
-    };
+    return this.getStreamingTableData(this.tableDashName(table));
   }
 
-  public async downloadQueryResults(query: string) {
-    const streamingTable = this.getOriginalTableFromQuery(query);
-    if (!streamingTable) {
+  public async downloadQueryResults(query: string, params: any, options: any) {
+    const { selectAllStreamingTable } = options;
+    if (!selectAllStreamingTable) {
       throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
-    
+
+    return this.getStreamingTableData(selectAllStreamingTable);
+  }
+
+  private async getStreamingTableData(streamingTable: string) {
     return {
       types: await this.tableColumnTypes(streamingTable),
       streamingTable,
@@ -209,11 +198,6 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         }
       }
     };
-  }
-
-  private getOriginalTableFromQuery(query: string): string | null {
-    const match = query?.match(/^SELECT \* FROM ([\S]+)$/);
-    return match?.[1] || null;
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {

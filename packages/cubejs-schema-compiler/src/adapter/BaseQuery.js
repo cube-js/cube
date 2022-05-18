@@ -2187,6 +2187,16 @@ class BaseQuery {
     );
   }
 
+  preAggregationReadOnly(cube, preAggregation) {
+    return preAggregation.type === 'originalSql' && Boolean(this.preAggregationSelectAllStreamingTable(cube, preAggregation));
+  }
+
+  preAggregationSelectAllStreamingTable(cube, preAggregation) {
+    const [sql] = this.preAggregationSql(cube, preAggregation);
+    const match = sql.match(/^SELECT \* FROM ([\S]+)$/);
+    return match && match[1];
+  }
+
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {
