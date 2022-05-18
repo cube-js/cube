@@ -2,7 +2,10 @@ pub mod compaction;
 
 use async_trait::async_trait;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::hash_aggregate::{
+    AggregateMode, AggregateStrategy, HashAggregateExec,
+};
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
 
@@ -10,7 +13,7 @@ use bincode::{deserialize_from, serialize_into};
 
 use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
-    MetaStore, Partition, WAL,
+    MetaStore, Partition, WAL, IndexType
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
@@ -767,6 +770,7 @@ impl ChunkStore {
                     .iter()
                     .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
+                let columns = self.post_process_columns(index.clone(), columns).await?;
                 new_chunks.push(
                     self.add_chunk_columns(index.clone(), partition, columns, in_memory)
                         .await?,
@@ -778,6 +782,53 @@ impl ChunkStore {
         assert_eq!(remaining_rows.len(), 0);
 
         Ok(new_chunks)
+    }
+
+    async fn post_process_columns(&self, index: IdRow<Index>, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+        match index.get_row().get_type() {
+            IndexType::Regular => Ok(data),
+            IndexType::Aggregate => {
+                let table = self.meta_store.get_table_by_id(index.get_row().table_id()).await?;
+                let schema = Arc::new(arrow_schema(&index.get_row()));
+                let batch = RecordBatch::try_new(schema.clone(), data)?;
+
+                let input = Arc::new(MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?);
+
+                let groups = index
+                    .get_row()
+                    .get_columns()
+                    .iter()
+                    .take(index.get_row().sort_key_size() as usize)
+                    .map(|c| -> Result<_, CubeError> {
+                        let col :Arc<dyn PhysicalExpr> = Arc::new(datafusion::physical_plan::expressions::Column::new_with_schema(
+                             c.get_name().as_str(),
+                             &schema,
+                             )?);
+                        Ok((col, c.get_name().clone()))
+
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let aggregates = table
+                    .get_row()
+                    .aggregate_columns()
+                    .iter()
+                    .map(|aggr_col| aggr_col.aggregate_expr(&schema))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let aggregate = Arc::new(HashAggregateExec::try_new(
+                        AggregateStrategy::InplaceSorted,
+                        None,
+                        AggregateMode::Final,
+                        groups.clone(),
+                        aggregates.clone(),
+                        input,
+                        schema.clone(),
+                        )?); 
+
+                let res = aggregate.execute(0).await?;
+                Ok(Vec::new())
+            }
+        } 
     }
 
     /// Processes data into parquet files in the current task and schedules an async file upload.

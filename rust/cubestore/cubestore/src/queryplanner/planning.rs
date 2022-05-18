@@ -1397,8 +1397,7 @@ pub mod tests {
             None,
             true,
             None,
-            None,
-            None,
+            Vec::new(),
             None,
             None,
         ));
@@ -1444,8 +1443,7 @@ pub mod tests {
             None,
             true,
             None,
-            None,
-            None,
+            Vec::new(),
             None,
             None,
         ));
@@ -1496,8 +1494,7 @@ pub mod tests {
             None,
             true,
             None,
-            None,
-            None,
+            Vec::new(),
             None,
             None,
         ));
