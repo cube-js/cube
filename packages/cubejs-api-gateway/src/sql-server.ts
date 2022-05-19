@@ -8,6 +8,7 @@ import type { CheckSQLAuthFn } from './interfaces';
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
   sqlPort?: number,
+  pgSqlPort?: number,
   sqlNonce?: string,
   sqlUser?: string,
   sqlPassword?: string,
@@ -34,6 +35,7 @@ export class SQLServer {
 
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
+      pgPort: options.pgSqlPort,
       nonce: options.sqlNonce,
       checkAuth: async ({ request, user }) => {
         const { password } = await checkSqlAuth(request, user);

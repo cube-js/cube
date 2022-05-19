@@ -308,6 +308,18 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             Some("pg_test_types".to_string()),
         )
         .await?;
+        self.test_snapshot_execute_query(
+            r#"
+                SELECT CAST(TRUNC(EXTRACT(QUARTER FROM "Orders"."completedAt")) AS INTEGER) AS q,
+                    SUM("Orders"."count") AS s
+                    FROM "public"."Orders" "Orders"
+                GROUP BY 1
+                ORDER BY q ASC
+            "#
+            .to_string(),
+            Some("datepart_quarter".to_string()),
+        )
+        .await?;
 
         self.test_execute_query(
             r#"SELECT

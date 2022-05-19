@@ -10,8 +10,7 @@ const config = {
   themeColor: "#c62828", // Used for setting manifest and progress theme colors.
   backgroundColor: "#e0e0e0", // Used for setting manifest background color.
   pathPrefix: "",
-  githubUrl: "https://github.com/cube-js/cube.js/tree/master/guides/multi-tenant-analytics",
-  canonicalUrl: "https://cube.dev/blog/multi-tenant-analytics-with-auth0/"
+  githubUrl: "https://github.com/cube-js/cube.js/tree/master/guides/multi-tenant-analytics"
 };
 
 // Validate

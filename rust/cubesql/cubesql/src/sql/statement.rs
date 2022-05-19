@@ -2,7 +2,7 @@ use msql_srv::{Column, ColumnFlags, ColumnType};
 use pg_srv::{BindValue, PgType};
 use sqlparser::{
     ast,
-    ast::{Expr, Value},
+    ast::{Expr, Ident, Value},
 };
 
 trait Visitor<'ast> {
@@ -514,6 +514,32 @@ impl<'ast> Visitor<'ast> for CastReplacer {
                 },
                 _ => self.visit_expr(&mut *cast_expr),
             }
+        }
+    }
+}
+
+/// Postgres to_timestamp clashes with Datafusion to_timestamp so we replace it with str_to_date
+#[derive(Debug)]
+pub struct ToTimestampReplacer {}
+
+impl ToTimestampReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast> for ToTimestampReplacer {
+    fn visit_identifier(&mut self, identifier: &mut Ident) {
+        if identifier.value.to_lowercase() == "to_timestamp" {
+            identifier.value = "str_to_date".to_string()
         }
     }
 }

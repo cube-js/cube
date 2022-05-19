@@ -6,15 +6,15 @@ use crate::{
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, BetweenExprNegated,
             BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
             CubeScanTableName, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, GetIndexedFieldExprKey,
-            InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanLimit, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
+            JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::auth_service::AuthContext,
@@ -285,7 +285,7 @@ impl LogicalPlanToLanguageConverter {
             Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
                 let expr = self.add_expr(expr)?;
-                let key = add_data_node!(self, key, GetIndexedFieldExprKey);
+                let key = self.add_expr(key)?;
                 self.graph
                     .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
             }
@@ -774,8 +774,8 @@ pub fn node_to_expr(
         }
         LogicalPlanLanguage::WildcardExpr(_) => Expr::Wildcard,
         LogicalPlanLanguage::GetIndexedFieldExpr(params) => {
-            let expr = Box::new(to_expr(params[0]).clone()?);
-            let key = match_data_node!(node_by_id, params[1], GetIndexedFieldExprKey);
+            let expr = Box::new(to_expr(params[0])?);
+            let key = Box::new(to_expr(params[1])?);
             Expr::GetIndexedField { expr, key }
         }
         x => panic!("Unexpected expression node: {:?}", x),
@@ -1306,16 +1306,26 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
+
                         if let Some(aliases) = aliases {
+                            let mut new_fields = Vec::with_capacity(aliases.len());
+
                             // Aliases serve solely column ordering purpose as fields generally not ordered
-                            let new_fields = aliases
-                                .iter()
-                                .map(|a| {
-                                    fields.iter().find(|(f, _)| f.name() == a).unwrap().clone()
-                                })
-                                .collect();
+                            for alias in aliases.iter() {
+                                let field_for_alias = fields
+                                    .iter()
+                                    .find(|(f, _)| f.name() == alias)
+                                    .ok_or(CubeError::internal(format!(
+                                        "Unable to find field for alias {}",
+                                        alias
+                                    )))?;
+
+                                new_fields.push(field_for_alias.clone());
+                            }
+
                             fields = new_fields;
                         }
+
                         let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(

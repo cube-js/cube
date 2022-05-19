@@ -179,10 +179,6 @@ export async function startBirdBoxFromContainer(
     };
   }
 
-  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
-    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
-  }
-
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
     const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
@@ -322,6 +318,9 @@ export async function startBirdBoxFromCli(
   let db: StartedTestContainer;
   let cli: ChildProcess;
 
+  if (!options.schemaDir) {
+    options.schemaDir = 'postgresql/schema';
+  }
   if (!options.cubejsConfig) {
     options.cubejsConfig = 'postgresql/single/cube.js';
   }
@@ -355,24 +354,25 @@ export async function startBirdBoxFromCli(
       }
       await db.stop();
       process.stderr.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished with error: ${
-          exitCode
-        }\n`
+        `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
       );
       process.exit(1);
     }
     if (options.log === Log.PIPE) {
       process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished successfully\n`
+        `[Birdbox] Script ${loadScript} finished successfully\n`
       );
     }
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
+
+  if (!options.useCubejsServerBinary) {
+    // cli mode, using a project created via cli
+    if (!fs.existsSync(testDir)) {
+      execInDir('.', 'npx cubejs-cli create birdbox-test-project -d postgres');
+    }
+  }
 
   // Do not remove whole dir as it contains node_modules
   if (fs.existsSync(path.join(testDir, '.env'))) {
@@ -382,6 +382,12 @@ export async function startBirdBoxFromCli(
   if (fs.existsSync(path.join(testDir, '.cubestore'))) {
     fs.removeSync(path.join(testDir, '.cubestore'));
   }
+
+  // Ignored if not explicitly required by a schema file.
+  fs.copySync(
+    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', 'dbt-project'),
+    path.join(testDir, 'dbt-project')
+  );
 
   if (options.schemaDir) {
     fs.copySync(
@@ -449,9 +455,11 @@ export async function startBirdBoxFromCli(
     }
     await pausePromise(10 * 1000);
   } catch (e) {
+    process.stdout.write(`Error spawning cube: ${e}\n`);
     // @ts-ignore
     db.stop();
   }
+
   return {
     stop: async () => {
       clearTestData();
