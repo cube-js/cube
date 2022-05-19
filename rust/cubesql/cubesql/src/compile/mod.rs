@@ -7168,6 +7168,32 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "powerbi_table_columns",
+            execute_query(
+                "select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, case when (data_type like '%unsigned%') then DATA_TYPE || ' unsigned' else DATA_TYPE end as DATA_TYPE
+                from INFORMATION_SCHEMA.columns
+                where TABLE_SCHEMA = 'public' and TABLE_NAME = 'KibanaSampleDataEcommerce'
+                order by TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_schemas",
+            execute_query(
+                "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+                from INFORMATION_SCHEMA.tables
+                where TABLE_SCHEMA not in ('information_schema', 'pg_catalog')
+                order by TABLE_SCHEMA, TABLE_NAME"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         // TODO: 'Boolean = Utf8' can't be evaluated because there isn't a common type to coerce the types to
         // insta::assert_snapshot!(
         //     "powerbi_introspection",
