@@ -14214,10 +14214,10 @@ find-yarn-workspace-root@^2.0.0:
   dependencies:
     micromatch "^4.0.2"
 
-firebolt-sdk@^0.1.1:
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/firebolt-sdk/-/firebolt-sdk-0.1.1.tgz#1bd8b145084e26afc24772152a172562bf4c7062"
-  integrity sha512-//Ji0xYnD81RHf5R+fUjyYhhKe1EKCvRbMlRQXTnVxHKCLRcHGNGOc2Y4X9am9Aw7Momun8MqMUrxYHaYKi37g==
+firebolt-sdk@^0.1.2:
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/firebolt-sdk/-/firebolt-sdk-0.1.2.tgz#44279599600d0cd9c2461123d296333cdeba3da8"
+  integrity sha512-or2BNlZ1ztIBE7MRjRbkfoEZGTfk0CDknRh/VaNQS4KG2KNL7F8pGLkJpP5rvTB8+aO0NCr1io+1MFRkjFzK8w==
   dependencies:
     "@types/json-bigint" "^1.0.1"
     abort-controller "^3.0.0"
