@@ -151,8 +151,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       });
 
       const baseQuery = `UNLOAD ('SELECT * FROM ${table}') TO '${bucketType}://${bucketName}/${exportPathName}/'`;
-      const credentialQuery = unloadArn ?
-        `iam_role '${unloadArn}'` : `CREDENTIALS 'aws_access_key_id=${keyId};aws_secret_access_key=${secretKey}'`;
+      // Prefer the unloadArn if it is present
+      const credentialQuery = unloadArn
+        ? `iam_role '${unloadArn}'`
+        : `CREDENTIALS 'aws_access_key_id=${keyId};aws_secret_access_key=${secretKey}'`;
+
       const unloadQuery = `${baseQuery} ${credentialQuery} ${optionsPart}`;
 
       // Unable to extract number of extracted rows, because it's done in protocol notice
