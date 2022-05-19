@@ -253,6 +253,7 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Plain(String),
@@ -271,25 +272,6 @@ impl Serialize for CommandComplete {
         }
 
         Some(buffer)
-    }
-}
-
-impl PartialEq for CommandComplete {
-    fn eq(&self, other: &Self) -> bool {
-        match &self {
-            CommandComplete::Select(left) => match other {
-                CommandComplete::Select(right) => left == right,
-                _ => false,
-            },
-            CommandComplete::Plain(left) => match other {
-                CommandComplete::Plain(right) => left == right,
-                _ => false,
-            },
-        }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 
