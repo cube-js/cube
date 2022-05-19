@@ -13,7 +13,9 @@ import {
 import { FireboltQuery } from './FireboltQuery';
 
 export type FireboltDriverConfiguration = {
-  readOnly?: boolean;
+  readOnly?: boolean
+  apiEndpoint?: string
+  connection: ConnectionOptions
 };
 
 const FireboltTypeToGeneric: Record<string, string> = {
@@ -23,8 +25,6 @@ const FireboltTypeToGeneric: Record<string, string> = {
 const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
 
 export class FireboltDriver extends BaseDriver implements DriverInterface {
-  private readonly connectionParams: ConnectionOptions;
-
   private readonly config: FireboltDriverConfiguration;
 
   private readonly firebolt;
@@ -36,20 +36,19 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: true,
-      ...config
+      apiEndpoint: process.env.CUBEJS_FIREBOLT_API_ENDPOINT,
+      ...config,
+      connection: {
+        username: <string>process.env.CUBEJS_DB_USER,
+        password: <string>process.env.CUBEJS_DB_PASS,
+        database: <string>process.env.CUBEJS_DB_NAME,
+        engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
+        ...config.connection || {}
+      }
     };
-
-    this.connectionParams = {
-      username: <string>process.env.CUBEJS_DB_USER,
-      password: <string>process.env.CUBEJS_DB_PASS,
-      database: <string>process.env.CUBEJS_DB_NAME,
-      engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
-    };
-
-    const apiEndpoint = process.env.CUBEJS_FIREBOLT_API_ENDPOINT;
 
     this.firebolt = Firebolt({
-      apiEndpoint,
+      apiEndpoint: config.apiEndpoint,
     });
   }
 
@@ -59,7 +58,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   protected async initConnection() {
     try {
-      const connection = await this.firebolt.connect(this.connectionParams);
+      const connection = await this.firebolt.connect(this.config.connection);
       return connection;
     } catch (e) {
       this.connection = null;
