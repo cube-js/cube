@@ -1741,6 +1741,12 @@ impl QueryPlanner {
                     CommandCompletion::Rollback,
                 ))
             }
+            (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Discard(object_type.to_string()),
+                ))
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -6767,6 +6773,40 @@ ORDER BY \"COUNT(count)\" DESC"
                 DatabaseProtocol::PostgreSQL
             )
             .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_discard_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "discard_postgres_all",
+            execute_query("DISCARD ALL;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_plans",
+            execute_query("DISCARD PLANS;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_sequences",
+            execute_query(
+                "DISCARD SEQUENCES;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_temporary",
+            execute_query(
+                "DISCARD TEMPORARY;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_temp",
+            execute_query("DISCARD TEMP;".to_string(), DatabaseProtocol::PostgreSQL).await?
         );
 
         Ok(())

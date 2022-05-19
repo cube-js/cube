@@ -11,6 +11,7 @@ use crate::{
         extended::Portal,
         session::DatabaseProtocol,
         statement::{StatementParamsFinder, StatementPlaceholderReplacer},
+        types::CommandCompletion,
         writer::BatchWriter,
         AuthContext, Session,
     },
@@ -19,7 +20,7 @@ use crate::{
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format},
+    protocol::{CommandComplete, ErrorCode, ErrorResponse, Format},
     PgType, PgTypeId, ProtocolError,
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
@@ -602,6 +603,8 @@ impl AsyncPostgresShim {
         let mut writer = BatchWriter::new(portal.get_format());
         let completion = portal.execute(&mut writer, 0).await?;
 
+        self.handle_command_complete(&completion);
+
         if writer.has_data() {
             buffer::write_direct(&mut self.socket, writer).await?;
         };
@@ -631,6 +634,15 @@ impl AsyncPostgresShim {
             Ok(Arc::new(ctx))
         } else {
             Err(CubeError::internal("must be auth".to_string()))
+        }
+    }
+
+    fn handle_command_complete(&mut self, completion: &CommandComplete) {
+        if completion == &CommandCompletion::Discard("ALL".to_string()).to_pg_command()
+            || completion == &CommandCompletion::Discard("PLANS".to_string()).to_pg_command()
+        {
+            self.statements = HashMap::new();
+            self.portals = HashMap::new();
         }
     }
 }

@@ -253,6 +253,7 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Plain(String),
