@@ -88,9 +88,12 @@ impl Row {
 pub enum TableValue {
     Null,
     String(String),
+    Int16(i16),
+    Int32(i32),
     Int64(i64),
     Boolean(bool),
     List(ArrayRef),
+    Float32(f32),
     Float64(f64),
     Timestamp(TimestampValue),
 }
@@ -100,8 +103,11 @@ impl ToString for TableValue {
         match &self {
             TableValue::Null => "NULL".to_string(),
             TableValue::String(v) => v.clone(),
+            TableValue::Int16(v) => v.to_string(),
+            TableValue::Int32(v) => v.to_string(),
             TableValue::Int64(v) => v.to_string(),
             TableValue::Boolean(v) => v.to_string(),
+            TableValue::Float32(v) => v.to_string(),
             TableValue::Float64(v) => v.to_string(),
             TableValue::Timestamp(v) => v.to_string(),
             TableValue::List(v) => {
@@ -308,13 +314,12 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::List(field) => Ok(ColumnType::List(field)),
+        DataType::Int32 | DataType::UInt32 => Ok(ColumnType::Int32),
         DataType::Int8
         | DataType::Int16
-        | DataType::Int32
         | DataType::Int64
         | DataType::UInt8
         | DataType::UInt16
-        | DataType::UInt32
         | DataType::UInt64 => Ok(ColumnType::Int64),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
@@ -348,21 +353,17 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
-                DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int64, i64),
-                DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int64, i64),
-                DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int64, i64),
+                DataType::UInt16 => convert_array!(array, num_rows, rows, UInt16Array, Int16, i16),
+                DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int16, i16),
+                DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int32, i32),
+                DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int32, i32),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int64, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int64, i64),
+                DataType::Float32 => {
+                    convert_array!(array, num_rows, rows, Float32Array, Float32, f32)
+                }
                 DataType::Float64 => {
-                    let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
-                    for i in 0..num_rows {
-                        rows[i].push(if a.is_null(i) {
-                            TableValue::Null
-                        } else {
-                            let decimal = a.value(i) as f64;
-                            TableValue::Float64(decimal)
-                        });
-                    }
+                    convert_array!(array, num_rows, rows, Float64Array, Float64, f64)
                 }
                 DataType::Utf8 => {
                     let a = array.as_any().downcast_ref::<StringArray>().unwrap();

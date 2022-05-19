@@ -120,7 +120,10 @@ impl MySqlConnection {
                             dataframe::TableValue::Boolean(s) => {
                                 rw.write_col(if *s == true { 1_u8 } else { 0_u8 })?
                             }
+                            dataframe::TableValue::Float32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int16(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
                             dt => unimplemented!("Not supported type for MySQL: {:?}", dt),
