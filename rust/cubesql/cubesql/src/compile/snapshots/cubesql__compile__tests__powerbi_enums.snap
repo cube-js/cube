@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7156
+expression: "execute_query(\"/*** Load enum fields ***/\n                SELECT pg_type.oid, enumlabel\n                FROM pg_enum\n                JOIN pg_type ON pg_type.oid=enumtypid\n                ORDER BY oid, enumsortorder\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
+++
+++
+++

@@ -7093,6 +7093,81 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn powerbi_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "powerbi_supported_types",
+            execute_query(
+                "/*** Load all supported types ***/
+                SELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,
+                CASE WHEN pg_proc.proname='array_recv' THEN 'a' ELSE a.typtype END AS type,
+                CASE
+                  WHEN pg_proc.proname='array_recv' THEN a.typelem
+                  WHEN a.typtype='r' THEN rngsubtype
+                  ELSE 0
+                END AS elemoid,
+                CASE
+                  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */
+                  WHEN a.typtype='r' THEN 2                                        /* Ranges before */
+                  WHEN a.typtype='d' THEN 1                                        /* Domains before */
+                  ELSE 0                                                           /* Base types first */
+                END AS ord
+                FROM pg_type AS a
+                JOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)
+                JOIN pg_proc ON pg_proc.oid = a.typreceive
+                LEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)
+                LEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)
+                LEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)
+                LEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid)
+                WHERE
+                  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */
+                  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */
+                  (pg_proc.proname='array_recv' AND (
+                    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */
+                    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */
+                    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */
+                  )) OR
+                  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */
+                /* changed for stable sort ORDER BY ord */
+                ORDER BY a.typname"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_composite_types",
+            execute_query(
+                "/*** Load field definitions for (free-standing) composite types ***/
+                SELECT typ.oid, att.attname, att.atttypid
+                FROM pg_type AS typ
+                JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+                JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+                JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+                WHERE
+                    (typ.typtype = 'c' AND cls.relkind='c') AND
+                attnum > 0 AND     /* Don't load system attributes */
+                NOT attisdropped
+                ORDER BY typ.oid, att.attnum"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_enums",
+            execute_query(
+                "/*** Load enum fields ***/
+                SELECT pg_type.oid, enumlabel
+                FROM pg_enum
+                JOIN pg_type ON pg_type.oid=enumtypid
+                ORDER BY oid, enumsortorder"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         // TODO: 'Boolean = Utf8' can't be evaluated because there isn't a common type to coerce the types to
         // insta::assert_snapshot!(
         //     "powerbi_introspection",
