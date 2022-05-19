@@ -84,7 +84,7 @@ impl PgCatalogTableProvider {
         let mut builder = PgCatalogTablesBuilder::new();
 
         for cube in cubes {
-            builder.add_table("db", cube.name.clone(), "def");
+            builder.add_table("public", cube.name.clone(), "db");
         }
 
         Self {
