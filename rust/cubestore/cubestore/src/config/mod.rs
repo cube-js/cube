@@ -57,7 +57,6 @@ pub struct CubeServices {
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
-    //pub remote_fs: Arc<QueueRemoteFs>,
 }
 
 #[derive(Clone)]
@@ -879,7 +878,7 @@ impl Config {
         self.local_dir().join("metastore")
     }
 
-    pub async fn configure_remote_fs(&self) {
+    async fn configure_remote_fs(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
@@ -945,15 +944,6 @@ impl Config {
             }
             FileStoreProvider::Local => unimplemented!(), // TODO
         };
-
-        self.injector
-            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
-                QueueRemoteFs::new(
-                    i.get_service_typed::<dyn ConfigObj>().await,
-                    i.get_service("original_remote_fs").await,
-                )
-            })
-            .await;
     }
 
     async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
@@ -965,7 +955,18 @@ impl Config {
         self.injector.clone()
     }
 
-    pub async fn configure_internal_services(&self) {
+    pub async fn configure_injector(&self) {
+        self.configure_remote_fs().await;
+
+        self.injector
+            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
+                QueueRemoteFs::new(
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                    i.get_service("original_remote_fs").await,
+                )
+            })
+            .await;
+
         let (event_sender, _) = broadcast::channel(10000); // TODO config
         let event_sender_to_move = event_sender.clone();
 
@@ -1210,11 +1211,6 @@ impl Config {
         }
     }
 
-    pub async fn configure_injector(&self) {
-        self.configure_remote_fs().await;
-        self.configure_internal_services().await;
-    }
-
     pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
@@ -1227,7 +1223,6 @@ impl Config {
             },
             meta_store: self.injector.get_service_typed().await,
             cluster: self.injector.get_service_typed().await,
-            //remote_fs: self.injector.get_service_typed().await,
         }
     }
 
