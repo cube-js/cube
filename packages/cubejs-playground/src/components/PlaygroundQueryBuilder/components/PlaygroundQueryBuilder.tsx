@@ -4,6 +4,7 @@ import {
   PivotConfig,
   PreAggregationType,
   Query,
+  validatedQuery,
   TransformedQuery,
 } from '@cubejs-client/core';
 import {
@@ -552,7 +553,7 @@ export function PlaygroundQueryBuilder({
                               await refreshToken();
 
                               handleRunButtonClick({
-                                query,
+                                query: validatedQuery(query),
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });

@@ -8,9 +8,11 @@ import {
   isQueryPresent,
   moveItemInArray,
   movePivotItem,
+  validateQuery,
   ResultSet
 } from '@cubejs-client/core';
 
+import { removeEmptyQueryFields } from '@cubejs-client/core/src';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 import { generateAnsiHTML, removeEmpty } from './utils';
@@ -200,6 +202,7 @@ export default class QueryBuilder extends React.Component {
 
   prepareRenderProps(queryRendererProps) {
     const getName = (member) => member.name;
+    
     const toTimeDimension = (member) => {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
@@ -211,6 +214,7 @@ export default class QueryBuilder extends React.Component {
         ...rangeSelection,
       });
     };
+    
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,
       operator: member.operator,
@@ -420,10 +424,10 @@ export default class QueryBuilder extends React.Component {
     const { query } = this.state;
 
     this.updateVizState({
-      query: {
+      query: removeEmptyQueryFields({
         ...query,
         ...queryUpdate,
-      },
+      }),
     });
   }
 
@@ -525,10 +529,7 @@ export default class QueryBuilder extends React.Component {
   validatedQuery(state) {
     const { query } = state || this.state;
 
-    return {
-      ...query,
-      filters: (query.filters || []).filter((f) => f.operator),
-    };
+    return validateQuery(query);
   }
 
   defaultHeuristics(newState) {
