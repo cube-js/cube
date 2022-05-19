@@ -477,8 +477,9 @@ impl AsyncPostgresShim {
             let plan =
                 convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
 
+            let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             let fields = self
-                .query_plan_to_row_description(&plan)
+                .query_plan_to_row_description(&plan, format)
                 .await?
                 .unwrap_or(vec![]);
             let description = if fields.len() > 0 {
@@ -486,8 +487,6 @@ impl AsyncPostgresShim {
             } else {
                 None
             };
-
-            let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
 
             Some(Portal::new(plan, format, description))
         } else {
@@ -505,6 +504,7 @@ impl AsyncPostgresShim {
     async fn query_plan_to_row_description(
         &mut self,
         plan: &QueryPlan,
+        required_format: protocol::Format,
     ) -> Result<Option<Vec<protocol::RowDescriptionField>>, ConnectionError> {
         match plan {
             QueryPlan::MetaOk(_, _) => Ok(None),
@@ -515,6 +515,7 @@ impl AsyncPostgresShim {
                     result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
+                        required_format,
                     ));
                 }
 
@@ -527,6 +528,7 @@ impl AsyncPostgresShim {
                     result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
+                        required_format,
                     ));
                 }
 
@@ -560,16 +562,18 @@ impl AsyncPostgresShim {
 
             let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
 
-            let description =
-                if let Some(fields) = self.query_plan_to_row_description(&plan).await? {
-                    if fields.len() > 0 {
-                        Some(protocol::RowDescription::new(fields))
-                    } else {
-                        None
-                    }
+            let description = if let Some(fields) = self
+                .query_plan_to_row_description(&plan, Format::Text)
+                .await?
+            {
+                if fields.len() > 0 {
+                    Some(protocol::RowDescription::new(fields))
                 } else {
                     None
-                };
+                }
+            } else {
+                None
+            };
 
             Some(PreparedStatement {
                 query,
@@ -596,7 +600,10 @@ impl AsyncPostgresShim {
         let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
 
         // Special handling for special queries, such as DISCARD ALL.
-        if let Some(description) = self.query_plan_to_row_description(&plan).await? {
+        if let Some(description) = self
+            .query_plan_to_row_description(&plan, Format::Text)
+            .await?
+        {
             match description.len() {
                 0 => self.write(protocol::NoData::new()).await?,
                 _ => {

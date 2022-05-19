@@ -306,6 +306,7 @@ macro_rules! impl_primitive {
     };
 }
 
+impl_primitive!(i8);
 impl_primitive!(i16);
 impl_primitive!(i32);
 impl_primitive!(i64);

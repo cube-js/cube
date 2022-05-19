@@ -86,9 +86,12 @@ impl PostgresIntegrationTestSuite {
         AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client }))
     }
 
-    async fn print_query_result<'a>(&self, res: Vec<Row>) -> String {
+    async fn print_query_result<'a>(&self, res: Vec<Row>, with_description: bool) -> String {
         let mut table = Table::new();
         table.load_preset("||--+-++|    ++++++");
+
+        let mut description_done = false;
+        let mut description: Vec<String> = Vec::new();
 
         let mut header = vec![];
 
@@ -104,9 +107,21 @@ impl PostgresIntegrationTestSuite {
             let mut values: Vec<String> = Vec::new();
 
             for (idx, column) in row.columns().into_iter().enumerate() {
+                if !description_done {
+                    description.push(format!(
+                        "{} type: ({:?})",
+                        column.name(),
+                        column.type_().oid(),
+                    ));
+                }
+
                 match column.type_().oid() {
                     20 => {
                         let value: i64 = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    21 => {
+                        let value: i16 = row.get(idx);
                         values.push(value.to_string());
                     }
                     23 => {
@@ -119,6 +134,10 @@ impl PostgresIntegrationTestSuite {
                     }
                     16 => {
                         let value: bool = row.get(idx);
+                        values.push(value.to_string());
+                    }
+                    700 => {
+                        let value: f32 = row.get(idx);
                         values.push(value.to_string());
                     }
                     701 => {
@@ -159,6 +178,18 @@ impl PostgresIntegrationTestSuite {
                                 .to_string(),
                         );
                     }
+                    // _float8
+                    1022 => {
+                        let value: Vec<f64> = row.get(idx);
+                        values.push(
+                            value
+                                .into_iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",")
+                                .to_string(),
+                        );
+                    }
                     // _text
                     1009 => {
                         let value: Vec<String> = row.get(idx);
@@ -173,23 +204,29 @@ impl PostgresIntegrationTestSuite {
                 }
             }
 
+            description_done = true;
             table.add_row(values);
         }
 
-        table.trim_fmt()
+        if with_description {
+            description.join("\r\n").to_string() + "\r\n" + &table.trim_fmt()
+        } else {
+            table.trim_fmt()
+        }
     }
 
     async fn test_snapshot_execute_query(
         &self,
         query: String,
         snapshot_name: Option<String>,
+        with_description: bool,
     ) -> RunResult<()> {
         print!("test {} .. ", query);
 
         let res = self.client.query(&query, &[]).await.unwrap();
         insta::assert_snapshot!(
             snapshot_name.unwrap_or(escape_snapshot_name(query)),
-            self.print_query_result(res).await
+            self.print_query_result(res, with_description).await
         );
 
         println!("ok");
@@ -290,22 +327,28 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
+            false,
         )
         .await?;
         self.test_snapshot_execute_query(
             r#"SELECT
                 NULL,
+                1.234::float as f32,
+                1.234::double as f64,
+                1::smallint as i16,
+                1::integer as i32,
+                1::bigint as i64,
                 true as bool_true,
                 false as bool_false,
-                'test',
-                1.0,
-                1,
+                'test' as str,
                 ARRAY['test1', 'test2'] as str_arr,
-                ARRAY[1,2,3] as int8_arr,
+                ARRAY[1,2,3] as i64_arr,
+                ARRAY[1.2,2.3,3.4] as f64_arr,
                 '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp
             "#
             .to_string(),
             Some("pg_test_types".to_string()),
+            true,
         )
         .await?;
         self.test_snapshot_execute_query(
@@ -318,6 +361,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             "#
             .to_string(),
             Some("datepart_quarter".to_string()),
+            false,
         )
         .await?;
 
