@@ -274,6 +274,25 @@ impl Serialize for CommandComplete {
     }
 }
 
+impl PartialEq for CommandComplete {
+    fn eq(&self, other: &Self) -> bool {
+        match &self {
+            CommandComplete::Select(left) => match other {
+                CommandComplete::Select(right) => left == right,
+                _ => false,
+            },
+            CommandComplete::Plain(left) => match other {
+                CommandComplete::Plain(right) => left == right,
+                _ => false,
+            },
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
 pub struct NoData {}
 
 impl NoData {
