@@ -863,7 +863,7 @@ export class PreAggregationLoader {
       params, {
         ...queryOptions,
         ...capabilities,
-        ...this.getStreamingOptions(preAggregation),
+        ...this.getStreamingOptions(),
       }
     )).catch((error: any) => {
       this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
@@ -889,9 +889,8 @@ export class PreAggregationLoader {
     };
   }
 
-  protected getStreamingOptions(preAggregation): StreamOptions {
+  protected getStreamingOptions(): StreamOptions {
     return {
-      selectAllStreamingTable: preAggregation.selectAllStreamingTable,
       // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
       highWaterMark: 10000
     };
@@ -925,7 +924,7 @@ export class PreAggregationLoader {
         tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
       } else if (capabilities.streamImport && client.stream) {
         tableData = await saveCancelFn(
-          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions(preAggregation))
+          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
         );
 
         if (client.unload) {

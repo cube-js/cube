@@ -176,12 +176,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public async downloadQueryResults(query: string, params: any, options: any) {
-    const { selectAllStreamingTable } = options;
-    if (!selectAllStreamingTable) {
+    const table = KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(query);
+    if (!table) {
       throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
 
-    return this.getStreamingTableData(selectAllStreamingTable);
+    return this.getStreamingTableData(table);
   }
 
   private async getStreamingTableData(streamingTable: string) {

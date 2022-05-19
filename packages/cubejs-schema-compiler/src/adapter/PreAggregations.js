@@ -143,6 +143,7 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
+    console.log(this.query.constructor.name);
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -182,8 +183,7 @@ export class PreAggregations {
           };
         }
       ),
-      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
-      selectAllStreamingTable: this.query.preAggregationSelectAllStreamingTable(cube, preAggregation)
+      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
     };
   }
 

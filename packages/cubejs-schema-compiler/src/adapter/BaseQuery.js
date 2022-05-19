@@ -2188,13 +2188,7 @@ class BaseQuery {
   }
 
   preAggregationReadOnly(cube, preAggregation) {
-    return preAggregation.type === 'originalSql' && Boolean(this.preAggregationSelectAllStreamingTable(cube, preAggregation));
-  }
-
-  preAggregationSelectAllStreamingTable(cube, preAggregation) {
-    const [sql] = this.preAggregationSql(cube, preAggregation);
-    const match = sql.match(/^SELECT \* FROM ([\S]+)$/);
-    return match && match[1];
+    return false;
   }
 
   // eslint-disable-next-line consistent-return
