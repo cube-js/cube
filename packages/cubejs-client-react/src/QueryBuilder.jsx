@@ -9,10 +9,10 @@ import {
   moveItemInArray,
   movePivotItem,
   validateQuery,
-  ResultSet
+  ResultSet,
+  removeEmptyQueryFields
 } from '@cubejs-client/core';
 
-import { removeEmptyQueryFields } from '@cubejs-client/core/src';
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
 import { generateAnsiHTML, removeEmpty } from './utils';

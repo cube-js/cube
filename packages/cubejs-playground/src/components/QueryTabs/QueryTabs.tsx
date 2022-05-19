@@ -1,4 +1,4 @@
-import { ChartType, PivotConfig, Query, validatedQuery } from '@cubejs-client/core';
+import { ChartType, PivotConfig, Query, validateQuery } from '@cubejs-client/core';
 import { Tabs } from 'antd';
 import equals from 'fast-deep-equal';
 import { ReactNode, useEffect, useState } from 'react';
@@ -187,7 +187,7 @@ export function QueryTabs({
       (tab) => tab.id === queryTabs.activeId
     );
 
-    if (query && !equals(validatedQuery(currentTab?.query), validatedQuery(query))) {
+    if (query && !equals(validateQuery(currentTab?.query), validateQuery(query))) {
       const id = getNextId();
 
       saveTabs({
