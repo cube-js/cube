@@ -477,11 +477,12 @@ impl AsyncPostgresShim {
             let plan =
                 convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
 
-            let fields = self.query_plan_to_row_description(&plan).await?;
+            let fields = self
+                .query_plan_to_row_description(&plan)
+                .await?
+                .unwrap_or(vec![]);
             let description = if fields.len() > 0 {
-                Some(protocol::RowDescription::new(
-                    self.query_plan_to_row_description(&plan).await?,
-                ))
+                Some(protocol::RowDescription::new(fields))
             } else {
                 None
             };
@@ -499,12 +500,14 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    /// This method returns schema for response
+    /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
     async fn query_plan_to_row_description(
         &mut self,
         plan: &QueryPlan,
-    ) -> Result<Vec<protocol::RowDescriptionField>, ConnectionError> {
+    ) -> Result<Option<Vec<protocol::RowDescriptionField>>, ConnectionError> {
         match plan {
-            QueryPlan::MetaOk(_, _) => Ok(vec![]),
+            QueryPlan::MetaOk(_, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -515,7 +518,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                Ok(result)
+                Ok(Some(result))
             }
             QueryPlan::DataFusionSelect(_, logical_plan, _) => {
                 let mut result = vec![];
@@ -527,7 +530,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                Ok(result)
+                Ok(Some(result))
             }
         }
     }
@@ -556,13 +559,17 @@ impl AsyncPostgresShim {
             let hacked_query = stmt_replacer.replace(&query);
 
             let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
-            let fields: Vec<protocol::RowDescriptionField> =
-                self.query_plan_to_row_description(&plan).await?;
-            let description = if fields.len() > 0 {
-                Some(protocol::RowDescription::new(fields))
-            } else {
-                None
-            };
+
+            let description =
+                if let Some(fields) = self.query_plan_to_row_description(&plan).await? {
+                    if fields.len() > 0 {
+                        Some(protocol::RowDescription::new(fields))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
             Some(PreparedStatement {
                 query,
@@ -588,14 +595,16 @@ impl AsyncPostgresShim {
 
         let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
 
-        let description = self.query_plan_to_row_description(&plan).await?;
-        match description.len() {
-            0 => self.write(protocol::NoData::new()).await?,
-            _ => {
-                self.write(protocol::RowDescription::new(description))
-                    .await?
-            }
-        };
+        // Special handling for special queries, such as DISCARD ALL.
+        if let Some(description) = self.query_plan_to_row_description(&plan).await? {
+            match description.len() {
+                0 => self.write(protocol::NoData::new()).await?,
+                _ => {
+                    self.write(protocol::RowDescription::new(description))
+                        .await?
+                }
+            };
+        }
 
         // Re-usage of Portal functionality
         let mut portal = Portal::new(plan, Format::Text, None);
