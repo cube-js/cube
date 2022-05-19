@@ -9,27 +9,30 @@ import {
   ConnectionOptions,
   Connection,
   OutputFormat,
+  Meta,
+  Row,
+  isNumberType
 } from 'firebolt-sdk';
 import { FireboltQuery } from './FireboltQuery';
 
 export type FireboltDriverConfiguration = {
-  readOnly?: boolean
-  apiEndpoint?: string
-  connection: ConnectionOptions
+  readOnly?: boolean;
+  apiEndpoint?: string;
+  connection: ConnectionOptions;
 };
 
 const FireboltTypeToGeneric: Record<string, string> = {
-  long: 'bigint'
+  long: 'bigint',
 };
 
 const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
 
 export class FireboltDriver extends BaseDriver implements DriverInterface {
-  private readonly config: FireboltDriverConfiguration;
+  private config: FireboltDriverConfiguration;
 
-  private readonly firebolt;
+  private firebolt;
 
-  protected connection: Promise<Connection> | null = null;
+  private connection: Promise<Connection> | null = null;
 
   public constructor(config: Partial<FireboltDriverConfiguration> = {}) {
     super(config);
@@ -43,12 +46,12 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         password: <string>process.env.CUBEJS_DB_PASS,
         database: <string>process.env.CUBEJS_DB_NAME,
         engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
-        ...config.connection || {}
-      }
+        ...(config.connection || {}),
+      },
     };
 
     this.firebolt = Firebolt({
-      apiEndpoint: config.apiEndpoint,
+      apiEndpoint: this.config.apiEndpoint,
     });
   }
 
@@ -56,7 +59,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     return `"${identifier}"`;
   }
 
-  protected async initConnection() {
+  private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
       return connection;
@@ -87,7 +90,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     return this.query(`DROP TABLE ${tableName}`, []);
   }
 
-  protected async getConnection(): Promise<Connection> {
+  private async getConnection(): Promise<Connection> {
     if (this.connection) {
       const connection = await this.connection;
       return connection;
@@ -109,16 +112,38 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     try {
       await this.query('select 1');
     } catch (error) {
+      console.log(error);
       throw new Error('Unable to connect');
     }
   }
+
+  private getHydratedValue(value: unknown, meta: Meta) {
+    const { type } = meta;
+    if (isNumberType(type)) {
+      return `${value}`;
+    }
+    return value;
+  }
+
+  private hydrateRow = (row: Row, meta: Meta[]) => {
+    const hydratedRow: Record<string, unknown> = {};
+    for (let index = 0; index < meta.length; index++) {
+      const column = meta[index];
+      const key = column.name;
+      hydratedRow[key] = this.getHydratedValue(
+        (row as Record<string, unknown>)[key],
+        column,
+      );
+    }
+    return hydratedRow;
+  };
 
   public async query<R = Record<string, unknown>>(
     query: string,
     parameters?: unknown[]
   ): Promise<R[]> {
-    const result = await this.queryResponse(query, parameters);
-    return result.data as R[];
+    const response = await this.queryResponse(query, parameters);
+    return response.data as R[];
   }
 
   public async stream(
@@ -130,11 +155,17 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     const statement = await connection.execute(query, {
       settings: { output_format: OutputFormat.JSON },
       parameters,
+      response: { hydrateRow: this.hydrateRow }
     });
 
-    const { data: rowStream, meta: metaPromise } = await statement.streamResult();
+    const { data: rowStream, meta: metaPromise } =
+      await statement.streamResult();
     const meta = await metaPromise;
-    const types = meta.map(({ type, name }) => ({ name, type: this.toGenericType(type) }));
+
+    const types = meta.map(({ type, name }) => ({
+      name,
+      type: this.toGenericType(type),
+    }));
 
     return {
       rowStream,
@@ -152,6 +183,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     const statement = await connection.execute(query, {
       settings: { output_format: OutputFormat.JSON },
       parameters,
+      response: { hydrateRow: this.hydrateRow }
     });
     const response = await statement.fetchResult();
     return response;
@@ -166,24 +198,29 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   }
   /* eslint-enable camelcase */
 
-  public async downloadQueryResults<R = Record<string, unknown>>(
-    query: string,
-    values: unknown[]
-  ) {
+  public async downloadQueryResults(query: string, values: unknown[]) {
     const response = await this.queryResponse(query, values);
     const { data, meta } = response;
-    const rows = data as R[];
-    const types = meta.map(({ type, name }) => ({ name, type: this.toGenericType(type) }));
+    const types = meta.map(({ type, name }) => ({
+      name,
+      type: this.toGenericType(type),
+    }));
     return {
-      rows,
+      rows: data as Record<string, unknown>[],
       types,
     };
   }
 
   /* eslint-disable camelcase */
   public async tableColumnTypes(table: string) {
-    const response = await this.query<{ column_name: string; data_type: string }>(`DESCRIBE ${table}`, []);
-    return response.map((row) => ({ name: row.column_name, type: this.toGenericType(row.data_type) }));
+    const response = await this.query<{
+      column_name: string;
+      data_type: string;
+    }>(`DESCRIBE ${table}`, []);
+    return response.map((row) => ({
+      name: row.column_name,
+      type: this.toGenericType(row.data_type),
+    }));
   }
   /* eslint-enable camelcase */
 
