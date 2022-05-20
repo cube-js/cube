@@ -1142,7 +1142,6 @@ class ApiGateway {
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
       ...extensions,
-      ...(!req.meta ? undefined : req.meta)
     };
   }
 

@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 export interface Request {
-    id: string
+    id: string,
+    meta: any,
 }
 
 export interface CheckAuthPayload {

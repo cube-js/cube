@@ -51,8 +51,6 @@ interface Request extends ExpressRequest {
    */
   securityContext?: any,
 
-  meta?: any,
-
   /**
    * @deprecated
    */

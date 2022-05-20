@@ -1,9 +1,9 @@
-import { setupLogger, registerInterface, SqlInterfaceInstance } from '@cubejs-backend/native';
+import { setupLogger, registerInterface, SqlInterfaceInstance, Request as NativeRequest } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
-import type { CheckSQLAuthFn } from './interfaces';
+import type { CheckSQLAuthFn, ExtendedRequestContext } from './interfaces';
 
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
@@ -68,7 +68,7 @@ export class SQLServer {
       load: async ({ request, user, query }) => {
         // @todo Store security context in native
         const { securityContext } = await checkSqlAuth(request, user);
-        const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
+        const context = await this.contextByNativeReq(request, securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -136,6 +136,15 @@ export class SQLServer {
         password: allowedPassword,
         securityContext: {}
       };
+    };
+  }
+
+  protected async contextByNativeReq(req: NativeRequest, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+    const context = await this.apiGateway.contextByReq(<any> req, securityContext, requestId);
+
+    return {
+      ...context,
+      ...req.meta,
     };
   }
 
