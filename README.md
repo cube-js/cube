@@ -80,6 +80,10 @@ You are also welcome to join our **monthly community calls** where we discuss co
 * [Meeting page](https://cube.dev/community-call/). 
 * Recordings will be posted on the [Community Call Playlist](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9). 
 
+### Our quarterly roadmap
+
+We publish our open source roadmap every quarter and discuss them during our [monthly community calls](https://cube.dev/community-call/). You can find our roadmap under [projects in our Cube.js repository](https://github.com/cube-js/cube.js/projects?query=is%3Aopen+sort%3Aupdated-desc). 
+
 ### Contributing
 
 There are many ways you can contribute to Cube! Here are a few possibilities:
@@ -92,10 +96,6 @@ There are many ways you can contribute to Cube! Here are a few possibilities:
 * Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels.
 
 All sort of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md) for more information.
-
-### Our quarterly roadmap
-
-We publish our open source roadmap every quarter and  present them during our [monthly community calls](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9). You can find our roadmap under [projects in our Cube.js repository](https://github.com/cube-js/cube.js/projects?query=is%3Aopen+sort%3Aupdated-desc). 
 
 ## License
 
