@@ -1,6 +1,6 @@
 import { CubeValidator } from '../../src/compiler/CubeValidator';
 import { CubeSymbols } from '../../src/compiler/CubeSymbols';
-import { prepareCompiler } from "./PrepareCompiler";
+import { prepareCompiler } from './PrepareCompiler';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
