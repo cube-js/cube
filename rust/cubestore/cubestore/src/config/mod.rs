@@ -57,7 +57,6 @@ pub struct CubeServices {
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
-    pub remote_fs: Arc<QueueRemoteFs>,
 }
 
 #[derive(Clone)]
@@ -94,7 +93,7 @@ impl CubeServices {
         futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
-        let remote_fs = self.remote_fs.clone();
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
@@ -156,7 +155,8 @@ impl CubeServices {
         #[cfg(not(target_os = "windows"))]
         self.cluster.stop_processing_loops().await?;
 
-        self.remote_fs.stop_processing_loops()?;
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
+        remote_fs.stop_processing_loops()?;
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;
         }
@@ -1223,7 +1223,6 @@ impl Config {
             },
             meta_store: self.injector.get_service_typed().await,
             cluster: self.injector.get_service_typed().await,
-            remote_fs: self.injector.get_service_typed().await,
         }
     }
 

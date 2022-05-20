@@ -4,15 +4,13 @@ use pg_srv::{protocol, PgTypeId, ProtocolError};
 pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
     match dt {
         DataType::Boolean => Ok(PgTypeId::BOOL),
-        // TODO: @ovr — table values <int8 are not supported at the moment
-        DataType::Int16 => Ok(PgTypeId::INT8),
-        DataType::Int32 => Ok(PgTypeId::INT8),
+        DataType::Int16 => Ok(PgTypeId::INT2),
+        DataType::UInt16 => Ok(PgTypeId::INT2),
+        DataType::Int32 => Ok(PgTypeId::INT4),
+        DataType::UInt32 => Ok(PgTypeId::INT4),
         DataType::Int64 => Ok(PgTypeId::INT8),
-        DataType::UInt16 => Ok(PgTypeId::INT8),
-        DataType::UInt32 => Ok(PgTypeId::INT8),
         DataType::UInt64 => Ok(PgTypeId::INT8),
-        // TODO: @ovr — table values <float8 are not supported at the moment
-        DataType::Float32 => Ok(PgTypeId::FLOAT8),
+        DataType::Float32 => Ok(PgTypeId::FLOAT4),
         DataType::Float64 => Ok(PgTypeId::FLOAT8),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(PgTypeId::TEXT),
         DataType::Timestamp(_, tz) => match tz {
