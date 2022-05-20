@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
+import { validateQuery } from '@cubejs-client/core';
 
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import DashboardSource from '../../DashboardSource';
@@ -55,7 +56,7 @@ export function ExplorePage() {
 
   function setQueryParam({ query }: { query?: Object }) {
     if (query) {
-      push({ search: `?query=${JSON.stringify(query)}` });
+      push({ search: `?query=${JSON.stringify(validateQuery(query))}` });
     }
   }
 
