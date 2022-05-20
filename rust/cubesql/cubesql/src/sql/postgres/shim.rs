@@ -574,7 +574,12 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone(), self.logger.clone())?;
+            let plan = convert_statement_to_cube_query(
+                &hacked_query,
+                meta,
+                self.session.clone(),
+                self.logger.clone(),
+            )?;
 
             let description = if let Some(fields) = self
                 .query_plan_to_row_description(&plan, Format::Text)
