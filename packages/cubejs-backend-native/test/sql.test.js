@@ -4,8 +4,16 @@ const util = require('util');
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
+let logger = jest.fn(({ event }) => {
+  if (!event.error.includes('load - strange response, success which contains error')) {
+      expect(event.apiType).toEqual('sql');
+      expect(event.protocol).toEqual('mysql');
+  }
+  console.log(event);
+});
+
 native.setupLogger(
-  ({ event }) => console.log(event),
+  logger,
   'trace',
 );
 
@@ -153,6 +161,9 @@ describe('SQLInteface', () => {
           expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
         }
       }
+
+      // Increment it in case you throw Error
+      expect(logger.mock.calls.length).toEqual(3);
 
       connection.destroy();
     } finally {
