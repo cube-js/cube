@@ -1,0 +1,31 @@
+---
+title: Firebolt
+permalink: /config/databases/firebolt
+---
+
+## Prerequisites
+
+- The username/password for the [Firebolt][firebolt] account
+
+## Setup
+
+### <--{"id" : "Setup"}--> Manual
+
+Add the following to a `.env` file in your Cube.js project:
+
+```bash
+CUBEJS_DB_NAME=firebolt_database
+CUBEJS_DB_USER=firebolt_user@customer.com
+CUBEJS_DB_PASS=**********
+CUBEJS_FIREBOLT_ENGINE_ENDPOINT=engine-endpoint.cube.us-east-1.app.firebolt.io
+```
+
+## Environment Variables
+
+| Environment Variable                            | Description                                                                                                                        | Possible Values                                                             | Required |
+| ----------------------------------------------- | -----------------------------------------------------------------------------------------------------------------------------------| ----------------------------------------------------------------------------| :------: |
+| `CUBEJS_DB_NAME`                                | The name of the database to connect to                                                                                             | A valid database name                                                       |    ✅    |
+| `CUBEJS_DB_USER`                                | The username used to connect to the database                                                                                       | A valid database username                                                   |    ✅    |
+| `CUBEJS_DB_PASS`                                | The password used to connect to the database                                                                                       | A valid database password                                                   |    ✅    |
+| `CUBEJS_FIREBOLT_ENGINE_ENDPOINT`               | Engine endpoint to connect to                                                                                                      | A valid engine endpoint                                                     |    ✅    |
+| `CUBEJS_FIREBOLT_API_ENDPOINT`                  | Firebolt api endpoint (used for authentication)                                                                                    | `api.dev.firebolt.io`, `api.staging.firebolt.io`, `api.app.firebolt.io`     |    -     |

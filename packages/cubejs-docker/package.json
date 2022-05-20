@@ -16,6 +16,7 @@
     "@cubejs-backend/dremio-driver": "^0.30.4",
     "@cubejs-backend/druid-driver": "^0.30.4",
     "@cubejs-backend/elasticsearch-driver": "^0.30.4",
+    "@cubejs-backend/firebolt-driver": "^0.30.4",
     "@cubejs-backend/hive-driver": "^0.30.4",
     "@cubejs-backend/ksql-driver": "^0.30.4",
     "@cubejs-backend/materialize-driver": "^0.30.4",
