@@ -19,4 +19,11 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   multidb: [],
   questdb: [],
   postgres: [],
+  redshift: [
+    'CUBEJS_DB_HOST',
+    'CUBEJS_DB_PORT',
+    'CUBEJS_DB_NAME',
+    'CUBEJS_DB_USER',
+    'CUBEJS_DB_PASS',
+  ],
 };

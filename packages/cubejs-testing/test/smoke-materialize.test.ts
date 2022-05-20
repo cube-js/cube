@@ -5,6 +5,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { pausePromise } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
+import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('materialize', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -25,12 +26,7 @@ describe('materialize', () => {
         CUBEJS_DB_USER: 'materialize',
         CUBEJS_DB_PASS: 'materialize',
 
-        CUBEJS_DEV_MODE: 'true',
-        CUBEJS_WEB_SOCKETS: 'false',
-        CUBEJS_EXTERNAL_DEFAULT: 'true',
-        CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
-        CUBEJS_REFRESH_WORKER: 'false',
-        CUBEJS_ROLLUP_ONLY: 'false',
+        ...DEFAULT_CONFIG,
       },
       {
         schemaDir: 'materialize/schema',
@@ -46,14 +42,7 @@ describe('materialize', () => {
     await db.stop();
   });
 
-  test('query measure', async () => {
-    const response = await client.load({
-      measures: [
-        'Orders.totalAmount',
-      ],
-    });
-    expect(response.rawData()).toMatchSnapshot('query');
-  });
+  test('query measure', () => testQueryMeasure(client));
 
   test('query dimensions', async () => {
     const queryDimensions = async () => {

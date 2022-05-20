@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7091
+expression: "execute_query(\"SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false\n                 FROM (SELECT true as v UNION ALL SELECT false as v) as r;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+---------+----------+
+| v     | is_true | is_false |
++-------+---------+----------+
+| true  | true    | false    |
+| false | false   | true     |
++-------+---------+----------+

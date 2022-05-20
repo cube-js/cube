@@ -39,19 +39,19 @@ use self::{
         provider::CubeContext,
         udf::{
             create_connection_id_udf, create_convert_tz_udf, create_current_schema_udf,
-            create_current_schemas_udf, create_current_timestamp, create_current_user_udf,
+            create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
             create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_get_constraintdef_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf, create_pg_get_expr_udf,
-            create_pg_get_userbyid, create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-            create_pg_numeric_scale_udf, create_pg_table_is_visible, create_pg_type_is_visible,
-            create_quarter_udf, create_second_udf, create_str_to_date, create_time_format_udf,
-            create_timediff_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
-            create_version_udf, create_year_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf, create_hour_udf,
+            create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf,
+            create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
+            create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
+            create_pg_numeric_scale_udf, create_pg_table_is_visible_udf,
+            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
+            create_str_to_date_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -1741,6 +1741,12 @@ impl QueryPlanner {
                     CommandCompletion::Rollback,
                 ))
             }
+            (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Discard(object_type.to_string()),
+                ))
+            }
             _ => Err(CompilationError::Unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
@@ -2329,7 +2335,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
         ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
-        ctx.register_udf(create_pg_backend_pid(self.state.clone()));
+        ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
         ctx.register_udf(create_user_udf(self.state.clone()));
         ctx.register_udf(create_current_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
@@ -2353,28 +2359,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_dayofyear_udf());
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
-        ctx.register_udf(create_str_to_date());
-        ctx.register_udf(create_current_timestamp());
+        ctx.register_udf(create_str_to_date_udf());
+        ctx.register_udf(create_current_timestamp_udf());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
-        ctx.register_udf(create_format_type_udf("format_type"));
-        ctx.register_udf(create_format_type_udf("pg_catalog.format_type"));
+        ctx.register_udf(create_format_type_udf());
         ctx.register_udf(create_pg_datetime_precision_udf());
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
         ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
         ctx.register_udf(create_pg_get_expr_udf());
-        ctx.register_udf(create_pg_table_is_visible());
-        ctx.register_udf(create_pg_get_userbyid());
-        ctx.register_udf(create_pg_type_is_visible());
-        ctx.register_udf(create_get_constraintdef_udf());
+        ctx.register_udf(create_pg_table_is_visible_udf());
+        ctx.register_udf(create_pg_type_is_visible_udf());
+        ctx.register_udf(create_pg_get_constraintdef_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
 
         // udtf
-        ctx.register_udtf(create_generate_series_udtf(true));
-        ctx.register_udtf(create_generate_series_udtf(false));
+        ctx.register_udtf(create_generate_series_udtf());
         ctx.register_udtf(create_unnest_udtf());
         ctx.register_udtf(create_generate_subscripts_udtf());
         ctx.register_udtf(create_pg_expandarray_udtf());
@@ -6351,8 +6354,18 @@ ORDER BY \"COUNT(count)\" DESC"
             "format_type",
             execute_query(
                 "
-                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f
-                FROM pg_catalog.pg_type t;
+                SELECT
+                    t.oid,
+                    t.typname,
+                    format_type(t.oid, 20::integer) ft20,
+                    format_type(t.oid, 5::integer) ft5,
+                    format_type(t.oid, 4::integer) ft4,
+                    format_type(t.oid, 0::integer) ft0,
+                    format_type(t.oid, -1::integer) ftneg,
+                    format_type(t.oid, NULL::integer) ftnull
+                FROM pg_catalog.pg_type t
+                ORDER BY t.oid ASC
+                ;
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -6450,18 +6463,14 @@ ORDER BY \"COUNT(count)\" DESC"
     #[tokio::test]
     async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
-            "pg_get_userbyid_main",
+            "pg_get_userbyid",
             execute_query(
-                "SELECT pg_get_userbyid(10);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "pg_get_userbyid_invalid",
-            execute_query(
-                "SELECT pg_get_userbyid(0);".to_string(),
+                "
+                SELECT pg_get_userbyid(t.id)
+                FROM information_schema.testing_dataset t
+                WHERE t.id < 15;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6576,8 +6585,18 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "pg_get_expr_1",
             execute_query(
-                "SELECT pg_catalog.pg_get_expr(adbin, adrelid) FROM pg_catalog.pg_attrdef;"
-                    .to_string(),
+                "
+                SELECT
+                    attrelid,
+                    attname,
+                    pg_catalog.pg_get_expr(attname, attrelid) default
+                FROM pg_catalog.pg_attribute
+                ORDER BY
+                    attrelid ASC,
+                    attname ASC
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6585,8 +6604,18 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "pg_get_expr_2",
             execute_query(
-                "SELECT pg_catalog.pg_get_expr(adbin, adrelid, true) FROM pg_catalog.pg_attrdef;"
-                    .to_string(),
+                "
+                SELECT
+                    attrelid,
+                    attname,
+                    pg_catalog.pg_get_expr(attname, attrelid, true) default
+                FROM pg_catalog.pg_attribute
+                ORDER BY
+                    attrelid ASC,
+                    attname ASC
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6736,6 +6765,54 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pg_catalog_udf_search_path() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_catalog_udf_search_path",
+            execute_query(
+                "SELECT version() UNION ALL SELECT pg_catalog.version();".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_discard_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "discard_postgres_all",
+            execute_query("DISCARD ALL;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_plans",
+            execute_query("DISCARD PLANS;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_sequences",
+            execute_query(
+                "DISCARD SEQUENCES;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_temporary",
+            execute_query(
+                "DISCARD TEMPORARY;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        insta::assert_snapshot!(
+            "discard_postgres_temp",
+            execute_query("DISCARD TEMP;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 
@@ -6762,7 +6839,36 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "superset_subquery",
             execute_query(
-                "SELECT a.attname, pg_catalog.format_type(a.atttypid, a.atttypmod), (SELECT format_type(d.adbin, d.adrelid) FROM pg_catalog.pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef) AS DEFAULT, a.attnotnull, a.attnum, a.attrelid as table_oid, pgd.description as comment, a.attgenerated as generated FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_description pgd ON ( pgd.objoid = a.attrelid AND pgd.objsubid = a.attnum) WHERE a.attrelid = 13449 AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum;".to_string(),
+                "
+                SELECT
+                    a.attname,
+                    pg_catalog.format_type(a.atttypid, a.atttypmod),
+                    (
+                        SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+                        FROM pg_catalog.pg_attrdef d
+                        WHERE
+                            d.adrelid = a.attrelid AND
+                            d.adnum = a.attnum AND
+                            a.atthasdef
+                    ) AS DEFAULT,
+                    a.attnotnull,
+                    a.attnum,
+                    a.attrelid as table_oid,
+                    pgd.description as comment,
+                    a.attgenerated as generated
+                FROM pg_catalog.pg_attribute a
+                LEFT JOIN pg_catalog.pg_description pgd ON (
+                    pgd.objoid = a.attrelid AND
+                    pgd.objsubid = a.attnum
+                )
+                WHERE
+                    a.attrelid = 18000
+                    AND a.attnum > 0
+                    AND NOT a.attisdropped
+                ORDER BY a.attnum
+                ;
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -6986,6 +7092,166 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn powerbi_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "powerbi_supported_types",
+            execute_query(
+                "/*** Load all supported types ***/
+                SELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,
+                CASE WHEN pg_proc.proname='array_recv' THEN 'a' ELSE a.typtype END AS type,
+                CASE
+                  WHEN pg_proc.proname='array_recv' THEN a.typelem
+                  WHEN a.typtype='r' THEN rngsubtype
+                  ELSE 0
+                END AS elemoid,
+                CASE
+                  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */
+                  WHEN a.typtype='r' THEN 2                                        /* Ranges before */
+                  WHEN a.typtype='d' THEN 1                                        /* Domains before */
+                  ELSE 0                                                           /* Base types first */
+                END AS ord
+                FROM pg_type AS a
+                JOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)
+                JOIN pg_proc ON pg_proc.oid = a.typreceive
+                LEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)
+                LEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)
+                LEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)
+                LEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid)
+                WHERE
+                  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */
+                  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */
+                  (pg_proc.proname='array_recv' AND (
+                    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */
+                    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */
+                    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */
+                  )) OR
+                  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */
+                /* changed for stable sort ORDER BY ord */
+                ORDER BY a.typname"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_composite_types",
+            execute_query(
+                "/*** Load field definitions for (free-standing) composite types ***/
+                SELECT typ.oid, att.attname, att.atttypid
+                FROM pg_type AS typ
+                JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
+                JOIN pg_class AS cls ON (cls.oid = typ.typrelid)
+                JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)
+                WHERE
+                    (typ.typtype = 'c' AND cls.relkind='c') AND
+                attnum > 0 AND     /* Don't load system attributes */
+                NOT attisdropped
+                ORDER BY typ.oid, att.attnum"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_enums",
+            execute_query(
+                "/*** Load enum fields ***/
+                SELECT pg_type.oid, enumlabel
+                FROM pg_enum
+                JOIN pg_type ON pg_type.oid=enumtypid
+                ORDER BY oid, enumsortorder"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_table_columns",
+            execute_query(
+                "select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, case when (data_type like '%unsigned%') then DATA_TYPE || ' unsigned' else DATA_TYPE end as DATA_TYPE
+                from INFORMATION_SCHEMA.columns
+                where TABLE_SCHEMA = 'public' and TABLE_NAME = 'KibanaSampleDataEcommerce'
+                order by TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_schemas",
+            execute_query(
+                "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+                from INFORMATION_SCHEMA.tables
+                where TABLE_SCHEMA not in ('information_schema', 'pg_catalog')
+                order by TABLE_SCHEMA, TABLE_NAME"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        // TODO: 'Boolean = Utf8' can't be evaluated because there isn't a common type to coerce the types to
+        // insta::assert_snapshot!(
+        //     "powerbi_introspection",
+        //     execute_query(
+        //         "SELECT
+        //           na.nspname as Schema,
+        //           cl.relname as Table,
+        //           att.attname AS Name,
+        //           att.attnum as Position,
+        //           CASE WHEN att.attnotnull = 'f' THEN 'true' ELSE 'false' END as Nullable,
+        //           CASE WHEN ty.typname Like 'bit' OR ty.typname Like 'varbit' and att.atttypmod > 0 THEN att.atttypmod
+        //                WHEN ty.typname Like 'interval' THEN -1
+        //                WHEN att.atttypmod > 0 THEN att.atttypmod - 4 ELSE att.atttypmod END as Length,
+        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_numeric_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Precision, */
+        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_numeric_scale(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Scale , */
+        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_datetime_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS DatetimeLength, */
+        //           CASE WHEN att.attnotnull = 'f' THEN 'false' ELSE 'true' END as IsUnique,
+        //           att.atthasdef as HasDefaultValue,
+        //           att.attisdropped as IsDropped,
+        //           att.attinhcount as ancestorCount,
+        //           att.attndims as Dimension,
+        //           CASE WHEN attndims > 0 THEN true ELSE false END AS isarray,
+        //           CASE WHEN ty.typname = 'bpchar' THEN 'char'
+        //                WHEN ty.typname = '_bpchar' THEN '_char' ELSE ty.typname END as TypeName,
+        //           tn.nspname as TypeSchema,
+        //           et.typname as elementaltypename,
+        //           description as Comment,
+        //           cs.relname AS sername,
+        //           ns.nspname AS serschema,
+        //            att.attidentity as IdentityMode,
+        //           CAST(pg_get_expr(def.adbin, def.adrelid) AS varchar) as DefaultValue
+        //           /* TODO: correlated sub queries use same column names which is not supported (SELECT count(1) FROM pg_type t2 WHERE t2.typname=ty.typname) > 1 AS isdup */
+        //         FROM pg_attribute att
+        //         JOIN pg_type ty ON ty.oid=atttypid
+        //         JOIN pg_namespace tn ON tn.oid=ty.typnamespace
+        //         JOIN pg_class cl ON cl.oid=attrelid AND ((cl.relkind = 'r') OR (cl.relkind = 's') OR (cl.relkind = 'v') OR (cl.relkind = 'm') OR (cl.relkind = 'f'))
+        //         JOIN pg_namespace na ON na.oid=cl.relnamespace
+        //         LEFT OUTER JOIN pg_type et ON et.oid=ty.typelem
+        //         LEFT OUTER JOIN pg_attrdef def ON adrelid=attrelid AND adnum=attnum
+        //         LEFT OUTER JOIN pg_description des ON des.objoid=attrelid AND des.objsubid=attnum
+        //         LEFT OUTER JOIN (pg_depend JOIN pg_class cs ON objid=cs.oid AND cs.relkind='S' AND classid='pg_class'::regclass::oid) ON refobjid=attrelid AND refobjsubid=attnum
+        //         LEFT OUTER JOIN pg_namespace ns ON ns.oid=cs.relnamespace
+        //         WHERE attnum > 0
+        //           AND attisdropped IS FALSE
+        //           /* TODO AND cl.relname like E'users' */
+        //           /* TODO AND na.nspname like E'public' */
+        //           AND att.attname like '%'
+        //         ORDER BY attnum"
+        //         .to_string(),
+        //         DatabaseProtocol::PostgreSQL
+        //     )
+        //     .await?
+        // );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn tableau_temporary_tables() {
         let create_query = convert_sql_to_cube_query(
             &"
@@ -7018,5 +7284,21 @@ ORDER BY \"COUNT(count)\" DESC"
             }
             _ => panic!("SELECT INTO should throw CompilationError::Unsupported"),
         }
+    }
+
+    #[tokio::test]
+    async fn df_is_boolean() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_is_boolean",
+            execute_query(
+                "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
+                 FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

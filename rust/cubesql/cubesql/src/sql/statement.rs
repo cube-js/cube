@@ -31,6 +31,12 @@ trait Visitor<'ast> {
                 self.visit_expr(&mut *low);
                 self.visit_expr(&mut *high);
             }
+            Expr::AnyOp(expr) => {
+                self.visit_expr(expr);
+            }
+            Expr::AllOp(expr) => {
+                self.visit_expr(&mut *expr);
+            }
             Expr::BinaryOp { left, op: _, right } => {
                 self.visit_expr(&mut *left);
                 self.visit_expr(&mut *right);
@@ -291,6 +297,7 @@ trait Visitor<'ast> {
     fn visit_statement(&mut self, statement: &mut ast::Statement) {
         match statement {
             ast::Statement::Query(query) => self.visit_query(query),
+            ast::Statement::Explain { statement, .. } => self.visit_statement(statement),
             // TODO:
             _ => {}
         }
@@ -299,6 +306,11 @@ trait Visitor<'ast> {
     fn visit_cast(&mut self, expr: &mut Expr) {
         if let Expr::Cast { expr, .. } = expr {
             self.visit_expr(expr);
+        } else {
+            unreachable!(
+                "visit_expr requires Cast expression as an argument, actual: {}",
+                expr
+            )
         }
     }
 
@@ -478,9 +490,9 @@ impl CastReplacer {
         result
     }
 
-    fn parse_value_to_str(&self, expr: &Value) -> Option<String> {
+    fn parse_value_to_str<'a>(&self, expr: &'a Value) -> Option<&'a str> {
         match expr {
-            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => Some(str.clone()),
+            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => Some(&str),
             _ => None,
         }
     }
@@ -493,7 +505,16 @@ impl<'ast> Visitor<'ast> for CastReplacer {
             data_type,
         } = expr
         {
-            match *data_type {
+            match data_type {
+                ast::DataType::Custom(name) => match name.to_string().as_str() {
+                    "oid" => {
+                        self.visit_expr(&mut *cast_expr);
+
+                        *expr = *cast_expr.clone();
+                    }
+                    // TODO:
+                    _ => (),
+                },
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
                         let str_val = self.parse_value_to_str(&val);
@@ -505,7 +526,7 @@ impl<'ast> Visitor<'ast> for CastReplacer {
                         for typ in PgType::get_all() {
                             if typ.typname == str_val {
                                 *expr = Expr::Value(Value::Number(typ.typrelid.to_string(), false));
-                                break;
+                                return;
                             }
                         }
                     }
@@ -550,34 +571,54 @@ mod tests {
     use crate::CubeError;
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
-    fn test_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
+    fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = CastReplacer::new();
+        let res = replacer.replace(&stmts[0]);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cast_replacer() -> Result<(), CubeError> {
+        run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
+
+        run_cast_replacer("SELECT 'pg_class'::regclass::oid", "SELECT 1259")?;
+
+        Ok(())
+    }
+
+    fn run_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let binder = StatementParamsBinder::new(values);
-        let mut input = stmts[0].clone();
-        binder.bind(&mut input);
+        let mut res = stmts[0].clone();
+        binder.bind(&mut res);
 
-        assert_eq!(input.to_string(), output);
+        assert_eq!(res.to_string(), output);
 
         Ok(())
     }
 
     #[test]
     fn test_binder_named() -> Result<(), CubeError> {
-        test_binder(
+        run_binder(
             "SELECT ?",
             "SELECT 'test'",
             vec![BindValue::String("test".to_string())],
         )?;
 
-        test_binder(
+        run_binder(
             "SELECT ? AS t1, ? AS t2",
             "SELECT 'test1' AS t1, NULL AS t2",
             vec![BindValue::String("test1".to_string()), BindValue::Null],
         )?;
 
         // binary op
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -594,7 +635,7 @@ mod tests {
         )?;
 
         // IN
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -608,7 +649,7 @@ mod tests {
         )?;
 
         // BETWEEN
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -621,7 +662,7 @@ mod tests {
             ],
         )?;
 
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -642,7 +683,7 @@ mod tests {
             ]
         )?;
 
-        test_binder(
+        run_binder(
             r#"
                 SELECT * FROM (
                     SELECT *

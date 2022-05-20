@@ -4,6 +4,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
+import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('questdb', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -24,12 +25,7 @@ describe('questdb', () => {
         CUBEJS_DB_USER: 'admin',
         CUBEJS_DB_PASS: 'quest',
 
-        CUBEJS_DEV_MODE: 'true',
-        CUBEJS_WEB_SOCKETS: 'false',
-        CUBEJS_EXTERNAL_DEFAULT: 'true',
-        CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'false',
-        CUBEJS_REFRESH_WORKER: 'false',
-        CUBEJS_ROLLUP_ONLY: 'false',
+        ...DEFAULT_CONFIG,
       },
       {
         schemaDir: 'questdb/schema',
@@ -45,14 +41,7 @@ describe('questdb', () => {
     await db.stop();
   });
 
-  test('query measure', async () => {
-    const response = await client.load({
-      measures: [
-        'Orders.totalAmount',
-      ],
-    });
-    expect(response.rawData()).toMatchSnapshot('query');
-  });
+  test('query measure', () => testQueryMeasure(client));
 
   // Error: column type mismatch [index=0, A=STRING, B=INT]
   test.skip('query measure + dimension', async () => {

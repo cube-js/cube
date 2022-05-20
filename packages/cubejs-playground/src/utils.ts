@@ -140,7 +140,7 @@ export function dispatchPlaygroundEvent(
   if (!document) {
     return;
   }
-
+  
   const myEvent = new CustomEvent('__cubejsPlaygroundEvent', {
     bubbles: true,
     composed: true,
