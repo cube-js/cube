@@ -7249,6 +7249,74 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "powerbi_from_subquery",
+            execute_query(
+                "
+                select
+                    pkcol.COLUMN_NAME as PK_COLUMN_NAME,
+                    fkcol.TABLE_SCHEMA AS FK_TABLE_SCHEMA,
+                    fkcol.TABLE_NAME AS FK_TABLE_NAME,
+                    fkcol.COLUMN_NAME as FK_COLUMN_NAME,
+                    fkcol.ORDINAL_POSITION as ORDINAL,
+                    fkcon.CONSTRAINT_SCHEMA || '_' || fkcol.TABLE_NAME || '_' || 'users' || '_' || fkcon.CONSTRAINT_NAME as FK_NAME
+                from
+                    (select distinct constraint_catalog, constraint_schema, unique_constraint_schema, constraint_name, unique_constraint_name
+                        from INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS) fkcon
+                        inner join
+                    INFORMATION_SCHEMA.KEY_COLUMN_USAGE fkcol
+                        on fkcon.CONSTRAINT_SCHEMA = fkcol.CONSTRAINT_SCHEMA
+                        and fkcon.CONSTRAINT_NAME = fkcol.CONSTRAINT_NAME
+                        inner join
+                    INFORMATION_SCHEMA.KEY_COLUMN_USAGE pkcol
+                        on fkcon.UNIQUE_CONSTRAINT_SCHEMA = pkcol.CONSTRAINT_SCHEMA
+                        and fkcon.UNIQUE_CONSTRAINT_NAME = pkcol.CONSTRAINT_NAME
+                where pkcol.TABLE_SCHEMA = 'public' and pkcol.TABLE_NAME = 'users'
+                        and pkcol.ORDINAL_POSITION = fkcol.ORDINAL_POSITION
+                order by FK_NAME, fkcol.ORDINAL_POSITION
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "powerbi_uppercase_alias",
+            execute_query(
+                "
+                select
+                    i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME,
+                    ii.COLUMN_NAME,
+                    ii.ORDINAL_POSITION,
+                    case
+                        when i.CONSTRAINT_TYPE = 'PRIMARY KEY' then 'Y'
+                        else 'N'
+                    end as PRIMARY_KEY
+                from INFORMATION_SCHEMA.table_constraints i
+                inner join INFORMATION_SCHEMA.key_column_usage ii on
+                    i.CONSTRAINT_SCHEMA = ii.CONSTRAINT_SCHEMA and
+                    i.CONSTRAINT_NAME = ii.CONSTRAINT_NAME and
+                    i.TABLE_SCHEMA = ii.TABLE_SCHEMA and
+                    i.TABLE_NAME = ii.TABLE_NAME
+                where
+                    i.TABLE_SCHEMA = 'public' and
+                    i.TABLE_NAME = 'KibanaSampleDataEcommerce' and
+                    i.CONSTRAINT_TYPE in ('PRIMARY KEY', 'UNIQUE')
+                order by
+                    i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME,
+                    ii.TABLE_SCHEMA,
+                    ii.TABLE_NAME,
+                    ii.ORDINAL_POSITION
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         // TODO: 'Boolean = Utf8' can't be evaluated because there isn't a common type to coerce the types to
         // insta::assert_snapshot!(
         //     "powerbi_introspection",
