@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, BooleanBuilder, Int32Builder, StringBuilder},
+        array::{Array, BooleanBuilder, Int32Builder, ListBuilder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -38,7 +38,7 @@ impl TableProvider for PgCatalogSettingsProvider {
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
             Field::new("name", DataType::Utf8, false),
-            Field::new("setting", DataType::Utf8, true),
+            Field::new("setting", DataType::Utf8, false),
             Field::new("unit", DataType::Utf8, true),
             Field::new("category", DataType::Utf8, true),
             Field::new("short_desc", DataType::Utf8, true),
@@ -48,7 +48,11 @@ impl TableProvider for PgCatalogSettingsProvider {
             Field::new("source", DataType::Utf8, true),
             Field::new("min_val", DataType::Utf8, true),
             Field::new("max_val", DataType::Utf8, true),
-            Field::new("enumvals", DataType::Utf8, true),
+            Field::new(
+                "enumvals",
+                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
             Field::new("boot_val", DataType::Utf8, true),
             Field::new("reset_val", DataType::Utf8, true),
             Field::new("sourcefile", DataType::Utf8, true),
@@ -74,7 +78,7 @@ impl TableProvider for PgCatalogSettingsProvider {
         let mut sources = StringBuilder::new(100);
         let mut min_vals = StringBuilder::new(100);
         let mut max_vals = StringBuilder::new(100);
-        let mut enumvals = StringBuilder::new(100);
+        let mut enumvals = ListBuilder::new(StringBuilder::new(100));
         let mut boot_vals = StringBuilder::new(100);
         let mut reset_vals = StringBuilder::new(100);
         let mut sourcefiles = StringBuilder::new(100);
@@ -94,7 +98,7 @@ impl TableProvider for PgCatalogSettingsProvider {
             sources.append_null().unwrap();
             min_vals.append_null().unwrap();
             max_vals.append_null().unwrap();
-            enumvals.append_null().unwrap();
+            enumvals.append(false).unwrap();
             boot_vals.append_null().unwrap();
             reset_vals.append_null().unwrap();
             sourcefiles.append_null().unwrap();

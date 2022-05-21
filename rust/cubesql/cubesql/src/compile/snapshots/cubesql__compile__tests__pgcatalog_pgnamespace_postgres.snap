@@ -1,13 +1,11 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4840
-expression: "execute_query(\"SELECT * FROM pg_catalog.pg_namespace\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
-
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_namespace\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+-------+--------------------+----------+------------------------+
-| oid   | nspname            | nspowner | nspacl                 |
-+-------+--------------------+----------+------------------------+
-| 11    | pg_catalog         | 10       | {test=UC/test,=U/test} |
-| 2200  | public             | 10       | {test=UC/test,=U/test} |
-| 13000 | information_schema | 10       | {test=UC/test,=U/test} |
-+-------+--------------------+----------+------------------------+
++-------+--------------------+----------+---------------------+
+| oid   | nspname            | nspowner | nspacl              |
++-------+--------------------+----------+---------------------+
+| 11    | pg_catalog         | 10       | {ovr=UC/ovr,=U/ovr} |
+| 2200  | public             | 10       | {ovr=UC/ovr,=U/ovr} |
+| 13000 | information_schema | 10       | {ovr=UC/ovr,=U/ovr} |
++-------+--------------------+----------+---------------------+

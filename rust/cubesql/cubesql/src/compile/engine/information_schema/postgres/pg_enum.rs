@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, Float32Builder, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Float32Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,9 +14,11 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogEnumBuilder {
-    oid: UInt32Builder,
-    enumtypid: UInt32Builder,
+    oid: OidBuilder,
+    enumtypid: OidBuilder,
     enumsortorder: Float32Builder,
     enumlabel: StringBuilder,
 }
@@ -26,8 +28,8 @@ impl PgCatalogEnumBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            enumtypid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
+            enumtypid: OidBuilder::new(capacity),
             enumsortorder: Float32Builder::new(capacity),
             enumlabel: StringBuilder::new(capacity),
         }
@@ -71,8 +73,8 @@ impl TableProvider for PgCatalogEnumProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
-            Field::new("enumtypid", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
+            Field::new("enumtypid", ExtDataType::Oid.into(), false),
             Field::new("enumsortorder", DataType::Float32, false),
             Field::new("enumlabel", DataType::Utf8, false),
         ]))

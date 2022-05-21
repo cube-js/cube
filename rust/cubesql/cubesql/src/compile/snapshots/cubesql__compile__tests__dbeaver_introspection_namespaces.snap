@@ -1,12 +1,11 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8334
 expression: "execute_query(\"SELECT n.oid,n.*,d.description FROM pg_catalog.pg_namespace n\n                LEFT OUTER JOIN pg_catalog.pg_description d ON d.objoid=n.oid AND d.objsubid=0 AND d.classoid='pg_namespace'::regclass\n                ORDER BY nspname\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+-------+-------+--------------------+----------+------------------------+-------------+
-| _oid  | oid   | nspname            | nspowner | nspacl                 | description |
-+-------+-------+--------------------+----------+------------------------+-------------+
-| 13000 | 13000 | information_schema | 10       | {test=UC/test,=U/test} | NULL        |
-| 11    | 11    | pg_catalog         | 10       | {test=UC/test,=U/test} | NULL        |
-| 2200  | 2200  | public             | 10       | {test=UC/test,=U/test} | NULL        |
-+-------+-------+--------------------+----------+------------------------+-------------+
++-------+-------+--------------------+----------+---------------------+-------------+
+| _oid  | oid   | nspname            | nspowner | nspacl              | description |
++-------+-------+--------------------+----------+---------------------+-------------+
+| 13000 | 13000 | information_schema | 10       | {ovr=UC/ovr,=U/ovr} | NULL        |
+| 11    | 11    | pg_catalog         | 10       | {ovr=UC/ovr,=U/ovr} | NULL        |
+| 2200  | 2200  | public             | 10       | {ovr=UC/ovr,=U/ovr} | NULL        |
++-------+-------+--------------------+----------+---------------------+-------------+

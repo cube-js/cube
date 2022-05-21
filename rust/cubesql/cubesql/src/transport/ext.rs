@@ -339,7 +339,9 @@ impl V1CubeMetaExt for V1CubeMeta {
 
 pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
     match column_type {
-        ColumnType::Int32 | ColumnType::Int64 | ColumnType::Int8 => DataType::Int64,
+        ColumnType::Int8 | ColumnType::Int16 | ColumnType::Int32 | ColumnType::Int64 => {
+            DataType::Int64
+        }
         ColumnType::String => DataType::Utf8,
         ColumnType::Double => DataType::Float64,
         ColumnType::Boolean => DataType::Boolean,

@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Int16Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -13,10 +13,13 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogAttrdefBuilder {
-    oid: UInt32Builder,
-    adrelid: UInt32Builder,
-    adnum: UInt32Builder,
+    oid: OidBuilder,
+    adrelid: OidBuilder,
+    adnum: Int16Builder,
+    // TODO: type pg_node_tree?
     adbin: StringBuilder,
 }
 
@@ -25,9 +28,9 @@ impl PgCatalogAttrdefBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            adrelid: UInt32Builder::new(capacity),
-            adnum: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
+            adrelid: OidBuilder::new(capacity),
+            adnum: Int16Builder::new(capacity),
             adbin: StringBuilder::new(capacity),
         }
     }
@@ -69,9 +72,9 @@ impl TableProvider for PgCatalogAttrdefProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
-            Field::new("adrelid", DataType::UInt32, false),
-            Field::new("adnum", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
+            Field::new("adrelid", ExtDataType::Oid.into(), false),
+            Field::new("adnum", DataType::Int16, false),
             Field::new("adbin", DataType::Utf8, false),
         ]))
     }

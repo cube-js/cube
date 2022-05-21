@@ -3,10 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{
-            Array, ArrayRef, BooleanBuilder, Int64Builder, ListBuilder, StringBuilder,
-            UInt16Builder, UInt32Builder,
-        },
+        array::{Array, ArrayRef, BooleanBuilder, Int16Builder, ListBuilder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -16,11 +13,13 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogIndexBuilder {
-    indexrelid: UInt32Builder,
-    indrelid: UInt32Builder,
-    indnatts: UInt16Builder,
-    indnkeyatts: UInt16Builder,
+    indexrelid: OidBuilder,
+    indrelid: OidBuilder,
+    indnatts: Int16Builder,
+    indnkeyatts: Int16Builder,
     indisunique: BooleanBuilder,
     indisprimary: BooleanBuilder,
     indisexclusion: BooleanBuilder,
@@ -31,11 +30,17 @@ struct PgCatalogIndexBuilder {
     indisready: BooleanBuilder,
     indislive: BooleanBuilder,
     indisreplident: BooleanBuilder,
-    indkey: ListBuilder<Int64Builder>,
-    indcollation: StringBuilder,
-    indclass: StringBuilder,
-    indoption: StringBuilder,
+    // TODO: int2vector has different text representation
+    indkey: ListBuilder<Int16Builder>,
+    // TODO: oidvector has different text representation
+    indcollation: ListBuilder<OidBuilder>,
+    // TODO: oidvector has different text representation
+    indclass: ListBuilder<OidBuilder>,
+    // TODO: int2vector has different text representation
+    indoption: ListBuilder<Int16Builder>,
+    // TODO: type pg_node_tree?
     indexprs: StringBuilder,
+    // TODO: type pg_node_tree?
     indpred: StringBuilder,
 }
 
@@ -44,10 +49,10 @@ impl PgCatalogIndexBuilder {
         let capacity = 10;
 
         Self {
-            indexrelid: UInt32Builder::new(capacity),
-            indrelid: UInt32Builder::new(capacity),
-            indnatts: UInt16Builder::new(capacity),
-            indnkeyatts: UInt16Builder::new(capacity),
+            indexrelid: OidBuilder::new(capacity),
+            indrelid: OidBuilder::new(capacity),
+            indnatts: Int16Builder::new(capacity),
+            indnkeyatts: Int16Builder::new(capacity),
             indisunique: BooleanBuilder::new(capacity),
             indisprimary: BooleanBuilder::new(capacity),
             indisexclusion: BooleanBuilder::new(capacity),
@@ -58,10 +63,10 @@ impl PgCatalogIndexBuilder {
             indisready: BooleanBuilder::new(capacity),
             indislive: BooleanBuilder::new(capacity),
             indisreplident: BooleanBuilder::new(capacity),
-            indkey: ListBuilder::new(Int64Builder::new(capacity)),
-            indcollation: StringBuilder::new(capacity),
-            indclass: StringBuilder::new(capacity),
-            indoption: StringBuilder::new(capacity),
+            indkey: ListBuilder::new(Int16Builder::new(capacity)),
+            indcollation: ListBuilder::new(OidBuilder::new(capacity)),
+            indclass: ListBuilder::new(OidBuilder::new(capacity)),
+            indoption: ListBuilder::new(Int16Builder::new(capacity)),
             indexprs: StringBuilder::new(capacity),
             indpred: StringBuilder::new(capacity),
         }
@@ -120,10 +125,10 @@ impl TableProvider for PgCatalogIndexProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("indexrelid", DataType::UInt32, false),
-            Field::new("indrelid", DataType::UInt32, false),
-            Field::new("indnatts", DataType::UInt16, false),
-            Field::new("indnkeyatts", DataType::UInt16, false),
+            Field::new("indexrelid", ExtDataType::Oid.into(), false),
+            Field::new("indrelid", ExtDataType::Oid.into(), false),
+            Field::new("indnatts", DataType::Int16, false),
+            Field::new("indnkeyatts", DataType::Int16, false),
             Field::new("indisunique", DataType::Boolean, false),
             Field::new("indisprimary", DataType::Boolean, false),
             Field::new("indisexclusion", DataType::Boolean, false),
@@ -136,12 +141,24 @@ impl TableProvider for PgCatalogIndexProvider {
             Field::new("indisreplident", DataType::Boolean, false),
             Field::new(
                 "indkey",
-                DataType::List(Box::new(Field::new("item", DataType::Int64, true))),
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
                 false,
             ),
-            Field::new("indcollation", DataType::Utf8, false),
-            Field::new("indclass", DataType::Utf8, false),
-            Field::new("indoption", DataType::Utf8, false),
+            Field::new(
+                "indcollation",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                false,
+            ),
+            Field::new(
+                "indclass",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                false,
+            ),
+            Field::new(
+                "indoption",
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                false,
+            ),
             Field::new("indexprs", DataType::Utf8, true),
             Field::new("indpred", DataType::Utf8, true),
         ]))

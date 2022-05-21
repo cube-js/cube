@@ -42,7 +42,7 @@ impl InfoSchemaCharacterSetsBuilder {
 
     fn add_character_set(
         &mut self,
-        character_set_name: impl AsRef<str> + Clone,
+        character_set_name: impl AsRef<str>,
         character_repertoire: impl AsRef<str>,
         default_collate_catalog: impl AsRef<str>,
         default_collate_schema: impl AsRef<str>,
@@ -51,7 +51,7 @@ impl InfoSchemaCharacterSetsBuilder {
         self.character_set_catalog.append_null().unwrap();
         self.character_set_schema.append_null().unwrap();
         self.character_set_name
-            .append_value(character_set_name.clone())
+            .append_value(&character_set_name)
             .unwrap();
         self.character_repertoire
             .append_value(character_repertoire)

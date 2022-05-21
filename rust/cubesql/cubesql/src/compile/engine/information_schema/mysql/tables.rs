@@ -14,7 +14,10 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::utils::{new_int64_array_with_placeholder, new_string_array_with_placeholder};
+use super::utils::{
+    new_int32_array_with_placeholder, new_int64_array_with_placeholder,
+    new_string_array_with_placeholder, new_uint64_array_with_placeholder,
+};
 
 struct InformationSchemaTablesBuilder {
     catalog_names: StringBuilder,
@@ -41,16 +44,10 @@ impl InformationSchemaTablesBuilder {
         schema_name: impl AsRef<str>,
         table_name: impl AsRef<str>,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
-        self.table_types
-            .append_value("BASE TABLE".to_string())
-            .unwrap();
+        self.catalog_names.append_value(catalog_name).unwrap();
+        self.schema_names.append_value(schema_name).unwrap();
+        self.table_names.append_value(table_name).unwrap();
+        self.table_types.append_value("BASE TABLE").unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -65,66 +62,30 @@ impl InformationSchemaTablesBuilder {
 
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            Some("InnoDB".to_string()),
+            Some("InnoDB"),
         )));
+        columns.push(Arc::new(new_int32_array_with_placeholder(total, Some(10))));
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            Some("10".to_string()),
+            Some("Dynamic"),
         )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, Some(0))));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, Some(0))));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(
             total,
-            Some("Dynamic".to_string()),
+            Some(16384),
         )));
-        columns.push(Arc::new(new_int64_array_with_placeholder(total, 0)));
-        columns.push(Arc::new(new_int64_array_with_placeholder(total, 0)));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("16384".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, Some(0))));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, Some(0))));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, Some(0))));
+        columns.push(Arc::new(new_uint64_array_with_placeholder(total, None)));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        columns.push(Arc::new(new_int64_array_with_placeholder(total, None)));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
 
         columns
     }
@@ -178,23 +139,23 @@ impl TableProvider for InfoSchemaTableProvider {
             Field::new("TABLE_SCHEMA", DataType::Utf8, false),
             Field::new("TABLE_NAME", DataType::Utf8, false),
             Field::new("TABLE_TYPE", DataType::Utf8, false),
-            Field::new("ENGINE", DataType::Utf8, false),
-            Field::new("VERSION", DataType::Utf8, false),
-            Field::new("ROW_FORMAT", DataType::Utf8, false),
-            Field::new("TABLES_ROWS", DataType::Int64, true),
-            Field::new("AVG_ROW_LENGTH", DataType::Int64, false),
-            Field::new("DATA_LENGTH", DataType::Utf8, false),
-            Field::new("MAX_DATA_LENGTH", DataType::Utf8, false),
-            Field::new("INDEX_LENGTH", DataType::Utf8, false),
-            Field::new("DATA_FREE", DataType::Utf8, false),
-            Field::new("AUTO_INCREMENT", DataType::Utf8, true),
+            Field::new("ENGINE", DataType::Utf8, true),
+            Field::new("VERSION", DataType::Int32, true),
+            Field::new("ROW_FORMAT", DataType::Utf8, true),
+            Field::new("TABLES_ROWS", DataType::UInt64, true),
+            Field::new("AVG_ROW_LENGTH", DataType::UInt64, true),
+            Field::new("DATA_LENGTH", DataType::UInt64, true),
+            Field::new("MAX_DATA_LENGTH", DataType::UInt64, true),
+            Field::new("INDEX_LENGTH", DataType::UInt64, true),
+            Field::new("DATA_FREE", DataType::UInt64, true),
+            Field::new("AUTO_INCREMENT", DataType::UInt64, true),
             Field::new("CREATE_TIME", DataType::Utf8, false),
             Field::new("UPDATE_TIME", DataType::Utf8, true),
             Field::new("CHECK_TIME", DataType::Utf8, true),
-            Field::new("TABLE_COLLATION", DataType::Utf8, false),
-            Field::new("CHECKSUM", DataType::Utf8, true),
-            Field::new("CREATE_OPTIONS", DataType::Utf8, false),
-            Field::new("TABLE_COMMENT", DataType::Utf8, false),
+            Field::new("TABLE_COLLATION", DataType::Utf8, true),
+            Field::new("CHECKSUM", DataType::Int64, true),
+            Field::new("CREATE_OPTIONS", DataType::Utf8, true),
+            Field::new("TABLE_COMMENT", DataType::Utf8, true),
         ]))
     }
 

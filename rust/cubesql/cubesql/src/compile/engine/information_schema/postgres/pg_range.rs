@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,23 +14,27 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, Oid, OidBuilder};
+
 struct PgRange {
-    rngtypid: u32,
-    rngsubtype: u32,
-    rngmultitypid: u32,
-    rngcollation: u32,
-    rngsubopc: u32,
+    rngtypid: Oid,
+    rngsubtype: Oid,
+    rngmultitypid: Oid,
+    rngcollation: Oid,
+    rngsubopc: Oid,
     rngcanonical: &'static str,
     rngsubdiff: &'static str,
 }
 
 struct PgCatalogRangeBuilder {
-    rngtypid: UInt32Builder,
-    rngsubtype: UInt32Builder,
-    rngmultitypid: UInt32Builder,
-    rngcollation: UInt32Builder,
-    rngsubopc: UInt32Builder,
+    rngtypid: OidBuilder,
+    rngsubtype: OidBuilder,
+    rngmultitypid: OidBuilder,
+    rngcollation: OidBuilder,
+    rngsubopc: OidBuilder,
+    // TODO: type regproc?
     rngcanonical: StringBuilder,
+    // TODO: type regproc?
     rngsubdiff: StringBuilder,
 }
 
@@ -39,11 +43,11 @@ impl PgCatalogRangeBuilder {
         let capacity = 10;
 
         Self {
-            rngtypid: UInt32Builder::new(capacity),
-            rngsubtype: UInt32Builder::new(capacity),
-            rngmultitypid: UInt32Builder::new(capacity),
-            rngcollation: UInt32Builder::new(capacity),
-            rngsubopc: UInt32Builder::new(capacity),
+            rngtypid: OidBuilder::new(capacity),
+            rngsubtype: OidBuilder::new(capacity),
+            rngmultitypid: OidBuilder::new(capacity),
+            rngcollation: OidBuilder::new(capacity),
+            rngsubopc: OidBuilder::new(capacity),
             rngcanonical: StringBuilder::new(capacity),
             rngsubdiff: StringBuilder::new(capacity),
         }
@@ -83,6 +87,7 @@ pub struct PgCatalogRangeProvider {
 impl PgCatalogRangeProvider {
     pub fn new() -> Self {
         let mut builder = PgCatalogRangeBuilder::new();
+
         builder.add_range(&PgRange {
             rngtypid: 3904,
             rngsubtype: 23,
@@ -156,11 +161,11 @@ impl TableProvider for PgCatalogRangeProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("rngtypid", DataType::UInt32, false),
-            Field::new("rngsubtype", DataType::UInt32, false),
-            Field::new("rngmultitypid", DataType::UInt32, false),
-            Field::new("rngcollation", DataType::UInt32, false),
-            Field::new("rngsubopc", DataType::UInt32, false),
+            Field::new("rngtypid", ExtDataType::Oid.into(), false),
+            Field::new("rngsubtype", ExtDataType::Oid.into(), false),
+            Field::new("rngmultitypid", ExtDataType::Oid.into(), false),
+            Field::new("rngcollation", ExtDataType::Oid.into(), false),
+            Field::new("rngsubopc", ExtDataType::Oid.into(), false),
             Field::new("rngcanonical", DataType::Utf8, false),
             Field::new("rngsubdiff", DataType::Utf8, false),
         ]))

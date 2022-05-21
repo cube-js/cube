@@ -1,14 +1,13 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6017
-expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT * FROM information_schema.tables\n                ORDER BY table_catalog ASC, table_schema ASC, table_name ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+
 | table_catalog | table_schema       | table_name                | table_type | self_referencing_column_name | reference_generation | user_defined_type_catalog | user_defined_type_schema | user_defined_type_name | is_insertable_into | is_typed | commit_action |
 +---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+
-| db            | information_schema | tables                    | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
-| db            | information_schema | columns                   | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
-| db            | information_schema | pg_tables                 | VIEW       |                              |                      |                           |                          |                        | NO                 | NO       |               |
-| db            | public             | KibanaSampleDataEcommerce | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
-| db            | public             | Logs                      | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| db            | information_schema | columns                   | VIEW       | NULL                         | NULL                 | NULL                      | NULL                     | NULL                   | NO                 | NO       | NULL          |
+| db            | information_schema | tables                    | VIEW       | NULL                         | NULL                 | NULL                      | NULL                     | NULL                   | NO                 | NO       | NULL          |
+| db            | pg_catalog         | pg_tables                 | VIEW       | NULL                         | NULL                 | NULL                      | NULL                     | NULL                   | NO                 | NO       | NULL          |
+| db            | public             | KibanaSampleDataEcommerce | BASE TABLE | NULL                         | NULL                 | NULL                      | NULL                     | NULL                   | NO                 | NO       | NULL          |
+| db            | public             | Logs                      | BASE TABLE | NULL                         | NULL                 | NULL                      | NULL                     | NULL                   | NO                 | NO       | NULL          |
 +---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+

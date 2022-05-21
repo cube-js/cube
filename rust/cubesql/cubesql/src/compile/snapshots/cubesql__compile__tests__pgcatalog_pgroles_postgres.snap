@@ -1,10 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6833
 expression: "execute_query(\"SELECT * FROM pg_catalog.pg_roles ORDER BY oid ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-----+
 | rolname | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig | oid |
 +---------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-----+
-| ovr     | true     | true       | false         | true        | true        | false          | -1           | ********    | NULL          | true         | NULL      | 10  |
+| ovr     | true     | true       | false         | false       | true        | false          | -1           | ********    | NULL          | true         | NULL      | 10  |
 +---------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-----+

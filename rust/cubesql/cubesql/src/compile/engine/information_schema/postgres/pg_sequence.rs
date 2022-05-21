@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, Int64Builder, UInt32Builder},
+        array::{Array, ArrayRef, BooleanBuilder, Int64Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,9 +14,11 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogSequenceBuilder {
-    seqrelid: UInt32Builder,
-    seqtypid: UInt32Builder,
+    seqrelid: OidBuilder,
+    seqtypid: OidBuilder,
     seqstart: Int64Builder,
     seqincrement: Int64Builder,
     seqmax: Int64Builder,
@@ -28,8 +30,8 @@ struct PgCatalogSequenceBuilder {
 impl PgCatalogSequenceBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            seqrelid: UInt32Builder::new(capacity),
-            seqtypid: UInt32Builder::new(capacity),
+            seqrelid: OidBuilder::new(capacity),
+            seqtypid: OidBuilder::new(capacity),
             seqstart: Int64Builder::new(capacity),
             seqincrement: Int64Builder::new(capacity),
             seqmax: Int64Builder::new(capacity),
@@ -82,8 +84,8 @@ impl TableProvider for PgCatalogSequenceProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("seqrelid", DataType::UInt32, false),
-            Field::new("seqtypid", DataType::UInt32, false),
+            Field::new("seqrelid", ExtDataType::Oid.into(), false),
+            Field::new("seqtypid", ExtDataType::Oid.into(), false),
             Field::new("seqstart", DataType::Int64, false),
             Field::new("seqincrement", DataType::Int64, false),
             Field::new("seqmax", DataType::Int64, false),

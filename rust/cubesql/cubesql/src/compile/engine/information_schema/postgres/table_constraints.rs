@@ -13,6 +13,8 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, YesNoBuilder};
+
 struct InfoSchemaTableConstraintsBuilder {
     constraint_catalog: StringBuilder,
     constraint_schema: StringBuilder,
@@ -21,9 +23,9 @@ struct InfoSchemaTableConstraintsBuilder {
     table_schema: StringBuilder,
     table_name: StringBuilder,
     constraint_type: StringBuilder,
-    is_deferrable: StringBuilder,
-    initially_deferred: StringBuilder,
-    enforced: StringBuilder,
+    is_deferrable: YesNoBuilder,
+    initially_deferred: YesNoBuilder,
+    enforced: YesNoBuilder,
 }
 
 impl InfoSchemaTableConstraintsBuilder {
@@ -38,9 +40,9 @@ impl InfoSchemaTableConstraintsBuilder {
             table_schema: StringBuilder::new(capacity),
             table_name: StringBuilder::new(capacity),
             constraint_type: StringBuilder::new(capacity),
-            is_deferrable: StringBuilder::new(capacity),
-            initially_deferred: StringBuilder::new(capacity),
-            enforced: StringBuilder::new(capacity),
+            is_deferrable: YesNoBuilder::new(capacity),
+            initially_deferred: YesNoBuilder::new(capacity),
+            enforced: YesNoBuilder::new(capacity),
         }
     }
 
@@ -94,9 +96,9 @@ impl TableProvider for InfoSchemaTableConstraintsProvider {
             Field::new("table_schema", DataType::Utf8, false),
             Field::new("table_name", DataType::Utf8, false),
             Field::new("constraint_type", DataType::Utf8, false),
-            Field::new("is_deferrable", DataType::Utf8, false),
-            Field::new("initially_deferred", DataType::Utf8, false),
-            Field::new("enforced", DataType::Utf8, false),
+            Field::new("is_deferrable", ExtDataType::YesNo.into(), false),
+            Field::new("initially_deferred", ExtDataType::YesNo.into(), false),
+            Field::new("enforced", ExtDataType::YesNo.into(), false),
         ]))
     }
 

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, ListBuilder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,18 +14,21 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-struct PgNamespace {
-    oid: u32,
+use super::utils::{ExtDataType, Oid, OidBuilder};
+
+struct PgNamespace<'a> {
+    oid: Oid,
     nspname: &'static str,
-    nspowner: u32,
-    nspacl: &'static str,
+    nspowner: Oid,
+    nspacl: Option<&'a Vec<String>>,
 }
 
 struct PgCatalogNamespaceBuilder {
-    oid: UInt32Builder,
+    oid: OidBuilder,
     nspname: StringBuilder,
-    nspowner: UInt32Builder,
-    nspacl: StringBuilder,
+    nspowner: OidBuilder,
+    // TODO: type aclitem?
+    nspacl: ListBuilder<StringBuilder>,
 }
 
 impl PgCatalogNamespaceBuilder {
@@ -33,10 +36,10 @@ impl PgCatalogNamespaceBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
             nspname: StringBuilder::new(capacity),
-            nspowner: UInt32Builder::new(capacity),
-            nspacl: StringBuilder::new(capacity),
+            nspowner: OidBuilder::new(capacity),
+            nspacl: ListBuilder::new(StringBuilder::new(capacity)),
         }
     }
 
@@ -44,7 +47,15 @@ impl PgCatalogNamespaceBuilder {
         self.oid.append_value(ns.oid).unwrap();
         self.nspname.append_value(ns.nspname).unwrap();
         self.nspowner.append_value(ns.nspowner).unwrap();
-        self.nspacl.append_value(ns.nspacl).unwrap();
+        match ns.nspacl {
+            Some(nspacl) => {
+                for acl in nspacl {
+                    self.nspacl.values().append_value(acl).unwrap();
+                }
+                self.nspacl.append(true).unwrap();
+            }
+            None => self.nspacl.append(false).unwrap(),
+        };
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -63,25 +74,29 @@ pub struct PgCatalogNamespaceProvider {
 }
 
 impl PgCatalogNamespaceProvider {
-    pub fn new() -> Self {
+    pub fn new(user: Option<String>) -> Self {
+        let user = user.unwrap_or("postgres".to_string());
+
+        let nspacl = vec![format!("{}=UC/{}", user, user), format!("=U/{}", user)];
+
         let mut builder = PgCatalogNamespaceBuilder::new();
         builder.add_namespace(&PgNamespace {
             oid: 11,
             nspname: "pg_catalog",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
+            nspacl: Some(&nspacl),
         });
         builder.add_namespace(&PgNamespace {
             oid: 2200,
             nspname: "public",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
+            nspacl: Some(&nspacl),
         });
         builder.add_namespace(&PgNamespace {
             oid: 13000,
             nspname: "information_schema",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
+            nspacl: Some(&nspacl),
         });
 
         Self {
@@ -102,10 +117,14 @@ impl TableProvider for PgCatalogNamespaceProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
             Field::new("nspname", DataType::Utf8, false),
-            Field::new("nspowner", DataType::UInt32, false),
-            Field::new("nspacl", DataType::Utf8, true),
+            Field::new("nspowner", ExtDataType::Oid.into(), false),
+            Field::new(
+                "nspacl",
+                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
         ]))
     }
 

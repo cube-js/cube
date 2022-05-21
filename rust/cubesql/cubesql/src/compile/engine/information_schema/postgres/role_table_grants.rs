@@ -14,6 +14,8 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{yes_no, ExtDataType, YesNoBuilder};
+
 struct InfoSchemaRoleTableGrantsBuilder {
     grantor: StringBuilder,
     grantee: StringBuilder,
@@ -21,8 +23,8 @@ struct InfoSchemaRoleTableGrantsBuilder {
     table_schema: StringBuilder,
     table_name: StringBuilder,
     privilege_type: StringBuilder,
-    is_grantable: StringBuilder,
-    with_hierarchy: StringBuilder,
+    is_grantable: YesNoBuilder,
+    with_hierarchy: YesNoBuilder,
 }
 
 impl InfoSchemaRoleTableGrantsBuilder {
@@ -34,8 +36,8 @@ impl InfoSchemaRoleTableGrantsBuilder {
             table_schema: StringBuilder::new(capacity),
             table_name: StringBuilder::new(capacity),
             privilege_type: StringBuilder::new(capacity),
-            is_grantable: StringBuilder::new(capacity),
-            with_hierarchy: StringBuilder::new(capacity),
+            is_grantable: YesNoBuilder::new(capacity),
+            with_hierarchy: YesNoBuilder::new(capacity),
         }
     }
 
@@ -48,13 +50,13 @@ impl InfoSchemaRoleTableGrantsBuilder {
         privilege_type: impl AsRef<str>,
     ) {
         self.grantor.append_value(&user).unwrap();
-        self.grantee.append_value(&user).unwrap();
-        self.table_catalog.append_value(&table_catalog).unwrap();
-        self.table_schema.append_value(&table_schema).unwrap();
-        self.table_name.append_value(&table_name).unwrap();
-        self.privilege_type.append_value(&privilege_type).unwrap();
-        self.is_grantable.append_value(&"YES").unwrap();
-        self.with_hierarchy.append_value(&"YES").unwrap();
+        self.grantee.append_value(user).unwrap();
+        self.table_catalog.append_value(table_catalog).unwrap();
+        self.table_schema.append_value(table_schema).unwrap();
+        self.table_name.append_value(table_name).unwrap();
+        self.privilege_type.append_value(privilege_type).unwrap();
+        self.is_grantable.append_value(yes_no(true)).unwrap();
+        self.with_hierarchy.append_value(yes_no(true)).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -77,11 +79,21 @@ pub struct InfoSchemaRoleTableGrantsProvider {
 }
 
 impl InfoSchemaRoleTableGrantsProvider {
-    pub fn new(current_user: String, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(
+        current_user: impl AsRef<str>,
+        database: impl AsRef<str>,
+        cubes: &Vec<V1CubeMeta>,
+    ) -> Self {
         let mut builder = InfoSchemaRoleTableGrantsBuilder::new(cubes.len());
 
         for cube in cubes {
-            builder.add_table(&current_user, "db", "public", cube.name.clone(), "SELECT");
+            builder.add_table(
+                &current_user,
+                &database,
+                "public",
+                cube.name.clone(),
+                "SELECT",
+            );
         }
 
         Self {
@@ -108,8 +120,8 @@ impl TableProvider for InfoSchemaRoleTableGrantsProvider {
             Field::new("table_schema", DataType::Utf8, false),
             Field::new("table_name", DataType::Utf8, false),
             Field::new("privilege_type", DataType::Utf8, false),
-            Field::new("is_grantable", DataType::Utf8, false),
-            Field::new("with_hierarchy", DataType::Utf8, false),
+            Field::new("is_grantable", ExtDataType::YesNo.into(), false),
+            Field::new("with_hierarchy", ExtDataType::YesNo.into(), false),
         ]))
     }
 

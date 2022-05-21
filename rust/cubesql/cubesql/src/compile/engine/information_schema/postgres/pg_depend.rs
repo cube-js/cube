@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, Int32Builder, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Int32Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -13,12 +13,14 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogDependBuilder {
-    classid: UInt32Builder,
-    objid: UInt32Builder,
+    classid: OidBuilder,
+    objid: OidBuilder,
     objsubid: Int32Builder,
-    refclassid: UInt32Builder,
-    refobjid: UInt32Builder,
+    refclassid: OidBuilder,
+    refobjid: OidBuilder,
     refobjsubid: Int32Builder,
     deptype: StringBuilder,
 }
@@ -28,11 +30,11 @@ impl PgCatalogDependBuilder {
         let capacity = 10;
 
         Self {
-            classid: UInt32Builder::new(capacity),
-            objid: UInt32Builder::new(capacity),
+            classid: OidBuilder::new(capacity),
+            objid: OidBuilder::new(capacity),
             objsubid: Int32Builder::new(capacity),
-            refclassid: UInt32Builder::new(capacity),
-            refobjid: UInt32Builder::new(capacity),
+            refclassid: OidBuilder::new(capacity),
+            refobjid: OidBuilder::new(capacity),
             refobjsubid: Int32Builder::new(capacity),
             deptype: StringBuilder::new(capacity),
         }
@@ -78,11 +80,11 @@ impl TableProvider for PgCatalogDependProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("classid", DataType::UInt32, false),
-            Field::new("objid", DataType::UInt32, false),
+            Field::new("classid", ExtDataType::Oid.into(), false),
+            Field::new("objid", ExtDataType::Oid.into(), false),
             Field::new("objsubid", DataType::Int32, false),
-            Field::new("refclassid", DataType::UInt32, false),
-            Field::new("refobjid", DataType::UInt32, false),
+            Field::new("refclassid", ExtDataType::Oid.into(), false),
+            Field::new("refobjid", ExtDataType::Oid.into(), false),
             Field::new("refobjsubid", DataType::Int32, false),
             Field::new("deptype", DataType::Utf8, false),
         ]))

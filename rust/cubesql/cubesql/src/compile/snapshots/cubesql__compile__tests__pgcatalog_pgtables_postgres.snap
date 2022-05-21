@@ -1,11 +1,10 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6101
 expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
 | schemaname | tablename                 | tableowner | tablespace | hasindexes | hasrules | hastriggers | rowsecurity |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
-| public     | KibanaSampleDataEcommerce | db         |            | true       | false    | false       | false       |
-| public     | Logs                      | db         |            | true       | false    | false       | false       |
+| public     | KibanaSampleDataEcommerce | ovr        | NULL       | true       | false    | false       | false       |
+| public     | Logs                      | ovr        | NULL       | true       | false    | false       | false       |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+

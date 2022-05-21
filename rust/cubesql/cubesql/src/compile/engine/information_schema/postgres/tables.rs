@@ -14,13 +14,15 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::utils::new_string_array_with_placeholder;
+use crate::compile::engine::information_schema::utils::ExtDataType;
+
+use super::utils::{new_string_array_with_placeholder, new_yes_no_array_with_placeholder};
 
 struct InformationSchemaTablesBuilder {
-    catalog_names: StringBuilder,
-    schema_names: StringBuilder,
-    table_names: StringBuilder,
-    table_types: StringBuilder,
+    table_catalog: StringBuilder,
+    table_schema: StringBuilder,
+    table_name: StringBuilder,
+    table_type: StringBuilder,
 }
 
 impl InformationSchemaTablesBuilder {
@@ -28,87 +30,65 @@ impl InformationSchemaTablesBuilder {
         let capacity = 10;
 
         Self {
-            catalog_names: StringBuilder::new(capacity),
-            schema_names: StringBuilder::new(capacity),
-            table_names: StringBuilder::new(capacity),
-            table_types: StringBuilder::new(capacity),
+            table_catalog: StringBuilder::new(capacity),
+            table_schema: StringBuilder::new(capacity),
+            table_name: StringBuilder::new(capacity),
+            table_type: StringBuilder::new(capacity),
         }
     }
 
     fn add_table(
         &mut self,
-        catalog_name: impl AsRef<str>,
-        schema_name: impl AsRef<str>,
+        table_catalog: impl AsRef<str>,
+        table_schema: impl AsRef<str>,
         table_name: impl AsRef<str>,
         table_type: impl AsRef<str>,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
-        self.table_types.append_value(table_type.as_ref()).unwrap();
+        self.table_catalog.append_value(table_catalog).unwrap();
+        self.table_schema.append_value(table_schema).unwrap();
+        self.table_name.append_value(table_name).unwrap();
+        self.table_type.append_value(table_type).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
         let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.catalog_names.finish()));
-        columns.push(Arc::new(self.schema_names.finish()));
-        columns.push(Arc::new(self.table_names.finish()));
 
-        let tables_types = self.table_types.finish();
-        let total = tables_types.len();
-        columns.push(Arc::new(tables_types));
+        let table_catalog = self.table_catalog.finish();
+        let total = table_catalog.len();
+        columns.push(Arc::new(table_catalog));
+        columns.push(Arc::new(self.table_schema.finish()));
+        columns.push(Arc::new(self.table_name.finish()));
+        columns.push(Arc::new(self.table_type.finish()));
 
         // self_referencing_column_name
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // reference_generation
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // user_defined_type_catalog
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // user_defined_type_schema
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // user_defined_type_name
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // is_insertable_into
-        columns.push(Arc::new(new_string_array_with_placeholder(
+        columns.push(Arc::new(new_yes_no_array_with_placeholder(
             total,
-            Some("NO".to_string()),
+            Some(false),
         )));
 
         // is_typed
-        columns.push(Arc::new(new_string_array_with_placeholder(
+        columns.push(Arc::new(new_yes_no_array_with_placeholder(
             total,
-            Some("NO".to_string()),
+            Some(false),
         )));
 
         // commit_action
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         columns
     }
@@ -119,15 +99,15 @@ pub struct InfoSchemaTableProvider {
 }
 
 impl InfoSchemaTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InformationSchemaTablesBuilder::new();
         // information_schema
-        builder.add_table("db", "information_schema", "tables", "VIEW");
-        builder.add_table("db", "information_schema", "columns", "VIEW");
-        builder.add_table("db", "information_schema", "pg_tables", "VIEW");
+        builder.add_table(db_name, "information_schema", "tables", "VIEW");
+        builder.add_table(db_name, "information_schema", "columns", "VIEW");
+        builder.add_table(db_name, "pg_catalog", "pg_tables", "VIEW");
 
         for cube in cubes {
-            builder.add_table("db", "public", cube.name.clone(), "BASE TABLE");
+            builder.add_table(db_name, "public", cube.name.clone(), "BASE TABLE");
         }
 
         Self {
@@ -152,14 +132,14 @@ impl TableProvider for InfoSchemaTableProvider {
             Field::new("table_schema", DataType::Utf8, false),
             Field::new("table_name", DataType::Utf8, false),
             Field::new("table_type", DataType::Utf8, false),
-            Field::new("self_referencing_column_name", DataType::Utf8, false),
-            Field::new("reference_generation", DataType::Utf8, false),
-            Field::new("user_defined_type_catalog", DataType::Utf8, false),
-            Field::new("user_defined_type_schema", DataType::Utf8, false),
-            Field::new("user_defined_type_name", DataType::Utf8, false),
-            Field::new("is_insertable_into", DataType::Utf8, false),
-            Field::new("is_typed", DataType::Utf8, false),
-            Field::new("commit_action", DataType::Utf8, false),
+            Field::new("self_referencing_column_name", DataType::Utf8, true),
+            Field::new("reference_generation", DataType::Utf8, true),
+            Field::new("user_defined_type_catalog", DataType::Utf8, true),
+            Field::new("user_defined_type_schema", DataType::Utf8, true),
+            Field::new("user_defined_type_name", DataType::Utf8, true),
+            Field::new("is_insertable_into", ExtDataType::YesNo.into(), false),
+            Field::new("is_typed", ExtDataType::YesNo.into(), false),
+            Field::new("commit_action", DataType::Utf8, true),
         ]))
     }
 

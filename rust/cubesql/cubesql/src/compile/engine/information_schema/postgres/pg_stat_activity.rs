@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::sql::{session::SessionStatActivity, SessionManager};
 use datafusion::{
     arrow::{
-        array::{Array, Int64Builder, StringBuilder, TimestampNanosecondBuilder, UInt32Builder},
+        array::{Array, Int32Builder, Int64Builder, StringBuilder, TimestampNanosecondBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
         record_batch::RecordBatch,
     },
@@ -15,17 +15,20 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder, XidBuilder};
+
 struct PgStatActivityBuilder {
-    oid: UInt32Builder,
+    oid: OidBuilder,
     datname: StringBuilder,
-    pid: UInt32Builder,
-    leader_pid: UInt32Builder,
-    usesysid: UInt32Builder,
+    pid: Int32Builder,
+    leader_pid: Int32Builder,
+    usesysid: OidBuilder,
     usename: StringBuilder,
     application_name: StringBuilder,
+    // TODO: type inet?
     client_addr: StringBuilder,
     client_hostname: StringBuilder,
-    client_port: StringBuilder,
+    client_port: Int32Builder,
     backend_start: TimestampNanosecondBuilder,
     xact_start: TimestampNanosecondBuilder,
     query_start: TimestampNanosecondBuilder,
@@ -33,8 +36,8 @@ struct PgStatActivityBuilder {
     wait_event_type: StringBuilder,
     wait_event: StringBuilder,
     state: StringBuilder,
-    backend_xid: UInt32Builder,
-    backend_xmin: UInt32Builder,
+    backend_xid: XidBuilder,
+    backend_xmin: XidBuilder,
     query_id: Int64Builder,
     query: StringBuilder,
     backend_type: StringBuilder,
@@ -43,16 +46,16 @@ struct PgStatActivityBuilder {
 impl PgStatActivityBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            oid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
             datname: StringBuilder::new(capacity),
-            pid: UInt32Builder::new(capacity),
-            leader_pid: UInt32Builder::new(capacity),
-            usesysid: UInt32Builder::new(capacity),
+            pid: Int32Builder::new(capacity),
+            leader_pid: Int32Builder::new(capacity),
+            usesysid: OidBuilder::new(capacity),
             usename: StringBuilder::new(capacity),
             application_name: StringBuilder::new(capacity),
             client_addr: StringBuilder::new(capacity),
             client_hostname: StringBuilder::new(capacity),
-            client_port: StringBuilder::new(capacity),
+            client_port: Int32Builder::new(capacity),
             backend_start: TimestampNanosecondBuilder::new(capacity),
             xact_start: TimestampNanosecondBuilder::new(capacity),
             query_start: TimestampNanosecondBuilder::new(capacity),
@@ -60,8 +63,8 @@ impl PgStatActivityBuilder {
             wait_event_type: StringBuilder::new(capacity),
             wait_event: StringBuilder::new(capacity),
             state: StringBuilder::new(capacity),
-            backend_xid: UInt32Builder::new(capacity),
-            backend_xmin: UInt32Builder::new(capacity),
+            backend_xid: XidBuilder::new(capacity),
+            backend_xmin: XidBuilder::new(capacity),
             query_id: Int64Builder::new(capacity),
             query: StringBuilder::new(capacity),
             backend_type: StringBuilder::new(capacity),
@@ -76,26 +79,26 @@ impl PgStatActivityBuilder {
         self.usesysid.append_null().unwrap();
         self.usename.append_option(session.usename).unwrap();
         self.application_name
-            .append_option(session.application_name)
+            .append_value(session.application_name.unwrap_or("".to_string()))
             .unwrap();
         self.client_addr.append_option(session.client_addr).unwrap();
         self.client_hostname
             .append_option(session.client_hostname)
             .unwrap();
         self.client_port.append_option(session.client_port).unwrap();
+        // TODO: non-nullable. Save the time when session began and append it here
         self.backend_start.append_null().unwrap();
         self.xact_start.append_null().unwrap();
         self.query_start.append_null().unwrap();
         self.state_change.append_null().unwrap();
         self.wait_event_type.append_null().unwrap();
         self.wait_event.append_null().unwrap();
-        self.state.append_null().unwrap();
+        self.state.append_value("active").unwrap();
         self.backend_xid.append_null().unwrap();
-        self.backend_xmin.append_null().unwrap();
+        self.backend_xmin.append_value(1).unwrap();
         self.query_id.append_null().unwrap();
         self.query.append_option(session.query).unwrap();
-
-        self.backend_type.append_value(&"client backend").unwrap();
+        self.backend_type.append_value("client backend").unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -150,19 +153,20 @@ impl TableProvider for PgCatalogStatActivityProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
-            Field::new("datname", DataType::Utf8, false),
-            Field::new("pid", DataType::UInt32, false),
-            Field::new("leader_pid", DataType::UInt32, false),
-            Field::new("usesysid", DataType::UInt32, true),
+            Field::new("oid", ExtDataType::Oid.into(), true),
+            Field::new("datname", DataType::Utf8, true),
+            Field::new("pid", DataType::Int32, false),
+            Field::new("leader_pid", DataType::Int32, true),
+            Field::new("usesysid", ExtDataType::Oid.into(), true),
             Field::new("usename", DataType::Utf8, true),
-            Field::new("application_name", DataType::Utf8, true),
+            Field::new("application_name", DataType::Utf8, false),
             Field::new("client_addr", DataType::Utf8, true),
             Field::new("client_hostname", DataType::Utf8, true),
-            Field::new("client_port", DataType::Utf8, true),
+            Field::new("client_port", DataType::Int32, true),
             Field::new(
                 "backend_start",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
+                // TODO: non-nullable
                 true,
             ),
             Field::new(
@@ -188,9 +192,9 @@ impl TableProvider for PgCatalogStatActivityProvider {
             // // idle in transaction (aborted): This state is similar to idle in transaction, except one of the statements in the transaction caused an error.
             // // fastpath function call: The backend is executing a fast-path function.
             // // disabled: This state is reported if track_activities is disabled in this backend.
-            Field::new("state", DataType::Utf8, false),
-            Field::new("backend_xid", DataType::UInt32, true),
-            Field::new("backend_xmin", DataType::UInt32, true),
+            Field::new("state", DataType::Utf8, true),
+            Field::new("backend_xid", ExtDataType::Xid.into(), true),
+            Field::new("backend_xmin", ExtDataType::Xid.into(), true),
             Field::new("query_id", DataType::Int64, true),
             Field::new("query", DataType::Utf8, true),
             Field::new("backend_type", DataType::Utf8, false),
