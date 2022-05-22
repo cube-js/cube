@@ -8,7 +8,7 @@ on:
       - 'examples/**'
     branches:
       - master
-      - examples
+      - examples-fixes
 
 jobs:
 
