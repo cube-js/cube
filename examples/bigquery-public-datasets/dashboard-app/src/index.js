@@ -8,7 +8,7 @@ import createExampleWrapper from "cube-example-wrapper"
 
 const exampleDescription = {
     title: "BigQuery Public Datasets — COVID-19 impact",
-    text: `These reports are based on <a href="https://console.cloud.google.com/marketplace/browse?filter=category:covid19">public datasets for COVID-19 research</a> hosted on Google Cloud Platform and queried with Cube.js.`,
+    text: `These reports are based on <a href="https://console.cloud.google.com/marketplace/browse?filter=category:covid19">public datasets for COVID-19 research</a><br>hosted on Google Cloud Platform and queried with Cube.js.`,
 }
 
 createExampleWrapper(exampleDescription)
