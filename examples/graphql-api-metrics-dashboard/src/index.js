@@ -3,10 +3,16 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { client } from "./ApolloClient/client";
-import { clientWithJwt } from "./ApolloClient/clientWithJwt";
 import { clientWithCubeCloud } from "./ApolloClient/clientWithCubeCloud";
 import { ApolloProvider } from '@apollo/client';
+import createExampleWrapper from "cube-example-wrapper";
+
+const exampleDescription = {
+  title: "GraphQL API Metrics Dashboard",
+  text: `A dashboard app built with Cube's GraphQL API, Postgres, Chart.js, and react-chartjs-2.`,
+};
+
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <ApolloProvider client={clientWithCubeCloud}>

@@ -4,6 +4,13 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
+import createExampleWrapper from "cube-example-wrapper";
+
+const exampleDescription = {
+    title: "Stripe Demo Dashboard",
+};
+
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(<App />, document.getElementById('root'));
 
