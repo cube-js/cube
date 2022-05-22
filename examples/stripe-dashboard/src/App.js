@@ -5,7 +5,6 @@ import moment from 'moment';
 import numeral from 'numeral';
 import cubejs from '@cubejs-client/core';
 import Chart from './Chart.js';
-import GithubCorner from 'react-github-corner';
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN);
 const currencyFormatter = (item) => numeral(item).format('$0,0')
@@ -118,7 +117,6 @@ class App extends Component {
             />
           </Col>
         </Row>
-        <GithubCorner size={120} href="https://github.com/statsbotco/cubejs-client/tree/master/examples/stripe-dashboard" />
       </Container>
     );
   }
