@@ -1,62 +1,62 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"\n                SELECT t.oid, t.typname, format_type(t.oid, t.typtypmod) f\n                FROM pg_catalog.pg_type t;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"\n                SELECT\n                    t.oid,\n                    t.typname,\n                    format_type(t.oid, 20::integer) ft20,\n                    format_type(t.oid, 5::integer) ft5,\n                    format_type(t.oid, 4::integer) ft4,\n                    format_type(t.oid, 0::integer) ft0,\n                    format_type(t.oid, -1::integer) ftneg,\n                    format_type(t.oid, NULL::integer) ftnull\n                FROM pg_catalog.pg_type t\n                ORDER BY t.oid ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+-------+----------------------------+-----------------------------------+
-| oid   | typname                    | f                                 |
-+-------+----------------------------+-----------------------------------+
-| 16    | bool                       | ???                               |
-| 17    | bytea                      | ???                               |
-| 19    | name                       | name                              |
-| 20    | int8                       | ???                               |
-| 21    | int2                       | ???                               |
-| 23    | int4                       | integer                           |
-| 25    | text                       | ???                               |
-| 26    | oid                        | ???                               |
-| 27    | tid                        | ???                               |
-| 83    | pg_class                   | ???                               |
-| 700   | float4                     | ???                               |
-| 701   | float8                     | ???                               |
-| 790   | money                      | ???                               |
-| 869   | inet                       | ???                               |
-| 1000  | _bool                      | ???                               |
-| 1001  | _bytea                     | ???                               |
-| 1005  | _int2                      | ???                               |
-| 1007  | _int4                      | ???                               |
-| 1009  | _text                      | ???                               |
-| 1016  | _int8                      | ???                               |
-| 1021  | _float4                    | ???                               |
-| 1022  | _float8                    | ???                               |
-| 1042  | bpchar                     | ???                               |
-| 1043  | varchar                    | character varying                 |
-| 1082  | date                       | ???                               |
-| 1083  | time                       | ???                               |
-| 1114  | timestamp                  | ???                               |
-| 1184  | timestamptz                | timestamp with time zone          |
-| 1186  | interval                   | ???                               |
-| 1266  | timetz                     | ???                               |
-| 1700  | numeric                    | ???                               |
-| 2249  | record                     | ???                               |
-| 2277  | anyarray                   | ???                               |
-| 2283  | anyelement                 | ???                               |
-| 3904  | int4range                  | ???                               |
-| 3906  | numrange                   | ???                               |
-| 3908  | tsrange                    | ???                               |
-| 3220  | pg_lsn                     | ???                               |
-| 3500  | anyenum                    | ???                               |
-| 3831  | anyrange                   | ???                               |
-| 3910  | tstzrange                  | ???                               |
-| 3912  | daterange                  | ???                               |
-| 3926  | int8range                  | ???                               |
-| 4532  | nummultirange              | ???                               |
-| 4533  | tsmultirange               | ???                               |
-| 4535  | datemultirange             | ???                               |
-| 4536  | int8multirange             | ???                               |
-| 4451  | int4multirange             | ???                               |
-| 13408 | character_data             | information_schema.character_data |
-| 13410 | sql_identifier             | information_schema.sql_identifier |
-| 18001 | KibanaSampleDataEcommerce  | ???                               |
-| 18002 | _KibanaSampleDataEcommerce | ???                               |
-| 18014 | Logs                       | ???                               |
-| 18015 | _Logs                      | ???                               |
-+-------+----------------------------+-----------------------------------+
++-------+----------------------------+---------------------------------------+--------------------------------------+--------------------------------------+--------------------------------------+-----------------------------------+-----------------------------------+
+| oid   | typname                    | ft20                                  | ft5                                  | ft4                                  | ft0                                  | ftneg                             | ftnull                            |
++-------+----------------------------+---------------------------------------+--------------------------------------+--------------------------------------+--------------------------------------+-----------------------------------+-----------------------------------+
+| 16    | bool                       | boolean                               | boolean                              | boolean                              | boolean                              | boolean                           | boolean                           |
+| 17    | bytea                      | bytea(20)                             | bytea(5)                             | bytea(4)                             | bytea(0)                             | bytea                             | bytea                             |
+| 19    | name                       | name(20)                              | name(5)                              | name(4)                              | name(0)                              | name                              | name                              |
+| 20    | int8                       | bigint                                | bigint                               | bigint                               | bigint                               | bigint                            | bigint                            |
+| 21    | int2                       | smallint                              | smallint                             | smallint                             | smallint                             | smallint                          | smallint                          |
+| 23    | int4                       | integer                               | integer                              | integer                              | integer                              | integer                           | integer                           |
+| 25    | text                       | text(20)                              | text(5)                              | text(4)                              | text(0)                              | text                              | text                              |
+| 26    | oid                        | oid(20)                               | oid(5)                               | oid(4)                               | oid(0)                               | oid                               | oid                               |
+| 27    | tid                        | tid(20)                               | tid(5)                               | tid(4)                               | tid(0)                               | tid                               | tid                               |
+| 83    | pg_class                   | pg_class(20)                          | pg_class(5)                          | pg_class(4)                          | pg_class(0)                          | pg_class                          | pg_class                          |
+| 700   | float4                     | real                                  | real                                 | real                                 | real                                 | real                              | real                              |
+| 701   | float8                     | double precision                      | double precision                     | double precision                     | double precision                     | double precision                  | double precision                  |
+| 790   | money                      | money(20)                             | money(5)                             | money(4)                             | money(0)                             | money                             | money                             |
+| 869   | inet                       | inet(20)                              | inet(5)                              | inet(4)                              | inet(0)                              | inet                              | inet                              |
+| 1000  | _bool                      | boolean[]                             | boolean[]                            | boolean[]                            | boolean[]                            | boolean[]                         | boolean[]                         |
+| 1001  | _bytea                     | bytea(20)[]                           | bytea(5)[]                           | bytea(4)[]                           | bytea(0)[]                           | bytea[]                           | bytea[]                           |
+| 1005  | _int2                      | smallint[]                            | smallint[]                           | smallint[]                           | smallint[]                           | smallint[]                        | smallint[]                        |
+| 1007  | _int4                      | integer[]                             | integer[]                            | integer[]                            | integer[]                            | integer[]                         | integer[]                         |
+| 1009  | _text                      | text(20)[]                            | text(5)[]                            | text(4)[]                            | text(0)[]                            | text[]                            | text[]                            |
+| 1016  | _int8                      | bigint[]                              | bigint[]                             | bigint[]                             | bigint[]                             | bigint[]                          | bigint[]                          |
+| 1021  | _float4                    | real[]                                | real[]                               | real[]                               | real[]                               | real[]                            | real[]                            |
+| 1022  | _float8                    | double precision[]                    | double precision[]                   | double precision[]                   | double precision[]                   | double precision[]                | double precision[]                |
+| 1042  | bpchar                     | character(16)                         | character(1)                         | character                            | character                            | bpchar                            | character                         |
+| 1043  | varchar                    | character varying(16)                 | character varying(1)                 | character varying                    | character varying                    | character varying                 | character varying                 |
+| 1082  | date                       | date(20)                              | date(5)                              | date(4)                              | date(0)                              | date                              | date                              |
+| 1083  | time                       | time(20) without time zone            | time(5) without time zone            | time(4) without time zone            | time(0) without time zone            | time without time zone            | time without time zone            |
+| 1114  | timestamp                  | timestamp(20) without time zone       | timestamp(5) without time zone       | timestamp(4) without time zone       | timestamp(0) without time zone       | timestamp without time zone       | timestamp without time zone       |
+| 1184  | timestamptz                | timestamp(20) with time zone          | timestamp(5) with time zone          | timestamp(4) with time zone          | timestamp(0) with time zone          | timestamp with time zone          | timestamp with time zone          |
+| 1186  | interval                   | -                                     | -                                    | -                                    | -                                    | interval                          | interval                          |
+| 1266  | timetz                     | time(20) with time zone               | time(5) with time zone               | time(4) with time zone               | time(0) with time zone               | time with time zone               | time with time zone               |
+| 1700  | numeric                    | numeric(0,16)                         | numeric(0,1)                         | numeric(0,0)                         | numeric(65535,65532)                 | numeric                           | numeric                           |
+| 2249  | record                     | record(20)                            | record(5)                            | record(4)                            | record(0)                            | record                            | record                            |
+| 2277  | anyarray                   | anyarray(20)                          | anyarray(5)                          | anyarray(4)                          | anyarray(0)                          | anyarray                          | anyarray                          |
+| 2283  | anyelement                 | anyelement(20)                        | anyelement(5)                        | anyelement(4)                        | anyelement(0)                        | anyelement                        | anyelement                        |
+| 3220  | pg_lsn                     | pg_lsn(20)                            | pg_lsn(5)                            | pg_lsn(4)                            | pg_lsn(0)                            | pg_lsn                            | pg_lsn                            |
+| 3500  | anyenum                    | anyenum(20)                           | anyenum(5)                           | anyenum(4)                           | anyenum(0)                           | anyenum                           | anyenum                           |
+| 3831  | anyrange                   | anyrange(20)                          | anyrange(5)                          | anyrange(4)                          | anyrange(0)                          | anyrange                          | anyrange                          |
+| 3904  | int4range                  | int4range(20)                         | int4range(5)                         | int4range(4)                         | int4range(0)                         | int4range                         | int4range                         |
+| 3906  | numrange                   | numrange(20)                          | numrange(5)                          | numrange(4)                          | numrange(0)                          | numrange                          | numrange                          |
+| 3908  | tsrange                    | tsrange(20)                           | tsrange(5)                           | tsrange(4)                           | tsrange(0)                           | tsrange                           | tsrange                           |
+| 3910  | tstzrange                  | tstzrange(20)                         | tstzrange(5)                         | tstzrange(4)                         | tstzrange(0)                         | tstzrange                         | tstzrange                         |
+| 3912  | daterange                  | daterange(20)                         | daterange(5)                         | daterange(4)                         | daterange(0)                         | daterange                         | daterange                         |
+| 3926  | int8range                  | int8range(20)                         | int8range(5)                         | int8range(4)                         | int8range(0)                         | int8range                         | int8range                         |
+| 4451  | int4multirange             | int4multirange(20)                    | int4multirange(5)                    | int4multirange(4)                    | int4multirange(0)                    | int4multirange                    | int4multirange                    |
+| 4532  | nummultirange              | nummultirange(20)                     | nummultirange(5)                     | nummultirange(4)                     | nummultirange(0)                     | nummultirange                     | nummultirange                     |
+| 4533  | tsmultirange               | tsmultirange(20)                      | tsmultirange(5)                      | tsmultirange(4)                      | tsmultirange(0)                      | tsmultirange                      | tsmultirange                      |
+| 4535  | datemultirange             | datemultirange(20)                    | datemultirange(5)                    | datemultirange(4)                    | datemultirange(0)                    | datemultirange                    | datemultirange                    |
+| 4536  | int8multirange             | int8multirange(20)                    | int8multirange(5)                    | int8multirange(4)                    | int8multirange(0)                    | int8multirange                    | int8multirange                    |
+| 13408 | character_data             | information_schema.character_data(20) | information_schema.character_data(5) | information_schema.character_data(4) | information_schema.character_data(0) | information_schema.character_data | information_schema.character_data |
+| 13410 | sql_identifier             | information_schema.sql_identifier(20) | information_schema.sql_identifier(5) | information_schema.sql_identifier(4) | information_schema.sql_identifier(0) | information_schema.sql_identifier | information_schema.sql_identifier |
+| 18001 | KibanaSampleDataEcommerce  | ???                                   | ???                                  | ???                                  | ???                                  | ???                               | ???                               |
+| 18002 | _KibanaSampleDataEcommerce | ???                                   | ???                                  | ???                                  | ???                                  | ???                               | ???                               |
+| 18014 | Logs                       | ???                                   | ???                                  | ???                                  | ???                                  | ???                               | ???                               |
+| 18015 | _Logs                      | ???                                   | ???                                  | ???                                  | ???                                  | ???                               | ???                               |
++-------+----------------------------+---------------------------------------+--------------------------------------+--------------------------------------+--------------------------------------+-----------------------------------+-----------------------------------+

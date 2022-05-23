@@ -5,37 +5,29 @@ category: API Reference
 menuOrder: 3
 ---
 
-<WarningBox heading={`🐣  Preview`}>
+<WarningBox heading={`Migration to Postgres protocol`}>
 
-The Cube SQL API is currently in Preview, and there may be changes in a future
-version.
+  This is documentation of Cube’s SQL API for the Postgres protocol.
+  The MySQL protocol used in the first versions of the Cube SQL API is no longer being developed and will be phased out soon.
+  Please consider migrating to the Postgres protocol.
 
 </WarningBox>
 
-Cube SQL API allows querying Cube via MySQL-compatible SQL. It enables the use
-of BIs, Python Notebooks, Reverse ETLs, and other downstream tools on top of
+The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables the use
+of BI applications, Python notebooks, reverse ETL tools, and other downstream tools on top of
 Cube.
-
-## Getting started
-
-Check out the example of Cube connecting to Apache Superset:
-
-<LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
-
-To learn more about connecting to Apache Superset, check out [the
-recipe][ref-recipe-cube-sql-superset].
 
 ### Cube Cloud
 
-The first step to get started with SQL API in Cube Cloud is to create a
+The first step to get started with the SQL API in Cube Cloud is to create a
 deployment. You can follow this
 [step-by-step guide on creating deployment within Cube Cloud](/cloud/getting-started/create).
 
-Once the deployment is ready click **How to connect** link on the Overview page.
-It will open the modal with instructions on different ways to connect to Cube,
-navigate to the SQL API tab and enable the SQL API.
+Once the deployment is ready, click **How to connect** link on the Overview page.
+It will open a modal with instructions on different ways to connect to Cube.
+Navigate to the SQL API tab and enable the SQL API.
 
-Once it is enabled you should see the screen like the one below with your
+Once it is enabled, you should see a screen like the one below with your
 connection credentials.
 
 <div style="text-align: center">
@@ -46,7 +38,7 @@ connection credentials.
   />
 </div>
 
-Since Cube SQL API is MySQL-compatible, please make sure to select **MySQL** as
+Since the Cube SQL API is Postgres-compatible, please make sure to select **Postgres** as
 a database type when connecting from BI tools.
 
 ### Self-hosted Cube
@@ -54,18 +46,18 @@ a database type when connecting from BI tools.
 To enable the SQL API, we first need to add a new environment variable:
 
 ```dotenv
-CUBEJS_SQL_PORT=3306
+CUBEJS_PG_SQL_PORT=5432
 ```
 
 If you're running Cube with Docker, remember to add a port mapping to the Cube
-service for `CUBEJS_SQL_PORT`. Docker compose example:
+service for `CUBEJS_PG_SQL_PORT`. Docker compose example:
 
 ```yaml
 services:
   cube_api:
     ...
     ports:
-      - 3306:3306 # Cube SQL API
+      - 5432:5432 # Cube SQL API
 ```
 
 Then, set Cube SQL credentials auth:
@@ -75,16 +67,61 @@ CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
 
-Now, you can start your Cube instance and connect via the `mysql` client with
+Now, you can start your Cube instance and connect via the `psql` client with
 provided credentials:
 
 ```bash
-mysql -h 127.0.0.1 --port 3306 -u myusername --password mypassword
+psql -h 127.0.0.1 --port 5432 -U myusername --password
 ```
 
-## Examples
+## Querying Fundamentals
 
-SQL API exposes cubes as the tables where measures and dimensions are columns.
+Under the hood, SQL API uses [Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution engine.
+It's responsible for query planning and execution.
+As the conversion process from SQL to Cube Query is ambiguous, additional step is done before the query is executed.
+This step is called rewriting.
+During this step, the query plan is being rewritten in a way a maximum number of Cube Queries can be detected within the given query plan.
+Overall, rewriting is a seamless process.
+There're some practical considerations that you should keep in mind while querying, though.
+
+### Cube is a table
+
+In order to simplify interaction with data tools, every cube is represented as a table.
+Measures, dimensions, and segments in this table are columns.
+However, not all queries are possible on these tables.
+In order to be valid, query against cube table should be:
+
+1. valid SQL statement and be compilable to the initial query plan by Datafusion;
+2. one of the supported query types to the cube so it can be converted to Cube Query.
+
+Let's discuss some of the supported query types.
+
+### Aggregated vs Non-aggregated queries
+
+There're two types of queries supported against cube tables: aggregated and non-aggregated.
+Aggregated are those with `GROUP BY` statement, and non-aggregated are those without it.
+Cube Queries issued to your database will always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query or not.
+
+### Filtering
+
+Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
+Cube tries to push down all filters into Cube Query.
+In some cases, SQL filters aren't available in Cube and can be done in a post-processing phase.
+Time dimension filters will be converted to time dimension date ranges whenever it's possible.
+
+### Ordering
+
+Cube tries to push down all `ORDER BY` statements into Cube Query.
+If it can't be done ordering part would be done in a post-processing phase.
+In case there're more than 50k rows in the result set, incorrect results can be received in this case.
+Please use `EXPLAIN` in order to check if it's the case.
+
+### Limit
+
+Limit push down is supported by Cube however, a limit over 50k can't be overridden.
+In future versions, paging and streaming would be used to avoid this limitation.
+
+## Examples
 
 Consider the following schema.
 
@@ -115,28 +152,16 @@ cube(`Orders`, {
 It would be represented as table in SQL API with `count`, `status`, `created`
 columns.
 
-```bash
-mysql> DESCRIBE Orders;
-+---------+--------------+------+------+---------+-------+
-| Field   | Type         | Null | Key  | Default | Extra |
-+---------+--------------+------+------+---------+-------+
-| count   | int          | No   |      | NULL    |       |
-| status  | varchar(255) | Yes  |      | NULL    |       |
-| created | datetime     | Yes  |      | NULL    |       |
-+---------+--------------+------+------+---------+-------+
-```
-
 To get the count of orders grouped by status we can run the following query.
 
 ```
-mysql> SELECT count, status FROM Orders;
-+-------+------------+
-| count | status     |
-+-------+------------+
-|  3354 | processing |
-|  3346 | completed  |
-|  3300 | shipped    |
-+-------+------------+
+cube=> SELECT count, status FROM Orders;
+ count |   status
+-------+------------
+ 15513 | completed
+ 14652 | processing
+ 13829 | shipped
+(3 rows)
 ```
 
 Cube will automatically apply the `GROUP BY` clause in case it is missing in the
@@ -145,26 +170,22 @@ grouped. In the following example we group orders by created month and also by
 status within every month.
 
 ```
-mysql> SELECT
-    ->   count,
-    ->   status,
-    ->   DATE(DATE_SUB(`created`, INTERVAL DAYOFMONTH(`created`) - 1 DAY)) date
-    -> FROM Orders
-    -> GROUP BY date, status
-    -> ORDER BY date ASC;
-+-------+------------+-------------------------+
-| count | status     | date                    |
-+-------+------------+-------------------------+
-|    50 | processing | 2019-01-01T00:00:00.000 |
-|    48 | completed  | 2019-01-01T00:00:00.000 |
-|    57 | shipped    | 2019-01-01T00:00:00.000 |
-|    34 | shipped    | 2019-02-01T00:00:00.000 |
-|    39 | processing | 2019-02-01T00:00:00.000 |
-|    54 | completed  | 2019-02-01T00:00:00.000 |
-|    75 | processing | 2019-03-01T00:00:00.000 |
-|    62 | shipped    | 2019-03-01T00:00:00.000 |
-|    77 | completed  | 2019-03-01T00:00:00.000 |
-+-------+------------+-------------------------+
+cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', createdAt) date FROM Orders GROUP BY date, status ORDER BY date asc;
+ measure(Orders.count) |   status   |            date
+-----------------------+------------+----------------------------
+                    31 | shipped    | 2016-01-01 00:00:00.000000
+                    28 | completed  | 2016-01-01 00:00:00.000000
+                    28 | processing | 2016-01-01 00:00:00.000000
+                    28 | shipped    | 2016-02-01 00:00:00.000000
+                    18 | processing | 2016-02-01 00:00:00.000000
+                    28 | completed  | 2016-02-01 00:00:00.000000
+                    54 | processing | 2016-03-01 00:00:00.000000
+                    57 | completed  | 2016-03-01 00:00:00.000000
+                    56 | shipped    | 2016-03-01 00:00:00.000000
+                    54 | shipped    | 2016-04-01 00:00:00.000000
+                    60 | completed  | 2016-04-01 00:00:00.000000
+                    43 | processing | 2016-04-01 00:00:00.000000
+                    55 | shipped    | 2016-05-01 00:00:00.000000
 ```
 
 ### Querying Dimensions
@@ -173,14 +194,13 @@ Querying dimensions is straightforward, simply add any required fields to the
 `SELECT` clause.
 
 ```sql
-mysql> SELECT status FROM Orders;
-+------------+
-| status     |
-+------------+
-| completed  |
-| processing |
-| shipped    |
-+------------+
+cube=> SELECT status FROM Orders;
+   status
+------------
+ completed
+ processing
+ shipped
+(3 rows)
 ```
 
 ### Querying Measures
@@ -188,18 +208,17 @@ mysql> SELECT status FROM Orders;
 Measures can similarly be queried through Cube SQL.
 
 Because measures are already aggregated in Cube there is no need to apply
-aggregate functions to them in SQL API.
+aggregate functions to them in SQL API if you don't have a `GROUP BY` statement in query.
 
 ```
-mysql> SELECT count FROM Orders;
-+-------+
-| count |
-+-------+
-| 10000 |
-+-------+
+cube=> SELECT count FROM Orders;
+ count
+-------
+ 43994
+(1 row)
 ```
 
-Some of the BI systems may require you to apply aggregate functions. To support
+Some of the BI systems or SQL constraints may require you to apply aggregate functions. To support
 this Cube allows aggregate functions on measures as long as they match the type
 of the measure.
 
@@ -208,12 +227,21 @@ of the measure.
 one.
 
 ```
-mysql> SELECT COUNT(count) FROM Orders;
-+-------+
-| count |
-+-------+
-| 10000 |
-+-------+
+cube=> SELECT COUNT(count) FROM Orders;
+ COUNT(Orders.count)
+---------------------
+               43994
+(1 row)
+```
+
+There's also universal aggregate function `MEASURE()` that matches any measure type.
+
+```
+cube=> SELECT MEASURE(count) FROM Orders;
+ measure(Orders.count)
+-----------------------
+                 43994
+(1 row)
 ```
 
 Let's look at more measures types:
@@ -378,13 +406,6 @@ WHERE completedAt IS NULL
 WHERE completedAt IS NOT NULL
 ```
 
-**`BETWEEN`:**
-
-```sql
-WHERE completedAt BETWEEN '2021-08-31' AND '2021-09-07'
-WHERE createdAt NOT BETWEEN '2021-08-31' AND '2021-09-07'
-```
-
 **`LIKE`:**
 
 ```sql
@@ -455,27 +476,18 @@ cube(`Users`, {
 Now, it is possible to get orders count by users city with the following query.
 
 ```
-mysql> SELECT count, user_city FROM Orders;
-+-------+---------------+
-| count | userCity      |
-+-------+---------------+
-|  1416 | Los Angeles   |
-|  1412 | Seattle       |
-|  1365 | Mountain View |
-|  1263 | New York      |
-|  1220 | Austin        |
-|  1164 | Chicago       |
-|  1101 | San Francisco |
-|  1059 | Palo Alto     |
-+-------+---------------+
+cube=> SELECT count, user_city FROM Orders;
+ count |   user_city
+-------+---------------
+  9524 | New York
+  9408 | San Francisco
+  6360 | Mountain View
+  6262 | Seattle
+  4393 | Los Angeles
+  3183 | Chicago
+  3060 | Austin
+  1804 | Palo Alto
+(8 rows)
 ```
 
-[superset]: https://superset.apache.org/
-[ms-powerbi]: https://powerbi.microsoft.com/en-gb/
-[mysql-docs-str-to-date]:
-  https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_str-to-date
-[mysql-docs-min]:
-  https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html#function_min
-[ref-schema-ref-types-formats]: /schema/reference/types-and-formats#min
-[ref-recipe-cube-sql-superset]: /recipes/using-apache-superset-with-cube-sql
 [ref-config-check-sql-auth]: /config#check-sql-auth

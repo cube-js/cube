@@ -11,7 +11,7 @@ cube(`Orders`, {
     //  */
     // dailyOrdersByCompany: {
     //   measures: [Orders.count],
-    //   dimensions: [Suppliers.company],
+    //   dimensions: [Suppliers.company, Suppliers.id],
     //   timeDimension: Orders.createdAt,
     //   granularity: `day`,
     //   partitionGranularity: `day`,

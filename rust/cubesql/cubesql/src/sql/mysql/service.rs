@@ -22,6 +22,7 @@ use tokio::{
 use crate::{
     compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
     config::processing_loop::ProcessingLoop,
+    telemetry::{ContextLogger, SessionLogger},
 };
 
 use crate::{
@@ -58,6 +59,7 @@ struct MySqlConnection {
     statements: Arc<RwLock<PreparedStatements>>,
     // Shared
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 }
 
 impl Drop for MySqlConnection {
@@ -82,7 +84,9 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                error!("Error during processing MySQL {}: {}", query, e.to_string());
+                self.logger.error(
+                    format!("Error during processing MySQL {}: {}", query, e.to_string()).as_str(),
+                );
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -120,7 +124,10 @@ impl MySqlConnection {
                             dataframe::TableValue::Boolean(s) => {
                                 rw.write_col(if *s == true { 1_u8 } else { 0_u8 })?
                             }
+                            dataframe::TableValue::Float32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int16(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
                             dt => unimplemented!("Not supported type for MySQL: {:?}", dt),
@@ -205,7 +212,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone(), self.logger.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
@@ -407,7 +414,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
-                    error!("Error during authentication MySQL connection: {}", e);
+                    self.logger.error(
+                        format!("Error during authentication MySQL connection: {}", e).as_str(),
+                    );
                 };
 
                 io::Error::new(io::ErrorKind::Other, e.to_string())
@@ -503,17 +512,21 @@ impl ProcessingLoop for MySqlServer {
                 socket.peer_addr().unwrap().to_string(),
             );
 
+            let logger = Arc::new(SessionLogger::new(session.state.clone()));
+
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     MySqlConnection {
                         session,
                         statements: Arc::new(RwLock::new(PreparedStatements::new())),
+                        logger: logger.clone(),
                     },
                     socket,
                 )
                 .await
                 {
-                    error!("Error during processing MySQL connection: {}", e);
+                    logger
+                        .error(format!("Error during processing MySQL connection: {}", e).as_str());
                     if let Some(bt) = e.backtrace() {
                         trace!("{}", bt.to_string());
                     } else {

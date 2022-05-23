@@ -92,6 +92,7 @@ pub enum CommandCompletion {
     Rollback,
     Set,
     Select(u32),
+    Discard(String),
 }
 
 impl CommandCompletion {
@@ -103,6 +104,7 @@ impl CommandCompletion {
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
             CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+            CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
         }
     }
 }

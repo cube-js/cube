@@ -74,7 +74,7 @@ export interface ExternalDriverCompatibilities {
   streamImport?: true,
 }
 export type StreamOptions = {
-  highWaterMark: number
+  highWaterMark: number;
 };
 
 export interface DownloadQueryResultsBase {
@@ -92,7 +92,7 @@ export type UnloadOptions = {
 };
 
 export type QueryOptions = {};
-export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData);
+export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData);
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;

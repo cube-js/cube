@@ -15,8 +15,21 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET',
     'CUBEJS_DB_BQ_CREDENTIALS',
   ],
+  firebolt: [
+    'CUBEJS_DB_USER',
+    'CUBEJS_DB_PASS',
+    'CUBEJS_DB_NAME',
+    'CUBEJS_FIREBOLT_ENGINE_ENDPOINT'
+  ],
   materialize: [],
   multidb: [],
   questdb: [],
   postgres: [],
+  redshift: [
+    'CUBEJS_DB_HOST',
+    'CUBEJS_DB_PORT',
+    'CUBEJS_DB_NAME',
+    'CUBEJS_DB_USER',
+    'CUBEJS_DB_PASS',
+  ],
 };

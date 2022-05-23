@@ -1213,6 +1213,8 @@ declare module '@cubejs-client/core' {
   export function getQueryMembers(query: DeeplyReadonly<Query>): string[];
 
   export function areQueriesEqual(query1: DeeplyReadonly<Query> | null, query2: DeeplyReadonly<Query> | null): boolean;
+  
+  export function validateQuery(query: DeeplyReadonly<Query> | null | undefined): Query;
 
   export type ProgressResponse = {
     stage: string;

@@ -1,0 +1,7 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                select\n                    i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME,\n                    ii.COLUMN_NAME,\n                    ii.ORDINAL_POSITION,\n                    case\n                        when i.CONSTRAINT_TYPE = 'PRIMARY KEY' then 'Y'\n                        else 'N'\n                    end as PRIMARY_KEY\n                from INFORMATION_SCHEMA.table_constraints i\n                inner join INFORMATION_SCHEMA.key_column_usage ii on\n                    i.CONSTRAINT_SCHEMA = ii.CONSTRAINT_SCHEMA and\n                    i.CONSTRAINT_NAME = ii.CONSTRAINT_NAME and\n                    i.TABLE_SCHEMA = ii.TABLE_SCHEMA and\n                    i.TABLE_NAME = ii.TABLE_NAME\n                where\n                    i.TABLE_SCHEMA = 'public' and\n                    i.TABLE_NAME = 'KibanaSampleDataEcommerce' and\n                    i.CONSTRAINT_TYPE in ('PRIMARY KEY', 'UNIQUE')\n                order by\n                    i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME,\n                    ii.TABLE_SCHEMA,\n                    ii.TABLE_NAME,\n                    ii.ORDINAL_POSITION\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
+++
+++
+++

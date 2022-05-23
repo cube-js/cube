@@ -1,8 +1,28 @@
 # The following people will be the default owners for this repo. Unless a
 # later match takes precedence, @cube-js/core will be requested for review when
 # someone opens a pull request.
-*           @cube-js/core
+# *           @cube-js/core
 
+/rust/cubesql/                         @cube-js/sql-api
+/rust/cubestore/                       @cube-js/cube-store
+
+/packages/cubejs-client*/              @cube-js/client
+/packages/cubejs-playground/           @cube-js/client
+/packages/cubejs-templates/            @cube-js/client
+
+/packages/cubejs-backend-*/            @cube-js/server
+/packages/cubejs-server*/              @cube-js/server
+/packages/cubejs-testing*/             @cube-js/server
+/packages/cubejs-docker/               @cube-js/server
+/packages/cubejs-cli/                  @cube-js/server
+/packages/cubejs-api-gateway/          @cube-js/server
+/packages/cubejs-linter/               @cube-js/server
+
+/packages/*-driver/                    @cube-js/query-orchestrator
+/packages/cubejs-query-orchestrator/   @cube-js/query-orchestrator
+
+/packages/cubejs-schema-compiler/      @cube-js/schema-compiler
+/packages/*-schema-extension/          @cube-js/schema-compiler
 
 # Developer Relations and Community
 *.md        @cube-js/developer-relations-and-community

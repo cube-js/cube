@@ -711,6 +711,7 @@ export class PreAggregationLoader {
       let refreshStrategy = this.refreshImplStoreInSourceStrategy;
       if (this.preAggregation.external) {
         const readOnly =
+          this.preAggregation.readOnly ||
           client.config && client.config.readOnly ||
           client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
         refreshStrategy = readOnly ?

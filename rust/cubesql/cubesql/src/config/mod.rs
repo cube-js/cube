@@ -10,7 +10,6 @@ use crate::{
         MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
         SqlAuthService,
     },
-    telemetry::{start_track_event_loop, stop_track_event_loop},
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -79,11 +78,6 @@ impl CubeServices {
             }));
         }
 
-        futures.push(tokio::spawn(async move {
-            start_track_event_loop().await;
-            Ok(())
-        }));
-
         Ok(futures)
     }
 
@@ -104,7 +98,6 @@ impl CubeServices {
                 .await?;
         }
 
-        stop_track_event_loop().await;
         Ok(())
     }
 }
@@ -169,12 +162,11 @@ impl Config {
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
-                bind_address: Some(env::var("CUBESQL_BIND_ADDR").ok().unwrap_or(
-                    format!("0.0.0.0:{}", env::var("CUBESQL_PORT")
-                            .ok()
-                            .map(|v| v.parse::<u16>().unwrap())
-                            .unwrap_or(3306u16)),
-                )),
+                bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
+                    env::var("CUBESQL_PORT")
+                        .ok()
+                        .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
+                }),
                 postgres_bind_address: env::var("CUBESQL_PG_PORT")
                     .ok()
                     .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
@@ -284,6 +276,7 @@ impl Config {
 
     pub async fn configure(&self) -> CubeServices {
         self.configure_injector().await;
+
         self.cube_services().await
     }
 }

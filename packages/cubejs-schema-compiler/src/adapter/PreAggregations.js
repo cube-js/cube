@@ -181,7 +181,8 @@ export class PreAggregations {
             )
           };
         }
-      )
+      ),
+      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
     };
   }
 

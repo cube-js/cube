@@ -26,6 +26,9 @@ $ env $(cat ~/.env.athena | xargs) yarn test
 
 $ cd packages/cubejs-bigquery-driver
 $ env $(cat ~/.env.bigquery | xargs) yarn test
+
+$ cd packages/cubejs-firebolt-driver
+$ env $(cat ~/.env.firebolt | xargs) yarn test
 ```
 
 Run e2e tests:
@@ -33,11 +36,11 @@ Run e2e tests:
 ```shell
 $ cd packages/cubejs-testing
 
-$ env $(cat ~/.env.athena | xargs) yarn birdbox:athena --mode=local
-$ env $(cat ~/.env.bigquery | xargs) yarn birdbox:bigquery --mode=local
+$ env $(cat ~/.env.athena | xargs) yarn smoke:athena --mode=local
+$ env $(cat ~/.env.bigquery | xargs) yarn smoke:bigquery --mode=local
 
-$ env $(cat ~/.env.athena | xargs) yarn birdbox:athena --mode=docker
-$ env $(cat ~/.env.bigquery | xargs) yarn birdbox:bigquery --mode=docker
+$ env $(cat ~/.env.athena | xargs) yarn smoke:athena --mode=docker
+$ env $(cat ~/.env.bigquery | xargs) yarn smoke:bigquery --mode=docker
 ```
 
 ### Run Cypress tests

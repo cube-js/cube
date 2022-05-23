@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Features
+
+* Download streaming `select * from table` originalSql pre-aggregations directly ([#4537](https://github.com/cube-js/cube.js/issues/4537)) ([a62d81a](https://github.com/cube-js/cube.js/commit/a62d81abe67fc94ca57cabf914cc55800fc89d96))
+
+
+
+
+
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/ksql-driver

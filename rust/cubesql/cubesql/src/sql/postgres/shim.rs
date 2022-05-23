@@ -11,15 +11,17 @@ use crate::{
         extended::Portal,
         session::DatabaseProtocol,
         statement::{StatementParamsFinder, StatementPlaceholderReplacer},
+        types::CommandCompletion,
         writer::BatchWriter,
         AuthContext, Session,
     },
+    telemetry::ContextLogger,
     CubeError,
 };
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format},
+    protocol::{CommandComplete, ErrorCode, ErrorResponse, Format},
     PgType, PgTypeId, ProtocolError,
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
@@ -31,6 +33,7 @@ pub struct AsyncPostgresShim {
     portals: HashMap<String, Option<Portal>>,
     // Shared
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -113,17 +116,24 @@ impl From<ErrorResponse> for ConnectionError {
 }
 
 impl AsyncPostgresShim {
-    pub async fn run_on(socket: TcpStream, session: Arc<Session>) -> Result<(), std::io::Error> {
+    pub async fn run_on(
+        socket: TcpStream,
+        session: Arc<Session>,
+        logger: Arc<dyn ContextLogger>,
+    ) -> Result<(), std::io::Error> {
         let mut shim = Self {
             socket,
             portals: HashMap::new(),
             statements: HashMap::new(),
             session,
+            logger,
         };
 
         match shim.run().await {
             Err(e) => {
-                error!("Error during processing PostgreSQL connection: {}", e);
+                shim.logger.error(
+                    format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                );
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -194,7 +204,8 @@ impl AsyncPostgresShim {
         &mut self,
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
-        error!("Error during processing PostgreSQL message: {}", err);
+        self.logger
+            .error(format!("Error during processing PostgreSQL message: {}", err).as_str());
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -473,19 +484,23 @@ impl AsyncPostgresShim {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan =
-                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
+            let plan = convert_statement_to_cube_query(
+                &prepared_statement,
+                meta,
+                self.session.clone(),
+                self.logger.clone(),
+            )?;
 
-            let fields = self.query_plan_to_row_description(&plan).await?;
+            let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
+            let fields = self
+                .query_plan_to_row_description(&plan, format)
+                .await?
+                .unwrap_or(vec![]);
             let description = if fields.len() > 0 {
-                Some(protocol::RowDescription::new(
-                    self.query_plan_to_row_description(&plan).await?,
-                ))
+                Some(protocol::RowDescription::new(fields))
             } else {
                 None
             };
-
-            let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
 
             Some(Portal::new(plan, format, description))
         } else {
@@ -498,12 +513,15 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    /// This method returns schema for response
+    /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
     async fn query_plan_to_row_description(
         &mut self,
         plan: &QueryPlan,
-    ) -> Result<Vec<protocol::RowDescriptionField>, ConnectionError> {
+        required_format: protocol::Format,
+    ) -> Result<Option<Vec<protocol::RowDescriptionField>>, ConnectionError> {
         match plan {
-            QueryPlan::MetaOk(_, _) => Ok(vec![]),
+            QueryPlan::MetaOk(_, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -511,10 +529,11 @@ impl AsyncPostgresShim {
                     result.push(protocol::RowDescriptionField::new(
                         field.get_name(),
                         PgType::get_by_tid(PgTypeId::TEXT),
+                        required_format,
                     ));
                 }
 
-                Ok(result)
+                Ok(Some(result))
             }
             QueryPlan::DataFusionSelect(_, logical_plan, _) => {
                 let mut result = vec![];
@@ -523,10 +542,11 @@ impl AsyncPostgresShim {
                     result.push(protocol::RowDescriptionField::new(
                         field.name().clone(),
                         df_type_to_pg_tid(field.data_type())?.to_type(),
+                        required_format,
                     ));
                 }
 
-                Ok(result)
+                Ok(Some(result))
             }
         }
     }
@@ -554,11 +574,22 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
-            let fields: Vec<protocol::RowDescriptionField> =
-                self.query_plan_to_row_description(&plan).await?;
-            let description = if fields.len() > 0 {
-                Some(protocol::RowDescription::new(fields))
+            let plan = convert_statement_to_cube_query(
+                &hacked_query,
+                meta,
+                self.session.clone(),
+                self.logger.clone(),
+            )?;
+
+            let description = if let Some(fields) = self
+                .query_plan_to_row_description(&plan, Format::Text)
+                .await?
+            {
+                if fields.len() > 0 {
+                    Some(protocol::RowDescription::new(fields))
+                } else {
+                    None
+                }
             } else {
                 None
             };
@@ -585,22 +616,34 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
+        let plan = convert_sql_to_cube_query(
+            &query.to_string(),
+            meta,
+            self.session.clone(),
+            self.logger.clone(),
+        )?;
 
-        let description = self.query_plan_to_row_description(&plan).await?;
-        match description.len() {
-            0 => self.write(protocol::NoData::new()).await?,
-            _ => {
-                self.write(protocol::RowDescription::new(description))
-                    .await?
-            }
-        };
+        // Special handling for special queries, such as DISCARD ALL.
+        if let Some(description) = self
+            .query_plan_to_row_description(&plan, Format::Text)
+            .await?
+        {
+            match description.len() {
+                0 => self.write(protocol::NoData::new()).await?,
+                _ => {
+                    self.write(protocol::RowDescription::new(description))
+                        .await?
+                }
+            };
+        }
 
         // Re-usage of Portal functionality
         let mut portal = Portal::new(plan, Format::Text, None);
 
         let mut writer = BatchWriter::new(portal.get_format());
         let completion = portal.execute(&mut writer, 0).await?;
+
+        self.handle_command_complete(&completion);
 
         if writer.has_data() {
             buffer::write_direct(&mut self.socket, writer).await?;
@@ -631,6 +674,15 @@ impl AsyncPostgresShim {
             Ok(Arc::new(ctx))
         } else {
             Err(CubeError::internal("must be auth".to_string()))
+        }
+    }
+
+    fn handle_command_complete(&mut self, completion: &CommandComplete) {
+        if completion == &CommandCompletion::Discard("ALL".to_string()).to_pg_command()
+            || completion == &CommandCompletion::Discard("PLANS".to_string()).to_pg_command()
+        {
+            self.statements = HashMap::new();
+            self.portals = HashMap::new();
         }
     }
 }

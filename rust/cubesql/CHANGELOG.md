@@ -3,6 +3,69 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Skip returning of schema for special queries in pg-wire ([479ec78](https://github.com/cube-js/cube.js/commit/479ec78836cc095dda8c3725e1378b9f60f56233))
+* **cubesql:** Wrong format in RowDescription, support i16/i32/f32 ([0c52cd6](https://github.com/cube-js/cube.js/commit/0c52cd6180e7cf43aeb735ec901da07508ff4598))
+
+
+### Features
+
+* **cubesql:** Allow ::oid casting ([bb31838](https://github.com/cube-js/cube.js/commit/bb318383028ce9557ccd45ae03cd33f05705bff2))
+* **cubesql:** Initial support for type receivers ([452f504](https://github.com/cube-js/cube.js/commit/452f504b7c57d6c669de2eabba935c7a398aa7d2))
+* **cubesql:** Support ||, correct schema/catalog/ordinal_position ([6d6cbf5](https://github.com/cube-js/cube.js/commit/6d6cbf5ee743e527d8b9f64008cdc0d12103abf6))
+* **cubesql:** Support DISCARD [ALL | PLANS | SEQUENCES | TEMPORARY |… ([#4560](https://github.com/cube-js/cube.js/issues/4560)) ([390c764](https://github.com/cube-js/cube.js/commit/390c764a98fb58fc294cdfe08ed224f2318e1b31))
+* **cubesql:** Support IS TRUE|FALSE ([4d227b1](https://github.com/cube-js/cube.js/commit/4d227b11cbe93352d735c81b50da79f256266bb9))
+
+
+
+
+
+## [0.30.3](https://github.com/cube-js/cube.js/compare/v0.30.2...v0.30.3) (2022-05-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Add support for all types to `pg_catalog.format_type` UDF ([c49c55a](https://github.com/cube-js/cube.js/commit/c49c55a213efba8da49f2e53cc36a8c8fd9cd64e))
+* **cubesql:** Coerce empty subquery result to `NULL` ([e59d2fb](https://github.com/cube-js/cube.js/commit/e59d2fb367f99deea3463316d87ee9eb5ae59463))
+* **cubesql:** Fix several UDFs to return correct row amount ([f1e0223](https://github.com/cube-js/cube.js/commit/f1e02239962965f6d246eed53a81c756cbc3a24d))
+
+
+### Features
+
+* **cubesql:** Ignore `pg_catalog` schema for UDFs ([ab2a0da](https://github.com/cube-js/cube.js/commit/ab2a0da0cdf2ec3cd9974dcb1a532c2ccfad4851))
+
+
+
+
+
+## [0.30.2](https://github.com/cube-js/cube.js/compare/v0.30.1...v0.30.2) (2022-05-16)
+
+
+### Features
+
+* **cubesql:** Superset Postgres protocol support ([#4535](https://github.com/cube-js/cube.js/issues/4535)) ([394248f](https://github.com/cube-js/cube.js/commit/394248fa8a10dfd568721405e4a8f392d236d551))
+
+
+
+
+
+## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
+
+
+### Features
+
+* **cubesql:** Add CUBEJS_PG_SQL_PORT env support and SQL API reference docs ([#4531](https://github.com/cube-js/cube.js/issues/4531)) ([de60d71](https://github.com/cube-js/cube.js/commit/de60d71c360be47e3231e7eafa349b9a0fddd244))
+* **cubesql:** Provide specific error messages for not matched expressions ([e035780](https://github.com/cube-js/cube.js/commit/e0357801bd39269585dd31d6ad932b32287a05af))
+* **cubesql:** Support `quarter` field in `date_part` SQL function ([7fdf4ac](https://github.com/cube-js/cube.js/commit/7fdf4acf6ce60387d3fa716c572e1611a77c205b))
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 

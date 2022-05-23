@@ -253,6 +253,7 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Plain(String),
@@ -361,7 +362,7 @@ impl Serialize for RowDescription {
             buffer.extend_from_slice(&field.data_type_oid.to_be_bytes());
             buffer.extend_from_slice(&field.data_type_size.to_be_bytes());
             buffer.extend_from_slice(&field.type_modifier.to_be_bytes());
-            buffer.extend_from_slice(&0_i16.to_be_bytes());
+            buffer.extend_from_slice(&(field.format as i16).to_be_bytes());
         }
 
         Some(buffer)
@@ -377,10 +378,11 @@ pub struct RowDescriptionField {
     data_type_oid: i32,
     data_type_size: i16,
     type_modifier: i32,
+    format: Format,
 }
 
 impl RowDescriptionField {
-    pub fn new(name: String, typ: &PgType) -> Self {
+    pub fn new(name: String, typ: &PgType, format: Format) -> Self {
         Self {
             name,
             table_oid: 0,
@@ -388,6 +390,24 @@ impl RowDescriptionField {
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
+            format: if format == Format::Binary {
+                // TODO: Introduce new function for PgType that checks for binary support
+                if typ.oid == PgTypeId::INT4 as u32
+                    || typ.oid == PgTypeId::INT2 as u32
+                    || typ.oid == PgTypeId::INT8 as u32
+                    || typ.oid == PgTypeId::BOOL as u32
+                    || typ.oid == PgTypeId::FLOAT4 as u32
+                    || typ.oid == PgTypeId::FLOAT8 as u32
+                    || typ.oid == PgTypeId::TIMESTAMP as u32
+                    || typ.oid == PgTypeId::TIMESTAMPTZ as u32
+                {
+                    Format::Binary
+                } else {
+                    Format::Text
+                }
+            } else {
+                Format::Text
+            },
         }
     }
 }
@@ -1058,9 +1078,21 @@ mod tests {
     async fn test_frontend_message_write_row_description() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
         let desc = RowDescription::new(vec![
-            RowDescriptionField::new("num".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
-            RowDescriptionField::new("str".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
-            RowDescriptionField::new("bool".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
+            RowDescriptionField::new(
+                "num".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
+            RowDescriptionField::new(
+                "str".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
+            RowDescriptionField::new(
+                "bool".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
         ]);
         buffer::write_message(&mut cursor, desc).await?;
 

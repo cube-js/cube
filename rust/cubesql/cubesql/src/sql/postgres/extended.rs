@@ -162,8 +162,11 @@ impl Portal {
                 match value {
                     TableValue::Null => writer.write_value::<Option<bool>>(None)?,
                     TableValue::String(v) => writer.write_value(v.clone())?,
+                    TableValue::Int16(v) => writer.write_value(*v)?,
+                    TableValue::Int32(v) => writer.write_value(*v)?,
                     TableValue::Int64(v) => writer.write_value(*v)?,
                     TableValue::Boolean(v) => writer.write_value(*v)?,
+                    TableValue::Float32(v) => writer.write_value(*v)?,
                     TableValue::Float64(v) => writer.write_value(*v)?,
                     TableValue::List(v) => writer.write_value(v.clone())?,
                     TableValue::Timestamp(v) => writer.write_value(v.clone())?,

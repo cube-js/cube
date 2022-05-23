@@ -2,7 +2,7 @@ use msql_srv::{Column, ColumnFlags, ColumnType};
 use pg_srv::{BindValue, PgType};
 use sqlparser::{
     ast,
-    ast::{Expr, Value},
+    ast::{Expr, Ident, Value},
 };
 
 trait Visitor<'ast> {
@@ -30,6 +30,12 @@ trait Visitor<'ast> {
                 self.visit_expr(&mut *expr);
                 self.visit_expr(&mut *low);
                 self.visit_expr(&mut *high);
+            }
+            Expr::AnyOp(expr) => {
+                self.visit_expr(expr);
+            }
+            Expr::AllOp(expr) => {
+                self.visit_expr(&mut *expr);
             }
             Expr::BinaryOp { left, op: _, right } => {
                 self.visit_expr(&mut *left);
@@ -291,6 +297,7 @@ trait Visitor<'ast> {
     fn visit_statement(&mut self, statement: &mut ast::Statement) {
         match statement {
             ast::Statement::Query(query) => self.visit_query(query),
+            ast::Statement::Explain { statement, .. } => self.visit_statement(statement),
             // TODO:
             _ => {}
         }
@@ -299,6 +306,11 @@ trait Visitor<'ast> {
     fn visit_cast(&mut self, expr: &mut Expr) {
         if let Expr::Cast { expr, .. } = expr {
             self.visit_expr(expr);
+        } else {
+            unreachable!(
+                "visit_expr requires Cast expression as an argument, actual: {}",
+                expr
+            )
         }
     }
 
@@ -478,9 +490,9 @@ impl CastReplacer {
         result
     }
 
-    fn parse_value_to_str(&self, expr: &Value) -> Option<String> {
+    fn parse_value_to_str<'a>(&self, expr: &'a Value) -> Option<&'a str> {
         match expr {
-            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => Some(str.clone()),
+            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => Some(&str),
             _ => None,
         }
     }
@@ -493,7 +505,16 @@ impl<'ast> Visitor<'ast> for CastReplacer {
             data_type,
         } = expr
         {
-            match *data_type {
+            match data_type {
+                ast::DataType::Custom(name) => match name.to_string().as_str() {
+                    "oid" => {
+                        self.visit_expr(&mut *cast_expr);
+
+                        *expr = *cast_expr.clone();
+                    }
+                    // TODO:
+                    _ => (),
+                },
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
                         let str_val = self.parse_value_to_str(&val);
@@ -505,7 +526,7 @@ impl<'ast> Visitor<'ast> for CastReplacer {
                         for typ in PgType::get_all() {
                             if typ.typname == str_val {
                                 *expr = Expr::Value(Value::Number(typ.typrelid.to_string(), false));
-                                break;
+                                return;
                             }
                         }
                     }
@@ -518,40 +539,168 @@ impl<'ast> Visitor<'ast> for CastReplacer {
     }
 }
 
+/// Postgres to_timestamp clashes with Datafusion to_timestamp so we replace it with str_to_date
+#[derive(Debug)]
+pub struct ToTimestampReplacer {}
+
+impl ToTimestampReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast> for ToTimestampReplacer {
+    fn visit_identifier(&mut self, identifier: &mut Ident) {
+        if identifier.value.to_lowercase() == "to_timestamp" {
+            identifier.value = "str_to_date".to_string()
+        }
+    }
+}
+
+// Some Postgres UDFs accept rows (records) as arguments.
+// We simplify the expression, passing only the required values
+pub struct UdfWildcardArgReplacer {}
+
+impl UdfWildcardArgReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+
+    pub fn get_new_args_for_fn(
+        &self,
+        name: &str,
+        args: &Vec<ast::FunctionArg>,
+    ) -> Option<Vec<ast::FunctionArg>> {
+        match name {
+            "information_schema._pg_truetypid" => self.replace_simple(
+                args,
+                vec![(0, "atttypid"), (1, "typtype"), (1, "typbasetype")],
+            ),
+            "information_schema._pg_truetypmod" => self.replace_simple(
+                args,
+                vec![(0, "atttypmod"), (1, "typtype"), (1, "typtypmod")],
+            ),
+            _ => None,
+        }
+    }
+
+    pub fn replace_simple(
+        &self,
+        args: &Vec<ast::FunctionArg>,
+        mapping: Vec<(usize, &str)>,
+    ) -> Option<Vec<ast::FunctionArg>> {
+        let max_index = mapping.iter().map(|(index, _)| index).max()?;
+        if args.len() <= *max_index {
+            return None;
+        }
+
+        let new_args = mapping
+            .iter()
+            .map(|(index, column)| match &args[*index] {
+                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::QualifiedWildcard(
+                    ast::ObjectName(idents),
+                )) => {
+                    let mut new_idents = idents.clone();
+                    new_idents.push(ast::Ident {
+                        value: column.to_string(),
+                        quote_style: None,
+                    });
+                    let new_arg = ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                        ast::Expr::CompoundIdentifier(new_idents),
+                    ));
+                    Some(new_arg)
+                }
+                _ => None,
+            })
+            .collect::<Option<_>>();
+
+        new_args
+    }
+}
+
+impl<'a> Visitor<'a> for UdfWildcardArgReplacer {
+    fn visit_expr(&mut self, expr: &mut Expr) {
+        match expr {
+            Expr::Function(fun) => {
+                if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &fun.args) {
+                    fun.args = new_args
+                }
+            }
+            _ => (),
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::CubeError;
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
-    fn test_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
+    fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = CastReplacer::new();
+        let res = replacer.replace(&stmts[0]);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cast_replacer() -> Result<(), CubeError> {
+        run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
+
+        run_cast_replacer("SELECT 'pg_class'::regclass::oid", "SELECT 1259")?;
+
+        Ok(())
+    }
+
+    fn run_binder(input: &str, output: &str, values: Vec<BindValue>) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let binder = StatementParamsBinder::new(values);
-        let mut input = stmts[0].clone();
-        binder.bind(&mut input);
+        let mut res = stmts[0].clone();
+        binder.bind(&mut res);
 
-        assert_eq!(input.to_string(), output);
+        assert_eq!(res.to_string(), output);
 
         Ok(())
     }
 
     #[test]
     fn test_binder_named() -> Result<(), CubeError> {
-        test_binder(
+        run_binder(
             "SELECT ?",
             "SELECT 'test'",
             vec![BindValue::String("test".to_string())],
         )?;
 
-        test_binder(
+        run_binder(
             "SELECT ? AS t1, ? AS t2",
             "SELECT 'test1' AS t1, NULL AS t2",
             vec![BindValue::String("test1".to_string()), BindValue::Null],
         )?;
 
         // binary op
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -568,7 +717,7 @@ mod tests {
         )?;
 
         // IN
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -582,7 +731,7 @@ mod tests {
         )?;
 
         // BETWEEN
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -595,7 +744,7 @@ mod tests {
             ],
         )?;
 
-        test_binder(
+        run_binder(
             r#"
                 SELECT *
                 FROM testdata
@@ -616,7 +765,7 @@ mod tests {
             ]
         )?;
 
-        test_binder(
+        run_binder(
             r#"
                 SELECT * FROM (
                     SELECT *

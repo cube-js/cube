@@ -37,6 +37,13 @@ export class OrchestratorApi {
     );
   }
 
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    await this.orchestrator.forceReconcile(datasource);
+  }
+
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();

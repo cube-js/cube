@@ -6,12 +6,6 @@ redirect_from:
   - /cubejs-introduction
 ---
 
-<InfoBox>
-  <b>Building Data Applications with Cube</b> workshop on May 18, 2022.<br/>
-  Learn all about building a modern data app with Cube.<br />
-  <a href="https://us02web.zoom.us/webinar/register/WN_DUeCHp5fRESAXsV_A1C_eg">Register for the workshop now</a> or see the agenda at the <a href="https://cube.dev/events/building-data-app/">event page</a>. 👈
-</InfoBox>
-
 **Cube is the headless business intelligence platform.** It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 <img

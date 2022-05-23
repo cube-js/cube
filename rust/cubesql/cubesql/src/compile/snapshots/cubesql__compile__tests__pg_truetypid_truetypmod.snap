@@ -1,0 +1,20 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    a.attrelid,\n                    a.attname,\n                    t.typname,\n                    information_schema._pg_truetypid(a.*, t.*) typid,\n                    information_schema._pg_truetypmod(a.*, t.*) typmod\n                FROM pg_attribute a\n                JOIN pg_type t ON t.oid = a.atttypid\n                ORDER BY a.attrelid ASC, a.attnum ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+--------------------+-----------+-------+--------+
+| attrelid | attname            | typname   | typid | typmod |
++----------+--------------------+-----------+-------+--------+
+| 18000    | count              | int8      | 20    | -1     |
+| 18000    | maxPrice           | numeric   | 1700  | -1     |
+| 18000    | minPrice           | numeric   | 1700  | -1     |
+| 18000    | avgPrice           | numeric   | 1700  | -1     |
+| 18000    | order_date         | timestamp | 1114  | -1     |
+| 18000    | customer_gender    | text      | 25    | -1     |
+| 18000    | taxful_total_price | numeric   | 1700  | -1     |
+| 18000    | has_subscription   | bool      | 16    | -1     |
+| 18000    | is_male            | bool      | 16    | -1     |
+| 18000    | is_female          | bool      | 16    | -1     |
+| 18013    | agentCount         | int8      | 20    | -1     |
+| 18013    | agentCountApprox   | int8      | 20    | -1     |
++----------+--------------------+-----------+-------+--------+

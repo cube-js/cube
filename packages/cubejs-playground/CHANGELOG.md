@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+
+### Features
+
+* **packages:** add Firebolt driver ([#4546](https://github.com/cube-js/cube.js/issues/4546)) ([9789d95](https://github.com/cube-js/cube.js/commit/9789d954064893ba2e3265127be5b734bf1f6db5))
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Bug Fixes
+
+* **playground:** refresh stale tokens ([#4551](https://github.com/cube-js/cube.js/issues/4551)) ([80ce87d](https://github.com/cube-js/cube.js/commit/80ce87da7fdcbe44aa26605ee33b9cfbb3cbfb24))
+* **playground:** Remove all time time dimension without granularity ([#4564](https://github.com/cube-js/cube.js/issues/4564)) ([054f488](https://github.com/cube-js/cube.js/commit/054f488ce6b8bfa103cd435f99178ca1f2fa38c7))
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 **Note:** Version bump only for package @cubejs-client/playground
