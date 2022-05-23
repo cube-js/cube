@@ -1,5 +1,4 @@
 use crate::{sql::SessionState, CubeError};
-use chrono::{SecondsFormat, Utc};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::{
     any::Any,
@@ -140,10 +139,6 @@ fn report(event: String, properties: HashMap<String, String>, level: Level) -> b
 
     let mut properties = properties;
     properties.insert("apiType".to_string(), "sql".to_string());
-    properties.insert(
-        "clientTimestamp".to_string(),
-        Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-    );
 
     guard.log(event, properties, level);
 

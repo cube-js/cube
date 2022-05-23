@@ -36,6 +36,7 @@ impl LogReporter for NodeBridgeLogger {
 
         let channel = self.channel.clone();
         let on_track = self.on_track.clone();
+        // TODO: Move to spawning loops
         spawn(async move { log(channel, on_track, Some(extra)).await });
     }
 }
