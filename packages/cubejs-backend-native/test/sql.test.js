@@ -163,8 +163,10 @@ describe('SQLInteface', () => {
       }
 
       // Increment it in case you throw Error
-      expect(logger.mock.calls.length).toEqual(3);
-
+      setTimeout(_ => {
+        expect(logger.mock.calls.length).toEqual(3);
+      },1000);
+      
       connection.destroy();
     } finally {
       await native.shutdownInterface(instance)
