@@ -873,4 +873,25 @@ mod tests {
 
         Ok(())
     }
+
+    fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let binder = SensitiveDataSanitizer::new();
+        let result = binder.replace(&stmts[0]);
+
+        assert_eq!(result.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sensitive_data_sanitizer() -> Result<(), CubeError> {
+        assert_sensitive_data_sanitizer(
+            "SELECT * FROM testdata WHERE email = 'george@gmail.com'",
+            "SELECT * FROM testdata WHERE email = '[REPLACED]'",
+        )?;
+
+        Ok(())
+    }
 }
