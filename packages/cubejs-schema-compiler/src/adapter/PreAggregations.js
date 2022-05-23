@@ -363,81 +363,176 @@ export class PreAggregations {
   }
 
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    /**
+     * Returns an array of 2-elements arrays with the dimension and
+     * granularity strings sorted by the concatenated dimension +
+     * granularity key.
+     * @param {Array<{dimension: string, granularity: string}>} timeDimensions
+     * @returns {Array<Array<string>>}
+     */
+    const sortTimeDimensions = (timeDimensions) => (
+      timeDimensions &&
+      R.sortBy(
+        d => d.join('.'),
+        timeDimensions.map(
+          d => [
+            d.dimension,
+            d.granularity || 'day', // TODO granularity shouldn't be null?
+          ]
+        ),
+      ) || []
+    );
+
+    /**
+     * @type {Set<string}
+     */
     const filterDimensionsSingleValueEqual =
       transformedQuery.filterDimensionsSingleValueEqual instanceof Set
         ? transformedQuery.filterDimensionsSingleValueEqual
         : new Set(
-          Object.keys(transformedQuery.filterDimensionsSingleValueEqual || {})
+          Object.keys(
+            transformedQuery.filterDimensionsSingleValueEqual || {},
+          )
         );
-      
-    function sortTimeDimensions(timeDimensions) {
-      return timeDimensions && R.sortBy(
-        d => d.join('.'),
-        timeDimensions.map(d => [d.dimension, d.granularity || 'day']) // TODO granularity shouldn't be null?
-      ) || [];
-    }
-    const expandGranularity = (granularity) => transformedQuery.granularityHierarchies[granularity] || [granularity];
-    // TimeDimension :: [Dimension, Granularity]
-    // TimeDimension -> [TimeDimension]
-    function expandTimeDimension(timeDimension) {
-      const [dimension, granularity] = timeDimension;
-      const makeTimeDimension = newGranularity => [dimension, newGranularity];
-      return expandGranularity(granularity).map(makeTimeDimension);
-    }
-    // [[TimeDimension]]
-    const queryTimeDimensionsList = transformedQuery.sortedTimeDimensions.map(expandTimeDimension);
 
+    /**
+     * Determine whether pre-aggregation can be used or not.
+     * @param {*} references
+     * @returns {boolean}
+     */
+    const canUsePreAggregationNotAdditive = (references) => {
+      const sortedTimeDimensions =
+        references.sortedTimeDimensions ||
+        sortTimeDimensions(references.timeDimensions);
+
+      return (
+        transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
+        !transformedQuery.hasCumulativeMeasures &&
+        (
+          references.allowNonStrictDateRangeMatch ||
+          R.equals(transformedQuery.sortedTimeDimensions, sortedTimeDimensions)
+        ) &&
+        (
+          transformedQuery.isAdditive ||
+          R.equals(transformedQuery.timeDimensions, sortedTimeDimensions)
+        ) &&
+        (
+          references.dimensions.length === filterDimensionsSingleValueEqual.size &&
+          R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions)
+        ) &&
+        (
+          R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
+          R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
+        )
+      );
+    };
+    
+    /**
+     * Wrap granularity string into an array.
+     * @param {string} granularity
+     * @returns {Array<string>}
+     */
+    const expandGranularity = (granularity) => (
+      transformedQuery.granularityHierarchies[granularity] ||
+        [granularity]
+    );
+
+    /**
+     * Determine whether time dimensions match to the window
+     * granularity or not.
+     * @param {*} references
+     * @returns {boolean}
+     */
     const windowGranularityMatches = (references) => {
       if (!transformedQuery.windowGranularity) {
         return true;
       }
+      const sortedTimeDimensions =
+        references.sortedTimeDimensions ||
+        sortTimeDimensions(references.timeDimensions);
 
-      const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
-      return expandGranularity(transformedQuery.windowGranularity).map(windowGranularity => R.all(
-        td => td[1] === windowGranularity,
-        sortedTimeDimensions,
-      )).filter(x => !!x).length > 0;
+      return expandGranularity(transformedQuery.windowGranularity)
+        .map(
+          windowGranularity => R.all(
+            td => td[1] === windowGranularity,
+            sortedTimeDimensions,
+          )
+        )
+        .filter(x => !!x)
+        .length > 0;
     };
 
-    const canUsePreAggregationNotAdditive = (references) => {
-      const sortedTimeDimensions = references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions);
-      return transformedQuery.hasNoTimeDimensionsWithoutGranularity &&
-      (
-        references.dimensions.length === filterDimensionsSingleValueEqual.size &&
-        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions)
-      ) &&
-      (
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
-      ) &&
-      R.equals(
-        transformedQuery.sortedTimeDimensions,
-        sortedTimeDimensions
-      ) &&
-      (transformedQuery.isAdditive || R.equals(
-        transformedQuery.timeDimensions,
-        sortedTimeDimensions
-      )) &&
-      !transformedQuery.hasCumulativeMeasures;
+    /**
+     * Returns an array of 2-element arrays with dimension and
+     * granularity strings.
+     * @param {*} timeDimension
+     * @returns {Array<Array<string>>}
+     */
+    const expandTimeDimension = (allow, timeDimension) => {
+      const [dimension, granularity] = timeDimension;
+      let final = granularity;
+      if (allow) {
+        const granularities = [granularity];
+        transformedQuery.timeDimensions.forEach((td) => {
+          if (td[0] === dimension) {
+            granularities.push(td[1]);
+          }
+        });
+        granularities.forEach((g) => {
+          if (
+            transformedQuery.granularityHierarchies[final].length <
+            transformedQuery.granularityHierarchies[g].length
+          ) {
+            final = g;
+          }
+        });
+      }
+      return expandGranularity(final)
+        .map((newGranularity) => [dimension, newGranularity]);
     };
 
-    // TODO revisit cumulative leaf measure matches
-    const canUsePreAggregationLeafMeasureAdditive = (references) => R.all(
-      d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
-      transformedQuery.sortedDimensions
-    ) &&
-      R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
-      R.allPass(
-        queryTimeDimensionsList.map(tds => R.anyPass(tds.map(td => R.contains(td))))
-      )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)) &&
-      windowGranularityMatches(references);
+    /**
+     * Determine whether pre-aggregation can be used or not.
+     * TODO: revisit cumulative leaf measure matches.
+     * @param {*} references
+     * @returns {boolean}
+     */
+    const canUsePreAggregationLeafMeasureAdditive = (references) => {
+      /**
+       * Array of 2-element arrays with dimension and granularity
+       * strings.
+       * @type {Array<Array<string>>}
+       */
+      const queryTimeDimensionsList =
+        transformedQuery
+          .sortedTimeDimensions
+          .map(
+            expandTimeDimension.bind(
+              undefined,
+              references.allowNonStrictDateRangeMatch,
+            )
+          );
 
-    let canUseFn;
-    if (transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures) {
-      canUseFn = (r) => canUsePreAggregationLeafMeasureAdditive(r) || canUsePreAggregationNotAdditive(r);
-    } else {
-      canUseFn = canUsePreAggregationNotAdditive;
-    }
+      return windowGranularityMatches(references) &&
+        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
+        R.all(
+          d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
+          transformedQuery.sortedDimensions
+        ) &&
+        R.allPass(
+          queryTimeDimensionsList.map(
+            tds => R.anyPass(
+              tds.map(td => R.contains(td))
+            )
+          )
+        )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
+    };
+
+    const canUseFn =
+      transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures
+        ? (r) => canUsePreAggregationLeafMeasureAdditive(r) || canUsePreAggregationNotAdditive(r)
+        : canUsePreAggregationNotAdditive;
+
     if (refs) {
       return canUseFn(refs);
     } else {
