@@ -30,6 +30,7 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
+use itertools::izip;
 use pg_srv::PgTypeId;
 
 use crate::{
@@ -1263,6 +1264,56 @@ pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
         "information_schema._pg_numeric_precision",
         vec![DataType::Int64, DataType::Int64],
         Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_truetypid_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let atttypids = downcast_primitive_arg!(args[0], "atttypid", UInt32Type);
+        let typtypes = downcast_string_arg!(args[1], "typtype", i32);
+        let typbasetypes = downcast_primitive_arg!(args[2], "typbasetype", UInt32Type);
+
+        let result = izip!(atttypids, typtypes, typbasetypes)
+            .map(|(atttypid, typtype, typbasetype)| match typtype {
+                Some("d") => typbasetype,
+                _ => atttypid,
+            })
+            .collect::<PrimitiveArray<UInt32Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "information_schema._pg_truetypid",
+        vec![DataType::UInt32, DataType::Utf8, DataType::UInt32],
+        Arc::new(DataType::UInt32),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_truetypmod_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let atttypmods = downcast_primitive_arg!(args[0], "atttypmod", Int32Type);
+        let typtypes = downcast_string_arg!(args[1], "typtype", i32);
+        let typtypmods = downcast_primitive_arg!(args[2], "typtypmod", Int32Type);
+
+        let result = izip!(atttypmods, typtypes, typtypmods)
+            .map(|(atttypmod, typtype, typtypmod)| match typtype {
+                Some("d") => typtypmod,
+                _ => atttypmod,
+            })
+            .collect::<PrimitiveArray<Int32Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "information_schema._pg_truetypmod",
+        vec![DataType::Int32, DataType::Utf8, DataType::Int32],
+        Arc::new(DataType::Int32),
         Volatility::Immutable,
         fun,
     )

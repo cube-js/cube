@@ -565,6 +565,88 @@ impl<'ast> Visitor<'ast> for ToTimestampReplacer {
     }
 }
 
+// Some Postgres UDFs accept rows (records) as arguments.
+// We simplify the expression, passing only the required values
+pub struct UdfWildcardArgReplacer {}
+
+impl UdfWildcardArgReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+
+    pub fn get_new_args_for_fn(
+        &self,
+        name: &str,
+        args: &Vec<ast::FunctionArg>,
+    ) -> Option<Vec<ast::FunctionArg>> {
+        match name {
+            "information_schema._pg_truetypid" => self.replace_simple(
+                args,
+                vec![(0, "atttypid"), (1, "typtype"), (1, "typbasetype")],
+            ),
+            "information_schema._pg_truetypmod" => self.replace_simple(
+                args,
+                vec![(0, "atttypmod"), (1, "typtype"), (1, "typtypmod")],
+            ),
+            _ => None,
+        }
+    }
+
+    pub fn replace_simple(
+        &self,
+        args: &Vec<ast::FunctionArg>,
+        mapping: Vec<(usize, &str)>,
+    ) -> Option<Vec<ast::FunctionArg>> {
+        let max_index = mapping.iter().map(|(index, _)| index).max()?;
+        if args.len() <= *max_index {
+            return None;
+        }
+
+        let new_args = mapping
+            .iter()
+            .map(|(index, column)| match &args[*index] {
+                ast::FunctionArg::Unnamed(ast::FunctionArgExpr::QualifiedWildcard(
+                    ast::ObjectName(idents),
+                )) => {
+                    let mut new_idents = idents.clone();
+                    new_idents.push(ast::Ident {
+                        value: column.to_string(),
+                        quote_style: None,
+                    });
+                    let new_arg = ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                        ast::Expr::CompoundIdentifier(new_idents),
+                    ));
+                    Some(new_arg)
+                }
+                _ => None,
+            })
+            .collect::<Option<_>>();
+
+        new_args
+    }
+}
+
+impl<'a> Visitor<'a> for UdfWildcardArgReplacer {
+    fn visit_expr(&mut self, expr: &mut Expr) {
+        match expr {
+            Expr::Function(fun) => {
+                if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &fun.args) {
+                    fun.args = new_args
+                }
+            }
+            _ => (),
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

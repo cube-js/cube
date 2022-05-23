@@ -48,10 +48,11 @@ use self::{
             create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-            create_pg_numeric_scale_udf, create_pg_table_is_visible_udf,
-            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
-            create_str_to_date_udf, create_time_format_udf, create_timediff_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_pg_numeric_scale_udf, create_pg_table_is_visible_udf, create_pg_truetypid_udf,
+            create_pg_truetypmod_udf, create_pg_type_is_visible_udf, create_quarter_udf,
+            create_second_udf, create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
+            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
+            create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -62,7 +63,7 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
         session::DatabaseProtocol,
-        statement::{CastReplacer, ToTimestampReplacer},
+        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -2372,6 +2373,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_table_is_visible_udf());
         ctx.register_udf(create_pg_type_is_visible_udf());
         ctx.register_udf(create_pg_get_constraintdef_udf());
+        ctx.register_udf(create_pg_truetypid_udf());
+        ctx.register_udf(create_pg_truetypmod_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -2460,6 +2463,7 @@ pub fn convert_statement_to_cube_query(
 ) -> CompilationResult<QueryPlan> {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
+    let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(&stmt)
@@ -7294,6 +7298,31 @@ ORDER BY \"COUNT(count)\" DESC"
                 "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
                  FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_truetyp() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_truetypid_truetypmod",
+            execute_query(
+                "
+                SELECT
+                    a.attrelid,
+                    a.attname,
+                    t.typname,
+                    information_schema._pg_truetypid(a.*, t.*) typid,
+                    information_schema._pg_truetypmod(a.*, t.*) typmod
+                FROM pg_attribute a
+                JOIN pg_type t ON t.oid = a.atttypid
+                ORDER BY a.attrelid ASC, a.attnum ASC
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
