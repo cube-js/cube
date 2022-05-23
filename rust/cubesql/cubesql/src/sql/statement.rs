@@ -695,6 +695,9 @@ impl<'ast> Visitor<'ast> for SensitiveDataSanitizer {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
             | ast::Value::NationalStringLiteral(str) => {
+                if vec!["f", "false", "t", "true"].contains(&str.as_str()) {
+                    return;
+                }
                 *str = "[REPLACED]".to_string();
             }
             _ => (),
@@ -888,7 +891,7 @@ mod tests {
     #[test]
     fn test_sensitive_data_sanitizer() -> Result<(), CubeError> {
         assert_sensitive_data_sanitizer(
-            "SELECT * FROM testdata WHERE email = 'george@gmail.com'",
+            "SELECT * FROM testdata WHERE email = 'to@replace.com'",
             "SELECT * FROM testdata WHERE email = '[REPLACED]'",
         )?;
 
