@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use cubesql::{
     di_service,
     sql::{AuthContext, AuthenticateResponse, SqlAuthService},
+    transport::TransportServiceMetaFields,
     CubeError,
 };
 use log::trace;
@@ -31,6 +32,7 @@ impl NodeBridgeAuthService {
 #[derive(Debug, Serialize)]
 pub struct TransportRequest {
     pub id: String,
+    pub meta: TransportServiceMetaFields,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +56,7 @@ impl SqlAuthService for NodeBridgeAuthService {
         let extra = serde_json::to_string(&CheckAuthRequest {
             request: TransportRequest {
                 id: format!("{}-span-1", request_id),
+                meta: None,
             },
             user: user.clone(),
         })?;

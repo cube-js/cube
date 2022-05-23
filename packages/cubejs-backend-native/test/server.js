@@ -41,6 +41,10 @@ const meta_fixture = require('./meta');
       throw new Error('Please specify password');
     };
 
+    native.setupLogger(
+      ({ event }) => console.log(event),
+    );
+
     native.setLogLevel('trace');
 
     const interface = await native.registerInterface({

@@ -3,20 +3,19 @@
 mod auth;
 mod channel;
 mod config;
+mod logger;
 mod transport;
 mod utils;
 
 use once_cell::sync::OnceCell;
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
-use cubesql::{
-    config::CubeServices,
-    telemetry::{track_event, ReportingLogger},
-};
+use cubesql::{config::CubeServices, telemetry::ReportingLogger};
 use log::Level;
+use logger::NodeBridgeLogger;
 use neon::prelude::*;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
@@ -45,31 +44,39 @@ fn runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
     })
 }
 
-fn init_logger(log_level: Level) {
+fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let options = cx.argument::<JsObject>(0)?;
+    let cube_logger = options
+        .get::<JsFunction, _, _>(&mut cx, "logger")?
+        .root(&mut cx);
+
+    let log_level_handle = options.get_value(&mut cx, "logLevel")?;
+    let log_level = if log_level_handle.is_a::<JsString, _>(&mut cx) {
+        let value = log_level_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
+        let log_level = match value.value(&mut cx).as_str() {
+            "error" => Level::Error,
+            "warn" => Level::Warn,
+            "info" => Level::Info,
+            "debug" => Level::Debug,
+            "trace" => Level::Trace,
+            x => cx.throw_error(format!("Unrecognized log level: {}", x))?,
+        };
+        log_level
+    } else {
+        Level::Trace
+    };
+
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
         .with_module_level("cubejs_native", log_level.to_level_filter());
 
-    ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
-}
-
-fn set_log_level(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let log_level = match cx
-        .argument::<JsString>(0)?
-        .value(&mut cx)
-        .to_lowercase()
-        .as_str()
-    {
-        "error" => Level::Error,
-        "warn" => Level::Warn,
-        "info" => Level::Info,
-        "debug" => Level::Debug,
-        "trace" => Level::Trace,
-        x => cx.throw_error(format!("Unrecognized log level: {}", x))?,
-    };
-
-    init_logger(log_level);
+    ReportingLogger::init(
+        Box::new(logger),
+        Box::new(NodeBridgeLogger::new(cx.channel(), cube_logger)),
+        log_level.to_level_filter(),
+    )
+    .unwrap();
 
     Ok(cx.undefined())
 }
@@ -132,7 +139,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
             let services_arc = services.clone();
             let interface = SQLInterface::new(services_arc);
 
-            track_event("Cube SQL Start".to_string(), HashMap::new()).await;
+            log::debug!("Cube SQL Start");
 
             let mut loops = services.spawn_processing_loops().await.unwrap();
             loops.push(tokio::spawn(async move {
@@ -170,7 +177,7 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("setLogLevel", set_log_level)?;
+    cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
 

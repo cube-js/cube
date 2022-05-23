@@ -66,9 +66,10 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
+    telemetry::ContextLogger,
     transport::{
-        df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
-        V1CubeMetaSegmentExt,
+        df_data_type_by_column_type, TransportServiceMetaFields, V1CubeMetaDimensionExt,
+        V1CubeMetaExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -1398,6 +1399,7 @@ struct QueryPlanner {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
+    logger: Arc<dyn ContextLogger>,
 }
 
 impl QueryPlanner {
@@ -1405,11 +1407,13 @@ impl QueryPlanner {
         state: Arc<SessionState>,
         meta: Arc<MetaContext>,
         session_manager: Arc<SessionManager>,
+        logger: Arc<dyn ContextLogger>,
     ) -> Self {
         Self {
             state,
             meta,
             session_manager,
+            logger,
         }
     }
 
@@ -1648,7 +1652,7 @@ impl QueryPlanner {
     }
 
     pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        match (stmt, &self.state.protocol) {
+        let plan = match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1673,7 +1677,6 @@ impl QueryPlanner {
                 StatusFlags::empty(),
                 CommandCompletion::Select(0),
             )),
-            // TODO: enable for Postgres after variables are supported
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
             }
@@ -1751,7 +1754,9 @@ impl QueryPlanner {
                 "Unsupported query type: {}",
                 stmt.to_string()
             ))),
-        }
+        };
+
+        plan
     }
 
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
@@ -2201,7 +2206,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         }
                     };
 
-                    global_columns_to_update.insert(
+                    session_columns_to_update.insert(
                         key_value.key.value.to_lowercase(),
                         DatabaseVariable::system(
                             key_value.key.value.to_lowercase(),
@@ -2300,6 +2305,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_execution_ctx(&self) -> DFSessionContext {
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
+            self.planner_meta_fields(),
+            self.logger.clone(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
@@ -2438,8 +2445,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
             });
         if let Err(_) = &result {
-            log::error!("Can't rewrite plan: {:#?}", optimized_plan);
-            log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.")
+            self.logger
+                .error(format!("Can't rewrite plan: {:#?}", optimized_plan).as_str());
+            self.logger.error(format!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.").as_str());
         }
         let rewrite_plan = result?;
 
@@ -2451,17 +2459,36 @@ WHERE `TABLE_SCHEMA` = '{}'",
             ctx,
         ))
     }
+
+    fn planner_meta_fields(&self) -> TransportServiceMetaFields {
+        // TODO: application_name for mysql
+        let mut meta_fields = HashMap::new();
+        if let Some(var) = self.state.all_variables().get("application_name") {
+            meta_fields.insert("appName".to_string(), var.value.to_string());
+        }
+
+        let protocol = self.state.protocol.to_string();
+        meta_fields.insert("protocol".to_string(), protocol);
+        meta_fields.insert("apiType".to_string(), "sql".to_string());
+        Some(meta_fields)
+    }
 }
 
 pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
 
-    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
+    let planner = QueryPlanner::new(
+        session.state.clone(),
+        meta,
+        session.session_manager.clone(),
+        logger.clone(),
+    );
     planner.plan(&stmt)
 }
 
@@ -2570,9 +2597,10 @@ pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone())?;
-    convert_statement_to_cube_query(&stmt, meta, session)
+    convert_statement_to_cube_query(&stmt, meta, session, logger)
 }
 
 #[cfg(test)]
@@ -2765,6 +2793,7 @@ mod tests {
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: Arc<AuthContext>,
+                _meta_fields: TransportServiceMetaFields,
             ) -> Result<V1LoadResponse, CubeError> {
                 panic!("It's a fake transport");
             }
@@ -2773,8 +2802,27 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
+    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
+        #[derive(Debug)]
+        struct TestContextLogger {}
+
+        #[async_trait]
+        impl ContextLogger for TestContextLogger {
+            fn error(&self, message: &str) {
+                log::error!("{}", message);
+            }
+        }
+
+        Arc::new(TestContextLogger {})
+    }
+
     fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_session(db),
+            get_test_context_logger(),
+        );
 
         query.unwrap()
     }
@@ -4055,6 +4103,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 &input_query,
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
+                get_test_context_logger(),
             );
 
             match &query {
@@ -4753,6 +4802,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
+                get_test_context_logger(),
             );
 
             match &query {
@@ -5133,7 +5183,12 @@ ORDER BY \"COUNT(count)\" DESC"
         query: String,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_session(db),
+            get_test_context_logger(),
+        );
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
@@ -7261,6 +7316,7 @@ ORDER BY \"COUNT(count)\" DESC"
             ".to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_context_logger(),
         );
         match create_query {
             Err(CompilationError::Unsupported(msg)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
@@ -7277,6 +7333,7 @@ ORDER BY \"COUNT(count)\" DESC"
             .to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_context_logger(),
         );
         match select_into_query {
             Err(CompilationError::Unsupported(msg)) => {

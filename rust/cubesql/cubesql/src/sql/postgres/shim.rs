@@ -15,6 +15,7 @@ use crate::{
         writer::BatchWriter,
         AuthContext, Session,
     },
+    telemetry::ContextLogger,
     CubeError,
 };
 use log::{debug, error, trace};
@@ -32,6 +33,7 @@ pub struct AsyncPostgresShim {
     portals: HashMap<String, Option<Portal>>,
     // Shared
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -114,17 +116,24 @@ impl From<ErrorResponse> for ConnectionError {
 }
 
 impl AsyncPostgresShim {
-    pub async fn run_on(socket: TcpStream, session: Arc<Session>) -> Result<(), std::io::Error> {
+    pub async fn run_on(
+        socket: TcpStream,
+        session: Arc<Session>,
+        logger: Arc<dyn ContextLogger>,
+    ) -> Result<(), std::io::Error> {
         let mut shim = Self {
             socket,
             portals: HashMap::new(),
             statements: HashMap::new(),
             session,
+            logger,
         };
 
         match shim.run().await {
             Err(e) => {
-                error!("Error during processing PostgreSQL connection: {}", e);
+                shim.logger.error(
+                    format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                );
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -195,7 +204,8 @@ impl AsyncPostgresShim {
         &mut self,
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
-        error!("Error during processing PostgreSQL message: {}", err);
+        self.logger
+            .error(format!("Error during processing PostgreSQL message: {}", err).as_str());
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -474,8 +484,12 @@ impl AsyncPostgresShim {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan =
-                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
+            let plan = convert_statement_to_cube_query(
+                &prepared_statement,
+                meta,
+                self.session.clone(),
+                self.logger.clone(),
+            )?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             let fields = self
@@ -560,7 +574,12 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
+            let plan = convert_statement_to_cube_query(
+                &hacked_query,
+                meta,
+                self.session.clone(),
+                self.logger.clone(),
+            )?;
 
             let description = if let Some(fields) = self
                 .query_plan_to_row_description(&plan, Format::Text)
@@ -597,7 +616,12 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let plan = convert_sql_to_cube_query(&query.to_string(), meta, self.session.clone())?;
+        let plan = convert_sql_to_cube_query(
+            &query.to_string(),
+            meta,
+            self.session.clone(),
+            self.logger.clone(),
+        )?;
 
         // Special handling for special queries, such as DISCARD ALL.
         if let Some(description) = self

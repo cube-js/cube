@@ -415,10 +415,7 @@ impl DatabaseProtocol {
                 "pg_proc" => return Some(Arc::new(PgCatalogProcProvider::new())),
                 "pg_settings" => {
                     return Some(Arc::new(PgCatalogSettingsProvider::new(
-                        context
-                            .sessions
-                            .server
-                            .all_variables(context.session_state.protocol.clone()),
+                        context.session_state.all_variables(),
                     )))
                 }
                 "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
