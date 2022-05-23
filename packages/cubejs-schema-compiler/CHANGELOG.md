@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+
+### Bug Fixes
+
+* **schema-compiler:** exclude non-included dimensions from drillMembers ([#4569](https://github.com/cube-js/cube.js/issues/4569)) ([c1f12d1](https://github.com/cube-js/cube.js/commit/c1f12d182a3f7434a296a97b640b19b705dba921))
+
+
+
+
+
 ## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
 
 

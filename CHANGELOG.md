@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+
+### Bug Fixes
+
+* **schema-compiler:** exclude non-included dimensions from drillMembers ([#4569](https://github.com/cube-js/cube.js/issues/4569)) ([c1f12d1](https://github.com/cube-js/cube.js/commit/c1f12d182a3f7434a296a97b640b19b705dba921))
+
+
+### Features
+
+* **packages:** add Firebolt driver ([#4546](https://github.com/cube-js/cube.js/issues/4546)) ([9789d95](https://github.com/cube-js/cube.js/commit/9789d954064893ba2e3265127be5b734bf1f6db5))
+* statefulset annotations ([#4422](https://github.com/cube-js/cube.js/issues/4422)) ([27c1ff2](https://github.com/cube-js/cube.js/commit/27c1ff2f0d89ac3c4401aaa897ee3ebf2542b6d0))
+
+
+
+
+
 ## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
 
 
