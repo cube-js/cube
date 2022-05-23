@@ -49,6 +49,29 @@ export class MaterializeDriver extends PostgresDriver {
     return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null);
   }
 
+  /**
+   * Materialize quereable schema
+   * Returns materialized sources, materialized views, and tables
+   * @returns {string} schemaQuery
+   */
+  public informationSchemaQuery(): string {
+    const materializationFilter = `
+        table_name IN (
+          SELECT name
+          FROM mz_catalog.mz_sources
+          WHERE mz_internal.mz_is_materialized(id)
+          UNION
+          SELECT name
+          FROM mz_catalog.mz_views
+          WHERE mz_internal.mz_is_materialized(id)
+          UNION
+          SELECT t.name
+          FROM mz_catalog.mz_tables t
+        )`;
+
+    return `${super.informationSchemaQuery()} AND ${materializationFilter}`;
+  }
+
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
     const timeout = `${this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000} milliseconds`;
     const queryParams = {
