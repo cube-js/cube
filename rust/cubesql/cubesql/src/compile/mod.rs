@@ -7442,7 +7442,11 @@ ORDER BY \"COUNT(count)\" DESC"
                     a.attname,
                     t.typname,
                     information_schema._pg_truetypid(a.*, t.*) typid,
-                    information_schema._pg_truetypmod(a.*, t.*) typmod
+                    information_schema._pg_truetypmod(a.*, t.*) typmod,
+                    information_schema._pg_numeric_precision(
+                        information_schema._pg_truetypid(a.*, t.*),
+                        information_schema._pg_truetypmod(a.*, t.*)
+                    ) as_arg
                 FROM pg_attribute a
                 JOIN pg_type t ON t.oid = a.atttypid
                 ORDER BY a.attrelid ASC, a.attnum ASC

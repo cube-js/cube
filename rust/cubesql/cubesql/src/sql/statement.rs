@@ -117,20 +117,7 @@ trait Visitor<'ast> {
                     self.visit_expr(res);
                 }
             }
-            Expr::Function(fun) => {
-                for res in fun.name.0.iter_mut() {
-                    self.visit_identifier(res);
-                }
-                self.visit_funtion_args(&mut fun.args);
-                if let Some(over) = &mut fun.over {
-                    for res in over.partition_by.iter_mut() {
-                        self.visit_expr(res);
-                    }
-                    for order_expr in over.order_by.iter_mut() {
-                        self.visit_expr(&mut order_expr.expr);
-                    }
-                }
-            }
+            Expr::Function(fun) => self.visit_function(fun),
             Expr::Exists(query) | Expr::Subquery(query) => self.visit_query(query),
             Expr::ListAgg(list_agg) => {
                 self.visit_expr(&mut list_agg.expr);
@@ -204,7 +191,7 @@ trait Visitor<'ast> {
                     self.visit_identifier(ident);
                 }
                 self.visit_table_alias(alias);
-                self.visit_funtion_args(args);
+                self.visit_function_args(args);
                 for hint in with_hints.iter_mut() {
                     self.visit_expr(hint);
                 }
@@ -314,7 +301,22 @@ trait Visitor<'ast> {
         }
     }
 
-    fn visit_funtion_args(&mut self, args: &mut Vec<ast::FunctionArg>) {
+    fn visit_function(&mut self, fun: &mut ast::Function) {
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res);
+        }
+        self.visit_function_args(&mut fun.args);
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res);
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr);
+            }
+        }
+    }
+
+    fn visit_function_args(&mut self, args: &mut Vec<ast::FunctionArg>) {
         for a in args.iter_mut() {
             match a {
                 ast::FunctionArg::Named { name, arg } => {
@@ -635,15 +637,22 @@ impl UdfWildcardArgReplacer {
 }
 
 impl<'a> Visitor<'a> for UdfWildcardArgReplacer {
-    fn visit_expr(&mut self, expr: &mut Expr) {
-        match expr {
-            Expr::Function(fun) => {
-                if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &fun.args) {
-                    fun.args = new_args
-                }
+    fn visit_function(&mut self, fun: &mut ast::Function) {
+        if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &fun.args) {
+            fun.args = new_args
+        }
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res);
+        }
+        self.visit_function_args(&mut fun.args);
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res);
             }
-            _ => (),
-        };
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr);
+            }
+        }
     }
 }
 
