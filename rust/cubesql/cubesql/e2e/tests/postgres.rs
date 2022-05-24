@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use super::utils::escape_snapshot_name;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use pg_srv::{PgType, PgTypeId};
-use tokio_postgres::{NoTls, Row};
+use tokio_postgres::{NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
@@ -302,6 +302,20 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_simple_query<AssertFn>(&self, query: String, f: AssertFn) -> RunResult<()>
+    where
+        AssertFn: FnOnce(Vec<SimpleQueryMessage>) -> (),
+    {
+        print!("test {} .. ", query);
+
+        let res = self.client.simple_query(&query).await.unwrap();
+        f(res);
+
+        println!("ok");
+
+        Ok(())
+    }
+
     async fn test_prepare(&self) -> RunResult<()> {
         let stmt = self
             .client
@@ -461,6 +475,16 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 );
             },
         )
+        .await?;
+
+        self.test_simple_query(r#"SET DateStyle = 'ISO'"#.to_string(), |messages| {
+            assert_eq!(messages.len(), 1);
+
+            // SET
+            if let SimpleQueryMessage::Row(_) = messages[0] {
+                panic!("Must be CommandComplete command, (SET is used)")
+            }
+        })
         .await?;
 
         Ok(())

@@ -2297,10 +2297,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 .set_variables(global_columns_to_update, self.state.protocol.clone());
         }
 
-        Ok(QueryPlan::MetaTabular(
-            flags,
-            Box::new(dataframe::DataFrame::new(vec![], vec![])),
-        ))
+        match self.state.protocol {
+            DatabaseProtocol::PostgreSQL => Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set)),
+            // TODO: Verify that it's possible to use MetaOk too...
+            DatabaseProtocol::MySQL => Ok(QueryPlan::MetaTabular(
+                flags,
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
+            )),
+        }
     }
 
     fn create_execution_ctx(&self) -> DFSessionContext {
