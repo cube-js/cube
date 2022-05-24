@@ -468,28 +468,25 @@ export class PreAggregations {
      * @param {*} timeDimension
      * @returns {Array<Array<string>>}
      */
-    const expandTimeDimension = (allow, timeDimension) => {
+    const expandTimeDimension = (timeDimension) => {
       const [dimension, granularity] = timeDimension;
-      let final = granularity;
-      if (allow) {
-        const granularities = [granularity];
-        transformedQuery.timeDimensions.forEach((td) => {
-          if (td[0] === dimension) {
-            granularities.push(td[1]);
-          }
-        });
-        granularities.forEach((g) => {
-          if (
-            transformedQuery.granularityHierarchies[final].length <
-            transformedQuery.granularityHierarchies[g].length
-          ) {
-            final = g;
-          }
-        });
-      }
-      return expandGranularity(final)
+      return expandGranularity(granularity)
         .map((newGranularity) => [dimension, newGranularity]);
     };
+
+    /**
+     * Array of 2-element arrays with dimension and granularity
+     * strings.
+     * @type {Array<Array<string>>}
+     */
+    const queryTimeDimensionsList =
+      transformedQuery
+        .sortedTimeDimensions
+        .map(
+          expandTimeDimension.bind(
+            undefined
+          )
+        );
 
     /**
      * Determine whether pre-aggregation can be used or not.
@@ -497,36 +494,24 @@ export class PreAggregations {
      * @param {*} references
      * @returns {boolean}
      */
-    const canUsePreAggregationLeafMeasureAdditive = (references) => {
-      /**
-       * Array of 2-element arrays with dimension and granularity
-       * strings.
-       * @type {Array<Array<string>>}
-       */
-      const queryTimeDimensionsList =
-        transformedQuery
-          .sortedTimeDimensions
-          .map(
-            expandTimeDimension.bind(
-              undefined,
-              references.allowNonStrictDateRangeMatch,
-            )
-          );
-
-      return windowGranularityMatches(references) &&
+    const canUsePreAggregationLeafMeasureAdditive = (references) => (
+      windowGranularityMatches(references) &&
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures) &&
         R.all(
           d => (references.sortedDimensions || references.dimensions).indexOf(d) !== -1,
           transformedQuery.sortedDimensions
         ) &&
-        R.allPass(
-          queryTimeDimensionsList.map(
-            tds => R.anyPass(
-              tds.map(td => R.contains(td))
+        (
+          references.allowNonStrictDateRangeMatch ||
+          R.allPass(
+            queryTimeDimensionsList.map(
+              tds => R.anyPass(
+                tds.map(td => R.contains(td))
+              )
             )
-          )
-        )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
-    };
+          )(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions))
+        )
+    );
 
     const canUseFn =
       transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures
@@ -552,8 +537,48 @@ export class PreAggregations {
   }
 
   findPreAggregationForQuery() {
+    let preAggregationForQuery;
     if (!this.preAggregationForQuery) {
-      this.preAggregationForQuery = this.rollupMatchResults().find(p => p.canUsePreAggregation);
+      const preAggs = this
+        .rollupMatchResults()
+        .filter(p => p.canUsePreAggregation);
+
+      if (preAggs.length > 0) {
+        if (preAggs.length === 1) {
+          [preAggregationForQuery] = preAggs;
+        } else {
+          const gransHierarcy = this.query.granularityHierarchies();
+
+          const queryTDim = this.query.timeDimensions.map(
+            d => [d.dimension, d.rollupGranularityValue]
+          );
+
+          const cubeTDim = preAggs.map(
+            p => [
+              p.references.timeDimensions[0].dimension,
+              p.references.timeDimensions[0].granularity,
+            ]
+          );
+          
+          const cubeWeights = cubeTDim.map(([cDim, cGran]) => {
+            let result;
+            queryTDim.forEach(([qDim, qGran]) => {
+              if (cDim === qDim && cGran === qGran) {
+                result = 1;
+              }
+            });
+            if (result) {
+              return result;
+            } else {
+              return gransHierarcy[cGran].length;
+            }
+          });
+
+          const i = cubeWeights.indexOf(Math.min(...cubeWeights));
+          preAggregationForQuery = preAggs[i];
+        }
+        this.preAggregationForQuery = preAggregationForQuery;
+      }
     }
     return this.preAggregationForQuery;
   }
