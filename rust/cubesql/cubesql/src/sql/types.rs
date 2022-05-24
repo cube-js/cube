@@ -1,5 +1,5 @@
-use crate::arrow::datatypes::{DataType, Field};
 use bitflags::bitflags;
+use datafusion::arrow::datatypes::{DataType, Field};
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };

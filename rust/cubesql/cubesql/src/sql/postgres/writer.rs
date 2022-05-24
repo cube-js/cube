@@ -1,14 +1,4 @@
-use crate::{
-    arrow::{
-        array::{
-            ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
-            Int32Array, Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array,
-            UInt8Array,
-        },
-        datatypes::DataType,
-    },
-    sql::{dataframe::TimestampValue, df_type_to_pg_tid},
-};
+use crate::sql::{dataframe::TimestampValue, df_type_to_pg_tid};
 use bytes::{BufMut, BytesMut};
 use chrono::{
     format::{
@@ -17,6 +7,13 @@ use chrono::{
         Pad::Zero,
     },
     prelude::*,
+};
+use datafusion::arrow::{
+    array::{
+        ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
+        Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    },
+    datatypes::DataType,
 };
 use pg_srv::{
     protocol,
@@ -383,15 +380,13 @@ impl<'a> Serialize for BatchWriter {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        arrow::array::{ArrayRef, Int64Builder},
-        sql::{
-            dataframe::TimestampValue,
-            shim::ConnectionError,
-            writer::{BatchWriter, ToPostgresValue},
-        },
+    use crate::sql::{
+        dataframe::TimestampValue,
+        shim::ConnectionError,
+        writer::{BatchWriter, ToPostgresValue},
     };
     use bytes::BytesMut;
+    use datafusion::arrow::array::{ArrayRef, Int64Builder};
     use pg_srv::{buffer, protocol::Format};
     use std::{io::Cursor, sync::Arc};
 
