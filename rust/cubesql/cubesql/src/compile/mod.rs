@@ -7415,6 +7415,7 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
+    // This tests asserts that our DF fork contains support for IS TRUE|FALSE
     #[tokio::test]
     async fn df_is_boolean() -> Result<(), CubeError> {
         insta::assert_snapshot!(
@@ -7422,6 +7423,22 @@ ORDER BY \"COUNT(count)\" DESC"
             execute_query(
                 "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
                  FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for escaped single quoted strings
+    #[tokio::test]
+    async fn df_escaped_strings() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_escaped_strings",
+            execute_query(
+                "SELECT 'test' LIKE e'%' as v1, 'payment_p2020_01' LIKE E'payment\\_p2020\\_01' as v2;"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
