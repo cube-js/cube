@@ -11,7 +11,7 @@ export function parameterNameAndType(this: ParameterReflection, displaySymbol = 
   }
   md.push(`${this.flags.isRest ? '...' : ''} **${this.name}**`);
   if (this.type) {
-    md.push(`: *${type.call(this.type)}*`);
+    md.push(`: \`${type.call(this.type)}\``);
   }
   if (this.defaultValue) {
     md.push(`= ${this.defaultValue}`);

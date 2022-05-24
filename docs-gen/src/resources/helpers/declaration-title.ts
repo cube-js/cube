@@ -15,10 +15,10 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
   const isOptional = this.flags.map((flag) => flag).includes('Optional');
 
   if (showSymbol) {
-    md.push(memberSymbol.call(this));
+    md.push(`\n${memberSymbol.call(this)}\n`);
   }
 
-  md.push(`**${this.name}**${isOptional ? '? ' : ''}`);
+  md.push(`${this.name}${isOptional ? '? ' : ''}`);
 
   if (this.typeHierarchy?.types.length) {
     if (this.typeHierarchy?.isTarget) {
@@ -29,7 +29,7 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
       const name = parent.reflection === undefined ? parent.symbolFullyQualifiedName : parent.name;
 
       md.push('extends');
-      md.push(`**${name}**`);
+      md.push(name);
 
       if (parent.typeArguments) {
         md.push(`‹${parent.typeArguments.map((typeArgument) => type.call(typeArgument)).join(', ')}›`.trim());
@@ -44,11 +44,15 @@ export function declarationTitle(this: DeclarationReflection, showSymbol: boolea
   }
 
   if (this.type) {
-    md.push(`*${type.call(this.type)}*`);
+    md.push(type.call(this.type));
   }
   if (this.defaultValue) {
     md.push(`= ${this.defaultValue}`);
   }
-  
+
+  if (showSymbol) {
+    md.push(`\n${memberSymbol.call(this)}\n`);
+  }
+
   return md.join(' ');
 }
