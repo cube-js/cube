@@ -5,7 +5,7 @@ permalink: /config/downstream/powerbi
 
 <WarningBox heading={`Power BI support is in preview`}>
 
-Power BI support is in preview, not all features and requests may work on this
+Power BI support is in preview, not all features and requests may work at this
 point.
 
 </WarningBox>
@@ -30,7 +30,7 @@ your connection credentials:
 
 <div style="text-align: center">
   <img
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
     style="border: none"
     width="80%"
   />
