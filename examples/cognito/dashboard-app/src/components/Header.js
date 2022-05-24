@@ -21,16 +21,13 @@ const Header = ({ location }) => {
   return (
     <AppBar position="static">
       <Toolbar variant="dense">
-        <IconButton className={classes.menuButton} edge="start" color="inherit" aria-label="menu">
-          <MenuIcon />
-        </IconButton>
         <Typography className={classes.title} variant="h6" color="inherit">
           My Dashboard
         </Typography>
         {authenticated && (
           <Button onClick={() => {
             logout();
-          }}>
+          }} color="inherit">
             Log Out
           </Button>
         )}

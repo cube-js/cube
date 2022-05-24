@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import './App.css';
-import './body.css';
 import { makeStyles } from '@material-ui/core/styles';
 import { Auth } from '@aws-amplify/auth';
 import { CubeProvider } from '@cubejs-client/react';
