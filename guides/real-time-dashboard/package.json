@@ -29,7 +29,7 @@
     "gatsby-transformer-sharp": "^2.2.19",
     "guides-base": "file:../guides-base",
     "lodash": "^4.17.11",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "prismjs": "^1.16.0",
     "react": "^16.10.1",
     "react-dom": "^16.10.1",
