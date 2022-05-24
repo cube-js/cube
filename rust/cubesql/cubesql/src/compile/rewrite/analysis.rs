@@ -1,8 +1,4 @@
 use crate::{
-    arrow::{
-        array::NullArray,
-        datatypes::{DataType, Field, Schema},
-    },
     compile::{
         engine::provider::CubeContext,
         rewrite::{
@@ -14,7 +10,11 @@ use crate::{
     var_iter, CubeError,
 };
 use datafusion::{
-    arrow::record_batch::RecordBatch,
+    arrow::{
+        array::NullArray,
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
         functions::Volatility, planner::DefaultPhysicalPlanner, ColumnarValue, PhysicalPlanner,
