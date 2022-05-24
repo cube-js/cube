@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7445
+expression: "execute_query(\"SELECT 'test' LIKE e'%' as v1, 'payment_p2020_01' LIKE E'payment\\\\_p2020\\\\_01' as v2;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+------+
+| v1   | v2   |
++------+------+
+| true | true |
++------+------+
