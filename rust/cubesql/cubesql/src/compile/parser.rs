@@ -33,10 +33,10 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-pub fn parse_sql_to_statement(
+pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
-) -> CompilationResult<Statement> {
+) -> CompilationResult<Vec<Statement>> {
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
@@ -124,12 +124,15 @@ pub fn parse_sql_to_statement(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    match parse_result {
-        Err(error) => Err(CompilationError::User(format!(
-            "Unable to parse: {:?}",
-            error
-        ))),
-        Ok(stmts) => {
+    parse_result.map_err(|err| CompilationError::User(format!("Unable to parse: {:?}", err)))
+}
+
+pub fn parse_sql_to_statement(
+    query: &String,
+    protocol: DatabaseProtocol,
+) -> CompilationResult<Statement> {
+    match parse_sql_to_statements(query, protocol)? {
+        stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
             } else if stmts.is_empty() {

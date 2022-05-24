@@ -487,6 +487,36 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         })
         .await?;
 
+        // Tableau Desktop
+        self.test_simple_query(
+            r#"SET DateStyle = 'ISO';SET extra_float_digits = 2;show transaction_isolation"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 4);
+
+                // SET
+                if let SimpleQueryMessage::Row(_) = messages[0] {
+                    panic!("Must be CommandComplete command, 1")
+                }
+
+                // SET
+                if let SimpleQueryMessage::Row(_) = messages[1] {
+                    panic!("Must be CommandComplete command, 2")
+                }
+
+                // SELECT
+                if let SimpleQueryMessage::CommandComplete(_) = messages[2] {
+                    panic!("Must be Row command, 3")
+                }
+
+                // DATA
+                if let SimpleQueryMessage::Row(_) = messages[3] {
+                    panic!("Must be CommandComplete command, 4")
+                }
+            },
+        )
+        .await?;
+
         Ok(())
     }
 }

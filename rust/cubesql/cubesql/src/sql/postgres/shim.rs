@@ -3,7 +3,8 @@ use std::{backtrace::Backtrace, collections::HashMap, sync::Arc};
 use super::extended::PreparedStatement;
 use crate::{
     compile::{
-        convert_sql_to_cube_query, convert_statement_to_cube_query, parser::parse_sql_to_statement,
+        convert_statement_to_cube_query,
+        parser::{parse_sql_to_statement, parse_sql_to_statements},
         CompilationError, QueryPlan,
     },
     sql::{
@@ -616,40 +617,49 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let plan = convert_sql_to_cube_query(
-            &query.to_string(),
-            meta,
-            self.session.clone(),
-            self.logger.clone(),
-        )?;
+        let statements = parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL)?;
 
-        // Special handling for special queries, such as DISCARD ALL.
-        if let Some(description) = self
-            .query_plan_to_row_description(&plan, Format::Text)
-            .await?
-        {
-            match description.len() {
-                0 => self.write(protocol::NoData::new()).await?,
-                _ => {
-                    self.write(protocol::RowDescription::new(description))
-                        .await?
-                }
-            };
+        let mut plans = Vec::with_capacity(statements.len());
+
+        // TODO: PostgreSQL execute it dependently.
+        for stmt in statements {
+            plans.push(convert_statement_to_cube_query(
+                &stmt,
+                meta.clone(),
+                self.session.clone(),
+                self.logger.clone(),
+            )?);
         }
 
-        // Re-usage of Portal functionality
-        let mut portal = Portal::new(plan, Format::Text, None);
+        for plan in plans {
+            // Special handling for special queries, such as DISCARD ALL.
+            if let Some(description) = self
+                .query_plan_to_row_description(&plan, Format::Text)
+                .await?
+            {
+                match description.len() {
+                    0 => self.write(protocol::NoData::new()).await?,
+                    _ => {
+                        self.write(protocol::RowDescription::new(description))
+                            .await?
+                    }
+                };
+            }
 
-        let mut writer = BatchWriter::new(portal.get_format());
-        let completion = portal.execute(&mut writer, 0).await?;
+            // Re-usage of Portal functionality
+            let mut portal = Portal::new(plan, Format::Text, None);
 
-        self.handle_command_complete(&completion);
+            let mut writer = BatchWriter::new(portal.get_format());
+            let completion = portal.execute(&mut writer, 0).await?;
 
-        if writer.has_data() {
-            buffer::write_direct(&mut self.socket, writer).await?;
-        };
+            self.handle_command_complete(&completion);
 
-        self.write(completion).await?;
+            if writer.has_data() {
+                buffer::write_direct(&mut self.socket, writer).await?;
+            };
+
+            self.write(completion).await?;
+        }
 
         Ok(())
     }
