@@ -23,7 +23,7 @@ your connection credentials:
 
 <div style="text-align: center">
   <img
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
     style="border: none"
     width="80%"
   />
