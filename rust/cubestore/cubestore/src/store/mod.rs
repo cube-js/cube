@@ -2,6 +2,7 @@ pub mod compaction;
 
 use async_trait::async_trait;
 use datafusion::physical_plan::collect;
+use datafusion::physical_plan::expressions::Column as FusionColumn;
 use datafusion::physical_plan::hash_aggregate::{
     AggregateMode, AggregateStrategy, HashAggregateExec,
 };
@@ -916,21 +917,15 @@ impl ChunkStore {
 
                 let input = Arc::new(MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?);
 
-                let groups = index
-                    .get_row()
-                    .get_columns()
-                    .iter()
-                    .take(index.get_row().sort_key_size() as usize)
-                    .map(|c| -> Result<_, CubeError> {
-                        let col: Arc<dyn PhysicalExpr> = Arc::new(
-                            datafusion::physical_plan::expressions::Column::new_with_schema(
-                                c.get_name().as_str(),
-                                &schema,
-                            )?,
-                        );
-                        Ok((col, c.get_name().clone()))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let key_size = index.get_row().sort_key_size() as usize;
+                let mut groups = Vec::with_capacity(key_size);
+                for i in 0..key_size {
+                    let f = schema.field(i);
+                    let col: Arc<dyn PhysicalExpr> =
+                        Arc::new(FusionColumn::new(f.name().as_str(), i));
+                    groups.push((col, f.name().clone()));
+                }
+
                 let aggregates = table
                     .get_row()
                     .aggregate_columns()
