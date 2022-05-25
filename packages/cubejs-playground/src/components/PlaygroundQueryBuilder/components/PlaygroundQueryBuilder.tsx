@@ -553,7 +553,7 @@ export function PlaygroundQueryBuilder({
                               await refreshToken();
 
                               handleRunButtonClick({
-                                query,
+                                query: validateQuery(query),
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });
