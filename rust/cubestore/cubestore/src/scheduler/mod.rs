@@ -568,7 +568,7 @@ impl SchedulerImpl {
             || chunks.len()
             > self.config.compaction_chunks_count_threshold() as usize
             // TODO config
-            || in_memory_chunks.len() > self.config.compaction_in_memory_chunks_max_length() as usize
+            || in_memory_chunks.len() > self.config.compaction_in_memory_chunks_max_length()
             || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_max_duration()).unwrap_or(false)
             || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_partition_max_idle_duration()).unwrap_or(false)
         {
