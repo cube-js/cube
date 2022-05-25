@@ -2,8 +2,9 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::table::AggregateColumn;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, Partition, PartitionData,
+    deactivate_table_on_corrupt_data, Chunk, IdRow, IndexType, MetaStore, Partition, PartitionData,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
@@ -264,7 +265,12 @@ impl CompactionService for CompactionServiceImpl {
             .get_table_by_id(index.get_row().table_id())
             .await?;
         let unique_key = table.get_row().unique_key_columns();
-        let records = merge_chunks(key_size, main_table, new, unique_key).await?;
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+        let records =
+            merge_chunks(key_size, main_table, new, unique_key, aggregate_columns).await?;
         let count_and_min =
             write_to_files(records, total_rows as usize, store, new_local_files2).await?;
 
@@ -832,6 +838,7 @@ async fn merge_chunks(
     l: Arc<dyn ExecutionPlan>,
     r: Vec<ArrayRef>,
     unique_key_columns: Option<Vec<&crate::metastore::Column>>,
+    aggregate_columns: Option<Vec<AggregateColumn>>,
 ) -> Result<SendableRecordBatchStream, CubeError> {
     let schema = l.schema();
     let r = RecordBatch::try_new(schema.clone(), r)?;
@@ -848,7 +855,31 @@ async fn merge_chunks(
     ]);
     let mut res: Arc<dyn ExecutionPlan> = Arc::new(MergeSortExec::try_new(Arc::new(inputs), key)?);
 
-    if let Some(key_columns) = unique_key_columns {
+    if let Some(aggregate_columns) = aggregate_columns {
+        let mut groups = Vec::with_capacity(key_size);
+        let schema = res.schema();
+        for i in 0..key_size {
+            let f = schema.field(i);
+            let col: Arc<dyn PhysicalExpr> = Arc::new(Column::new(f.name().as_str(), i));
+            groups.push((col, f.name().clone()));
+        }
+        let aggregates = aggregate_columns
+            .iter()
+            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let output_sort_order = (0..key_size).map(|x| x as usize).collect();
+
+        res = Arc::new(HashAggregateExec::try_new(
+            AggregateStrategy::InplaceSorted,
+            Some(output_sort_order),
+            AggregateMode::Final,
+            groups,
+            aggregates,
+            res.clone(),
+            schema,
+        )?);
+    } else if let Some(key_columns) = unique_key_columns {
         res = Arc::new(LastRowByUniqueKeyExec::try_new(
             res.clone(),
             key_columns
@@ -860,7 +891,7 @@ async fn merge_chunks(
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
-        )?)
+        )?);
     }
 
     Ok(res.execute(0).await?)
