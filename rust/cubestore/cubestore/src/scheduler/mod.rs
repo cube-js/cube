@@ -16,7 +16,7 @@ use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use flatbuffers::bitflags::_core::time::Duration;
 use futures_timer::Delay;
-use log::{error, trace};
+use log::error;
 use std::collections::{BinaryHeap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
