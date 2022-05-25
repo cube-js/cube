@@ -621,7 +621,7 @@ impl Config {
                 ),
                 compaction_in_memory_chunks_max_length: env_parse(
                     "CUBESTORE_COMPACTION_IN_MEMORY_CHUNKS_MAX_LENGTH",
-                    100
+                    100,
                 ),
                 compaction_in_memory_max_duration: env_parse(
                     "CUBESTORE_COMPACTION_IN_MEMORY_MAX_DURATION",
