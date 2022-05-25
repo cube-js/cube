@@ -1,12 +1,6 @@
-import { useEffect, useState } from "react"
-import cubejs from "@cubejs-client/core";
-import { Spin, Table } from "antd";
-
-// Initiate Cube.js API
-const cubejsApi = cubejs(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTMyODIzNDQsImV4cCI6MTY1NTg3NDM0NH0.6__5oRpMmh8dEbBmhN-tkFOVc-B8CNU8IkxX7E_z5XI',
-  { apiUrl: 'https://inherent-lynx.aws-us-east-1.cubecloudapp.dev/cubejs-api/v1' }
-);
+import { useEffect, useState, useContext } from "react"
+import { CubeContext } from '@cubejs-client/react'
+import { Spin, Table } from "antd"
 
 // Declaire Pivot Configuration [Constant for each chart]
 const pivotConfig = {
@@ -22,7 +16,7 @@ const pivotConfig = {
 }
 
 const TableRenderer = () => {
-
+  const { cubejsApi } = useContext(CubeContext);
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [columns, setColumns] = useState([])

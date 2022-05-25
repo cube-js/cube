@@ -1,6 +1,6 @@
-import React from "react";
-import cubejs from "@cubejs-client/core";
+import React, { useContext } from "react";
 import { QueryRenderer } from "@cubejs-client/react";
+import { CubeContext } from '@cubejs-client/react';
 import { Spin } from "antd";
 import {
   CartesianGrid,
@@ -24,13 +24,6 @@ const CartesianChart = ({ resultSet, children, ChartComponent }) => (
       <Tooltip />
     </ChartComponent>
   </ResponsiveContainer>
-);
-
-const cubejsApi = cubejs(
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTMyODIzNDQsImV4cCI6MTY1NTg3NDM0NH0.6__5oRpMmh8dEbBmhN-tkFOVc-B8CNU8IkxX7E_z5XI",
-  {
-    apiUrl: "https://inherent-lynx.aws-us-east-1.cubecloudapp.dev/cubejs-api/v1"
-  }
 );
 
 const renderChart = ({
@@ -65,6 +58,7 @@ const renderChart = ({
 };
 
 const ChartRenderer = () => {
+  const { cubejsApi } = useContext(CubeContext);
   return (
     <QueryRenderer
       query={{
