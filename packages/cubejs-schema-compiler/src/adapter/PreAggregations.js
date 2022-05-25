@@ -546,6 +546,7 @@ export class PreAggregations {
   }
 
   // eslint-disable-next-line no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getCubeLattice(cube, preAggregationName, preAggregation) {
     throw new UserError('Auto rollups supported only in Enterprise version');
   }
@@ -576,6 +577,7 @@ export class PreAggregations {
       return R.pipe(
         R.toPairs,
         // eslint-disable-next-line no-unused-vars
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         R.filter(([k, a]) => a.type === 'autoRollup'),
         R.map(([preAggregationName, preAggregation]) => {
           const cubeLattice = this.getCubeLattice(cube, preAggregationName, preAggregation);
@@ -635,6 +637,7 @@ export class PreAggregations {
     return R.pipe(
       R.toPairs,
       // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin'),
       R.map(([preAggregationName, preAggregation]) => {
         const preAggObj = this.evaluatedPreAggregationObj(
