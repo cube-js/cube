@@ -6,17 +6,17 @@ use crate::data_frame_from;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
+use arrow::datatypes::Schema as ArrowSchema;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
+use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Sum};
+use datafusion::physical_plan::{AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;
-use arrow::datatypes::Schema as ArrowSchema;
-use datafusion::physical_plan::{AggregateExpr, PhysicalExpr};
-use datafusion::physical_plan::expressions::{Column as FusionColumn, Sum, Max};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct AggregateColumnIndex {
@@ -65,22 +65,21 @@ impl AggregateColumn {
         &self.function
     }
 
-    pub fn aggregate_expr(&self, schema: &ArrowSchema) -> Result<Arc<dyn AggregateExpr>, CubeError> {
-        let col  = Arc::new(FusionColumn::new_with_schema(
+    pub fn aggregate_expr(
+        &self,
+        schema: &ArrowSchema,
+    ) -> Result<Arc<dyn AggregateExpr>, CubeError> {
+        let col = Arc::new(FusionColumn::new_with_schema(
             self.column.get_name().as_str(),
             &schema,
-            )?);
-        let res :Arc<dyn AggregateExpr> = match self.function {
-            AggregateFunction::SUM => Arc::new(Sum::new(
-                col.clone(), 
-                col.name(), 
-                col.data_type(schema)?
-                )),
-            AggregateFunction::MAX => Arc::new(Max::new(
-                col.clone(), 
-                col.name(), 
-                col.data_type(schema)?
-                ))
+        )?);
+        let res: Arc<dyn AggregateExpr> = match self.function {
+            AggregateFunction::SUM => {
+                Arc::new(Sum::new(col.clone(), col.name(), col.data_type(schema)?))
+            }
+            AggregateFunction::MAX => {
+                Arc::new(Max::new(col.clone(), col.name(), col.data_type(schema)?))
+            }
         };
         Ok(res)
     }

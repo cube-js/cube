@@ -35,7 +35,7 @@ use crate::metastore::partition::PartitionIndexKey;
 use crate::metastore::source::{
     Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
 };
-use crate::metastore::table::{TableIndexKey, TablePath, AggregateColumnIndex};
+use crate::metastore::table::{AggregateColumnIndex, TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::table::{Row, TableValue};
@@ -3195,7 +3195,7 @@ impl MetaStore for RocksMetaStore {
                             }
                         }
                         let function = aggr.0.parse::<AggregateFunction>()?;
-                        Ok(AggregateColumnIndex::new(index, function)) 
+                        Ok(AggregateColumnIndex::new(index, function))
                     })
                 .collect::<Result<Vec<_>,_>>()?;
 
@@ -3203,7 +3203,6 @@ impl MetaStore for RocksMetaStore {
             } else {
                 vec![]
             };
-
             let table = Table::new(
                 table_name,
                 schema_id.get_id(),
@@ -5145,8 +5144,8 @@ fn swap_active_partitions_impl(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::table::AggregateColumn;
+    use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
     use futures_timer::Delay;
@@ -5559,18 +5558,17 @@ mod tests {
             assert_eq!(
                 aggr_columns[0],
                 AggregateColumn::new(
-                    Column::new("aggr_col2".to_string(), ColumnType::Int, 4), 
+                    Column::new("aggr_col2".to_string(), ColumnType::Int, 4),
                     AggregateFunction::SUM
-                    )
+                )
             );
             assert_eq!(
                 aggr_columns[1],
                 AggregateColumn::new(
                     Column::new("aggr_col1".to_string(), ColumnType::Int, 3),
-                    AggregateFunction::MAX                     
+                    AggregateFunction::MAX
                 )
             );
-
 
             let indexes = meta_store.get_table_indexes(table_id).await.unwrap();
             assert_eq!(indexes.len(), 2);

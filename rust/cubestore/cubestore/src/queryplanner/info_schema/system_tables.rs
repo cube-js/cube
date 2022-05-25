@@ -144,15 +144,10 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 Box::new(|tables| {
                     let aggregates = tables
                         .iter()
-                        .map(|row| {
-                            format!("{:?}", row.table.get_row().aggregate_columns())
-                        })
+                        .map(|row| format!("{:?}", row.table.get_row().aggregate_columns()))
                         .collect::<Vec<_>>();
                     Arc::new(StringArray::from(
-                        aggregates
-                            .iter()
-                            .map(|v| v.as_str())
-                            .collect::<Vec<_>>(),
+                        aggregates.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
                     ))
                 }),
             ),
