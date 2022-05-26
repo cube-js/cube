@@ -1116,6 +1116,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::ARRAYINT8 => "bigint[]".to_string(),
                             PgTypeId::ARRAYFLOAT4 => "real[]".to_string(),
                             PgTypeId::ARRAYFLOAT8 => "double precision[]".to_string(),
+                            PgTypeId::ACLITEM => format!("aclitem{}", typemod_str()),
+                            PgTypeId::ARRAYACLITEM => format!("aclitem{}[]", typemod_str()),
                             PgTypeId::BPCHAR => match typemod {
                                 Some(typemod) if typemod < 0 => "bpchar".to_string(),
                                 _ => format!("character{}", typemod_str()),
