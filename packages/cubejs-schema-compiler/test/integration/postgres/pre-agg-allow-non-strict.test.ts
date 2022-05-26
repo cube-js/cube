@@ -1,6 +1,5 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { dbRunner } from './PostgresDBRunner';
 
 const getSql = () => `
   select 3060 as row_id, 'CA-2017-131492' as order_id, to_date('2020-10-19', 'YYYY-MM-DD') as order_date, 'HH-15010' as customer_id, 'San Francisco' as city, 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name, 24.36800 as sales, 2 as quantity, 0.20000 as discount, -3.35060 as profit union all
