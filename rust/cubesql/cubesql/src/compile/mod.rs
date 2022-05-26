@@ -7770,7 +7770,7 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "to_char_1",
             execute_query(
-                "select to_char(now(), 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
+                "SELECT to_char(x, 'YYYY-MM-DD HH24:MI:SS.MS TZ') FROM (SELECT Str_to_date('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') x) e".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -7779,7 +7779,15 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "to_char_2",
             execute_query(
-                "select to_char(now(), a) from (select 'YYYY-MM-DD HH24:MI:SS.MS TZ' a union all select 'YYYY-MM-DD HH24:MI:SS' a) x".to_string(),
+                "
+                SELECT to_char(x, 'YYYY-MM-DD HH24:MI:SS.MS TZ') 
+                FROM  (
+                        SELECT Str_to_date('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') x 
+                    UNION ALL 
+                        SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') x
+                ) e
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -7790,14 +7798,11 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_to_char_query() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "metabase_to_char_query",
-            execute_query(
-                "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        execute_query(
+            "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
 
         Ok(())
     }
