@@ -5855,6 +5855,240 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_excel() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "excel_select_db_query",
+            execute_query(
+                "
+                SELECT
+                    'db' as Database,
+                    ns.nspname as Schema,
+                    relname as Name,
+                    CASE
+                        WHEN ns.nspname Like E'pg\\_catalog' then 'Catalog'
+                        WHEN ns.nspname Like E'information\\_schema' then 'Information'
+                        WHEN relkind = 'f' then 'Foreign'
+                        ELSE 'User'
+                    END as TableType,
+                    pg_get_userbyid(relowner) AS definer,
+                    rel.oid as Oid,
+                    relacl as ACL,
+                    true as HasOids,
+                    relhassubclass as HasSubtables,
+                    reltuples as RowNumber,
+                    description as Comment,
+                    relnatts as ColumnNumber,
+                    relhastriggers as TriggersNumber,
+                    conname as Constraint,
+                    conkey as ColumnConstrainsIndexes
+                FROM pg_class rel
+                INNER JOIN pg_namespace ns ON relnamespace = ns.oid
+                LEFT OUTER JOIN pg_description des ON
+                    des.objoid = rel.oid AND
+                    des.objsubid = 0
+                LEFT OUTER JOIN pg_constraint c ON
+                    c.conrelid = rel.oid AND
+                    c.contype = 'p'
+                WHERE
+                    (
+                        (relkind = 'r') OR
+                        (relkind = 's') OR
+                        (relkind = 'f')
+                    ) AND
+                    NOT ns.nspname LIKE E'pg\\_temp\\_%%' AND
+                    NOT ns.nspname like E'pg\\_%' AND
+                    NOT ns.nspname like E'information\\_schema' AND
+                    ns.nspname::varchar like E'public' AND
+                    relname::varchar like '%' AND
+                    pg_get_userbyid(relowner)::varchar like '%'
+                ORDER BY relname
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "excel_typname_big_query",
+            execute_query(
+                "
+                SELECT
+                    typname as name,
+                    n.nspname as Schema,
+                    pg_get_userbyid(typowner) as Definer,
+                    typlen as Length,
+                    t.oid as oid,
+                    typbyval as IsReferenceType,
+                    case
+                        when typtype = 'b' then 'base'
+                        when typtype = 'd' then 'domain'
+                        when typtype = 'c' then 'composite'
+                        when typtype = 'd' then 'pseudo'
+                    end as Type,
+                    case
+                        when typalign = 'c' then 'char'
+                        when typalign = 's' then 'short'
+                        when typalign = 'i' then 'int'
+                        else 'double'
+                    end as alignment,
+                    case
+                        when typstorage = 'p' then 'plain'
+                        when typstorage = 'e' then 'secondary'
+                        when typstorage = 'm' then 'compressed inline'
+                        else 'secondary or compressed inline'
+                    end as ValueStorage,
+                    typdefault as DefaultValue,
+                    description as comment
+                FROM pg_type t
+                LEFT OUTER JOIN
+                    pg_description des ON des.objoid = t.oid,
+                    pg_namespace n
+                WHERE
+                    t.typnamespace = n.oid and
+                    t.oid::varchar like E'1033' and
+                    typname like E'%' and
+                    n.nspname like E'%' and
+                    pg_get_userbyid(typowner)::varchar like E'%' and
+                    typtype::varchar like E'c'
+                ORDER BY name
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "excel_typname_aclitem_query",
+            execute_query(
+                "
+                SELECT
+                    typname as name,
+                    t.oid as oid,
+                    typtype as Type,
+                    typelem as TypeElement
+                FROM pg_type t
+                WHERE
+                    t.oid::varchar like '1034' and
+                    typtype::varchar like 'b' and
+                    typelem != 0
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "excel_pg_constraint_query",
+            execute_query(
+                "
+                SELECT
+                    a.conname as Name,
+                    ns.nspname as Schema,
+                    mycl.relname as Table,
+                    b.conname as ReferencedKey,
+                    frns.nspname as ReferencedSchema,
+                    frcl.relname as ReferencedTable,
+                    a.oid as Oid,
+                    a.conkey as ColumnIndexes,
+                    a.confkey as ForeignColumnIndexes,
+                    a.confupdtype as UpdateActionCode,
+                    a.confdeltype as DeleteActionCode,
+                    a.confmatchtype as ForeignKeyMatchType,
+                    a.condeferrable as IsDeferrable,
+                    a.condeferred as Iscondeferred
+                FROM pg_constraint a
+                inner join pg_constraint b on (
+                    a.confrelid = b.conrelid AND
+                    a.confkey = b.conkey
+                )
+                INNER JOIN pg_namespace ns ON a.connamespace = ns.oid
+                INNER JOIN pg_class mycl ON a.conrelid = mycl.oid
+                LEFT OUTER JOIN pg_class frcl ON a.confrelid = frcl.oid
+                INNER JOIN pg_namespace frns ON frcl.relnamespace = frns.oid
+                WHERE
+                    a.contype = 'f' AND
+                    (
+                        b.contype = 'p' OR
+                        b.contype = 'u'
+                    ) AND
+                    a.oid::varchar like '%' AND
+                    a.conname like '%' AND
+                    ns.nspname like E'public' AND
+                    mycl.relname like E'KibanaSampleDataEcommerce' AND
+                    frns.nspname like '%' AND
+                    frcl.relname like '%'
+                ORDER BY 1
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "excel_pg_attribute_query",
+            execute_query(
+                "
+                SELECT DISTINCT
+                    attname AS Name,
+                    attnum
+                FROM pg_attribute
+                JOIN pg_class ON oid = attrelid
+                INNER JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid
+                WHERE
+                    attnum > 0 AND
+                    attisdropped IS FALSE AND
+                    pg_namespace.nspname like 'public' AND
+                    relname like 'KibanaSampleDataEcommerce' AND
+                    attnum in (2)
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "excel_fkey_query",
+            execute_query(
+                "
+                SELECT
+                    nspname as Schema,
+                    cl.relname as Table,
+                    clr.relname as RefTableName,
+                    conname as Name,
+                    conkey as ColumnIndexes,
+                    confkey as ColumnRefIndexes
+                FROM pg_constraint
+                INNER JOIN pg_namespace ON connamespace = pg_namespace.oid
+                INNER JOIN pg_class cl ON conrelid = cl.oid
+                INNER JOIN pg_class clr ON confrelid = clr.oid
+                WHERE
+                    contype = 'f' AND
+                    conname like E'sample\\_fkey' AND
+                    nspname like E'public' AND
+                    cl.relname like E'KibanaSampleDataEcommerce'
+                order by 1
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_explain_table() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             execute_query(
