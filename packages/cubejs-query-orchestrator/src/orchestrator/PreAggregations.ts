@@ -1469,6 +1469,7 @@ export class PreAggregations {
     let queryParamsReplacement = null;
 
     const preAggregationsTablesToTempTablesPromise = preAggregations.map((p: PreAggregationDescription, i) => (preAggregationsTablesToTempTables) => {
+      console.log('III', i, p.tableName, preAggregationsTablesToTempTables);
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
         () => this.driverFactory(p.dataSource || 'default'),
@@ -1476,7 +1477,7 @@ export class PreAggregations {
         this.queryCache,
         this,
         p,
-        preAggregationsTablesToTempTables,
+        [],
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           waitForRenew: queryBody.renewQuery,
