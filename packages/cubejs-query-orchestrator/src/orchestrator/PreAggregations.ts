@@ -1507,10 +1507,13 @@ export class PreAggregations {
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
 
-    return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => ({
-      preAggregationsTablesToTempTables,
-      values: queryParamsReplacement
-    }));
+    return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => {
+      console.log('TTT', preAggregationsTablesToTempTables);
+      return {
+        preAggregationsTablesToTempTables,
+        values: queryParamsReplacement
+      };
+    });
   }
 
   public async checkPartitionsBuildRangeCache(queryBody) {
