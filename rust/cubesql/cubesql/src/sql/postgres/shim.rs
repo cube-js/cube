@@ -122,20 +122,27 @@ impl ConnectionError {
             ConnectionError::Cube(e) => {
                 protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
             }
-            ConnectionError::CompilationError(e) => match e {
-                CompilationError::Internal(_, _) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InternalError,
-                    e.to_string(),
-                ),
-                CompilationError::User(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InvalidSqlStatement,
-                    e.to_string(),
-                ),
-                CompilationError::Unsupported(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::FeatureNotSupported,
-                    e.to_string(),
-                ),
-            },
+            ConnectionError::CompilationError(e) => {
+                fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
+                    match e {
+                        CompilationError::Internal(_, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InternalError,
+                            e.to_string(),
+                        ),
+                        CompilationError::User(_) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InvalidSqlStatement,
+                            e.to_string(),
+                        ),
+                        CompilationError::Unsupported(_) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            e.to_string(),
+                        ),
+                        CompilationError::Extended(e, _) => to_error_response(*e),
+                    }
+                }
+
+                to_error_response(e)
+            }
             ConnectionError::Protocol(e) => e.to_error_response(),
         }
     }
@@ -259,10 +266,21 @@ impl AsyncPostgresShim {
         &mut self,
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
-        self.logger.error(
-            format!("Error during processing PostgreSQL message: {}", err).as_str(),
-            None,
-        );
+        let (message, props) = match &err {
+            ConnectionError::CompilationError(err) => match err {
+                CompilationError::Extended(err, props) => (err.to_string(), Some(props.clone())),
+                _ => (
+                    format!("Error during processing PostgreSQL message: {}", err),
+                    None,
+                ),
+            },
+            _ => (
+                format!("Error during processing PostgreSQL message: {}", err),
+                None,
+            ),
+        };
+
+        self.logger.error(message.as_str(), props);
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -564,12 +582,8 @@ impl AsyncPostgresShim {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_statement_to_cube_query(
-                &prepared_statement,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan =
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             Some(Portal::new(plan, format, true))
@@ -587,11 +601,7 @@ impl AsyncPostgresShim {
         let prepared = if parse.query.trim() == "" {
             None
         } else {
-            let query = parse_sql_to_statement(
-                &parse.query,
-                DatabaseProtocol::PostgreSQL,
-                self.logger.clone(),
-            )?;
+            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
 
             if self.statements.len()
                 >= self
@@ -629,12 +639,7 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(
-                &hacked_query,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
 
             let description = if let Some(description) = plan.to_row_description(Format::Text)? {
                 if description.len() > 0 {

@@ -4,6 +4,7 @@ use log::SetLoggerError;
 use sqlparser::parser::ParserError;
 use std::{
     backtrace::Backtrace,
+    collections::HashMap,
     fmt,
     fmt::{Debug, Formatter},
     num::ParseIntError,
@@ -21,6 +22,7 @@ pub struct CubeError {
 pub enum CubeErrorCauseType {
     User,
     Internal,
+    Extended(Box<CubeErrorCauseType>, HashMap<String, String>),
 }
 
 impl CubeError {
@@ -61,12 +63,21 @@ impl CubeError {
 
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.cause {
-            CubeErrorCauseType::User => f.write_fmt(format_args!("{}", self.message)),
-            CubeErrorCauseType::Internal => {
-                f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+        fn write_fmt(
+            cause: CubeErrorCauseType,
+            message: String,
+            f: &mut Formatter<'_>,
+        ) -> fmt::Result {
+            match cause {
+                CubeErrorCauseType::User => f.write_fmt(format_args!("{}", message)),
+                CubeErrorCauseType::Internal => {
+                    f.write_fmt(format_args!("{:?}: {}", cause, message))
+                }
+                CubeErrorCauseType::Extended(e, _) => write_fmt(*e, message, f),
             }
         }
+
+        write_fmt(self.cause.clone(), self.message.clone(), f)
     }
 }
 
@@ -102,7 +113,15 @@ impl From<cubeclient::apis::Error<MetaV1Error>> for CubeError {
 
 impl From<crate::compile::CompilationError> for CubeError {
     fn from(v: crate::compile::CompilationError) -> Self {
-        CubeError::internal_with_bt(v.to_string(), v.to_backtrace())
+        match v {
+            crate::compile::CompilationError::Extended(e, props) => {
+                let mut v = Self::from(*e);
+                v.cause = CubeErrorCauseType::Extended(Box::new(v.cause), props.clone());
+
+                v
+            }
+            _ => CubeError::internal_with_bt(v.to_string(), v.to_backtrace()),
+        }
     }
 }
 

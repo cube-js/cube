@@ -23,6 +23,7 @@ use crate::{
     compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
     config::processing_loop::ProcessingLoop,
     telemetry::{ContextLogger, SessionLogger},
+    CubeErrorCauseType,
 };
 
 use crate::{
@@ -84,10 +85,17 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                self.logger.error(
-                    format!("Error during processing MySQL {}: {}", query, e.to_string()).as_str(),
-                    None,
-                );
+                let (message, props) = match &e.cause {
+                    CubeErrorCauseType::Extended(_, props) => {
+                        (e.message.clone(), Some(props.clone()))
+                    }
+                    _ => (
+                        format!("Error during processing MySQL {}: {}", query, e.to_string()),
+                        None,
+                    ),
+                };
+
+                self.logger.error(message.as_str(), props);
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -213,7 +221,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone(), self.logger.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
@@ -272,17 +280,14 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
     ) -> Result<(), Self::Error> {
         debug!("[mysql] on_execute: {}", input);
 
-        let mut statement = match parse_sql_to_statement(
-            &input.to_string(),
-            DatabaseProtocol::MySQL,
-            self.logger.clone(),
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
-                return Ok(());
-            }
-        };
+        let mut statement =
+            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
+                Ok(s) => s,
+                Err(e) => {
+                    info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
+                    return Ok(());
+                }
+            };
 
         let stmt_prepare = StatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
@@ -418,10 +423,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
-                    self.logger.error(
-                        format!("Error during authentication MySQL connection: {}", e).as_str(),
-                        None,
-                    );
+                    log::warn!("Error during authentication MySQL connection: {}", e);
                 };
 
                 io::Error::new(io::ErrorKind::Other, e.to_string())

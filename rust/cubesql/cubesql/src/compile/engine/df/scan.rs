@@ -28,7 +28,6 @@ use log::warn;
 
 use crate::{
     sql::AuthContext,
-    telemetry::ContextLogger,
     transport::{TransportService, TransportServiceMetaFields},
 };
 use chrono::{TimeZone, Utc};
@@ -108,7 +107,6 @@ impl UserDefinedLogicalNode for CubeScanNode {
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
     pub meta_fields: Option<HashMap<String, String>>,
-    pub logger: Arc<dyn ContextLogger>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -134,7 +132,6 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
                     meta_fields: self.meta_fields.clone(),
-                    logger: self.logger.clone(),
                 }))
             } else {
                 None
@@ -154,7 +151,6 @@ struct CubeScanExecutionPlan {
     transport: Arc<dyn TransportService>,
     // Fields passing to cube (for now using to pass app_name and protocol for telemetry)
     meta_fields: TransportServiceMetaFields,
-    logger: Arc<dyn ContextLogger>,
 }
 
 impl CubeScanExecutionPlan {
@@ -568,20 +564,6 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
-        #[derive(Debug)]
-        struct TestContextLogger {}
-
-        #[async_trait]
-        impl ContextLogger for TestContextLogger {
-            fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
-                log::error!("{} {:?}", message, props.unwrap_or_default());
-            }
-        }
-
-        Arc::new(TestContextLogger {})
-    }
-
     #[tokio::test]
     async fn test_df_cube_scan_execute() {
         let schema = Arc::new(Schema::new(vec![
@@ -617,7 +599,6 @@ mod tests {
             }),
             transport: get_test_transport(),
             meta_fields: None,
-            logger: get_test_context_logger(),
         };
 
         let runtime = Arc::new(
