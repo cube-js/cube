@@ -27,6 +27,8 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 1016  | _int8                      | pg_catalog         | true       |
 | 1021  | _float4                    | pg_catalog         | true       |
 | 1022  | _float8                    | pg_catalog         | true       |
+| 1033  | aclitem                    | pg_catalog         | true       |
+| 1034  | _aclitem                   | pg_catalog         | true       |
 | 1042  | bpchar                     | pg_catalog         | true       |
 | 1043  | varchar                    | pg_catalog         | true       |
 | 1082  | date                       | pg_catalog         | true       |

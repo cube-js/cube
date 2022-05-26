@@ -27,6 +27,8 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 1016  | NULL |
 | 1021  | NULL |
 | 1022  | NULL |
+| 1033  | NULL |
+| 1034  | NULL |
 | 1042  | NULL |
 | 1043  | NULL |
 | 1082  | NULL |
