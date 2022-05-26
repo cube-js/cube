@@ -7763,4 +7763,18 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_subquery_with_same_name_excel() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "subquery_with_same_name_excel",
+            execute_query(
+                "SELECT oid, (SELECT oid FROM pg_type WHERE typname like 'geography') as dd FROM pg_type WHERE typname like 'geometry'".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
