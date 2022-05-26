@@ -782,9 +782,9 @@ mod tests {
 
             let data: Vec<ArrayRef> = vec![foos, boos, sums];
 
-            let indicies = meta_store.get_table_indexes(table.get_id()).await.unwrap();
+            let indices = meta_store.get_table_indexes(table.get_id()).await.unwrap();
 
-            let aggr_index = indicies
+            let aggr_index = indices
                 .iter()
                 .find(|i| i.get_row().get_name() == "aggr")
                 .unwrap();
@@ -899,6 +899,9 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
+    ///Post-processing of index columns chunk data before saving to parqet files.
+    ///Suitable for pre-aggregaions and similar things
+    ///`data` must be sorted in order of index columns
     async fn post_process_columns(
         &self,
         index: IdRow<Index>,

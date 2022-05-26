@@ -833,6 +833,7 @@ async fn write_to_files_by_keys(
     Ok(row_counts)
 }
 
+///Makes `SendableRecordBatchStream` with result of merging  persistent chunk `l` and in-memory chunk `r`
 async fn merge_chunks(
     key_size: usize,
     l: Arc<dyn ExecutionPlan>,
