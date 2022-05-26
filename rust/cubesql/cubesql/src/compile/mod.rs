@@ -51,8 +51,8 @@ use self::{
             create_pg_numeric_scale_udf, create_pg_table_is_visible_udf, create_pg_truetypid_udf,
             create_pg_truetypmod_udf, create_pg_type_is_visible_udf, create_quarter_udf,
             create_second_udf, create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
-            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
-            create_year_udf,
+            create_to_char_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
+            create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2386,6 +2386,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_constraintdef_udf());
         ctx.register_udf(create_pg_truetypid_udf());
         ctx.register_udf(create_pg_truetypmod_udf());
+        ctx.register_udf(create_to_char_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7756,6 +7757,43 @@ ORDER BY \"COUNT(count)\" DESC"
                 ORDER BY a.attrelid ASC, a.attnum ASC
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_to_char_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "to_char_1",
+            execute_query(
+                "select to_char(now(), 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "to_char_2",
+            execute_query(
+                "select to_char(now(), a) from (select 'YYYY-MM-DD HH24:MI:SS.MS TZ' a union all select 'YYYY-MM-DD HH24:MI:SS' a) x".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_to_char_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_to_char_query",
+            execute_query(
+                "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

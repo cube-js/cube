@@ -7,8 +7,9 @@ use datafusion::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
             Float64Array, GenericStringArray, Int32Array, Int64Array, Int64Builder,
             IntervalDayTimeArray, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
-            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampNanosecondArray,
-            UInt32Array, UInt32Builder,
+            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt32Array,
+            UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -953,6 +954,21 @@ pub fn create_date_add_udf() -> ScalarUDF {
     )
 }
 
+fn postgres_datetime_format_to_iso(format: String) -> String {
+    format
+        .replace("%i", "%M")
+        .replace("%s", "%S")
+        .replace(".%f", "%.f")
+        .replace("YYYY", "%Y")
+        .replace("DD", "%d")
+        .replace("HH24", "%H")
+        .replace("MI", "%M")
+        .replace("SS", "%S")
+        .replace(".US", "%.f")
+        .replace("MM", "%m")
+        .replace(".MS", "%.3f")
+}
+
 pub fn create_str_to_date_udf() -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |args: &[ColumnarValue]| {
@@ -978,17 +994,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
                 }
             };
 
-            let format = format
-                .replace("%i", "%M")
-                .replace("%s", "%S")
-                .replace(".%f", "%.f")
-                .replace("YYYY", "%Y")
-                .replace("DD", "%d")
-                .replace("HH24", "%H")
-                .replace("MI", "%M")
-                .replace("SS", "%S")
-                .replace(".US", "%.f")
-                .replace("MM", "%m");
+            let format = postgres_datetime_format_to_iso(format.clone());
 
             let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
@@ -1026,6 +1032,137 @@ pub fn create_current_timestamp_udf() -> ScalarUDF {
     ScalarUDF::new(
         "current_timestamp",
         &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+macro_rules! parse_timestamp_arr {
+    ($ARR:expr, $ARR_TYPE: ident, $FN_NAME: ident) => {{
+        let arr = $ARR.as_any().downcast_ref::<$ARR_TYPE>();
+        if arr.is_some() {
+            let mut result = Vec::new();
+            let arr = arr.unwrap();
+            for i in 0..arr.len() {
+                result.push(Duration::$FN_NAME(arr.value(i)));
+            }
+
+            Some(result)
+        } else {
+            None
+        }
+    }};
+}
+
+pub fn create_to_char_udf() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        Arc::new(move |args: &[ColumnarValue]| {
+            let (durations, timezone) = match &args[0] {
+                ColumnarValue::Scalar(scalar) => {
+                    let (duration, timezone) = match scalar {
+                        ScalarValue::TimestampNanosecond(Some(value), tz) => (
+                            Duration::nanoseconds(*value),
+                            tz.clone().unwrap_or_default(),
+                        ),
+                        ScalarValue::TimestampMillisecond(Some(value), tz) => (
+                            Duration::milliseconds(*value),
+                            tz.clone().unwrap_or_default(),
+                        ),
+                        ScalarValue::TimestampMicrosecond(Some(value), tz) => (
+                            Duration::microseconds(*value),
+                            tz.clone().unwrap_or_default(),
+                        ),
+                        ScalarValue::TimestampSecond(Some(value), tz) => {
+                            (Duration::seconds(*value), tz.clone().unwrap_or_default())
+                        }
+                        _ => {
+                            return Err(DataFusionError::Execution(
+                                "unsupported datetime format for to_char".to_string(),
+                            ))
+                        }
+                    };
+
+                    (vec![duration], timezone)
+                }
+                ColumnarValue::Array(array) => {
+                    let res = {
+                        let mut arr =
+                            parse_timestamp_arr!(array, TimestampNanosecondArray, nanoseconds);
+                        if arr.is_none() {
+                            arr = parse_timestamp_arr!(
+                                array,
+                                TimestampMillisecondArray,
+                                milliseconds
+                            );
+                        }
+                        if arr.is_none() {
+                            arr = parse_timestamp_arr!(
+                                array,
+                                TimestampMicrosecondArray,
+                                microseconds
+                            );
+                        }
+                        if arr.is_none() {
+                            arr = parse_timestamp_arr!(array, TimestampSecondArray, seconds);
+                        }
+                        if arr.is_none() {
+                            return Err(DataFusionError::Execution(
+                                "unsupported datetime format for to_char".to_string(),
+                            ));
+                        }
+
+                        arr
+                    };
+
+                    (res.unwrap(), "".to_string())
+                }
+            };
+
+            let formats = match &args[1] {
+                ColumnarValue::Scalar(ScalarValue::Utf8(str)) => {
+                    vec![str.clone().unwrap_or_default()]
+                }
+                ColumnarValue::Array(arr) => {
+                    let string_arr = downcast_string_arg!(arr, "format_str", i32);
+                    let mut result = Vec::new();
+                    for i in 0..arr.len() {
+                        result.push(string_arr.value(i).to_string());
+                    }
+
+                    result
+                }
+                _ => vec!["".to_string()],
+            };
+
+            let mut builder = StringBuilder::new(1);
+
+            for (i, format) in formats.iter().enumerate() {
+                let duration = if durations.len() > i {
+                    durations[i]
+                } else {
+                    *durations.last().unwrap()
+                };
+
+                let replaced_format =
+                    postgres_datetime_format_to_iso(format.clone()).replace("TZ", &timezone);
+
+                let secs = duration.num_seconds();
+                let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
+                let timestamp = NaiveDateTime::from_timestamp(secs, nanosecs as u32);
+
+                builder
+                    .append_value(timestamp.format(&replaced_format).to_string())
+                    .unwrap();
+            }
+
+            Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+        });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "to_char",
+        &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
     )
