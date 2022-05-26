@@ -92,19 +92,25 @@ pub enum CommandCompletion {
     Rollback,
     Set,
     Select(u32),
+    DeclareCursor,
     Discard(String),
 }
 
 impl CommandCompletion {
     pub fn to_pg_command(self) -> CommandComplete {
         match self {
+            // IDENTIFIER ONLY
             CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
-            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+            CommandCompletion::DeclareCursor => {
+                CommandComplete::Plain("DECLARE CURSOR".to_string())
+            }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
+            // ROWS COUNT
+            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
         }
     }
 }

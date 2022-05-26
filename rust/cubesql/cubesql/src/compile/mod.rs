@@ -1,4 +1,5 @@
-use std::{backtrace::Backtrace, collections::HashMap, env, sync::Arc};
+use core::fmt;
+use std::{backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, sync::Arc};
 
 use chrono::{prelude::*, Duration};
 
@@ -2576,6 +2577,30 @@ pub enum QueryPlan {
     MetaTabular(StatusFlags, Box<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
     DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
+}
+
+impl fmt::Debug for QueryPlan {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryPlan::MetaOk(flags, completion) => {
+                f.write_str(&format!(
+                    "MetaOk(StatusFlags: {:?}, CommandCompletion: {:?})", flags, completion
+                ))
+            },
+            QueryPlan::MetaTabular(flags, _) => {
+                f.write_str(&format!(
+                    "MetaTabular(StatusFlags: {:?}, DataFrame: hidden)",
+                    flags
+                ))
+            },
+            QueryPlan::DataFusionSelect(flags, _, _) => {
+                f.write_str(&format!(
+                    "DataFusionSelect(StatusFlags: {:?}, LogicalPlan: hidden, DFSessionContext: hidden)",
+                    flags
+                ))
+            },
+        }
+    }
 }
 
 impl QueryPlan {

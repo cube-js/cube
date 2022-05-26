@@ -11,7 +11,7 @@ use pg_srv::{protocol, BindValue, ProtocolError};
 use sqlparser::ast;
 use std::fmt;
 
-use crate::sql::shim::ConnectionError;
+use crate::sql::shim::{ConnectionError, QueryPlanExt};
 use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
 use futures::StreamExt;
 
@@ -34,21 +34,22 @@ impl PreparedStatement {
     }
 }
 
+#[derive(Debug)]
 pub struct PreparedState {
     plan: QueryPlan,
-    description: Option<protocol::RowDescription>,
-}
-
-impl fmt::Debug for PreparedState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("plan: hidden")
-    }
 }
 
 #[derive(Debug)]
 pub struct InExecutionFrameState {
     // Format which is used to return data
     batch: DataFrame,
+    description: Option<protocol::RowDescription>,
+}
+
+impl InExecutionFrameState {
+    fn new(batch: DataFrame, description: Option<protocol::RowDescription>) -> Self {
+        Self { batch, description }
+    }
 }
 
 pub struct InExecutionStreamState {
@@ -56,12 +57,17 @@ pub struct InExecutionStreamState {
     // DF return batch with which unknown size what we cannot control, but client can send max_rows
     // < then batch size and we need to persist somewhere unused part of RecordBatch
     unused: Option<RecordBatch>,
+    description: Option<protocol::RowDescription>,
 }
 
 impl InExecutionStreamState {
-    fn new(stream: SendableRecordBatchStream) -> Self {
+    fn new(
+        stream: SendableRecordBatchStream,
+        description: Option<protocol::RowDescription>,
+    ) -> Self {
         Self {
             stream,
+            description,
             unused: None,
         }
     }
@@ -69,7 +75,13 @@ impl InExecutionStreamState {
 
 impl fmt::Debug for InExecutionStreamState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("stream: hidden")
+        f.write_str("stream: hidden, ")?;
+
+        if let Some(batch) = &self.unused {
+            f.write_str(&format!("unused: Some(num_rows: {})", batch.num_rows()))
+        } else {
+            f.write_str("unused: None")
+        }
     }
 }
 
@@ -94,21 +106,19 @@ unsafe impl Send for Portal {}
 unsafe impl Sync for Portal {}
 
 impl Portal {
-    pub fn new(
-        plan: QueryPlan,
-        format: protocol::Format,
-        description: Option<protocol::RowDescription>,
-    ) -> Self {
+    pub fn new(plan: QueryPlan, format: protocol::Format) -> Self {
         Self {
             format,
-            state: Some(PortalState::Prepared(PreparedState { plan, description })),
+            state: Some(PortalState::Prepared(PreparedState { plan })),
         }
     }
 
-    pub fn get_description(&self) -> Option<protocol::RowDescription> {
+    pub fn get_description(&self) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self.state {
-            Some(PortalState::Prepared(state)) => state.description.clone(),
-            _ => None,
+            Some(PortalState::Prepared(state)) => state.plan.to_row_description(self.format),
+            Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
+            Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
+            _ => panic!("Unable to get description on finished (empty) Portal"),
         }
     }
 
@@ -269,35 +279,38 @@ impl Portal {
     ) -> Result<protocol::CommandComplete, ConnectionError> {
         if let Some(state) = self.state.take() {
             match state {
-                PortalState::Prepared(state) => match state.plan {
-                    QueryPlan::MetaOk(_, completion) => {
-                        self.state = Some(PortalState::Finished);
+                PortalState::Prepared(state) => {
+                    let description = state.plan.to_row_description(self.format)?;
+                    match state.plan {
+                        QueryPlan::MetaOk(_, completion) => {
+                            self.state = Some(PortalState::Finished);
 
-                        Ok(completion.clone().to_pg_command())
+                            Ok(completion.clone().to_pg_command())
+                        }
+                        QueryPlan::MetaTabular(_, batch) => {
+                            let new_state = InExecutionFrameState::new(*batch, description);
+                            let (next_state, complete) = self
+                                .hand_execution_frame_state(writer, new_state, max_rows)
+                                .await?;
+
+                            self.state = Some(next_state);
+
+                            Ok(complete)
+                        }
+                        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                            let df = DFDataFrame::new(ctx.state.clone(), &plan);
+                            let stream = df.execute_stream().await?;
+
+                            let new_state = InExecutionStreamState::new(stream, description);
+                            let (next_state, complete) = self
+                                .hand_execution_stream_state(writer, new_state, max_rows)
+                                .await?;
+                            self.state = Some(next_state);
+
+                            Ok(complete)
+                        }
                     }
-                    QueryPlan::MetaTabular(_, batch) => {
-                        let new_state = InExecutionFrameState { batch: *batch };
-                        let (next_state, complete) = self
-                            .hand_execution_frame_state(writer, new_state, max_rows)
-                            .await?;
-
-                        self.state = Some(next_state);
-
-                        Ok(complete)
-                    }
-                    QueryPlan::DataFusionSelect(_, plan, ctx) => {
-                        let df = DFDataFrame::new(ctx.state.clone(), &plan);
-                        let stream = df.execute_stream().await?;
-
-                        let new_state = InExecutionStreamState::new(stream);
-                        let (next_state, complete) = self
-                            .hand_execution_stream_state(writer, new_state, max_rows)
-                            .await?;
-                        self.state = Some(next_state);
-
-                        Ok(complete)
-                    }
-                },
+                }
                 PortalState::InExecutionFrame(frame_state) => {
                     let (next_state, complete) = self
                         .hand_execution_frame_state(writer, frame_state, max_rows)
@@ -364,9 +377,10 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            state: Some(PortalState::InExecutionFrame(InExecutionFrameState {
-                batch: generate_testing_data_frame(3),
-            })),
+            state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
+                generate_testing_data_frame(3),
+                None,
+            ))),
         };
 
         portal.execute(&mut writer, 10).await?;
@@ -382,9 +396,10 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            state: Some(PortalState::InExecutionFrame(InExecutionFrameState {
-                batch: generate_testing_data_frame(3),
-            })),
+            state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
+                generate_testing_data_frame(3),
+                None,
+            ))),
         };
 
         let res = portal.execute(&mut writer, 1).await;
@@ -405,9 +420,10 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            state: Some(PortalState::InExecutionFrame(InExecutionFrameState {
-                batch: generate_testing_data_frame(3),
-            })),
+            state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
+                generate_testing_data_frame(3),
+                None,
+            ))),
         };
 
         portal.execute(&mut writer, 0).await?;
@@ -426,10 +442,9 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            state: Some(PortalState::InExecutionStream(InExecutionStreamState {
-                stream,
-                unused: None,
-            })),
+            state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
+                stream, None,
+            ))),
         };
 
         portal.execute(&mut writer, 1).await?;
@@ -457,10 +472,9 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            state: Some(PortalState::InExecutionStream(InExecutionStreamState {
-                stream,
-                unused: None,
-            })),
+            state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
+                stream, None,
+            ))),
         };
 
         // use 1 batch
