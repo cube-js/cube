@@ -509,7 +509,7 @@ impl<'ast> Visitor<'ast> for CastReplacer {
         {
             match data_type {
                 ast::DataType::Custom(name) => match name.to_string().as_str() {
-                    "oid" => {
+                    "oid" | "information_schema.cardinal_number" => {
                         self.visit_expr(&mut *cast_expr);
 
                         *expr = *cast_expr.clone();
@@ -678,6 +678,8 @@ mod tests {
         run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
 
         run_cast_replacer("SELECT 'pg_class'::regclass::oid", "SELECT 1259")?;
+
+        run_cast_replacer("SELECT 64::information_schema.cardinal_number", "SELECT 64")?;
 
         Ok(())
     }
