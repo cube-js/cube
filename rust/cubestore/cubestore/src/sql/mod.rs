@@ -2986,7 +2986,9 @@ mod tests {
                     file.shutdown().await.unwrap();
 
                     services
-                        .remote_fs
+                        .injector
+                        .get_service_typed::<dyn RemoteFs>()
+                        .await
                         .upload_file(path_2.to_str().unwrap(), "temp-uploads/orders.csv.gz")
                         .await
                         .unwrap();
