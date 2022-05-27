@@ -1085,24 +1085,14 @@ pub fn create_to_char_udf() -> ScalarUDF {
             }
 
             let durations = durations.unwrap();
+            let formats = downcast_string_arg!(&args[1], "format_str", i32);
 
-            let mut formats = Vec::new();
-            let string_arr = downcast_string_arg!(&args[1], "format_str", i32);
-            for i in 0..string_arr.len() {
-                formats.push(string_arr.value(i).to_string());
-            }
+            let mut builder = StringBuilder::new(durations.len());
 
-            let mut builder = StringBuilder::new(1);
-
-            for (i, format) in formats.iter().enumerate() {
-                let duration = if durations.len() > i {
-                    durations[i]
-                } else {
-                    *durations.last().unwrap()
-                };
-
+            for (i, duration) in durations.iter().enumerate() {
+                let format = formats.value(i);
                 let replaced_format =
-                    postgres_datetime_format_to_iso(format.clone()).replace("TZ", &timezone);
+                    postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
 
                 let secs = duration.num_seconds();
                 let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
