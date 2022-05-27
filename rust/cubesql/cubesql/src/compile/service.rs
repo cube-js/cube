@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{sql::Session, CubeError};
+use crate::{sql::Session, telemetry::ContextLogger, CubeError};
 
 use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 
@@ -13,6 +13,7 @@ pub trait SqlService: Send + Sync {
         query: &String,
         meta: Arc<MetaContext>,
         session: Arc<Session>,
+        logger: Arc<dyn ContextLogger>,
     ) -> CompilationResult<QueryPlan>;
 }
 
@@ -27,7 +28,8 @@ impl SqlService for SqlAuthDefaultImpl {
         query: &String,
         meta: Arc<MetaContext>,
         session: Arc<Session>,
+        logger: Arc<dyn ContextLogger>,
     ) -> CompilationResult<QueryPlan> {
-        convert_sql_to_cube_query(&query, meta, session)
+        convert_sql_to_cube_query(&query, meta, session, logger)
     }
 }

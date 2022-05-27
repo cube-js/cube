@@ -1,14 +1,40 @@
+use crate::config::injection::DIService;
 use crate::metastore::Index;
 use crate::CubeError;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
 use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
 use parquet::file::properties::{WriterProperties, WriterVersion};
-use parquet::file::reader::SerializedFileReader;
-use std::convert::TryFrom;
 use std::fs::File;
 use std::sync::Arc;
+
+pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
+    fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache>;
+}
+
+#[derive(Debug)]
+pub struct CubestoreParquetMetadataCacheImpl {
+    cache: Arc<dyn ParquetMetadataCache>,
+}
+
+crate::di_service!(
+    CubestoreParquetMetadataCacheImpl,
+    [CubestoreParquetMetadataCache]
+);
+
+impl CubestoreParquetMetadataCacheImpl {
+    pub fn new(cache: Arc<dyn ParquetMetadataCache>) -> Arc<CubestoreParquetMetadataCacheImpl> {
+        Arc::new(CubestoreParquetMetadataCacheImpl { cache })
+    }
+}
+
+impl CubestoreParquetMetadataCache for CubestoreParquetMetadataCacheImpl {
+    fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache> {
+        self.cache.clone()
+    }
+}
 
 pub struct ParquetTableStore {
     table: Index,
@@ -16,8 +42,10 @@ pub struct ParquetTableStore {
 }
 
 impl ParquetTableStore {
-    pub fn read_columns(&self, file: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let mut r = ParquetFileArrowReader::new(Arc::new(SerializedFileReader::try_from(file)?));
+    pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
+        let mut r = ParquetFileArrowReader::new(Arc::new(
+            NoopParquetMetadataCache::new().file_reader(path)?,
+        ));
         let mut batches = Vec::new();
         for b in r.get_record_reader(self.row_group_size)? {
             batches.push(b?)
@@ -169,7 +197,8 @@ mod tests {
         let r = SerializedFileReader::new(dest_file.into_file()).unwrap();
 
         assert_eq!(r.num_row_groups(), 1);
-        let columns = r.metadata().row_group(0).columns();
+        let metadata = r.metadata();
+        let columns = metadata.row_group(0).columns();
         let columns = columns
             .iter()
             .map(|c| print_min_max(c.statistics()))

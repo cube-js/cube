@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select pg_catalog.pg_get_constraintdef(r.oid, true) from pg_catalog.pg_constraint r;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------------------------+
+| pg_get_constraintdef(r.oid,Boolean(true)) |
++-------------------------------------------+
++-------------------------------------------+

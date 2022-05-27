@@ -23,6 +23,10 @@ spec:
       labels:
         app.kubernetes.io/component: workers
         {{- include "cubejs.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
       containers:
         - name: cube
@@ -31,6 +35,7 @@ spec:
           {{- else }}
           image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
           {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.config.apiPort }}

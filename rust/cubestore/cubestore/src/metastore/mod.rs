@@ -3096,6 +3096,16 @@ impl MetaStore for RocksMetaStore {
             RocksMetaStore::check_if_exists(&schema_name, existing_keys.len())?;
             let schema_id = existing_keys[0];
 
+            let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
+            if tables
+                .into_iter()
+                .any(|t| t.get_row().get_schema_id() == schema_id)
+            {
+                return Err(CubeError::user(format!(
+                    "Schema {} contains tables and cannot be deleted",
+                    schema_name
+                )));
+            }
             table.delete(schema_id, batch_pipe)?;
 
             Ok(())
@@ -3106,6 +3116,16 @@ impl MetaStore for RocksMetaStore {
     async fn delete_schema_by_id(&self, schema_id: u64) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
+            let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
+            if tables
+                .into_iter()
+                .any(|t| t.get_row().get_schema_id() == schema_id)
+            {
+                return Err(CubeError::internal(format!(
+                    "Schema with id {} contains tables and cannot be deleted",
+                    schema_id
+                )));
+            }
             let table = SchemaRocksTable::new(db_ref.clone());
             table.delete(schema_id, batch_pipe)?;
 
@@ -3492,12 +3512,6 @@ impl MetaStore for RocksMetaStore {
                     Some(MultiPartitionRocksTable::new(db_ref.clone()).get_row_or_not_found(m)?)
                 }
             };
-            if !partition.get_row().is_active() && !multi_part.is_some() {
-                return Err(CubeError::internal(format!(
-                    "Cannot compact inactive partition: {:?}",
-                    partition.get_row()
-                )));
-            }
             Ok((partition, index, table, multi_part))
         })
         .await
@@ -5345,6 +5359,73 @@ mod tests {
             assert!(meta_store.get_schema("foo1".to_string()).await.is_err());
             assert!(meta_store.get_schema("boo".to_string()).await.is_err());
         }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn non_empty_schema_test() {
+        let config = Config::test("non_empty_schema_test");
+        let store_path = env::current_dir().unwrap().join("test-local-ne-schema");
+        let remote_store_path = env::current_dir().unwrap().join("test-remote-ne-schema");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let meta_store = RocksMetaStore::new(
+            store_path.join("metastore").as_path(),
+            remote_fs,
+            config.config_obj(),
+        );
+
+        let schema1 = meta_store
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+
+        let _schema2 = meta_store
+            .create_schema("foo2".to_string(), false)
+            .await
+            .unwrap();
+        let mut columns = Vec::new();
+        columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
+
+        let _table1 = meta_store
+            .create_table(
+                "foo".to_string(),
+                "boo".to_string(),
+                columns.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let _table2 = meta_store
+            .create_table(
+                "foo2".to_string(),
+                "boo".to_string(),
+                columns.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert!(meta_store
+            .delete_schema_by_id(schema1.get_id())
+            .await
+            .is_err());
+        assert!(meta_store.delete_schema("foo2".to_string()).await.is_err());
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }

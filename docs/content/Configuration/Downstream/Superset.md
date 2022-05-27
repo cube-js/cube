@@ -10,8 +10,6 @@ API. [Apache Superset][superset] is an open-source data exploration and
 visualization platform, commonly used to visualize business metrics and
 performance.
 
-<LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
-
 ## Enable Cube SQL API
 
 <InfoBox>
@@ -23,13 +21,13 @@ here][ref-getting-started].
 
 ### Cube Cloud
 
-Click **How to connect** link on the Overview page, navigate to the SQL API tab
+Click **How to connect your BI tool** link on the Overview page, navigate to the SQL API tab
 and enable it. Once enabled, you should see the screen like the one below with
 your connection credentials:
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF"
     style="border: none"
     width="80%"
   />
@@ -42,12 +40,14 @@ These credentials will be required to connect to Cube from Apache Superset
 later.
 
 ```dotenv
-CUBEJS_SQL_PORT=3306
+CUBEJS_PG_SQL_PORT=5432
 CUBE_SQL_USERNAME=myusername
 CUBE_SQL_PASSWORD=mypassword
 ```
 
 ## Connecting from Superset
+
+Apache Superset connects to Cube as to a Postgres database.
 
 In Apache Superset, go to Data > Databases, then click '+ Database' to add a new
 database:
@@ -61,31 +61,9 @@ database:
   />
 </div>
 
-Pick MySQL from the modal:
+## Querying data
 
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: add new database modal"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-2.png"
-    style="border: none"
-    width="100%"
-  />
-</div>
-
-Now enter the Cube SQL API credentials from earlier:
-
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: add database credentials"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-3.png"
-    style="border: none"
-    width="100%"
-  />
-</div>
-
-Click 'Connect' and then 'Finish'. Now, we can create a dataset in Superset and
-explore it. The Cube SQL API exposes cubes as tables where both measures and
-dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
 
 Let's use the following Cube data schema:
 
@@ -125,8 +103,6 @@ create datasets based on tables. Let's create one from `Orders` table:
   />
 </div>
 
-## Creating Charts
-
 Now, we can explore this dataset. Let's create a new chart of type line with
 **Orders** dataset.
 
@@ -142,40 +118,7 @@ Now, we can explore this dataset. Let's create a new chart of type line with
 We can select `COUNT(*)` as metric and `created` as time column with time grain
 **month**.
 
-When querying measures in Cube, there is no need to apply aggregate functions to
-them; for example, the following would be a valid query to Cube SQL API:
-
-```sql
-SELECT count FROM Orders;
-```
-
-But because many BI tools generate metrics with aggregate functions, Cube knows
-how to re-write aggregates to measures. The `COUNT(*)` metric is automatically
-generated for every new dataset in Superset. Cube will replace `COUNT(*)` with
-measure of type count in the selected cube:
-
-```sql
---- For our Orders cube
---- this query
-SELECT COUNT(*) FROM Orders;
-
---- is similiar to this
-SELECT count FROM Orders;
-
---- because Cube replaces COUNT(*) with measure of type count in the given cube
-```
-
-You can customize the list of metrics for a dataset in Settings and map cube
-measures to metrics.
-
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-6.png"
-    style="border: none"
-    width="100%"
-  />
-</div>
+`COUNT(*)` aggregate function is being mapped to measure with type [count](/schema/reference/types-and-formats#measures-types-count) in the cube.
 
 [ref-getting-started]: /cloud/getting-started
 [superset]: https://superset.apache.org/

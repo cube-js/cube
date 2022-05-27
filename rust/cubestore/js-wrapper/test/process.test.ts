@@ -61,7 +61,7 @@ describe('CubeStoreHandler', () => {
     await handler.acquire();
 
     // It's enough, just to test that it starts.
-    await pausePromise(5 * 1000);
+    await pausePromise(10 * 1000);
 
     if (handler.cubeStore) {
       handler.cubeStore.kill();
@@ -69,7 +69,7 @@ describe('CubeStoreHandler', () => {
       throw new Error('Cube Store doesn`t start!');
     }
 
-    await pausePromise(5 * 1000);
+    await pausePromise(10 * 1000);
 
     expect(restartCount).toEqual(1);
 

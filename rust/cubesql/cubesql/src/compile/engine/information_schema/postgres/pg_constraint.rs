@@ -4,7 +4,10 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder},
+        array::{
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, ListBuilder,
+            StringBuilder, UInt32Builder,
+        },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -33,8 +36,8 @@ struct PgCatalogConstraintBuilder {
     conislocal: BooleanBuilder,
     coninhcount: Int32Builder,
     connoinherit: BooleanBuilder,
-    conkey: StringBuilder,
-    confkey: StringBuilder,
+    conkey: ListBuilder<Int16Builder>,
+    confkey: ListBuilder<Int16Builder>,
     conpfeqop: StringBuilder,
     conppeqop: StringBuilder,
     conffeqop: StringBuilder,
@@ -65,8 +68,8 @@ impl PgCatalogConstraintBuilder {
             conislocal: BooleanBuilder::new(capacity),
             coninhcount: Int32Builder::new(capacity),
             connoinherit: BooleanBuilder::new(capacity),
-            conkey: StringBuilder::new(capacity),
-            confkey: StringBuilder::new(capacity),
+            conkey: ListBuilder::new(Int16Builder::new(capacity)),
+            confkey: ListBuilder::new(Int16Builder::new(capacity)),
             conpfeqop: StringBuilder::new(capacity),
             conppeqop: StringBuilder::new(capacity),
             conffeqop: StringBuilder::new(capacity),
@@ -152,8 +155,16 @@ impl TableProvider for PgCatalogConstraintProvider {
             Field::new("conislocal", DataType::Boolean, false),
             Field::new("coninhcount", DataType::Int32, false),
             Field::new("connoinherit", DataType::Boolean, false),
-            Field::new("conkey", DataType::Utf8, true),
-            Field::new("confkey", DataType::Utf8, true),
+            Field::new(
+                "conkey",
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                true,
+            ),
+            Field::new(
+                "confkey",
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                true,
+            ),
             Field::new("conpfeqop", DataType::Utf8, true),
             Field::new("conppeqop", DataType::Utf8, true),
             Field::new("conffeqop", DataType::Utf8, true),

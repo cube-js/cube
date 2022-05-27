@@ -1,4 +1,5 @@
 export { getEnv, isDockerImage } from './env';
+export { QueryAlias } from './enums';
 export * from './package';
 export * from './track';
 export * from './errors';

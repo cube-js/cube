@@ -137,6 +137,7 @@ const schemaOptions = Joi.object().keys({
   livePreview: Joi.boolean(),
   // SQL API
   sqlPort: Joi.number(),
+  pgSqlPort: Joi.number(),
   checkSqlAuth: Joi.func(),
   sqlUser: Joi.string(),
   sqlPassword: Joi.string(),

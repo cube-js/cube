@@ -1,0 +1,20 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    attrelid,\n                    attname,\n                    pg_catalog.pg_get_expr(attname, attrelid) default\n                FROM pg_catalog.pg_attribute\n                ORDER BY\n                    attrelid ASC,\n                    attname ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+--------------------+---------+
+| attrelid | attname            | default |
++----------+--------------------+---------+
+| 18000    | avgPrice           | NULL    |
+| 18000    | count              | NULL    |
+| 18000    | customer_gender    | NULL    |
+| 18000    | has_subscription   | NULL    |
+| 18000    | is_female          | NULL    |
+| 18000    | is_male            | NULL    |
+| 18000    | maxPrice           | NULL    |
+| 18000    | minPrice           | NULL    |
+| 18000    | order_date         | NULL    |
+| 18000    | taxful_total_price | NULL    |
+| 18013    | agentCount         | NULL    |
+| 18013    | agentCountApprox   | NULL    |
++----------+--------------------+---------+

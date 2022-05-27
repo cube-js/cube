@@ -22,6 +22,7 @@ use datafusion::logical_plan::{
     Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
     PlanVisitor,
 };
+use datafusion::physical_plan::parquet::ParquetMetadataCache;
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
@@ -243,6 +244,7 @@ pub struct WorkerContext {
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: Vec<(u64, RowFilter)>,
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
 impl SerializedLogicalPlan {
@@ -309,6 +311,7 @@ impl SerializedLogicalPlan {
                         worker_context.remote_to_local_names.clone(),
                         worker_context.worker_partition_ids.clone(),
                         worker_context.chunk_id_to_record_batches.clone(),
+                        worker_context.parquet_metadata_cache.clone(),
                     )),
                 },
                 projection: projection.clone(),
@@ -672,11 +675,13 @@ impl SerializedPlan {
         &self,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     ) -> Result<LogicalPlan, CubeError> {
         self.logical_plan.logical_plan(&WorkerContext {
             remote_to_local_names,
             worker_partition_ids: self.partition_ids_to_execute.clone(),
             chunk_id_to_record_batches,
+            parquet_metadata_cache,
         })
     }
 

@@ -1,13 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 
-body {
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  font-feature-settings: 'ss03' on;
-  font-feature-settings: 'ss04' on;
-  background-color: #f0f2f5 !important;
-}
-
 .ant-popover-disabled-compatible-wrapper {
   pointer-events: none;
 }
@@ -31,6 +23,7 @@ body {
 
 .examples__container {
   padding: 40px;
+  background-color: #f3f3fb;
 }
 
 @media (max-width: 640px) {

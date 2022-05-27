@@ -29,7 +29,7 @@ class IndexPage extends Component<Props> {
       <div className={styles.docContent}>
         <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
-
+        
         <Row>
           <Col span={24}>
             <p>

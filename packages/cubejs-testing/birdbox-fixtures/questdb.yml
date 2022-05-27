@@ -6,24 +6,25 @@ services:
     image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
     environment:
       CUBEJS_DB_TYPE: questdb
-      CUBEJS_DB_HOST: db
-      CUBEJS_DB_PORT: 8812
-      CUBEJS_DB_NAME: qdb
-      CUBEJS_DB_USER: admin
-      CUBEJS_DB_PASS: quest
+
+      CUBEJS_DB_HOST: host.docker.internal
+      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT:-8812}
+      CUBEJS_DB_NAME: ${CUBEJS_DB_NAME:-qdb}
+      CUBEJS_DB_USER: ${CUBEJS_DB_USER:-admin}
+      CUBEJS_DB_PASS: ${CUBEJS_DB_PASS:-quest}
+
       CUBEJS_DEV_MODE: "true"
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
-    depends_on:
-      - db
-    links:
-      - db
     volumes:
       - ./questdb/schema:/cube/conf/schema
-      - ./postgresql/dbt-project:/cube/conf/dbt-project
     ports:
       - "4000"
     restart: always
+
+  # Database instances, for troubleshooting.
+  # NOT required.
+  # Tests provide db instances via testcontainers, in both LOCAL and DOCKER modes.
 
   db:
     container_name: birdbox-db

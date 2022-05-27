@@ -128,6 +128,89 @@ const repositoryWithPreAggregations: SchemaFileRepository = {
   ]),
 };
 
+const repositoryWithRollupJoin: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    { fileName: 'main.js', content: `
+      cube(\`Users\`, {
+          sql: \`SELECT * FROM public.users\`,
+        
+          preAggregations: {
+            usersRollup: {
+              dimensions: [CUBE.id],
+            },
+          },
+        
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+        
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+            
+            name: {
+              sql: \`name\`,
+              type: \`string\`,
+            },
+          },
+        });
+        
+        cube('Orders', {
+          sql: \`SELECT * FROM orders\`,
+        
+          preAggregations: {
+            ordersRollup: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.userId, CUBE.status],
+            },
+            
+            ordersRollupJoin: {
+              type: \`rollupJoin\`,
+              measures: [CUBE.count],
+              dimensions: [Users.name],
+              rollups: [Users.usersRollup, CUBE.ordersRollup],
+            },
+          },
+        
+          joins: {
+            Users: {
+              relationship: \`belongsTo\`,
+              sql: \`\${CUBE.userId} = \${Users.id}\`,
+            },
+          },
+        
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+        
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            userId: {
+              sql: \`user_id\`,
+              type: \`number\`,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+          },
+        });
+    ` },
+  ]),
+};
+
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -292,6 +375,8 @@ describe('Refresh Scheduler', () => {
   jest.setTimeout(60000);
 
   test('Round robin pre-aggregation refresh by history priority', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
@@ -365,6 +450,8 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Manual build', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
@@ -406,6 +493,8 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Cache only pre-aggregation partitions', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
     const {
       refreshScheduler,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
@@ -585,6 +674,8 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Iterator waits before advance', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations });
@@ -670,5 +761,30 @@ describe('Refresh Scheduler', () => {
       workerIndices: [0],
       throwErrors: true
     });
+  });
+
+  test('rollupJoin scheduledRefresh', async () => {
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const {
+      refreshScheduler
+    } = setupScheduler({ repository: repositoryWithRollupJoin, useOriginalSqlPreAggregations: true });
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    for (let i = 0; i < 1000; i++) {
+      try {
+        const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          throwErrors: true,
+        });
+        break;
+      } catch (e) {
+        if (e.error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+    }
   });
 });

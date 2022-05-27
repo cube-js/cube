@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::DataType;
-use datafusion::error::Result;
-use datafusion::variable::VarType;
-use datafusion::{scalar::ScalarValue, variable::VarProvider};
+use datafusion::{
+    arrow::datatypes::DataType,
+    error::Result,
+    scalar::ScalarValue,
+    variable::{VarProvider, VarType},
+};
 use log::warn;
 
-use crate::sql::session::DatabaseProtocol;
-use crate::sql::{ServerManager, SessionState};
+use crate::sql::{session::DatabaseProtocol, ServerManager, SessionState};
 
 pub struct VariablesProvider {
     session: Arc<SessionState>,

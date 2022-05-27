@@ -56,7 +56,7 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
-    
+
     this.updateAuthorizationPromise = null;
   }
 
@@ -73,7 +73,7 @@ class CubejsApi {
       callback = options;
       options = undefined;
     }
-    
+
     options = options || {};
 
     const mutexKey = options.mutexKey || 'default';
@@ -127,11 +127,11 @@ class CubejsApi {
         }
         return null;
       };
-      
+
       if (options.subscribe && !skipAuthorizationUpdate) {
         await this.updateTransportAuthorization();
       }
-      
+
       skipAuthorizationUpdate = false;
 
       if (response.status === 502) {
@@ -162,7 +162,7 @@ class CubejsApi {
           await requestInstance.unsubscribe();
         }
 
-        const error = new RequestError(body.error, body); // TODO error class
+        const error = new RequestError(body.error, body, response.status); // TODO error class
         if (callback) {
           callback(error);
         } else {
@@ -209,7 +209,7 @@ class CubejsApi {
       await this.updateAuthorizationPromise;
       return;
     }
-    
+
     if (typeof this.apiToken === 'function') {
       this.updateAuthorizationPromise = new Promise(async (resolve, reject) => {
         try {
@@ -224,7 +224,7 @@ class CubejsApi {
           this.updateAuthorizationPromise = null;
         }
       });
-      
+
       await this.updateAuthorizationPromise;
     }
   }
@@ -241,7 +241,12 @@ class CubejsApi {
       responseFormat === ResultType.COMPACT &&
       query.responseFormat !== ResultType.COMPACT
     ) {
-      query.responseFormat = ResultType.COMPACT;
+      return {
+        ...query,
+        responseFormat: ResultType.COMPACT,
+      };
+    } else {
+      return query;
     }
   }
 
@@ -287,11 +292,9 @@ class CubejsApi {
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
-        query.forEach((q) => {
-          this.patchQueryInternal(q, ResultType.COMPACT);
-        });
+        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
       } else {
-        this.patchQueryInternal(query, ResultType.COMPACT);
+        query = this.patchQueryInternal(query, ResultType.COMPACT);
       }
     }
     return this.loadMethod(
@@ -318,11 +321,9 @@ class CubejsApi {
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
-        query.forEach((q) => {
-          this.patchQueryInternal(q, ResultType.COMPACT);
-        });
+        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
       } else {
-        this.patchQueryInternal(query, ResultType.COMPACT);
+        query = this.patchQueryInternal(query, ResultType.COMPACT);
       }
     }
     return this.loadMethod(
@@ -367,15 +368,4 @@ class CubejsApi {
 export default (apiToken, options) => new CubejsApi(apiToken, options);
 
 export { CubejsApi, HttpTransport, ResultSet };
-export {
-  areQueriesEqual,
-  defaultHeuristics,
-  movePivotItem,
-  isQueryPresent,
-  moveItemInArray,
-  defaultOrder,
-  flattenFilters,
-  getQueryMembers,
-  getOrderMembersFromOrder,
-  GRANULARITIES
-} from './utils';
+export * from './utils';

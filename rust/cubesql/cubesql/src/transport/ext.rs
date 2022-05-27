@@ -1,4 +1,5 @@
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
+use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
 use crate::sql::ColumnType;
 
@@ -24,6 +25,12 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+            } else if expect_agg_type.eq(&"sum".to_string()) {
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"sum".to_string())
+                    || agg_type.eq(&"count".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else {
                 self.agg_type.as_ref().unwrap().eq(expect_agg_type)
             }
@@ -35,6 +42,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
     fn get_sql_type(&self) -> ColumnType {
         let from_type = match &self._type.to_lowercase().as_str() {
             &"number" => ColumnType::Double,
+            &"boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         };
 
@@ -97,7 +105,7 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
         match self._type.to_lowercase().as_str() {
             "time" => ColumnType::Timestamp,
             "number" => ColumnType::Double,
-            "boolean" => ColumnType::Int8,
+            "boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         }
     }
@@ -120,7 +128,7 @@ impl CubeColumn {
     }
 
     pub fn get_column_type(&self) -> ColumnType {
-        self.column_type
+        self.column_type.clone()
     }
 }
 
@@ -131,7 +139,15 @@ pub trait V1CubeMetaExt {
 
     fn contains_member(&self, member_name: &str) -> bool;
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+    fn member_name(&self, column_name: &str) -> String;
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure>;
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment>;
+
+    fn df_data_type(&self, member_name: &str) -> Option<DataType>;
 
     fn member_type(&self, member_name: &str) -> Option<MemberType>;
 }
@@ -166,7 +182,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for segment in &self.segments {
             columns.push(CubeColumn {
                 name: segment.get_real_name(),
-                column_type: ColumnType::Blob,
+                column_type: ColumnType::Boolean,
                 can_be_null: false,
             });
         }
@@ -206,10 +222,56 @@ impl V1CubeMetaExt for V1CubeMeta {
                 .any(|m| m.name.eq_ignore_ascii_case(member_name))
     }
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+    fn member_name(&self, column_name: &str) -> String {
+        format!("{}.{}", self.name, column_name)
+    }
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure> {
+        let member_name = self.member_name(column_name);
+        self.measures
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension> {
+        let member_name = self.member_name(column_name);
         self.dimensions
             .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment> {
+        let member_name = self.member_name(column_name);
+        self.segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn df_data_type(&self, member_name: &str) -> Option<DataType> {
+        if let Some(m) = self
+            .measures
+            .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(df_data_type_by_column_type(m.get_sql_type()));
+        }
+
+        if let Some(m) = self
+            .dimensions
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(df_data_type_by_column_type(m.get_sql_type()));
+        }
+
+        if let Some(_) = self
+            .segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+        {
+            return Some(df_data_type_by_column_type(ColumnType::Int8));
+        }
+        None
     }
 
     fn member_type(&self, member_name: &str) -> Option<MemberType> {
@@ -243,5 +305,16 @@ impl V1CubeMetaExt for V1CubeMeta {
             return Some(MemberType::Boolean);
         }
         None
+    }
+}
+
+pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
+    match column_type {
+        ColumnType::Int32 | ColumnType::Int64 | ColumnType::Int8 => DataType::Int64,
+        ColumnType::String => DataType::Utf8,
+        ColumnType::Double => DataType::Float64,
+        ColumnType::Boolean => DataType::Boolean,
+        ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        _ => panic!("Unimplemented support for {:?}", column_type),
     }
 }

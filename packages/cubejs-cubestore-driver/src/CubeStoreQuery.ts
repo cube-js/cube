@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
 };
 
 class CubeStoreFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column, not, param, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 

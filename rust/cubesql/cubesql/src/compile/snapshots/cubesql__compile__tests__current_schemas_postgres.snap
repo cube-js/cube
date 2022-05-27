@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5292
+expression: "execute_query(\"SELECT current_schemas(false)\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------------+
+| current_schemas(Boolean(false)) |
++---------------------------------+
+| {public}                        |
++---------------------------------+

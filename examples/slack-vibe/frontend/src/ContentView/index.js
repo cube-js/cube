@@ -11,7 +11,6 @@ import {
 import styles from './styles.module.css';
 import MemberList from '../MemberList';
 import ChannelList from '../ChannelList';
-import Header from '../Header';
 import Banner from '../Banner';
 import MessagesChart from '../MessagesChart';
 import MembersChart from '../MembersChart';
@@ -61,15 +60,6 @@ function ContentView() {
   return (
     <div className={styles.root}>
       <div className={styles.content}>
-        <Header
-          onClick={() => {
-            setPeriod(defaultPeriod);
-            setGranularity(defaultGranularity);
-            setChosenChannel(null);
-            setChosenMember(null);
-            setDoShowFilter(false);
-          }}
-        />
         <div className={styles.header}>
           {renderHeader(period, granularity, chosenMember, chosenChannel, () =>
             setDoShowFilter(true)

@@ -24,15 +24,17 @@
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
     "postinstall": "lerna link && patch-package",
-    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link && cd ../cubejs-client-core && npm link && cd ../cubejs-client-ws-transport && npm link && cd ../cubejs-playground && npm link"
+    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-backend-cloud && npm link && cd ../cubejs-backend-native && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link && cd ../cubejs-athena-driver && npm link && cd ../cubejs-bigquery-driver && npm link && cd ../cubejs-postgres-driver && npm link && cd ../cubejs-databricks-jdbc-driver && npm link && cd ../cubejs-templates && npm link && cd ../cubejs-client-core && npm link && cd ../cubejs-client-ws-transport && npm link && cd ../cubejs-playground && npm link"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.6.5",
+    "lerna": "^3.13.1",
     "ramda": "^0.27.0",
     "rollup-plugin-dts": "^1.1.8",
+    "patch-package": "^6.4.7",
     "whatwg-fetch": "^3.0.0"
   },
   "files": [
@@ -56,10 +58,8 @@
     "flush-promises": "^1.0.2",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
-    "lerna": "^3.13.1",
     "less": "^3.13.1",
     "npm-package-json-lint": "^5.1.0",
-    "patch-package": "^6.4.7",
     "postcss": "^8.2.8",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",

@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT pg_catalog.generate_series(1, 5);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------+
+| generate_series(Int64(1),Int64(5)) |
++------------------------------------+
+| 1                                  |
+| 2                                  |
+| 3                                  |
+| 4                                  |
+| 5                                  |
++------------------------------------+

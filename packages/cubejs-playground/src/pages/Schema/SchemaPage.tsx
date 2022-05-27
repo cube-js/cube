@@ -1,6 +1,6 @@
 import { Component } from 'react';
 import { Layout, Button, Modal, Empty, Typography } from 'antd';
-import { RouterProps } from 'react-router';
+import { RouterProps } from 'react-router-dom';
 
 import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';

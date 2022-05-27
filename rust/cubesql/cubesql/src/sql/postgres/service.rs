@@ -10,6 +10,7 @@ use tokio::{
 use crate::{
     config::processing_loop::ProcessingLoop,
     sql::{session::DatabaseProtocol, SessionManager},
+    telemetry::{ContextLogger, SessionLogger},
     CubeError,
 };
 
@@ -61,9 +62,15 @@ impl ProcessingLoop for PostgresServer {
                 socket.peer_addr().unwrap().to_string(),
             );
 
+            trace!("[pg] New connection {}", session.state.connection_id);
+
+            let logger = Arc::new(SessionLogger::new(session.state.clone()));
+
             tokio::spawn(async move {
-                if let Err(e) = AsyncPostgresShim::run_on(socket, session).await {
-                    error!("Error during processing PostgreSQL connection: {}", e);
+                if let Err(e) = AsyncPostgresShim::run_on(socket, session, logger.clone()).await {
+                    logger.error(
+                        format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                    );
                 }
             });
         }

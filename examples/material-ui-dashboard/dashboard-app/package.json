@@ -10,24 +10,25 @@
     "@material-ui/core": "^4.10.2",
     "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "^4.0.0-alpha.56",
+    "@material-ui/pickers": "^3.2.10",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
-    "react-countup": "^4.3.3",
-    "react-perfect-scrollbar": "^1.5.8",
-    "typeface-roboto": "^0.0.75",
-    "@material-ui/pickers": "^3.2.10",
     "antd": "^4.3.5",
     "chart.js": "^2.9.3",
+    "cube-example-wrapper": "^1.0.26",
     "date-fns": "^2.14.0",
     "moment": "^2.27.0",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
     "react-chartjs-2": "^2.9.0",
+    "react-countup": "^4.3.3",
     "react-dom": "^16.13.1",
+    "react-perfect-scrollbar": "^1.5.8",
     "react-router": "^5.2.0",
     "react-router-dom": "^5.2.0",
-    "react-scripts": "3.4.4"
+    "react-scripts": "3.4.4",
+    "typeface-roboto": "^0.0.75"
   },
   "devDependencies": {
     "cross-env": "^7.0.2"
@@ -37,7 +38,8 @@
     "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"

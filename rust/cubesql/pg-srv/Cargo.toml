@@ -1,0 +1,21 @@
+[package]
+name = "pg-srv"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2018"
+license = "Apache-2.0"
+description = "Library for emulating a PostgreSQL server"
+documentation = "https://cube.dev/docs"
+homepage = "https://cube.dev"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1.36"
+log = "=0.4.11"
+bytes = "0.5.4"
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+hex = "0.4.3"
+

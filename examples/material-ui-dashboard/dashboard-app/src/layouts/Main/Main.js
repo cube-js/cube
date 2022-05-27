@@ -4,22 +4,20 @@ import clsx from 'clsx';
 import { makeStyles, useTheme } from '@material-ui/styles';
 import { useMediaQuery } from '@material-ui/core';
 
-import { Sidebar, Topbar } from './components';
+import palette from '../../theme/palette';
+import { Sidebar } from './components';
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    paddingTop: 56,
-    height: '100%',
-    [theme.breakpoints.up('sm')]: {
-      paddingTop: 64,
-    },
+    backgroundColor: palette.primary.light,
+    position: 'relative',
   },
   shiftContent: {
     paddingLeft: 240,
   },
   content: {
     height: '100%',
-    minHeight: 'calc(100vh - 64px)',
+    overflow: 'auto'
   },
 }));
 
@@ -51,7 +49,6 @@ const Main = (props) => {
         [classes.shiftContent]: isDesktop,
       })}
     >
-      <Topbar onSidebarOpen={handleSidebarOpen} />
       <Sidebar onClose={handleSidebarClose} open={shouldOpenSidebar} variant={isDesktop ? 'persistent' : 'temporary'} />
       <main className={classes.content}>{children}</main>
     </div>

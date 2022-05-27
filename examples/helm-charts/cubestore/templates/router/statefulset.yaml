@@ -22,6 +22,10 @@ spec:
       labels:
         app.kubernetes.io/component: router
         {{- include "cubestore.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
       containers:
         - name: cubestore

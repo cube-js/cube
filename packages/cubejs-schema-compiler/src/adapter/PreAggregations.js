@@ -136,8 +136,13 @@ export class PreAggregations {
         td.camelizeOperator === 'inDateRange' // TODO support all date operators
     );
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    const uniqueKeyColumns = preAggregation.type === 'rollup' ?
-      this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dimensionColumns() : null;
+
+    const uniqueKeyColumnsDefault = () => null;
+    const uniqueKeyColumns = ({
+      rollup: () => this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation).dimensionColumns(),
+      originalSql: () => preAggregation.uniqueKeyColumns || null
+    }[preAggregation.type] || uniqueKeyColumnsDefault)();
+
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -176,7 +181,8 @@ export class PreAggregations {
             )
           };
         }
-      )
+      ),
+      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
     };
   }
 
@@ -671,35 +677,44 @@ export class PreAggregations {
   }
 
   originalSqlPreAggregationQuery(cube, aggregation) {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      timeDimensions: aggregation.partitionTimeDimensions,
-      preAggregationQuery: true,
-    });
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        timeDimensions: aggregation.partitionTimeDimensions,
+        preAggregationQuery: true,
+      }
+    );
   }
 
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
-    return this.query.newSubQuery({
-      rowLimit: null,
-      measures: references.measures,
-      dimensions: references.dimensions,
-      timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
-      preAggregationQuery: true,
-      useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-    });
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        measures: references.measures,
+        dimensions: references.dimensions,
+        timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
+        preAggregationQuery: true,
+        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+      }
+    );
   }
 
   autoRollupPreAggregationQuery(cube, aggregation) {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      measures: aggregation.measures,
-      dimensions: aggregation.dimensions,
-      timeDimensions:
-        this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
-      preAggregationQuery: true,
-      useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-    });
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        measures: aggregation.measures,
+        dimensions: aggregation.dimensions,
+        timeDimensions:
+          this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
+        preAggregationQuery: true,
+        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+      }
+    );
   }
 
   mergePartitionTimeDimensions(aggregation, partitionTimeDimensions) {

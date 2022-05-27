@@ -37,6 +37,13 @@ export class OrchestratorApi {
     );
   }
 
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    await this.orchestrator.forceReconcile(datasource);
+  }
+
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
@@ -98,12 +105,20 @@ export class OrchestratorApi {
           requestId: query.requestId
         });
 
-        const fromCache = await this.orchestrator.resultFromCacheIfExists(query);
-        if (!query.renewQuery && fromCache && !query.scheduledRefresh) {
+        const fromCache = await this
+          .orchestrator
+          .resultFromCacheIfExists(query);
+        if (
+          !query.renewQuery &&
+          fromCache &&
+          !query.scheduledRefresh
+        ) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
-            warning: 'Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations.'
+            warning: 'Query is too slow to be renewed during the ' +
+              'user request and was served from the cache. Please ' +
+              'consider using low latency pre-aggregations.'
           });
 
           return {
@@ -114,14 +129,16 @@ export class OrchestratorApi {
 
         throw {
           error: 'Continue wait',
-          stage: !query.scheduledRefresh ? await this.orchestrator.queryStage(query) : null
+          stage: !query.scheduledRefresh
+            ? await this.orchestrator.queryStage(query)
+            : null
         };
       }
 
       this.logger('Error querying db', {
         query: queryForLog,
         params: query.values,
-        error: (err.stack || err),
+        error: ((err as Error).stack || err),
         requestId: query.requestId
       });
 

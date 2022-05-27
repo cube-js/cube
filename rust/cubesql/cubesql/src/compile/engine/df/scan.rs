@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    collections::HashMap,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -23,13 +24,18 @@ use datafusion::{
     },
 };
 use futures::Stream;
-use log::{error, warn};
+use log::warn;
 
-use crate::{sql::AuthContext, transport::TransportService};
+use crate::{
+    sql::AuthContext,
+    telemetry::ContextLogger,
+    transport::{TransportService, TransportServiceMetaFields},
+};
 use chrono::{TimeZone, Utc};
-use datafusion::arrow::array::TimestampNanosecondBuilder;
-use datafusion::arrow::datatypes::TimeUnit;
-use datafusion::execution::context::TaskContext;
+use datafusion::{
+    arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
+    execution::context::TaskContext,
+};
 
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
@@ -101,6 +107,8 @@ impl UserDefinedLogicalNode for CubeScanNode {
 //  the logical plan node.
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
+    pub meta_fields: Option<HashMap<String, String>>,
+    pub logger: Arc<dyn ContextLogger>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -125,6 +133,8 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
+                    meta_fields: self.meta_fields.clone(),
+                    logger: self.logger.clone(),
                 }))
             } else {
                 None
@@ -142,6 +152,9 @@ struct CubeScanExecutionPlan {
     auth_context: Arc<AuthContext>,
     // Shared references which will be injected by extension planner
     transport: Arc<dyn TransportService>,
+    // Fields passing to cube (for now using to pass app_name and protocol for telemetry)
+    meta_fields: TransportServiceMetaFields,
+    logger: Arc<dyn ContextLogger>,
 }
 
 impl CubeScanExecutionPlan {
@@ -171,10 +184,7 @@ impl CubeScanExecutionPlan {
                             }
                             serde_json::Value::Number(v) => builder.append_value(v.to_string())?,
                             v => {
-                                error!(
-                                    "Unable to map value {:?} to DataType::Utf8 (returning null)",
-                                    v
-                                );
+                                self.logger.error(format!("Unable to map value {:?} to DataType::Utf8 (returning null)", v).as_str());
 
                                 builder.append_null()?
                             }
@@ -208,10 +218,7 @@ impl CubeScanExecutionPlan {
                                 }
                             },
                             v => {
-                                error!(
-                                    "Unable to map value {:?} to DataType::Int64 (returning null)",
-                                    v
-                                );
+                                self.logger.error(format!("Unable to map value {:?} to DataType::Int64 (returning null)", v).as_str());
 
                                 builder.append_null()?
                             }
@@ -245,10 +252,7 @@ impl CubeScanExecutionPlan {
                                 }
                             },
                             v => {
-                                error!(
-                                    "Unable to map value {:?} to DataType::Float64 (returning null)",
-                                    v
-                                );
+                                self.logger.error(format!("Unable to map value {:?} to DataType::Float64 (returning null)", v).as_str());
 
                                 builder.append_null()?
                             }
@@ -270,11 +274,18 @@ impl CubeScanExecutionPlan {
                         match &value {
                             serde_json::Value::Null => builder.append_null()?,
                             serde_json::Value::Bool(v) => builder.append_value(*v)?,
+                            // Cube allows to mark a type as boolean, but it doesn't guarantee that the user will return a boolean type
+                            serde_json::Value::String(v) => match v.as_str() {
+                                "true" | "1" => builder.append_value(true)?,
+                                "false" | "0" => builder.append_value(false)?,
+                                _ => {
+                                    self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
+
+                                    builder.append_null()?
+                                }
+                            },
                             v => {
-                                error!(
-                                    "Unable to map value {:?} to DataType::Boolean (returning null)",
-                                    v
-                                );
+                                self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
 
                                 builder.append_null()?
                             }
@@ -307,10 +318,7 @@ impl CubeScanExecutionPlan {
                                 builder.append_value(timestamp.timestamp_nanos())?;
                             }
                             v => {
-                                error!(
-                                    "Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)",
-                                    v
-                                );
+                                self.logger.error(format!("Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)", v).as_str());
 
                                 builder.append_null()?
                             }
@@ -374,7 +382,11 @@ impl ExecutionPlan for CubeScanExecutionPlan {
     ) -> Result<SendableRecordBatchStream> {
         let result = self
             .transport
-            .load(self.request.clone(), self.auth_context.clone())
+            .load(
+                self.request.clone(),
+                self.auth_context.clone(),
+                self.meta_fields.clone(),
+            )
             .await;
 
         let mut response = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
@@ -462,6 +474,8 @@ impl RecordBatchStream for CubeScanMemoryStream {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::{compile::MetaContext, CubeError};
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
@@ -474,11 +488,7 @@ mod tests {
         },
         physical_plan::common,
     };
-    use std::collections::HashMap;
-
-    use super::*;
-    use crate::{compile::MetaContext, CubeError};
-    use std::result::Result;
+    use std::{collections::HashMap, result::Result};
 
     fn get_test_transport() -> Arc<dyn TransportService> {
         #[derive(Debug)]
@@ -496,6 +506,7 @@ mod tests {
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: Arc<AuthContext>,
+                _meta_fields: Option<HashMap<String, String>>,
             ) -> Result<V1LoadResponse, CubeError> {
                 let response = r#"
                     {
@@ -508,7 +519,9 @@ mod tests {
                         "data": [
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null},
                             {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false}
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false"}
                         ]
                     }
                 "#;
@@ -525,6 +538,20 @@ mod tests {
         }
 
         Arc::new(TestConnectionTransport {})
+    }
+
+    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
+        #[derive(Debug)]
+        struct TestContextLogger {}
+
+        #[async_trait]
+        impl ContextLogger for TestContextLogger {
+            fn error(&self, message: &str) {
+                log::error!("{}", message);
+            }
+        }
+
+        Arc::new(TestContextLogger {})
     }
 
     #[tokio::test]
@@ -561,6 +588,8 @@ mod tests {
                 base_path: "base_path".to_string(),
             }),
             transport: get_test_transport(),
+            meta_fields: None,
+            logger: get_test_context_logger(),
         };
 
         let runtime = Arc::new(
@@ -582,9 +611,27 @@ mod tests {
             RecordBatch::try_new(
                 schema.clone(),
                 vec![
-                    Arc::new(StringArray::from(vec![None, Some("5"), Some("5")])) as ArrayRef,
-                    Arc::new(Float64Array::from(vec![None, Some(5.05), Some(5.05)])) as ArrayRef,
-                    Arc::new(BooleanArray::from(vec![None, Some(true), Some(false)])) as ArrayRef,
+                    Arc::new(StringArray::from(vec![
+                        None,
+                        Some("5"),
+                        Some("5"),
+                        None,
+                        None
+                    ])) as ArrayRef,
+                    Arc::new(Float64Array::from(vec![
+                        None,
+                        Some(5.05),
+                        Some(5.05),
+                        None,
+                        None
+                    ])) as ArrayRef,
+                    Arc::new(BooleanArray::from(vec![
+                        None,
+                        Some(true),
+                        Some(false),
+                        Some(true),
+                        Some(false)
+                    ])) as ArrayRef,
                 ],
             )
             .unwrap()

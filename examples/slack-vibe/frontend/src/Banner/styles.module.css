@@ -3,16 +3,15 @@
 }
 
 .banner {
-  background-color: var(--color-bg);
+  background-color: var(--color-bg-card);
   border-radius: var(--border-radius);
   padding: 24px;
 }
 
 .buttons {
-  display: inline-grid;
+  display: grid;
   grid-gap: 12px;
-  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto auto;
   list-style: none;
-  margin-top: 12px;
   padding: 0;
 }

@@ -39,7 +39,7 @@ use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, Ingestion};
+use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
@@ -68,6 +68,7 @@ use crate::{
 };
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
+use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use std::mem::take;
 
 pub mod cache;
@@ -538,6 +539,7 @@ impl SqlServiceImpl {
             vec![Row::new(vec![TableValue::String(dump_dir)])],
         )))
     }
+
     async fn explain(
         &self,
         statement: Statement,
@@ -566,7 +568,11 @@ impl SqlServiceImpl {
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
                 let res = if !analyze {
-                    let logical_plan = serialized.logical_plan(HashMap::new(), HashMap::new())?;
+                    let logical_plan = serialized.logical_plan(
+                        HashMap::new(),
+                        HashMap::new(),
+                        NoopParquetMetadataCache::new(),
+                    )?;
 
                     DataFrame::new(
                         vec![Column::new(
@@ -1240,22 +1246,6 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRe
     Ok(arrays)
 }
 
-fn decode_byte(s: &str) -> Option<u8> {
-    let v = s.as_bytes();
-    if v.len() != 2 {
-        return None;
-    }
-    let decode_char = |c| match c {
-        b'a'..=b'f' => Some(10 + c - b'a'),
-        b'A'..=b'F' => Some(10 + c - b'A'),
-        b'0'..=b'9' => Some(c - b'0'),
-        _ => None,
-    };
-    let v0 = decode_char(v[0])?;
-    let v1 = decode_char(v[1])?;
-    return Some(v0 * 16 + v1);
-}
-
 fn parse_hyper_log_log<'a>(
     buffer: &'a mut Vec<u8>,
     v: &'a Value,
@@ -1295,18 +1285,7 @@ fn parse_binary_string<'a>(buffer: &'a mut Vec<u8>, v: &'a Value) -> Result<&'a 
         // We interpret strings of the form '0f 0a 14 ff' as a list of hex-encoded bytes.
         // MySQL will store bytes of the string itself instead and we should do the same.
         // TODO: Ensure CubeJS does not send strings of this form our way and match MySQL behavior.
-        Value::SingleQuotedString(s) => {
-            *buffer = s
-                .split(' ')
-                .filter(|b| !b.is_empty())
-                .map(|s| {
-                    decode_byte(s).ok_or_else(|| {
-                        CubeError::user(format!("cannot convert value to binary string: {}", v))
-                    })
-                })
-                .try_collect()?;
-            Ok(buffer.as_slice())
-        }
+        Value::SingleQuotedString(s) => parse_space_separated_binstring(buffer, s.as_ref()),
         // TODO: allocate directly on arena.
         Value::HexStringLiteral(s) => {
             *buffer = Vec::from_hex(s.as_bytes())?;
@@ -2027,8 +2006,8 @@ mod tests {
                     path
                 };
 
-                services
-                    .remote_fs
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                remote_fs
                     .upload_file(
                         path.to_str().unwrap(),
                         &chunk.get_row().get_full_name(chunk.get_id()),
@@ -2481,8 +2460,8 @@ mod tests {
                 // Wait for GC tasks to drop files
                 Delay::new(Duration::from_millis(3000)).await;
 
-                let files = services
-                    .remote_fs
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                let files = remote_fs
                     .list("")
                     .await
                     .unwrap()
@@ -2812,7 +2791,8 @@ mod tests {
 
                 file.shutdown().await.unwrap();
 
-                services.remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
 
                 vec!["temp://foo-3.csv.gz".to_string()]
             };
