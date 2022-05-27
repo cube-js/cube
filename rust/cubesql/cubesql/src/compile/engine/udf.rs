@@ -1057,82 +1057,41 @@ macro_rules! parse_timestamp_arr {
 pub fn create_to_char_udf() -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |args: &[ColumnarValue]| {
-            let (durations, timezone) = match &args[0] {
-                ColumnarValue::Scalar(scalar) => {
-                    let (duration, timezone) = match scalar {
-                        ScalarValue::TimestampNanosecond(Some(value), tz) => (
-                            Duration::nanoseconds(*value),
-                            tz.clone().unwrap_or_default(),
-                        ),
-                        ScalarValue::TimestampMillisecond(Some(value), tz) => (
-                            Duration::milliseconds(*value),
-                            tz.clone().unwrap_or_default(),
-                        ),
-                        ScalarValue::TimestampMicrosecond(Some(value), tz) => (
-                            Duration::microseconds(*value),
-                            tz.clone().unwrap_or_default(),
-                        ),
-                        ScalarValue::TimestampSecond(Some(value), tz) => {
-                            (Duration::seconds(*value), tz.clone().unwrap_or_default())
-                        }
-                        _ => {
-                            return Err(DataFusionError::Execution(
-                                "unsupported datetime format for to_char".to_string(),
-                            ))
-                        }
-                    };
-
-                    (vec![duration], timezone)
-                }
-                ColumnarValue::Array(array) => {
-                    let res = {
-                        let mut arr =
-                            parse_timestamp_arr!(array, TimestampNanosecondArray, nanoseconds);
-                        if arr.is_none() {
-                            arr = parse_timestamp_arr!(
-                                array,
-                                TimestampMillisecondArray,
-                                milliseconds
-                            );
-                        }
-                        if arr.is_none() {
-                            arr = parse_timestamp_arr!(
-                                array,
-                                TimestampMicrosecondArray,
-                                microseconds
-                            );
-                        }
-                        if arr.is_none() {
-                            arr = parse_timestamp_arr!(array, TimestampSecondArray, seconds);
-                        }
-                        if arr.is_none() {
-                            return Err(DataFusionError::Execution(
-                                "unsupported datetime format for to_char".to_string(),
-                            ));
-                        }
-
-                        arr
-                    };
-
-                    (res.unwrap(), "".to_string())
-                }
+            let arr = args[0].clone().into_array(1);
+            let (durations, timezone) = match arr.data_type() {
+                DataType::Timestamp(TimeUnit::Nanosecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampNanosecondArray, nanoseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Millisecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampMillisecondArray, milliseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Microsecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampMicrosecondArray, microseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Second, str) => (
+                    parse_timestamp_arr!(arr, TimestampSecondArray, seconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                _ => (None, "".to_string()),
             };
 
-            let formats = match &args[1] {
-                ColumnarValue::Scalar(ScalarValue::Utf8(str)) => {
-                    vec![str.clone().unwrap_or_default()]
-                }
-                ColumnarValue::Array(arr) => {
-                    let string_arr = downcast_string_arg!(arr, "format_str", i32);
-                    let mut result = Vec::new();
-                    for i in 0..arr.len() {
-                        result.push(string_arr.value(i).to_string());
-                    }
+            if durations.is_none() {
+                return Err(DataFusionError::Execution(
+                    "unsupported datetime format for to_char".to_string(),
+                ));
+            }
 
-                    result
-                }
-                _ => vec!["".to_string()],
-            };
+            let durations = durations.unwrap();
+
+            let mut formats = Vec::new();
+            let arr = args[1].clone().into_array(1);
+            let string_arr = downcast_string_arg!(arr, "format_str", i32);
+            for i in 0..arr.len() {
+                formats.push(string_arr.value(i).to_string());
+            }
 
             let mut builder = StringBuilder::new(1);
 
