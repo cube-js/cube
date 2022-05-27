@@ -3,9 +3,6 @@ title: Connecting from Tableau
 permalink: /config/downstream/tableau
 ---
 
-You can connect to Cube from Tableau, a visual analytics platform, using the [Cube SQL
-API][ref-sql-api].
-
 <InfoBox>
 
 The SQL API and Extended Support for BI Tools workshop is on June 22nd at 9-10:30 am PT! You'll have the opportunity to learn the latest on Cube's [SQL API](https://cube.dev/blog/expanded-bi-support/). 
@@ -13,6 +10,9 @@ The SQL API and Extended Support for BI Tools workshop is on June 22nd at 9-10:3
 You can register for the workshop at [the event page](https://cube.dev/events/sql-api). 👈
 
 </InfoBox>
+
+You can connect to Cube from Tableau, a visual analytics platform, using the [Cube SQL
+API][ref-sql-api].
 
 ## Enable Cube SQL API
 
