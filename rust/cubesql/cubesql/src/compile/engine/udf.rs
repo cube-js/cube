@@ -1056,8 +1056,8 @@ macro_rules! parse_timestamp_arr {
 
 pub fn create_to_char_udf() -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
-        Arc::new(move |args: &[ColumnarValue]| {
-            let arr = args[0].clone().into_array(1);
+        make_scalar_function(move |args: &[ArrayRef]| {
+            let arr = &args[0];
             let (durations, timezone) = match arr.data_type() {
                 DataType::Timestamp(TimeUnit::Nanosecond, str) => (
                     parse_timestamp_arr!(arr, TimestampNanosecondArray, nanoseconds),
@@ -1087,9 +1087,8 @@ pub fn create_to_char_udf() -> ScalarUDF {
             let durations = durations.unwrap();
 
             let mut formats = Vec::new();
-            let arr = args[1].clone().into_array(1);
-            let string_arr = downcast_string_arg!(arr, "format_str", i32);
-            for i in 0..arr.len() {
+            let string_arr = downcast_string_arg!(&args[1], "format_str", i32);
+            for i in 0..string_arr.len() {
                 formats.push(string_arr.value(i).to_string());
             }
 
@@ -1114,7 +1113,7 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     .unwrap();
             }
 
-            Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+            Ok(Arc::new(builder.finish()) as ArrayRef)
         });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
