@@ -35,7 +35,7 @@ use crate::metastore::partition::PartitionIndexKey;
 use crate::metastore::source::{
     Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
 };
-use crate::metastore::table::{TableIndexKey, TablePath};
+use crate::metastore::table::{AggregateColumnIndex, TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::table::{Row, TableValue};
@@ -2848,7 +2848,8 @@ impl RocksMetaStore {
         }
 
         let aggregate_columns = table_id.get_row().aggregate_columns();
-        if aggregate_columns.is_none() {
+        if aggregate_columns.is_empty() {
+            //TODO check that index column is not in aggregate columns
             return Err(CubeError::user(format!(
                     "Can't create aggregate index for table '{}' because aggregate columns not specified for the table",
                     table_id.get_row().get_table_name()
@@ -2888,10 +2889,8 @@ impl RocksMetaStore {
 
         let sorted_key_size = index_columns.len() as u64;
         // Put the rest of the columns.
-        if let Some(aggregate_columns) = aggregate_columns {
-            for col in aggregate_columns {
-                index_columns.push(col.replace_index(index_columns.len()));
-            }
+        for col in aggregate_columns {
+            index_columns.push(col.column().replace_index(index_columns.len()));
         }
 
         let index = Index::try_new(
@@ -3172,11 +3171,8 @@ impl MetaStore for RocksMetaStore {
             } else {
                 None
             };
-            let (aggregate_column_indices, aggregate_functions) = if let Some(aggrs) = aggregates {
-                let functions = aggrs.iter()
-                        .map(|aggr| aggr.0.parse::<AggregateFunction>())
-                        .collect::<Result<Vec<_>, _>>()?;
-                let indices = aggrs.iter()
+            let aggregate_column_indices = if let Some(aggrs) = aggregates {
+                let res = aggrs.iter()
                     .map(|aggr| {
                         let aggr_column = &aggr.1;
                         let column = columns
@@ -3189,24 +3185,24 @@ impl MetaStore for RocksMetaStore {
                                     ))
                             })?;
 
+                        let index = column.column_index as u64;
                         if let Some(unique_indices) = &unique_key_column_indices {
-                            if unique_indices.iter().find(|i| i == &&(column.column_index as u64)).is_some() {
+                            if unique_indices.iter().find(|i| i == &&index).is_some() {
                                 return Err(CubeError::user(format!(
                                             "Aggregate column {} is in unique key. A column can't be in an unique key and an aggregation at the same time",
                                             aggr_column
                                             )));
                             }
                         }
-                        Ok(column.column_index as u64)
-
+                        let function = aggr.0.parse::<AggregateFunction>()?;
+                        Ok(AggregateColumnIndex::new(index, function))
                     })
-                    .collect::<Result<Vec<u64>, CubeError>>()?;
+                .collect::<Result<Vec<_>,_>>()?;
 
-                    (Some(indices), Some(functions))
+                res
             } else {
-                (None, None)
+                vec![]
             };
-
             let table = Table::new(
                 table_name,
                 schema_id.get_id(),
@@ -3216,7 +3212,6 @@ impl MetaStore for RocksMetaStore {
                 is_ready,
                 unique_key_column_indices,
                 aggregate_column_indices,
-                aggregate_functions,
                 seq_column_index,
                 partition_split_threshold,
             );
@@ -5149,6 +5144,7 @@ fn swap_active_partitions_impl(
 
 #[cfg(test)]
 mod tests {
+    use super::table::AggregateColumn;
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
@@ -5558,19 +5554,21 @@ mod tests {
                 table1
             );
 
-            let aggr_columns = table1.get_row().aggregate_columns().unwrap();
+            let aggr_columns = table1.get_row().aggregate_columns();
             assert_eq!(
                 aggr_columns[0],
-                &Column::new("aggr_col2".to_string(), ColumnType::Int, 4)
+                AggregateColumn::new(
+                    Column::new("aggr_col2".to_string(), ColumnType::Int, 4),
+                    AggregateFunction::SUM
+                )
             );
             assert_eq!(
                 aggr_columns[1],
-                &Column::new("aggr_col1".to_string(), ColumnType::Int, 3)
+                AggregateColumn::new(
+                    Column::new("aggr_col1".to_string(), ColumnType::Int, 3),
+                    AggregateFunction::MAX
+                )
             );
-
-            let aggr_funcs = table1.get_row().aggregate_functions().as_ref().unwrap();
-            assert_eq!(aggr_funcs[0], AggregateFunction::SUM);
-            assert_eq!(aggr_funcs[1], AggregateFunction::MAX);
 
             let indexes = meta_store.get_table_indexes(table_id).await.unwrap();
             assert_eq!(indexes.len(), 2);
