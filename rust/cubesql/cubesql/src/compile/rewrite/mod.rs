@@ -752,11 +752,10 @@ pub fn original_expr_name(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
 ) -> Option<String> {
-    egraph[id]
-        .data
-        .original_expr
-        .as_ref()
-        .map(|e| e.name(&DFSchema::empty()).unwrap())
+    egraph[id].data.original_expr.as_ref().map(|e| match e {
+        Expr::Column(c) => c.name.to_string(),
+        _ => e.name(&DFSchema::empty()).unwrap(),
+    })
 }
 
 pub struct ChainSearcher {

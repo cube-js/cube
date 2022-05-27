@@ -2991,6 +2991,8 @@ mod tests {
 
     #[test]
     fn test_order_by() {
+        init_logger();
+
         let supported_orders = vec![
             // test_order_alias_for_dimension_default
             (
@@ -3004,6 +3006,25 @@ mod tests {
                     time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                        "asc".to_string(),
+                    ]]),
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            ),
+            (
+                "SELECT COUNT(*) count, customer_gender, order_date FROM KibanaSampleDataEcommerce GROUP BY customer_gender, order_date ORDER BY order_date".to_string(),
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                        "KibanaSampleDataEcommerce.order_date".to_string(),
+                    ]),
+                    time_dimensions: None,
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.order_date".to_string(),
                         "asc".to_string(),
                     ]]),
                     limit: None,
@@ -3032,7 +3053,7 @@ mod tests {
             ),
             // test_order_compound_identifier_default
             (
-                "SELECT taxful_total_price FROM `KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`".to_string(),
+                "SELECT taxful_total_price FROM `db`.`KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec![]),
                     segments: Some(vec![]),
