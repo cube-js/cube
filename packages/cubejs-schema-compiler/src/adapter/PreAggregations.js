@@ -553,9 +553,9 @@ export class PreAggregations {
 
   /**
    * Returns pre-agg which determined as applicable for the query (the first one
-   * from the list of potencially applicable pre-aggs). The order of the incoming
-   * list of potencially applicable pre-aggs is equal to the order of these pre-
-   * aggs from the cube schema js-file.
+   * from the list of potentially applicable pre-aggs). The order of the
+   * potentially applicable pre-aggs is the same as the order in which these
+   * pre-aggs appear in the schema file.
    * @returns {Object}
    */
   findPreAggregationForQuery() {
@@ -600,7 +600,7 @@ export class PreAggregations {
 
   /**
    * Returns an array of potencially applicable for the query preaggs in the
-   * same order they have in the cube schema js-file.
+   * same order they appear in the schema file.
    * @returns {Array<Object>}
    */
   rollupMatchResults() {
