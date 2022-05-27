@@ -14,7 +14,7 @@
   "main": "index.js",
   "dependencies": {
     "@cubejs-backend/serverless": "^0.30.7",
-    "@google-cloud/pubsub": "^2.5.0"
+    "@google-cloud/pubsub": "^3.0.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.30.0",
