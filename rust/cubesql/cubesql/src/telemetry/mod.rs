@@ -1,7 +1,6 @@
 use crate::{sql::SessionState, CubeError};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::{
-    any::Any,
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, RwLock},
@@ -46,11 +45,9 @@ impl ReportingLogger {
         reporter: Box<dyn LogReporter>,
         max_level: LevelFilter,
     ) -> Result<(), CubeError> {
-        let as_any: &dyn Any = &reporter;
-        let need_to_report = as_any.downcast_ref::<LocalReporter>().is_none();
         let reporting_logger = Self {
             logger,
-            need_to_report,
+            need_to_report: reporter.is_active(),
         };
 
         let mut guard = REPORTER
