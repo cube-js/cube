@@ -262,6 +262,20 @@ impl LogicalPlanAnalysis {
 
                 Some(vec)
             }
+            LogicalPlanLanguage::AggregateGroupExpr(params) => {
+                for p in params.iter() {
+                    vec.extend(referenced_columns(*p)?.into_iter());
+                }
+
+                Some(vec)
+            }
+            LogicalPlanLanguage::AggregateAggrExpr(params) => {
+                for p in params.iter() {
+                    vec.extend(referenced_columns(*p)?.into_iter());
+                }
+
+                Some(vec)
+            }
             _ => None,
         }
     }

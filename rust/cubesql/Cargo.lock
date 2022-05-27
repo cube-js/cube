@@ -765,6 +765,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "comfy-table 4.1.1",
+ "csv",
  "cubeclient",
  "datafusion",
  "egg",

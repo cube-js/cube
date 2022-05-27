@@ -9,15 +9,15 @@ use crate::{
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
             measure_expr, member_replacer, original_expr_name, projection, projection_expr,
-            projection_expr_empty_tail, rewrite, rewriter::RewriteRules, table_scan,
-            time_dimension_expr, transforming_chain_rewrite, transforming_rewrite, udaf_expr,
-            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            ColumnAliasReplacerAliases, ColumnAliasReplacerTableName, ColumnExprColumn,
-            CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
-            MemberErrorPriority, ProjectionAlias, TableScanSourceTableName, TableScanTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            WithColumnRelation,
+            projection_expr_empty_tail, referenced_columns, rewrite, rewriter::RewriteRules,
+            table_scan, time_dimension_expr, transforming_chain_rewrite, transforming_rewrite,
+            udaf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
+            ColumnAliasReplacerAliases, ColumnAliasReplacerTableName,
+            ColumnAliasReplacerTargetTableName, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
+            CubeScanTableName, DimensionName, LimitN, LiteralExprValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, MemberErrorPriority, ProjectionAlias,
+            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -29,7 +29,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst};
-use std::{ops::Index, sync::Arc};
+use std::{collections::HashSet, ops::Index, sync::Arc};
 
 pub struct MemberRules {
     cube_context: Arc<CubeContext>,
@@ -159,10 +159,10 @@ impl RewriteRules for MemberRules {
             transforming_chain_rewrite(
                 "member-replacer-dimension",
                 member_replacer(
-                    aggr_group_expr("?aggr_expr", "?tail_group_expr"),
+                    aggr_group_expr("?original_expr", "?tail_group_expr"),
                     "?source_table_name",
                 ),
-                vec![("?aggr_expr", column_expr("?column"))],
+                vec![("?original_expr", column_expr("?column"))],
                 cube_scan_members(
                     "?dimension",
                     member_replacer("?tail_group_expr", "?source_table_name"),
@@ -170,135 +170,101 @@ impl RewriteRules for MemberRules {
                 self.transform_dimension(
                     "?source_table_name",
                     "?column",
-                    "?aggr_expr",
                     "?dimension",
-                ),
-            ),
-            transforming_rewrite(
-                "date-trunc",
-                member_replacer(
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                    "?source_table_name",
-                ),
-                time_dimension_expr(
-                    "?time_dimension_name",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                ),
-                self.transform_time_dimension(
-                    "?source_table_name",
-                    "?column",
-                    "?time_dimension_name",
-                    "?granularity",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                ),
-            ),
-            // TODO make cast split work
-            transforming_rewrite(
-                "date-trunc-unwrap-cast",
-                member_replacer(
-                    cast_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?date_type",
-                    ),
-                    "?source_table_name",
-                ),
-                time_dimension_expr(
-                    "?time_dimension_name",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                    cast_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?date_type",
-                    ),
-                ),
-                self.transform_time_dimension(
-                    "?source_table_name",
-                    "?column",
-                    "?time_dimension_name",
-                    "?granularity",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                ),
-            ),
-            // TODO duplicate of previous rule with aliasing. Extract aliasing as separate step?
-            transforming_rewrite(
-                "date-trunc-alias",
-                member_replacer(
-                    alias_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?alias",
-                    ),
-                    "?source_table_name",
-                ),
-                time_dimension_expr(
-                    "?time_dimension_name",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                    alias_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "?alias",
-                    ),
-                ),
-                self.transform_time_dimension(
-                    "?source_table_name",
-                    "?column",
-                    "?time_dimension_name",
-                    "?granularity",
-                    "?time_dimension_granularity",
-                    "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "time-dimension-alias",
-                time_dimension_expr(
-                    "?time_dimension_name",
-                    "?time_dimension_granularity",
-                    "?date_range",
                     "?original_expr",
                 ),
+            ),
+            transforming_chain_rewrite(
+                "date-trunc",
+                member_replacer("?original_expr", "?source_table_name"),
+                vec![(
+                    "?original_expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                )],
                 time_dimension_expr(
                     "?time_dimension_name",
                     "?time_dimension_granularity",
                     "?date_range",
                     "?alias",
                 ),
-                Self::transform_original_expr_alias("?original_expr", "?alias"),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?original_expr",
+                    "?alias",
+                ),
             ),
-            transforming_rewrite(
-                "measure-alias",
-                measure_expr("?measure", "?original_expr"),
-                measure_expr("?measure", "?alias"),
-                Self::transform_original_expr_alias("?original_expr", "?alias"),
+            // TODO make cast split work
+            transforming_chain_rewrite(
+                "date-trunc-unwrap-cast",
+                member_replacer("?original_expr", "?source_table_name"),
+                vec![(
+                    "?original_expr",
+                    cast_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?date_type",
+                    ),
+                )],
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?alias",
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?original_expr",
+                    "?alias",
+                ),
             ),
-            transforming_rewrite(
-                "dimension-alias",
-                dimension_expr("?dimension", "?original_expr"),
-                dimension_expr("?dimension", "?alias"),
-                Self::transform_original_expr_alias("?original_expr", "?alias"),
+            // TODO duplicate of previous rule with aliasing. Extract aliasing as separate step?
+            transforming_chain_rewrite(
+                "date-trunc-alias",
+                member_replacer("?original_expr", "?source_table_name"),
+                vec![(
+                    "?original_expr",
+                    alias_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?alias",
+                    ),
+                )],
+                time_dimension_expr(
+                    "?time_dimension_name",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?alias",
+                ),
+                self.transform_time_dimension(
+                    "?source_table_name",
+                    "?column",
+                    "?time_dimension_name",
+                    "?granularity",
+                    "?time_dimension_granularity",
+                    "?date_range",
+                    "?original_expr",
+                    "?alias",
+                ),
             ),
             rewrite(
-                "push-down-aggregate",
+                "push-down-aggregate-to-empty-scan",
                 aggregate(
                     cube_scan(
                         "?source_table_name",
@@ -329,7 +295,45 @@ impl RewriteRules for MemberRules {
                     "?split",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
+                "push-down-aggregate",
+                aggregate(
+                    cube_scan(
+                        "?source_table_name",
+                        "?old_members",
+                        "?filters",
+                        "?orders",
+                        "?limit",
+                        "?offset",
+                        "?aliases",
+                        "?table_name",
+                        "?split",
+                    ),
+                    "?group_expr",
+                    "?aggr_expr",
+                ),
+                cube_scan(
+                    "?source_table_name",
+                    cube_scan_members(
+                        member_replacer("?group_expr", "?source_table_name"),
+                        member_replacer("?aggr_expr", "?source_table_name"),
+                    ),
+                    "?filters",
+                    "?orders",
+                    "?limit",
+                    "?offset",
+                    "?aliases",
+                    "?table_name",
+                    "?split",
+                ),
+                self.push_down_non_empty_aggregate(
+                    "?table_name",
+                    "?group_expr",
+                    "?aggr_expr",
+                    "?old_members",
+                ),
+            ),
+            transforming_rewrite(
                 "push-down-projection-to-empty-scan",
                 projection(
                     "?expr",
@@ -354,9 +358,10 @@ impl RewriteRules for MemberRules {
                     "?limit",
                     "?offset",
                     "?aliases",
-                    "?table_name",
+                    "?new_table_name",
                     "?split",
                 ),
+                self.push_down_projection_to_empty_scan("?alias", "?table_name", "?new_table_name"),
             ),
             transforming_rewrite(
                 "push-down-projection",
@@ -377,7 +382,7 @@ impl RewriteRules for MemberRules {
                 ),
                 cube_scan(
                     "?source_table_name",
-                    column_alias_replacer("?members", "?aliases", "?cube"),
+                    column_alias_replacer("?members", "?aliases", "?cube", "?target_table_name"),
                     "?filters",
                     "?orders",
                     "?limit",
@@ -395,6 +400,7 @@ impl RewriteRules for MemberRules {
                     "?alias",
                     "?table_name",
                     "?new_table_name",
+                    "?target_table_name",
                 ),
             ),
             transforming_rewrite(
@@ -435,17 +441,20 @@ impl RewriteRules for MemberRules {
                     ),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     column_alias_replacer(
                         cube_scan_members("?members_left", "?tail_left"),
                         "?aliases",
                         "?cube",
+                        "?target_table_name",
                     ),
                     column_alias_replacer(
                         cube_scan_members("?members_right", "?tail_right"),
                         "?aliases",
                         "?cube",
+                        "?target_table_name",
                     ),
                 ),
             ),
@@ -458,6 +467,7 @@ impl RewriteRules for MemberRules {
                     ),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     cube_scan_members_empty_tail(),
@@ -465,6 +475,7 @@ impl RewriteRules for MemberRules {
                         cube_scan_members("?members_right", "?tail_right"),
                         "?aliases",
                         "?cube",
+                        "?target_table_name",
                     ),
                 ),
             ),
@@ -477,12 +488,14 @@ impl RewriteRules for MemberRules {
                     ),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     column_alias_replacer(
                         cube_scan_members("?members_left", "?tail_left"),
                         "?aliases",
                         "?cube",
+                        "?target_table_name",
                     ),
                     cube_scan_members_empty_tail(),
                 ),
@@ -493,12 +506,24 @@ impl RewriteRules for MemberRules {
                     cube_scan_members(measure_expr("?measure", "?expr"), "?tail_group_expr"),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     measure_expr("?measure", "?replaced_alias_expr"),
-                    column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
+                    column_alias_replacer(
+                        "?tail_group_expr",
+                        "?aliases",
+                        "?cube",
+                        "?target_table_name",
+                    ),
                 ),
-                self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
+                self.replace_projection_alias(
+                    "?expr",
+                    "?aliases",
+                    "?cube",
+                    "?target_table_name",
+                    "?replaced_alias_expr",
+                ),
             ),
             transforming_rewrite(
                 "alias-replacer-dimension",
@@ -506,12 +531,24 @@ impl RewriteRules for MemberRules {
                     cube_scan_members(dimension_expr("?dimension", "?expr"), "?tail_group_expr"),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     dimension_expr("?dimension", "?replaced_alias_expr"),
-                    column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
+                    column_alias_replacer(
+                        "?tail_group_expr",
+                        "?aliases",
+                        "?cube",
+                        "?target_table_name",
+                    ),
                 ),
-                self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
+                self.replace_projection_alias(
+                    "?expr",
+                    "?aliases",
+                    "?cube",
+                    "?target_table_name",
+                    "?replaced_alias_expr",
+                ),
             ),
             transforming_rewrite(
                 "alias-replacer-time-dimension",
@@ -527,6 +564,7 @@ impl RewriteRules for MemberRules {
                     ),
                     "?aliases",
                     "?cube",
+                    "?target_table_name",
                 ),
                 cube_scan_members(
                     time_dimension_expr(
@@ -535,13 +573,29 @@ impl RewriteRules for MemberRules {
                         "?date_range",
                         "?replaced_alias_expr",
                     ),
-                    column_alias_replacer("?tail_group_expr", "?aliases", "?cube"),
+                    column_alias_replacer(
+                        "?tail_group_expr",
+                        "?aliases",
+                        "?cube",
+                        "?target_table_name",
+                    ),
                 ),
-                self.replace_projection_alias("?expr", "?aliases", "?cube", "?replaced_alias_expr"),
+                self.replace_projection_alias(
+                    "?expr",
+                    "?aliases",
+                    "?cube",
+                    "?target_table_name",
+                    "?replaced_alias_expr",
+                ),
             ),
             rewrite(
                 "alias-replacer-tail",
-                column_alias_replacer(cube_scan_members_empty_tail(), "?aliases", "?cube"),
+                column_alias_replacer(
+                    cube_scan_members_empty_tail(),
+                    "?aliases",
+                    "?cube",
+                    "?target_table_name",
+                ),
                 cube_scan_members_empty_tail(),
             ),
             rewrite(
@@ -698,6 +752,7 @@ impl MemberRules {
         alias_var: &'static str,
         table_name_var: &'static str,
         new_table_name_var: &'static str,
+        target_table_name_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let members_var = var!(members_var);
@@ -707,6 +762,7 @@ impl MemberRules {
         let alias_var = var!(alias_var);
         let table_name_var = var!(table_name_var);
         let new_table_name_var = var!(new_table_name_var);
+        let target_table_name_var = var!(target_table_name_var);
         move |egraph, subst| {
             if let Some(expr_to_alias) =
                 &egraph.index(subst[projection_expr_var]).data.expr_to_alias
@@ -757,12 +813,105 @@ impl MemberRules {
                                     ));
                                 subst.insert(cube_var, cube);
 
+                                let final_table_name =
+                                    projection_alias.clone().unwrap_or(table_name);
                                 let new_table_name =
                                     egraph.add(LogicalPlanLanguage::CubeScanTableName(
-                                        CubeScanTableName(projection_alias.unwrap_or(table_name)),
+                                        CubeScanTableName(final_table_name.to_string()),
                                     ));
                                 subst.insert(new_table_name_var, new_table_name);
 
+                                let target_table_name = egraph.add(
+                                    LogicalPlanLanguage::ColumnAliasReplacerTargetTableName(
+                                        ColumnAliasReplacerTargetTableName(Some(final_table_name)),
+                                    ),
+                                );
+                                subst.insert(target_table_name_var, target_table_name);
+
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn push_down_projection_to_empty_scan(
+        &self,
+        alias_var: &'static str,
+        table_name_var: &'static str,
+        new_table_name_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_var = var!(alias_var);
+        let table_name_var = var!(table_name_var);
+        let new_table_name_var = var!(new_table_name_var);
+        move |egraph, subst| {
+            for table_name in var_iter!(egraph[subst[table_name_var]], CubeScanTableName).cloned() {
+                for projection_alias in
+                    var_iter!(egraph[subst[alias_var]], ProjectionAlias).cloned()
+                {
+                    let new_table_name = egraph.add(LogicalPlanLanguage::CubeScanTableName(
+                        CubeScanTableName(projection_alias.unwrap_or(table_name)),
+                    ));
+                    subst.insert(new_table_name_var, new_table_name);
+
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn push_down_non_empty_aggregate(
+        &self,
+        table_name_var: &'static str,
+        group_expr_var: &'static str,
+        aggregate_expr_var: &'static str,
+        members_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let table_name_var = var!(table_name_var);
+        let group_expr_var = var!(group_expr_var);
+        let aggregate_expr_var = var!(aggregate_expr_var);
+        let members_var = var!(members_var);
+        move |egraph, subst| {
+            for table_name in var_iter!(egraph[subst[table_name_var]], CubeScanTableName) {
+                if let Some(referenced_group_expr) =
+                    &egraph.index(subst[group_expr_var]).data.referenced_expr
+                {
+                    if let Some(referenced_aggr_expr) =
+                        &egraph.index(subst[aggregate_expr_var]).data.referenced_expr
+                    {
+                        if let Some(member_name_to_expr) = egraph
+                            .index(subst[members_var])
+                            .data
+                            .member_name_to_expr
+                            .clone()
+                        {
+                            let member_column_names = column_name_to_member_name(
+                                member_name_to_expr,
+                                table_name.to_string(),
+                            )
+                            .keys()
+                            .cloned()
+                            .collect::<HashSet<_>>();
+                            let mut columns = HashSet::new();
+                            columns.extend(
+                                referenced_columns(
+                                    referenced_group_expr.clone(),
+                                    table_name.to_string(),
+                                )
+                                .into_iter(),
+                            );
+                            columns.extend(
+                                referenced_columns(
+                                    referenced_aggr_expr.clone(),
+                                    table_name.to_string(),
+                                )
+                                .into_iter(),
+                            );
+                            if columns == member_column_names {
                                 return true;
                             }
                         }
@@ -802,12 +951,14 @@ impl MemberRules {
         expr_var: &'static str,
         column_name_to_alias: &'static str,
         cube_var: &'static str,
+        target_table_name_var: &'static str,
         replaced_alias_expr: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let expr_var = expr_var.parse().unwrap();
         let column_name_to_alias = column_name_to_alias.parse().unwrap();
         let cube_var = cube_var.parse().unwrap();
         let replaced_alias_expr = replaced_alias_expr.parse().unwrap();
+        let target_table_name_var = var!(target_table_name_var);
         move |egraph, subst| {
             let expr = egraph[subst[expr_var]]
                 .data
@@ -823,18 +974,28 @@ impl MemberRules {
                     egraph[subst[column_name_to_alias]],
                     ColumnAliasReplacerAliases
                 ) {
-                    if let Some((_, new_alias)) =
-                        column_name_to_alias.iter().find(|(c, _)| c == &column_name)
+                    for target_table_name in var_iter!(
+                        egraph[subst[target_table_name_var]],
+                        ColumnAliasReplacerTargetTableName
+                    )
+                    .cloned()
                     {
-                        let new_alias = new_alias.clone();
-                        let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                            ColumnExprColumn(Column::from_name(new_alias.to_string())),
-                        ));
-                        subst.insert(
-                            replaced_alias_expr,
-                            egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                        );
-                        return true;
+                        if let Some((_, new_alias)) =
+                            column_name_to_alias.iter().find(|(c, _)| c == &column_name)
+                        {
+                            let new_alias = new_alias.clone();
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(Column {
+                                    name: new_alias.to_string(),
+                                    relation: target_table_name.clone(),
+                                }),
+                            ));
+                            subst.insert(
+                                replaced_alias_expr,
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                            );
+                            return true;
+                        }
                     }
                 }
             }
@@ -987,13 +1148,13 @@ impl MemberRules {
         &self,
         cube_var: &'static str,
         column_var: &'static str,
-        aggr_expr_var: &'static str,
         dimension_var: &'static str,
+        original_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let column_var = var!(column_var);
-        let aggr_expr_var = var!(aggr_expr_var);
         let dimension_var = var!(dimension_var);
+        let original_expr_var = var!(original_expr_var);
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for dimension_name in
@@ -1001,45 +1162,50 @@ impl MemberRules {
             {
                 for cube_name in var_iter!(egraph[subst[cube_var]], TableScanSourceTableName) {
                     if let Some(cube) = meta_context.find_cube_with_name(cube_name.to_string()) {
-                        let dimension_name = format!("{}.{}", cube_name, dimension_name);
-                        if let Some(dimension) = cube
-                            .dimensions
-                            .iter()
-                            .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
-                        {
-                            let dimension_name = egraph.add(LogicalPlanLanguage::DimensionName(
-                                DimensionName(dimension.name.to_string()),
-                            ));
+                        if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
+                            let dimension_name = format!("{}.{}", cube_name, dimension_name);
+                            if let Some(dimension) = cube
+                                .dimensions
+                                .iter()
+                                .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
+                            {
+                                let dimension_name =
+                                    egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
+                                        dimension.name.to_string(),
+                                    )));
 
-                            subst.insert(
-                                dimension_var,
-                                egraph.add(LogicalPlanLanguage::Dimension([
-                                    dimension_name,
-                                    subst[aggr_expr_var],
-                                ])),
-                            );
+                                let alias_expr = Self::add_alias_column(egraph, alias);
 
-                            return true;
-                        }
+                                subst.insert(
+                                    dimension_var,
+                                    egraph.add(LogicalPlanLanguage::Dimension([
+                                        dimension_name,
+                                        alias_expr,
+                                    ])),
+                                );
 
-                        if let Some(s) = cube
-                            .segments
-                            .iter()
-                            .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
-                        {
-                            subst.insert(
-                                dimension_var,
-                                add_member_error(
-                                    egraph,
-                                    format!(
-                                        "Unable to use segment '{}' in GROUP BY",
-                                        s.get_real_name()
+                                return true;
+                            }
+
+                            if let Some(s) = cube
+                                .segments
+                                .iter()
+                                .find(|d| d.name.eq_ignore_ascii_case(&dimension_name))
+                            {
+                                subst.insert(
+                                    dimension_var,
+                                    add_member_error(
+                                        egraph,
+                                        format!(
+                                            "Unable to use segment '{}' in GROUP BY",
+                                            s.get_real_name()
+                                        ),
+                                        1,
                                     ),
-                                    1,
-                                ),
-                            );
+                                );
 
-                            return true;
+                                return true;
+                            }
                         }
                     }
                 }
@@ -1056,6 +1222,8 @@ impl MemberRules {
         granularity_var: &'static str,
         time_dimension_granularity_var: &'static str,
         date_range_var: &'static str,
+        original_expr_var: &'static str,
+        alias_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = cube_var.parse().unwrap();
         let dimension_var = dimension_var.parse().unwrap();
@@ -1063,6 +1231,8 @@ impl MemberRules {
         let granularity_var = granularity_var.parse().unwrap();
         let time_dimension_granularity_var = time_dimension_granularity_var.parse().unwrap();
         let date_range_var = date_range_var.parse().unwrap();
+        let original_expr_var = var!(original_expr_var);
+        let alias_var = var!(alias_var);
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for time_dimension_name in var_iter!(egraph[subst[dimension_var]], ColumnExprColumn)
@@ -1081,36 +1251,47 @@ impl MemberRules {
                             for granularity in
                                 var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
                             {
-                                match granularity {
-                                    ScalarValue::Utf8(Some(granularity_value)) => {
-                                        let granularity_value = granularity_value.to_lowercase();
-                                        subst.insert(
-                                            time_dimension_name_var,
-                                            egraph.add(LogicalPlanLanguage::TimeDimensionName(
-                                                TimeDimensionName(time_dimension.name.to_string()),
-                                            )),
-                                        );
-                                        subst.insert(
-                                            date_range_var,
-                                            egraph.add(
-                                                LogicalPlanLanguage::TimeDimensionDateRange(
-                                                    TimeDimensionDateRange(None), // TODO
+                                if let Some(alias) =
+                                    original_expr_name(egraph, subst[original_expr_var])
+                                {
+                                    match granularity {
+                                        ScalarValue::Utf8(Some(granularity_value)) => {
+                                            let granularity_value =
+                                                granularity_value.to_lowercase();
+                                            subst.insert(
+                                                time_dimension_name_var,
+                                                egraph.add(LogicalPlanLanguage::TimeDimensionName(
+                                                    TimeDimensionName(
+                                                        time_dimension.name.to_string(),
+                                                    ),
+                                                )),
+                                            );
+                                            subst.insert(
+                                                date_range_var,
+                                                egraph.add(
+                                                    LogicalPlanLanguage::TimeDimensionDateRange(
+                                                        TimeDimensionDateRange(None), // TODO
+                                                    ),
                                                 ),
-                                            ),
-                                        );
-                                        subst.insert(
-                                            time_dimension_granularity_var,
-                                            egraph.add(
-                                                LogicalPlanLanguage::TimeDimensionGranularity(
-                                                    TimeDimensionGranularity(Some(
-                                                        granularity_value,
-                                                    )),
+                                            );
+                                            subst.insert(
+                                                time_dimension_granularity_var,
+                                                egraph.add(
+                                                    LogicalPlanLanguage::TimeDimensionGranularity(
+                                                        TimeDimensionGranularity(Some(
+                                                            granularity_value,
+                                                        )),
+                                                    ),
                                                 ),
-                                            ),
-                                        );
-                                        return true;
+                                            );
+
+                                            let alias_expr = Self::add_alias_column(egraph, alias);
+                                            subst.insert(alias_var, alias_expr);
+
+                                            return true;
+                                        }
+                                        _ => {}
                                     }
-                                    _ => {}
                                 }
                             }
                         }
@@ -1119,6 +1300,16 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    fn add_alias_column(
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        alias: String,
+    ) -> Id {
+        let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+            Column::from_name(alias),
+        )));
+        egraph.add(LogicalPlanLanguage::ColumnExpr([alias]))
     }
 
     fn measure_rewrite(
@@ -1220,32 +1411,38 @@ impl MemberRules {
                                     .iter()
                                     .find(|m| measure_name.eq_ignore_ascii_case(&m.name))
                                 {
-                                    if call_agg_type.is_some()
-                                        && !measure
-                                            .is_same_agg_type(call_agg_type.as_ref().unwrap())
+                                    if let Some(alias) =
+                                        original_expr_name(egraph, subst[aggr_expr_var])
                                     {
-                                        subst.insert(
-                                            measure_out_var,
-                                            add_member_error(egraph, format!(
-                                                "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
-                                                measure.get_real_name(),
-                                                measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
-                                                call_agg_type.unwrap().to_uppercase(),
-                                            ), 1),
-                                        );
-                                    } else {
-                                        let measure_name =
-                                            egraph.add(LogicalPlanLanguage::MeasureName(
-                                                MeasureName(measure.name.to_string()),
-                                            ));
+                                        if call_agg_type.is_some()
+                                            && !measure
+                                                .is_same_agg_type(call_agg_type.as_ref().unwrap())
+                                        {
+                                            subst.insert(
+                                                measure_out_var,
+                                                add_member_error(egraph, format!(
+                                                    "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
+                                                    measure.get_real_name(),
+                                                    measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
+                                                    call_agg_type.unwrap().to_uppercase(),
+                                                ), 1),
+                                            );
+                                        } else {
+                                            let measure_name =
+                                                egraph.add(LogicalPlanLanguage::MeasureName(
+                                                    MeasureName(measure.name.to_string()),
+                                                ));
 
-                                        subst.insert(
-                                            measure_out_var,
-                                            egraph.add(LogicalPlanLanguage::Measure([
-                                                measure_name,
-                                                subst[aggr_expr_var],
-                                            ])),
-                                        );
+                                            let alias_expr = Self::add_alias_column(egraph, alias);
+
+                                            subst.insert(
+                                                measure_out_var,
+                                                egraph.add(LogicalPlanLanguage::Measure([
+                                                    measure_name,
+                                                    alias_expr,
+                                                ])),
+                                            );
+                                        }
                                     }
 
                                     return true;
