@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct command completion for SET in pg-wire ([ab42e54](https://github.com/cube-js/cube.js/commit/ab42e54b2c49aea63d4db75e9332655159fa73e6))
+* **playground:** query validation ([2052895](https://github.com/cube-js/cube.js/commit/205289549c964eba01e76fdadca86c4e8117e967))
+
+
+### Features
+
+* **cubesql:** Support escaped string literals, E'str' ([ef9700d](https://github.com/cube-js/cube.js/commit/ef9700d8f7a1ccd0a31aeece70fdcecee092eb9f))
+* **cubesql:** Support multiple stmts for simple query in pg-wire ([0f645cb](https://github.com/cube-js/cube.js/commit/0f645cbd0a4bf25d0a03a14d366607ae716fc792))
+
+
+
+
+
 ## [0.30.6](https://github.com/cube-js/cube.js/compare/v0.30.5...v0.30.6) (2022-05-24)
 
 

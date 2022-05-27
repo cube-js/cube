@@ -150,7 +150,7 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useDeepEffect(() => {
-    if (!areQueriesEqual(query1, query2)) {
+    if (!areQueriesEqual(validateQuery(query1), validateQuery(query2))) {
       onChange();
     }
   }, [query1, query2]);
@@ -533,8 +533,8 @@ export function PlaygroundQueryBuilder({
                         <ChartRenderer
                           queryId={queryId}
                           areQueriesEqual={areQueriesEqual(
-                            query,
-                            queryRef.current
+                            validateQuery(query),
+                            validateQuery(queryRef.current)
                           )}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
