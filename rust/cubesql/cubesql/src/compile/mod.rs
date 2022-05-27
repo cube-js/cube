@@ -7777,4 +7777,34 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_join_where_and_or() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "join_where_and_or",
+            execute_query(
+                "
+                SELECT
+                    att.attname,
+                    att.attnum,
+                    cl.oid
+                FROM pg_attribute att
+                JOIN pg_class cl ON
+                    cl.oid = attrelid AND (
+                        cl.relkind = 's' OR
+                        cl.relkind = 'r'
+                    )
+                ORDER BY
+                    cl.oid ASC,
+                    att.attnum ASC
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
