@@ -13,8 +13,9 @@ use datafusion::{
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
-            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
+            DataType, Field, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type,
+            IntervalDayTimeType, IntervalUnit, TimeUnit, TimestampNanosecondType, UInt16Type,
+            UInt32Type, UInt64Type, UInt8Type,
         },
     },
     error::{DataFusionError, Result},
@@ -36,7 +37,7 @@ use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
-        coerce::{if_coercion, least_coercion},
+        coerce::{if_coercion, is_numeric, least_coercion},
         columar::if_then_else,
     },
     sql::SessionState,
@@ -1743,6 +1744,192 @@ pub fn create_unnest_udtf() -> TableUDF {
     TableUDF::new(
         "unnest",
         &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+macro_rules! impl_array_list_fn_iter {
+    ($INPUT:expr, $INPUT_DT:ty, $FN:ident) => {{
+        let mut builder = PrimitiveBuilder::<$INPUT_DT>::new($INPUT.len());
+
+        for i in 0..$INPUT.len() {
+            let current_row = $INPUT.value(i);
+
+            if $INPUT.is_null(i) {
+                builder.append_null()?;
+            } else {
+                let arr = current_row
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<$INPUT_DT>>()
+                    .unwrap();
+                if let Some(Some(v)) = arr.into_iter().$FN() {
+                    builder.append_value(v)?;
+                } else {
+                    builder.append_null()?;
+                }
+            }
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    }};
+}
+
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_lower_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() >= 1);
+
+        let input_arr_list_dt = match args[0].data_type() {
+            DataType::List(field) => match field.data_type() {
+                dt if is_numeric(dt) => field.data_type(),
+                other => {
+                    return Err(DataFusionError::Execution(format!(
+                        "anyarray argument must be a List of numeric values, actual: List<{}>",
+                        other
+                    )));
+                }
+            },
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "anyarray argument must be a List of numeric values, actual: {}",
+                    other
+                )));
+            }
+        };
+
+        let input_arr = downcast_list_arg!(args[0], "anyarray");
+        if args.len() == 2 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "bound argument is not supported right now"
+            )));
+        };
+
+        match input_arr_list_dt {
+            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, min),
+            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, min),
+            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, min),
+            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, min),
+            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, min),
+            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, min),
+            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, min),
+            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, min),
+            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
+            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, min),
+            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, min),
+            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, min),
+            dt => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unable to extract lower element from the List of {}",
+                    dt
+                )))
+            }
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        assert!(args.len() >= 1);
+
+        match &args[0] {
+            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
+            other => Err(DataFusionError::Execution(format!(
+                "anyarray argument must be a List of numeric values, actual: {}",
+                other
+            ))),
+        }
+    });
+
+    ScalarUDF::new(
+        "array_lower",
+        &Signature::one_of(
+            vec![
+                // array anyarray
+                TypeSignature::Any(1),
+                // array anyarray, bound integer
+                TypeSignature::Any(2),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_upper_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() >= 1);
+
+        let input_arr_list_dt = match args[0].data_type() {
+            DataType::List(field) => match field.data_type() {
+                dt if is_numeric(dt) => field.data_type(),
+                other => {
+                    return Err(DataFusionError::Execution(format!(
+                        "anyarray argument must be a List of numeric values, actual: List<{}>",
+                        other
+                    )));
+                }
+            },
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "anyarray argument must be a List of numeric values, actual: {}",
+                    other
+                )));
+            }
+        };
+
+        let input_arr = downcast_list_arg!(args[0], "anyarray");
+        if args.len() == 2 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "bound argument is not supported right now"
+            )));
+        };
+
+        match input_arr_list_dt {
+            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, max),
+            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, max),
+            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, max),
+            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, max),
+            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, max),
+            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, max),
+            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, max),
+            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, max),
+            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
+            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, max),
+            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, max),
+            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, max),
+            dt => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unable to extract lower element from the List of {}",
+                    dt
+                )))
+            }
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        assert!(args.len() >= 1);
+
+        match &args[0] {
+            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
+            other => Err(DataFusionError::Execution(format!(
+                "anyarray argument must be a List of numeric values, actual: {}",
+                other
+            ))),
+        }
+    });
+
+    ScalarUDF::new(
+        "array_upper",
+        &Signature::one_of(
+            vec![
+                // array anyarray
+                TypeSignature::Any(1),
+                // array anyarray, bound integer
+                TypeSignature::Any(2),
+            ],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )

@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7144
+expression: "execute_query(\"\n                SELECT\n                    array_lower(t.v) q\n                FROM (\n                    SELECT ARRAY[1,2,3,4,5] as v UNION ALL\n                    SELECT ARRAY[5,4,3,2,1] as v\n                ) t\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---+
+| q |
++---+
+| 1 |
+| 1 |
++---+
