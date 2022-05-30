@@ -664,24 +664,32 @@ impl AsyncPostgresShim {
                 };
 
                 let limit: usize = match direction {
-                    FetchDirection::Count { limit } => match limit {
-                        Value::Number(v, negative) => {
-                            if negative {
-                                // HINT:  Declare it with SCROLL option to enable backward scan.
-                                // But it's not supported right now!
-                                return Err(ConnectionError::Protocol(
-                                    protocol::ErrorResponse::error(
-                                        protocol::ErrorCode::ObjectNotInPrerequisiteState,
-                                        "cursor can only scan forward".to_string(),
-                                    )
-                                    .into(),
-                                ));
-                            }
+                    FetchDirection::Count { limit } => {
+                        match limit {
+                            Value::Number(v, negative) => {
+                                if negative {
+                                    // HINT:  Declare it with SCROLL option to enable backward scan.
+                                    // But it's not supported right now!
+                                    return Err(ConnectionError::Protocol(
+                                        protocol::ErrorResponse::error(
+                                            protocol::ErrorCode::ObjectNotInPrerequisiteState,
+                                            "cursor can only scan forward".to_string(),
+                                        )
+                                        .into(),
+                                    ));
+                                }
 
-                            v.parse::<usize>().unwrap()
+                                v.parse::<usize>().map_err(|err| ConnectionError::Protocol(
+                                protocol::ErrorResponse::error(
+                                    protocol::ErrorCode::ProtocolViolation,
+                                    format!(r#""Unable to parse number "{}" for fetch limit: {}"#, v, err),
+                                )
+                                    .into(),
+                            ))?
+                            }
+                            _ => unreachable!(),
                         }
-                        _ => unreachable!(),
-                    },
+                    }
                     other => {
                         return Err(ConnectionError::Protocol(
                             protocol::ErrorResponse::error(
