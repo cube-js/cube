@@ -527,6 +527,19 @@ impl AsyncPostgresShim {
             )
         })?;
 
+        if self.portals.len() >= self.session.server.configuration.connection_max_portals {
+            return Err(ConnectionError::Protocol(
+                protocol::ErrorResponse::error(
+                    protocol::ErrorCode::ConfigurationLimitExceeded,
+                    format!(
+                        "Unable to allocate a new portal: max allocation reached, actual: {}, max: {}",
+                        self.portals.len(),
+                        self.session.server.configuration.connection_max_portals),
+                )
+                    .into(),
+            ));
+        }
+
         let portal = if let Some(statement) = source_statement {
             let prepared_statement = statement.bind(body.to_bind_values());
 
@@ -561,6 +574,25 @@ impl AsyncPostgresShim {
             None
         } else {
             let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
+
+            if self.statements.len()
+                >= self
+                    .session
+                    .server
+                    .configuration
+                    .connection_max_prepared_statements
+            {
+                return Err(ConnectionError::Protocol(
+                    protocol::ErrorResponse::error(
+                        protocol::ErrorCode::ConfigurationLimitExceeded,
+                        format!(
+                            "Unable to allocate a new prepared statement: max allocation reached, actual: {}, max: {}",
+                            self.statements.len(),
+                            self.session.server.configuration.connection_max_prepared_statements),
+                    )
+                        .into(),
+                ));
+            }
 
             let stmt_finder = StatementParamsFinder::new();
             let parameters: Vec<PgTypeId> = stmt_finder
