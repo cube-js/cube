@@ -277,16 +277,12 @@ mode][ref-development-mode] it ignores validation.
 
 Called on each request from Cube SQL API.
 
-Also, you can use empty `checkAuth` function to disable built-in security. See
-an example below.
-
 For example, you can use `checkSqlAuth` to validate username and password.
 
 ```javascript
 module.exports = {
   checkSqlAuth: (req, username) => {
-    const userInfo = await getUserFromLDAP(username);
-    if (userInfo) {
+    if (username === 'fooUser') {
         return {
             password: 'mypassword',
             securityContext: {},
