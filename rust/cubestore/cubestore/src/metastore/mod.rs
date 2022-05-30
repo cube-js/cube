@@ -5027,7 +5027,7 @@ fn swap_active_partitions_impl(
     let table = PartitionRocksTable::new(db_ref.clone());
     let chunk_table = ChunkRocksTable::new(db_ref.clone());
 
-    // Rows are compacted using unique key columns and totals don't match
+    // Rows are compacted using unique key columns or aggregating index and totals don't match
     let skip_row_count_sanity_check = if let Some(current) = current_active.first() {
         let current_partition =
             table
@@ -5038,7 +5038,8 @@ fn swap_active_partitions_impl(
                 )))?;
         let index = index_table.get_row_or_not_found(current_partition.get_row().get_index_id())?;
         let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
-        table.get_row().unique_key_columns().is_some()
+        index.get_row().get_type() == IndexType::Aggregate
+            || table.get_row().unique_key_columns().is_some()
     } else {
         false
     };
