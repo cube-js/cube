@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import { makeStyles, useTheme } from '@material-ui/styles';
@@ -7,7 +7,7 @@ import { useMediaQuery } from '@material-ui/core';
 import palette from '../../theme/palette';
 import { Sidebar } from './components';
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(() => ({
   root: {
     backgroundColor: palette.primary.light,
     position: 'relative',
@@ -30,18 +30,6 @@ const Main = (props) => {
     defaultMatches: true,
   });
 
-  const [openSidebar, setOpenSidebar] = useState(false);
-
-  const handleSidebarOpen = () => {
-    setOpenSidebar(true);
-  };
-
-  const handleSidebarClose = () => {
-    setOpenSidebar(false);
-  };
-
-  const shouldOpenSidebar = isDesktop ? true : openSidebar;
-
   return (
     <div
       className={clsx({
@@ -49,7 +37,7 @@ const Main = (props) => {
         [classes.shiftContent]: isDesktop,
       })}
     >
-      <Sidebar onClose={handleSidebarClose} open={shouldOpenSidebar} variant={isDesktop ? 'persistent' : 'temporary'} />
+      <Sidebar onClose={() => {}} open variant={isDesktop ? 'persistent' : 'temporary'} />
       <main className={classes.content}>{children}</main>
     </div>
   );

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom";
 import { HashRouter as Router, Route } from "react-router-dom";
 import { Auth } from '@aws-amplify/auth';
+import createExampleWrapper from "cube-example-wrapper";
 
 import { AmplifyProvider } from "./libs/amplify";
 import App from "./App";
@@ -9,6 +10,12 @@ import * as serviceWorker from "./serviceWorker";
 import DashboardPage from "./pages/DashboardPage";
 import "./index.css";
 import config from './auth_config';
+
+const exampleDescription = {
+  title: "Amazon Cognito",
+};
+
+createExampleWrapper(exampleDescription);
 
 Auth.configure(config);
 

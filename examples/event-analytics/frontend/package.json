@@ -8,6 +8,7 @@
     "@material-ui/core": "^3.9.2",
     "@material-ui/icons": "^3.0.2",
     "@material-ui/lab": "^3.0.0-alpha.30",
+    "cube-example-wrapper": "^1.0.26",
     "history": "^4.7.2",
     "moment": "^2.24.0",
     "numeral": "^2.0.6",

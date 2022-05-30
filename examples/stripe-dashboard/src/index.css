@@ -3,7 +3,12 @@ html {
 }
 
 body {
-  padding-top: 30px;
+  margin: 0;
+}
+
+#root {
+  padding-top: 15px;
+  padding-bottom: 15px;
   background: #f5f6f7;
 }
 

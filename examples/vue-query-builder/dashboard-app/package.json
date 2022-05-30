@@ -20,6 +20,7 @@
     "apollo-link-schema": "^1.2.5",
     "chart.js": "^2.9.3",
     "core-js": "^3.6.5",
+    "cube-example-wrapper": "^1.0.26",
     "graphql": "^15.5.0",
     "graphql-tag": "^2.11.0",
     "graphql-tools": "5.0.0",

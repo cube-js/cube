@@ -2,7 +2,7 @@ import './body.css';
 import 'antd/dist/antd.css';
 import React, { useEffect, useState, useCallback } from 'react';
 import '@ant-design/compatible';
-import { ApolloProvider } from '@apollo/react-hooks';
+import { ApolloProvider } from '@apollo/client';
 import { Layout } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
@@ -28,19 +28,9 @@ const App = ({ children }) => {
     error,
     isAuthenticated,
     loginWithRedirect,
-    getAccessTokenSilently,
+    getAccessTokenWithPopup,
     user
   } = useAuth0();
-
-  console.log('===');
-  console.log({
-    isLoading,
-    error,
-    isAuthenticated,
-    loginWithRedirect,
-    getAccessTokenSilently,
-    user
-  });
 
   // Force to work only for logged in users bye checking isAuthenticated
   useEffect(() => {
@@ -52,12 +42,10 @@ const App = ({ children }) => {
 
   // Get CubeJS instance with access_token and set to component state
   const initCubejs = useCallback(async () => {
-    const accessToken = await getAccessTokenSilently({
+    const accessToken = await getAccessTokenWithPopup({
       audience: process.env.REACT_APP_AUTH0_AUDIENCE,
       scope: 'openid profile email',
     });
-
-    console.log(accessToken);
 
     setCubejsApi(cubejs({
       apiUrl: process.env.REACT_APP_API_URL,
@@ -65,7 +53,7 @@ const App = ({ children }) => {
         Authorization: `${accessToken}`
       },
     }));
-  }, [ getAccessTokenSilently ]);
+  }, [ getAccessTokenWithPopup ]);
 
   // Init CubeJS instance with access_token
   useEffect(() => {

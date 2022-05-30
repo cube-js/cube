@@ -4,12 +4,19 @@ import VueChartkick from 'vue-chartkick';
 import VueRouter from 'vue-router';
 import VueApollo from 'vue-apollo';
 import cubejs from '@cubejs-client/core';
+import createExampleWrapper from "cube-example-wrapper";
 
 import App from './App.vue';
 import vuetify from './plugins/vuetify';
 import Explore from './pages/explore/Explore.vue';
 import Dashboard from './pages/dashboard/Dashboard.vue';
 import apolloClient from './graphql/client';
+
+const exampleDescription = {
+  title: "Vue Dashboard",
+};
+
+createExampleWrapper(exampleDescription);
 
 Vue.use(VueApollo);
 

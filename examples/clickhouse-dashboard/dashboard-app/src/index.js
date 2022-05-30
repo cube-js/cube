@@ -4,6 +4,14 @@ import { HashRouter as Router, Route } from 'react-router-dom';
 import ExplorePage from './pages/ExplorePage';
 import DashboardPage from './pages/DashboardPage';
 import App from './App';
+import createExampleWrapper from "cube-example-wrapper";
+
+const exampleDescription = {
+  title: "ClickHouse Dashboard",
+};
+
+createExampleWrapper(exampleDescription);
+
 ReactDOM.render(<Router>
     <App>
       <Route key="index" exact path="/" component={DashboardPage} />

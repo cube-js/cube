@@ -7,7 +7,6 @@ import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
 import moment from 'moment';
-import GithubCorner from 'react-github-corner';
 import { trackPageView } from './track';
 import PrismCode from './PrismCode';
 
@@ -16,7 +15,7 @@ const dateRange = [
   moment().format('YYYY-MM-DD'),
 ];
 
-const { Header, Footer, Sider, Content } = Layout;
+const { Content } = Layout;
 
 const renderChart = (resultSet) => (
   <Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
@@ -183,11 +182,8 @@ class App extends Component {
   }
 
   render() {
-    return [
+    return (
       <Layout>
-          <Header>
-            <h2 style={{ color: '#fff' }}>AWS Web Analytics Dashboard</h2>
-          </Header>
           <Content style={{ padding: '25px', margin: '25px' }}>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
               <Col span={24} lg={12}>
@@ -310,9 +306,8 @@ class App extends Component {
               </Col>
             </Row>
           </Content>
-        </Layout>,
-        <GithubCorner size={120} href="https://github.com/statsbotco/cubejs-client/tree/master/examples/aws-web-analytics" />
-    ];
+        </Layout>
+    )
   }
 }
 
