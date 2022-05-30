@@ -51,8 +51,8 @@ use self::{
             create_pg_numeric_scale_udf, create_pg_table_is_visible_udf, create_pg_truetypid_udf,
             create_pg_truetypmod_udf, create_pg_type_is_visible_udf, create_quarter_udf,
             create_second_udf, create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
-            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
-            create_year_udf,
+            create_to_char_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
+            create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2386,6 +2386,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_constraintdef_udf());
         ctx.register_udf(create_pg_truetypid_udf());
         ctx.register_udf(create_pg_truetypmod_udf());
+        ctx.register_udf(create_to_char_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7760,6 +7761,48 @@ ORDER BY \"COUNT(count)\" DESC"
             )
             .await?
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_to_char_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "to_char_1",
+            execute_query(
+                "SELECT to_char(x, 'YYYY-MM-DD HH24:MI:SS.MS TZ') FROM (SELECT Str_to_date('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') x) e".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "to_char_2",
+            execute_query(
+                "
+                SELECT to_char(x, 'YYYY-MM-DD HH24:MI:SS.MS TZ') 
+                FROM  (
+                        SELECT Str_to_date('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') x 
+                    UNION ALL 
+                        SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') x
+                ) e
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_to_char_query() -> Result<(), CubeError> {
+        execute_query(
+            "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
 
         Ok(())
     }
