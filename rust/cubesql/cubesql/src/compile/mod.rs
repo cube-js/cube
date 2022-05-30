@@ -1770,16 +1770,19 @@ impl QueryPlanner {
         };
 
         match plan {
-            Err(err) => Err(CompilationError::Extended(
-                Box::new(err),
-                HashMap::from([
-                    (
-                        "query".to_string(),
-                        SensitiveDataSanitizer::new().replace(stmt).to_string(),
-                    ),
-                    ("stage".to_string(), "planning".to_string()),
-                ]),
-            )),
+            Err(err) => match err {
+                CompilationError::Extended(_, _) => Err(err),
+                _ => Err(CompilationError::Extended(
+                    Box::new(err),
+                    HashMap::from([
+                        (
+                            "query".to_string(),
+                            SensitiveDataSanitizer::new().replace(stmt).to_string(),
+                        ),
+                        ("stage".to_string(), "planning".to_string()),
+                    ]),
+                )),
+            },
             _ => plan,
         }
     }
