@@ -10,7 +10,7 @@
     "@material-ui/lab": "^3.0.0-alpha.30",
     "cube-example-wrapper": "^1.0.26",
     "history": "^4.7.2",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "numeral": "^2.0.6",
     "prismjs": "^1.23.0",
     "react": "^16.8.1",
