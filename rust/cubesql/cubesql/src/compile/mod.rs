@@ -4459,8 +4459,8 @@ ORDER BY \"COUNT(count)\" DESC"
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
                 Err(e) => match e {
-                    CompilationError::Extended(e, _) => {
-                        assert_eq!(&**e, expected_error, "for {}", input_query)
+                    CompilationError::Extended(err, _) => {
+                        assert_eq!(&**err, expected_error, "for {}", input_query)
                     }
                     _ => assert_eq!(e, expected_error, "for {}", input_query),
                 },
