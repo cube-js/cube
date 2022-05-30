@@ -6,7 +6,7 @@ use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, StringBuilder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int64Builder, StringBuilder,
             UInt32Builder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
@@ -48,7 +48,8 @@ struct PgCatalogTypeBuilder {
     typstorage: StringBuilder,
     typnotnull: BooleanBuilder,
     typbasetype: UInt32Builder,
-    typtypmod: Int32Builder,
+    // TODO: See pg_attribute.atttypmod
+    typtypmod: Int64Builder,
     typndims: StringBuilder,
     typcollation: StringBuilder,
     typdefaultbin: StringBuilder,
@@ -89,7 +90,7 @@ impl PgCatalogTypeBuilder {
             typstorage: StringBuilder::new(capacity),
             typnotnull: BooleanBuilder::new(capacity),
             typbasetype: UInt32Builder::new(capacity),
-            typtypmod: Int32Builder::new(capacity),
+            typtypmod: Int64Builder::new(capacity),
             typndims: StringBuilder::new(capacity),
             typcollation: StringBuilder::new(capacity),
             typdefaultbin: StringBuilder::new(capacity),
@@ -283,7 +284,7 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typstorage", DataType::Utf8, true),
             Field::new("typnotnull", DataType::Boolean, true),
             Field::new("typbasetype", DataType::UInt32, true),
-            Field::new("typtypmod", DataType::Int32, true),
+            Field::new("typtypmod", DataType::Int64, true),
             Field::new("typndims", DataType::Utf8, true),
             Field::new("typcollation", DataType::Utf8, true),
             Field::new("typdefaultbin", DataType::Utf8, true),
