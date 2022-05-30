@@ -336,8 +336,7 @@ user will be authenticated with provided security context.
 ```javascript
 module.exports = {
   checkSqlAuth: async (req, username) => {
-    const userInfo = await getUserFromLDAP(username);
-    if (userInfo) {
+    if (username === 'fooUser') {
       return {
         password: 'mypassword',
         securityContext: {},
