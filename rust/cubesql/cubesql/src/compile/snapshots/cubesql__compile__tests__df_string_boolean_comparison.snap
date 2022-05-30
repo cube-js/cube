@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT TRUE = 't' t, FALSE <> 'f' f;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+-------+
+| t    | f     |
++------+-------+
+| true | false |
++------+-------+

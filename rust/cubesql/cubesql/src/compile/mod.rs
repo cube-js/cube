@@ -7811,6 +7811,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for string-boolean coercion and cast
+    #[tokio::test]
+    async fn db_string_boolean_comparison() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_string_boolean_comparison",
+            execute_query(
+                "SELECT TRUE = 't' t, FALSE <> 'f' f;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_pg_truetyp() -> Result<(), CubeError> {
         insta::assert_snapshot!(
