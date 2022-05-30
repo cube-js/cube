@@ -289,7 +289,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
 
         let mut state = self.statements.write().await;
         if state.statements.len()
-            > self
+            >= self
                 .session
                 .server
                 .configuration

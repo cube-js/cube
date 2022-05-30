@@ -9,7 +9,7 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::Portal,
+        extended::{Cursor, Portal},
         session::DatabaseProtocol,
         statement::{StatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
@@ -35,6 +35,7 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     // Extended query
     statements: HashMap<String, Option<PreparedStatement>>,
+    cursors: HashMap<String, Cursor>,
     portals: HashMap<String, Option<Portal>>,
     // Shared
     session: Arc<Session>,
@@ -174,6 +175,7 @@ impl AsyncPostgresShim {
     ) -> Result<(), std::io::Error> {
         let mut shim = Self {
             socket,
+            cursors: HashMap::new(),
             portals: HashMap::new(),
             statements: HashMap::new(),
             session,
@@ -681,26 +683,37 @@ impl AsyncPostgresShim {
                     );
                 }
 
-                let prepared = if let Some(p) = self.statements.get(&name.value) {
-                    p.as_ref().unwrap()
-                } else {
+                if self.portals.len() >= self.session.server.configuration.connection_max_portals {
                     return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::ConfigurationLimitExceeded,
+                            format!(
+                                "Unable to allocate a new portal to open cursor: max allocation reached, actual: {}, max: {}",
+                                self.portals.len(),
+                                self.session.server.configuration.connection_max_portals),
+                        )
+                            .into(),
+                    ));
+                }
+
+                let cursor = self.cursors.remove(&name.value).ok_or_else(|| {
+                    ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
                             protocol::ErrorCode::ProtocolViolation,
                             format!(r#"cursor "{}" does not exist"#, name.value),
                         )
                         .into(),
-                    ));
-                };
+                    )
+                })?;
 
                 let plan = convert_statement_to_cube_query(
-                    &prepared.query,
+                    &cursor.query,
                     meta,
                     self.session.clone(),
                     self.logger.clone(),
                 )?;
 
-                let mut portal = Portal::new(plan, Format::Text);
+                let mut portal = Portal::new(plan, cursor.format);
 
                 self.write_portal(&mut portal, limit).await?;
                 self.portals.insert(name.value, Some(portal));
@@ -713,16 +726,6 @@ impl AsyncPostgresShim {
                 sensitive,
                 hold,
             } => {
-                if binary {
-                    return Err(ConnectionError::Protocol(
-                        protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            "BINARY format is not supported for DECLARE statement".to_string(),
-                        )
-                        .into(),
-                    ));
-                };
-
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -767,36 +770,34 @@ impl AsyncPostgresShim {
                 }
 
                 let select_stmt = Statement::Query(query);
-                let plan = convert_statement_to_cube_query(
+                // It's just a verification that we can compile that query.
+                let _ = convert_statement_to_cube_query(
                     &select_stmt,
                     meta.clone(),
                     self.session.clone(),
                     self.logger.clone(),
                 )?;
 
-                let description =
-                    if let Some(description) = plan.to_row_description(Format::Text)? {
-                        if description.len() > 0 {
-                            Some(description)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                // PgSQL supports arguments for DECLARE CURSOR, but we dont support it right now
-                let parameters: Vec<PgTypeId> = vec![];
-
-                // We re-use prepare statement, because declare can be use with arguments and OPEN will be required
-                // to start Portal
-                let prepared = Some(PreparedStatement {
+                let cursor = Cursor {
                     query: select_stmt,
-                    parameters: protocol::ParameterDescription::new(parameters),
-                    description,
-                });
+                    hold: hold.unwrap_or(false),
+                    format: if binary { Format::Binary } else { Format::Text },
+                };
 
-                self.statements.insert(name.value, prepared);
+                if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::ConfigurationLimitExceeded,
+                            format!(
+                                "Unable to allocate a new cursor: max allocation reached, actual: {}, max: {}",
+                                self.cursors.len(),
+                                self.session.server.configuration.connection_max_cursors),
+                        )
+                            .into(),
+                    ));
+                }
+
+                self.cursors.insert(name.value, cursor);
 
                 let plan =
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
@@ -807,6 +808,7 @@ impl AsyncPostgresShim {
             Statement::Discard { object_type } => {
                 self.statements = HashMap::new();
                 self.portals = HashMap::new();
+                self.cursors = HashMap::new();
 
                 let plan = QueryPlan::MetaOk(
                     StatusFlags::empty(),

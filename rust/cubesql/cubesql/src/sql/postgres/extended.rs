@@ -16,6 +16,16 @@ use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRec
 use futures::StreamExt;
 
 #[derive(Debug)]
+pub struct Cursor {
+    pub query: ast::Statement,
+    // WITH HOLD specifies that the cursor can continue to be used after the transaction that created it successfully commits.
+    // WITHOUT HOLD specifies that the cursor cannot be used outside of the transaction that created it.
+    pub hold: bool,
+    // What format will be used for Cursor
+    pub format: protocol::Format,
+}
+
+#[derive(Debug)]
 pub struct PreparedStatement {
     pub query: ast::Statement,
     pub parameters: protocol::ParameterDescription,
