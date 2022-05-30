@@ -6138,6 +6138,102 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "excel_large_select_query",
+            execute_query(
+                "
+                SELECT
+                    na.nspname as Schema,
+                    cl.relname as Table,
+                    att.attname AS Name,
+                    att.attnum as Position,
+                    CASE
+                        WHEN att.attnotnull = 'f' THEN 'true'
+                        ELSE 'false'
+                    END as Nullable,
+                    CASE
+                        WHEN
+                            ty.typname Like 'bit' OR
+                            ty.typname Like 'varbit' and
+                            att.atttypmod > 0
+                        THEN att.atttypmod
+                        WHEN ty.typname Like 'interval' THEN -1
+                        WHEN att.atttypmod > 0 THEN att.atttypmod - 4
+                        ELSE att.atttypmod
+                    END as Length,
+                    (information_schema._pg_numeric_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Precision,
+                    (information_schema._pg_numeric_scale(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Scale,
+                    (information_schema._pg_datetime_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS DatetimeLength,
+                    CASE
+                        WHEN att.attnotnull = 'f' THEN 'false'
+                        ELSE 'true'
+                    END as IsUnique,
+                    att.atthasdef as HasDefaultValue,
+                    att.attisdropped as IsDropped,
+                    att.attinhcount as ancestorCount,
+                    att.attndims as Dimension,
+                    CASE
+                        WHEN attndims > 0 THEN true
+                        ELSE false
+                    END AS isarray,
+                    CASE
+                        WHEN ty.typname = 'bpchar' THEN 'char'
+                        WHEN ty.typname = '_bpchar' THEN '_char'
+                        ELSE ty.typname
+                    END as TypeName,
+                    tn.nspname as TypeSchema,
+                    et.typname as elementaltypename,
+                    description as Comment,
+                    cs.relname AS sername,
+                    ns.nspname AS serschema,
+                    att.attidentity as IdentityMode,
+                    CAST(pg_get_expr(def.adbin, def.adrelid) AS varchar) as DefaultValue,
+                    (SELECT count(1) FROM pg_type t2 WHERE t2.typname=ty.typname) > 1 AS isdup
+                FROM pg_attribute att
+                JOIN pg_type ty ON ty.oid=atttypid
+                JOIN pg_namespace tn ON tn.oid=ty.typnamespace
+                JOIN pg_class cl ON
+                    cl.oid=attrelid AND
+                    (
+                        (cl.relkind = 'r') OR
+                        (cl.relkind = 's') OR
+                        (cl.relkind = 'v') OR
+                        (cl.relkind = 'm') OR
+                        (cl.relkind = 'f')
+                    )
+                JOIN pg_namespace na ON na.oid=cl.relnamespace
+                LEFT OUTER JOIN pg_type et ON et.oid=ty.typelem
+                LEFT OUTER JOIN pg_attrdef def ON
+                    adrelid=attrelid AND
+                    adnum=attnum
+                LEFT OUTER JOIN pg_description des ON
+                    des.objoid=attrelid AND
+                    des.objsubid=attnum
+                LEFT OUTER JOIN (
+                    pg_depend
+                    JOIN pg_class cs ON
+                        objid=cs.oid AND
+                        cs.relkind='S' AND
+                        classid='pg_class'::regclass::oid
+                ) ON
+                    refobjid=attrelid AND
+                    refobjsubid=attnum
+                LEFT OUTER JOIN pg_namespace ns ON ns.oid=cs.relnamespace
+                WHERE
+                    attnum > 0 AND
+                    attisdropped IS FALSE AND
+                    cl.relname like E'KibanaSampleDataEcommerce' AND
+                    na.nspname like E'public' AND
+                    att.attname like '%'
+                ORDER BY attnum
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -6707,12 +6803,12 @@ ORDER BY \"COUNT(count)\" DESC"
                 SELECT
                     t.oid,
                     t.typname,
-                    format_type(t.oid, 20::integer) ft20,
-                    format_type(t.oid, 5::integer) ft5,
-                    format_type(t.oid, 4::integer) ft4,
-                    format_type(t.oid, 0::integer) ft0,
-                    format_type(t.oid, -1::integer) ftneg,
-                    format_type(t.oid, NULL::integer) ftnull
+                    format_type(t.oid, 20) ft20,
+                    format_type(t.oid, 5) ft5,
+                    format_type(t.oid, 4) ft4,
+                    format_type(t.oid, 0) ft0,
+                    format_type(t.oid, -1) ftneg,
+                    format_type(t.oid, NULL::bigint) ftnull
                 FROM pg_catalog.pg_type t
                 ORDER BY t.oid ASC
                 ;

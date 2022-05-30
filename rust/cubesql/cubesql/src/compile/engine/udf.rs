@@ -5,9 +5,9 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int32Array, Int64Array, Int64Builder,
-            IntervalDayTimeArray, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
-            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
+            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
             TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt32Array,
             UInt32Builder,
         },
@@ -1152,7 +1152,8 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 pub fn create_format_type_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
-        let typemods = args[1].as_any().downcast_ref::<Int32Array>().unwrap();
+        // TODO: See pg_attribute.atttypmod
+        let typemods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
 
         let result = oids
             .iter()
@@ -1384,24 +1385,27 @@ pub fn create_pg_truetypid_udf() -> ScalarUDF {
 
 pub fn create_pg_truetypmod_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let atttypmods = downcast_primitive_arg!(args[0], "atttypmod", Int32Type);
+        // TODO: See pg_attribute.atttypmod
+        let atttypmods = downcast_primitive_arg!(args[0], "atttypmod", Int64Type);
         let typtypes = downcast_string_arg!(args[1], "typtype", i32);
-        let typtypmods = downcast_primitive_arg!(args[2], "typtypmod", Int32Type);
+        // TODO: See pg_attribute.atttypmod
+        let typtypmods = downcast_primitive_arg!(args[2], "typtypmod", Int64Type);
 
         let result = izip!(atttypmods, typtypes, typtypmods)
             .map(|(atttypmod, typtype, typtypmod)| match typtype {
                 Some("d") => typtypmod,
                 _ => atttypmod,
             })
-            .collect::<PrimitiveArray<Int32Type>>();
+            .collect::<PrimitiveArray<Int64Type>>();
 
         Ok(Arc::new(result))
     });
 
     create_udf(
         "information_schema._pg_truetypmod",
-        vec![DataType::Int32, DataType::Utf8, DataType::Int32],
-        Arc::new(DataType::Int32),
+        vec![DataType::Int64, DataType::Utf8, DataType::Int64],
+        // TODO: See pg_attribute.atttypmod
+        Arc::new(DataType::Int64),
         Volatility::Immutable,
         fun,
     )
