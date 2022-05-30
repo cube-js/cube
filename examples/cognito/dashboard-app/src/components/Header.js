@@ -1,7 +1,6 @@
 import React from "react";
 import { withRouter } from "react-router";
-import MenuIcon from "@material-ui/icons/Menu";
-import { Button, IconButton, Typography, Toolbar, AppBar } from '@material-ui/core';
+import { Button, Typography, Toolbar, AppBar } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import { useAmplify } from '../libs/amplify';
 
