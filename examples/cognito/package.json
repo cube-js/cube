@@ -11,8 +11,8 @@
     "dev": "./node_modules/.bin/cubejs-server"
   },
   "devDependencies": {
-    "@cubejs-backend/postgres-driver": "^0.26.2",
-    "@cubejs-backend/server": "^0.26.2"
+    "@cubejs-backend/postgres-driver": "^0.30.8",
+    "@cubejs-backend/server": "^0.30.8"
   },
   "dependencies": {
     "aws-sdk": "^2.836.0"
