@@ -5,7 +5,8 @@
 [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
 
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Rust/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ARust+branch%3Amaster)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
+[![Crates.io (latest)](https://img.shields.io/crates/dv/pg-srv)](https://crates.io/crates/pg-srv)
+[![Documentation (latest)](https://img.shields.io/badge/Documentation-latest-orange)](https://docs.rs/pg-srv/latest/pg_srv/)
 
 # Cube SQL API
 

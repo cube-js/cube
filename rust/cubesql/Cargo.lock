@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "cubeclient"
-version = "0.28.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
