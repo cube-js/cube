@@ -22,7 +22,7 @@
     "graphql": "^15.3.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^5.0.0",
-    "highcharts": "^8.1.2",
+    "highcharts": "^9.0.0",
     "highcharts-react-official": "^3.0.0",
     "moment": "^2.27.0",
     "prop-types": "^15.7.2",
