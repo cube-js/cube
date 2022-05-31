@@ -30,12 +30,10 @@ class IndexPage extends Component<Props> {
         <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
         
-<InfoBox>
-
-        The SQL API and Extended Support for BI Tools workshop is on June 22nd at 9-10:30 am PT! You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API</a>.
-        <br />
-        You can register for the workshop at <a href="https://cube.dev/events/sql-api">the event page</a>.
-
+        <InfoBox>
+          <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
+          You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
+          Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
         </InfoBox>
         
         <Row>
