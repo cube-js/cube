@@ -5,6 +5,7 @@ use crate::{
         statement::StatementParamsBinder,
         writer::BatchWriter,
     },
+    CubeError,
 };
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, ProtocolError};
@@ -47,6 +48,11 @@ impl PreparedStatement {
 #[derive(Debug)]
 pub struct PreparedState {
     plan: QueryPlan,
+}
+
+#[derive(Debug)]
+pub struct FinishedState {
+    description: Option<protocol::RowDescription>,
 }
 
 #[derive(Debug)]
@@ -101,7 +107,7 @@ pub enum PortalState {
     #[allow(dead_code)]
     InExecutionFrame(InExecutionFrameState),
     InExecutionStream(InExecutionStreamState),
-    Finished,
+    Finished(FinishedState),
 }
 
 #[derive(Debug)]
@@ -128,7 +134,10 @@ impl Portal {
             Some(PortalState::Prepared(state)) => state.plan.to_row_description(self.format),
             Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
             Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
-            _ => panic!("Unable to get description on finished (empty) Portal"),
+            Some(PortalState::Finished(state)) => Ok(state.description.clone()),
+            _ => Err(ConnectionError::Cube(CubeError::internal(
+                "Unable to get description on Portal without state. It's a bug.".to_string(),
+            ))),
         }
     }
 
@@ -160,7 +169,9 @@ impl Portal {
             )?;
 
             Ok((
-                PortalState::Finished,
+                PortalState::Finished(FinishedState {
+                    description: frame_state.description,
+                }),
                 protocol::CommandComplete::Select(writer.num_rows() as u32),
             ))
         }
@@ -258,7 +269,9 @@ impl Portal {
             match stream_state.stream.next().await {
                 None => {
                     return Ok((
-                        PortalState::Finished,
+                        PortalState::Finished(FinishedState {
+                            description: stream_state.description,
+                        }),
                         protocol::CommandComplete::Select(writer.num_rows() as u32),
                     ))
                 }
@@ -293,7 +306,7 @@ impl Portal {
                     let description = state.plan.to_row_description(self.format)?;
                     match state.plan {
                         QueryPlan::MetaOk(_, completion) => {
-                            self.state = Some(PortalState::Finished);
+                            self.state = Some(PortalState::Finished(FinishedState { description }));
 
                             Ok(completion.clone().to_pg_command())
                         }
@@ -339,7 +352,11 @@ impl Portal {
 
                     Ok(complete)
                 }
-                PortalState::Finished => Ok(protocol::CommandComplete::Select(0)),
+                PortalState::Finished(finish_state) => {
+                    self.state = Some(PortalState::Finished(finish_state));
+
+                    Ok(protocol::CommandComplete::Select(0))
+                }
             }
         } else {
             unreachable!();
