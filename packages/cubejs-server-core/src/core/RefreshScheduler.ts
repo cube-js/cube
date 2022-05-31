@@ -134,6 +134,46 @@ export class RefreshScheduler {
     }
   }
 
+  /**
+   * Evaluate and returns minimal QueryQueue concurrency value.
+   */
+  protected async evalConcurrency(context: RequestContext): Promise<number> {
+    const queues = this.serverCore
+      .getOrchestratorApi(context)
+      .getQueryOrchestrator()
+      .getQueryCache()
+      .getQueues();
+
+    let concurrency: number;
+    
+    if (!queues) { // first execution - no queues
+      const compilerApi = this.serverCore.getCompilerApi(context);
+      const compilers = await compilerApi.getCompilers();
+      const { cubeEvaluator } = compilers;
+      const processed = {};
+      const concurrencies: number[] = [];
+      cubeEvaluator.cubeNames().forEach((name) => {
+        const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
+        if (!processed[ds]) {
+          processed[ds] = true;
+          concurrencies.push(
+            this.serverCore
+              .getOrchestratorApi(context)
+              .getConcurrencyByDatasource(ds)
+          );
+        }
+      });
+      concurrency = Math.min(...concurrencies);
+    } else { // further executions - queues ready
+      const concurrencies: number[] = [];
+      Object.keys(queues).forEach((name) => {
+        concurrencies.push(queues[name].concurrency);
+      });
+      concurrency = Math.min(...concurrencies);
+    }
+    return concurrency;
+  }
+
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
     const context: RequestContext = {
       authInfo: null,
@@ -142,10 +182,12 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
+    const evalConcurrency = await this.evalConcurrency(context);
+
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
-      concurrency: options.concurrency || 1,
+      concurrency: options.concurrency || evalConcurrency || 1,
       workerIndices: options.workerIndices || R.range(0, options.concurrency || 1),
       contextSymbols: {
         securityContext: context.securityContext,

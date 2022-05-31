@@ -4,14 +4,14 @@ import { getEnv } from '@cubejs-backend/shared';
 import { QueryCache } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
-import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
+import { ExternalDriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory';
 
 export interface QueryOrchestratorOptions {
-  externalDriverFactory?: DriverFactory;
+  externalDriverFactory?: ExternalDriverFactory;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: any;
@@ -91,6 +91,13 @@ export class QueryOrchestrator {
         new LocalQueueEventsBus();
     }
     return this.queueEventsBus;
+  }
+
+  /**
+   * Returns QueryCache instance.
+   */
+  public getQueryCache(): QueryCache {
+    return this.queryCache;
   }
 
   /**

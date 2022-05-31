@@ -119,6 +119,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
+  concurrency: () => get('CUBEJS_CONCURRENCY').asInt(),
   // It's only excepted for CI, nothing else.
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')

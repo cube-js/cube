@@ -65,7 +65,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     super();
 
     this.pool = new Pool({
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      ...config,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL &&
+        parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.max || 8,
       idleTimeoutMillis: 30000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
@@ -73,7 +77,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
       ssl: this.getSslOptions(),
-      ...config
     });
     this.pool.on('error', (err) => {
       console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
@@ -84,6 +87,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       executionTimeout: getEnv('dbQueryTimeout'),
       ...config,
     };
+  }
+
+  /**
+   * Returns default concurrency value.
+   */
+  public static getConcurrency(): number {
+    return 12;
   }
 
   /**
@@ -134,8 +144,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
-      if (e.toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${e.toString()}`);
+      if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
+        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
 
       throw e;
@@ -249,6 +259,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const result = await this.queryResponse(query, values);
     return result.rows;

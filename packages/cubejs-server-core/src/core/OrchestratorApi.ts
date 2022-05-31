@@ -1,6 +1,7 @@
 /* eslint-disable no-throw-literal */
 import pt from 'promise-timeout';
 import {
+  BaseDriver,
   QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
@@ -35,6 +36,20 @@ export class OrchestratorApi {
       logger,
       options
     );
+  }
+
+  /**
+   * Returns concurrency evaluated for the specified datasource.
+   */
+  public getConcurrencyByDatasource(ds: string): number {
+    return this.driverFactory(ds, undefined, true) as number;
+  }
+
+  /**
+   * Returns QueryOrchestrator instance.
+   */
+  public getQueryOrchestrator(): QueryOrchestrator {
+    return this.orchestrator;
   }
 
   /**
@@ -148,8 +163,10 @@ export class OrchestratorApi {
 
   public async testConnection() {
     return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
-      this.testDriverConnection(this.options.externalDriverFactory)
+      ...Object.keys(this.seenDataSources).map(
+        ds => this.testDriverConnection(this.driverFactory, ds)
+      ),
+      this.testDriverConnection(this.options.externalDriverFactory),
     ]);
   }
 
@@ -159,22 +176,24 @@ export class OrchestratorApi {
 
   public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
+      const driver = await driverFn(dataSource) as BaseDriver;
       await driver.testConnection();
     }
   }
 
   public async release() {
     return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
+      ...Object.keys(this.seenDataSources).map(
+        ds => this.releaseDriver(this.driverFactory, ds),
+      ),
       this.releaseDriver(this.options.externalDriverFactory),
-      this.orchestrator.cleanup()
+      this.orchestrator.cleanup(),
     ]);
   }
 
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
+      const driver = await driverFn(dataSource) as BaseDriver;
       if (driver.release) {
         await driver.release();
       }

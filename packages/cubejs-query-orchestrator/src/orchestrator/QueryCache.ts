@@ -223,24 +223,33 @@ export class QueryCache {
 
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
+      const concurrency = this.driverFactory(dataSource, undefined, true) as number;
+      const options = ((typeof this.options.queueOptions === 'function')
+        ? this.options.queueOptions(dataSource)
+        : this.options.queueOptions) || {};
+        
+      if (!options.concurrency && concurrency > 0) {
+        options.concurrency = concurrency;
+      }
+
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource),
+        (maxPool?: number) => (
+          this.driverFactory(dataSource, maxPool) as (BaseDriver | Promise<BaseDriver>)
+        ),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
           });
           return client.query(q.query, q.values, q);
-        }, {
+        },
+        {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
-          )
+          ...options,
         }
       );
     }
@@ -278,40 +287,54 @@ export class QueryCache {
     executeFn: (client: BaseDriver, q: any) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
-    const queue: any = new QueryQueue(redisPrefix, {
-      getQueueEventsBus: options.getQueueEventsBus,
-      queryHandlers: {
-        query: async (q, setCancelHandle) => {
-          const client = await clientFactory();
-          const resultPromise = executeFn(client, q);
-          let handle;
-          if (resultPromise.cancel) {
-            queue.cancelHandlerCounter += 1;
-            handle = queue.cancelHandlerCounter;
-            queue.handles[handle] = resultPromise;
-            await setCancelHandle(handle);
+    const queue: any = new QueryQueue(
+      redisPrefix,
+      {
+        getQueueEventsBus: options.getQueueEventsBus,
+        queryHandlers: {
+          query: async (q, setCancelHandle, maxPool?: number) => {
+            const client = await clientFactory(maxPool);
+            const resultPromise = executeFn(client, q);
+            let handle;
+            if (resultPromise.cancel) {
+              queue.cancelHandlerCounter += 1;
+              handle = queue.cancelHandlerCounter;
+              queue.handles[handle] = resultPromise;
+              await setCancelHandle(handle);
+            }
+            const result = await resultPromise;
+            if (handle) {
+              delete queue.handles[handle];
+            }
+            return result;
           }
-          const result = await resultPromise;
-          if (handle) {
-            delete queue.handles[handle];
+        },
+        cancelHandlers: {
+          query: async (q) => {
+            if (q.cancelHandler && queue.handles[q.cancelHandler]) {
+              await queue.handles[q.cancelHandler].cancel();
+              delete queue.handles[q.cancelHandler];
+            }
           }
-          return result;
-        }
-      },
-      cancelHandlers: {
-        query: async (q) => {
-          if (q.cancelHandler && queue.handles[q.cancelHandler]) {
-            await queue.handles[q.cancelHandler].cancel();
-            delete queue.handles[q.cancelHandler];
-          }
-        }
-      },
-      logger: (msg, params) => options.logger(msg, params),
-      ...options
-    });
+        },
+        logger: (msg, params) => options.logger(msg, params),
+        ...options
+      }
+    );
     queue.cancelHandlerCounter = 0;
     queue.handles = {};
     return queue;
+  }
+
+  /**
+   * Returns registered queries queues hash map if any, false otherwise.
+   */
+  public getQueues(): false | {[dataSource: string]: QueryQueue} {
+    if (Object.keys(this.queue).length > 0) {
+      return this.queue;
+    } else {
+      return false;
+    }
   }
 
   public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {

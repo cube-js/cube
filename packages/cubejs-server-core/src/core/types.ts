@@ -88,7 +88,7 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
+export type DriverFactoryFn = (context: DriverContext, maxPool?: number) => Promise<BaseDriver> | BaseDriver;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external

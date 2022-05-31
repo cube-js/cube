@@ -34,6 +34,13 @@ export class QueryQueue {
     this.skipQueue = options.skipQueue;
   }
 
+  /**
+   * Evaluate max pool size based on concurrency value.
+   */
+  getMaxPool() {
+    return this.concurrency;
+  }
+
   async executeInQueue(queryHandler, queryKey, query, priority, options) {
     options = options || {};
     if (this.skipQueue) {
@@ -347,7 +354,8 @@ export class QueryQueue {
             query.query,
             async (cancelHandler) => {
               handler = cancelHandler;
-            }
+            },
+            this.getMaxPool(),
           )
         )
       };
@@ -449,7 +457,8 @@ export class QueryQueue {
                     });
                   }
                   return null;
-                }
+                },
+                this.getMaxPool(),
               )
             )
           };
