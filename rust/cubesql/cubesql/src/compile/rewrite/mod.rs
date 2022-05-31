@@ -133,6 +133,11 @@ crate::plan_to_language! {
             op: Operator,
             right: Box<Expr>,
         },
+        AnyExpr {
+            left: Box<Expr>,
+            op: Operator,
+            right: Box<Expr>,
+        },
         NotExpr { expr: Box<Expr>, },
         IsNotNullExpr { expr: Box<Expr>, },
         IsNullExpr { expr: Box<Expr>, },

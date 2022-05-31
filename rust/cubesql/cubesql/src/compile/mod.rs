@@ -8087,6 +8087,24 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_pg_type_any_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_pg_type_any",
+            execute_query(
+                "SELECT n.nspname = ANY(current_schemas(true)), n.nspname, t.typname
+                FROM pg_catalog.pg_type t
+                JOIN pg_catalog.pg_namespace n
+                ON t.typnamespace = n.oid WHERE t.oid = 25;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_pg_class_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "metabase_pg_class_query",
@@ -8116,7 +8134,7 @@ ORDER BY \"COUNT(count)\" DESC"
                             LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)
                             LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')
                             LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')
-                        WHERE c.relkind IN ('r', 'p', 'v', 'f', 'm') AND a.attnum > 0 AND NOT a.attisdropped AND n.nspname LIKE 'public' AND c.relname LIKE 'actor') c
+                        WHERE c.relkind IN ('r', 'p', 'v', 'f', 'm') AND a.attnum > 0 AND NOT a.attisdropped AND n.nspname LIKE 'public' AND c.relname LIKE 'KibanaSampleDataEcommerce') c
                 WHERE true
                 ORDER BY nspname, c.relname, attnum;
                 "
