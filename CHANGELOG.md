@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.9](https://github.com/cube-js/cube.js/compare/v0.30.8...v0.30.9) (2022-05-31)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow `CASE` with `pg_attribute.atttypmod` offset ([fc09160](https://github.com/cube-js/cube.js/commit/fc091609e6f3512d5a078501279e8b9064048b54))
+
+
+### Features
+
+* **cubesql:** Support comparison between strings and booleans ([#4618](https://github.com/cube-js/cube.js/issues/4618)) ([e4352c3](https://github.com/cube-js/cube.js/commit/e4352c3930e6c948e98bae764920f5d6e21103e8))
+
+
+
+
+
 ## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
 
 
