@@ -2341,17 +2341,27 @@ WHERE `TABLE_SCHEMA` = '{}'",
         // udf
         if self.state.protocol == DatabaseProtocol::MySQL {
             ctx.register_udf(create_version_udf("8.0.25".to_string()));
+            ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
+            ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
+            ctx.register_udf(create_current_user_udf(self.state.clone(), true));
         } else if self.state.protocol == DatabaseProtocol::PostgreSQL {
             ctx.register_udf(create_version_udf(
                 "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
             ));
+            ctx.register_udf(create_db_udf(
+                "current_database".to_string(),
+                self.state.clone(),
+            ));
+            ctx.register_udf(create_db_udf(
+                "current_schema".to_string(),
+                self.state.clone(),
+            ));
+            ctx.register_udf(create_current_user_udf(self.state.clone(), false));
         }
-        ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
-        ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
+
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
         ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
         ctx.register_udf(create_user_udf(self.state.clone()));
-        ctx.register_udf(create_current_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_ucase_udf());
         ctx.register_udf(create_isnull_udf());
@@ -7539,6 +7549,20 @@ ORDER BY \"COUNT(count)\" DESC"
                 JOIN (SELECT 2615 AS oid, 2 AS attnum UNION ALL SELECT 1259, 2 UNION ALL SELECT 2609, 4) vals
                 ON ( c.oid = vals.oid AND a.attnum = vals.attnum );"
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn datagrip_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "datagrip_introspection",
+            execute_query(
+                "select current_database(), current_schema(), current_user;".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
