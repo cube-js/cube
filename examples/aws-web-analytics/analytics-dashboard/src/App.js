@@ -203,7 +203,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderChart(resultSet) || (<Spin />)
+                      resultSet ? renderChart(resultSet) : (<Spin />)
                     )}
                   />
                 </Card>
@@ -225,7 +225,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderChart(resultSet) || (<Spin />)
+                      resultSet ? renderChart(resultSet) : (<Spin />)
                     )}
                   />
                 </Card>
@@ -250,7 +250,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderStackedBarChart(resultSet, "PageViews.userCount") || (<Spin />)
+                      resultSet ? renderStackedBarChart(resultSet, "PageViews.userCount") : (<Spin />)
                     )}
                   />
                 </Card>
@@ -274,14 +274,14 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderPieChart(resultSet, "PageViews.userCount") || (<Spin />)
+                      resultSet ? renderPieChart(resultSet, "PageViews.userCount") : (<Spin />)
                     )}
                   />
                 </Card>
               </Col>
               <Col lg={12} span={24}>
                 <Card title="Architecture" style={{ marginBottom: '24px', textAlign: 'center' }}>
-                  <img src="./architecture.png" style={{ width: '100%', maxWidth: '500px' }}/>
+                  <img src="./architecture.png" style={{ width: '100%', maxWidth: '500px' }} alt="" />
                 </Card>
               </Col>
               <Col lg={12} span={24}>
@@ -301,7 +301,7 @@ class App extends Component {
               </Col>
               <Col span={24} style={{ textAlign: 'center' }}>
                 <a href="https://statsbot.co/cubejs/">
-                  <img src='./powered-by-cubejs-color.svg' style={{ width: 200 }}/>
+                  <img src='./powered-by-cubejs-color.svg' style={{ width: 200 }} alt="" />
                 </a>
               </Col>
             </Row>
