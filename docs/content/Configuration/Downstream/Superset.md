@@ -5,6 +5,12 @@ redirect_from:
   - /recipes/using-apache-superset-with-cube-sql
 ---
 
+<InfoBox>
+  <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
+  You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
+  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
+</InfoBox>
+
 You can connect a Cube project to [Apache Superset][superset] using the Cube SQL
 API. [Apache Superset][superset] is an open-source data exploration and
 visualization platform, commonly used to visualize business metrics and
