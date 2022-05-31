@@ -383,7 +383,7 @@ impl PostgresIntegrationTestSuite {
     // Tableau Desktop uses it
     async fn test_simple_cursors(&self) -> RunResult<()> {
         self.test_simple_query(
-            r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 10000);"#
+            r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 100);"#
                 .to_string(),
             |messages| {
                 assert_eq!(messages.len(), 1);
@@ -430,6 +430,33 @@ impl PostgresIntegrationTestSuite {
             },
         )
         .await?;
+
+        // Read till finish
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series;"#.to_string(),
+            |messages| {
+                // fetch 1
+                // fetch 10
+                // 100 - 11 = 89
+                assert_eq!(messages.len(), 89 + 1);
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[89] {
+                    assert_eq!(rows, 89_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 89")
+                }
+            },
+        )
+        .await?;
+
+        // Portal for Cursor was finished.
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 2);
+            }
+        ).await?;
 
         Ok(())
     }
