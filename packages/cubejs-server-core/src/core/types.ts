@@ -61,6 +61,7 @@ export type DatabaseType =
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
+  | 'crate'
   | 'druid'
   | 'jdbc'
   | 'firebolt'
