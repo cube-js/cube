@@ -102,11 +102,15 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
-            builder.append_value(user.clone() + "@%").unwrap();
+            if with_host {
+                builder.append_value(user.clone() + "@%").unwrap();
+            } else {
+                builder.append_value(user.clone()).unwrap();
+            }
         } else {
             builder.append_null()?;
         }
