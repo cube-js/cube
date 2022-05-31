@@ -8085,4 +8085,47 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_metabase_pg_class_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_pg_class_query",
+            execute_query(
+                "
+                SELECT *
+                    FROM (
+                        SELECT  n.nspname,
+                                c.relname,
+                                a.attname,
+                                a.atttypid,
+                                a.attnotnull or (t.typtype = 'd' AND t.typnotnull) AS attnotnull,
+                                a.atttypmod,
+                                a.attlen,
+                                t.typtypmod,
+                                row_number() OVER (partition BY a.attrelid ORDER BY a.attnum) AS attnum,
+                                NULLIF(a.attidentity, '') AS attidentity,
+                                pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,
+                                dsc.description,
+                                t.typbasetype,
+                                t.typtype
+                            FROM pg_catalog.pg_namespace n
+                            JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)
+                            JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)
+                            JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)
+                            LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)
+                            LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)
+                            LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')
+                            LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')
+                        WHERE c.relkind IN ('r', 'p', 'v', 'f', 'm') AND a.attnum > 0 AND NOT a.attisdropped AND n.nspname LIKE 'public' AND c.relname LIKE 'actor') c
+                WHERE true
+                ORDER BY nspname, c.relname, attnum;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
