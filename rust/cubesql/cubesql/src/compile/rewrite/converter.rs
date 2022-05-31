@@ -3,18 +3,18 @@ use crate::{
         engine::{df::scan::CubeScanNode, provider::CubeContext},
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, BetweenExprNegated,
-            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
-            CubeScanTableName, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
-            JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
+            BetweenExprNegated, BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases,
+            CubeScanLimit, CubeScanTableName, DimensionName, EmptyRelationProduceOneRow,
+            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
+            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanLimit,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::auth_service::AuthContext,
@@ -131,6 +131,13 @@ impl LogicalPlanToLanguageConverter {
             Expr::Literal(value) => {
                 let value = add_data_node!(self, value, LiteralExprValue);
                 self.graph.add(LogicalPlanLanguage::LiteralExpr([value]))
+            }
+            Expr::AnyExpr { left, op, right } => {
+                let left = self.add_expr(left)?;
+                let op = add_data_node!(self, op, AnyExprOp);
+                let right = self.add_expr(right)?;
+                self.graph
+                    .add(LogicalPlanLanguage::AnyExpr([left, op, right]))
             }
             Expr::BinaryExpr { left, op, right } => {
                 let left = self.add_expr(left)?;
@@ -563,6 +570,7 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::ScalarVariableExpr(_) => true,
         LogicalPlanLanguage::LiteralExpr(_) => true,
         LogicalPlanLanguage::BinaryExpr(_) => true,
+        LogicalPlanLanguage::AnyExpr(_) => true,
         LogicalPlanLanguage::NotExpr(_) => true,
         LogicalPlanLanguage::IsNotNullExpr(_) => true,
         LogicalPlanLanguage::IsNullExpr(_) => true,
@@ -614,6 +622,12 @@ pub fn node_to_expr(
         LogicalPlanLanguage::LiteralExpr(params) => {
             let value = match_data_node!(node_by_id, params[0], LiteralExprValue);
             Expr::Literal(value)
+        }
+        LogicalPlanLanguage::AnyExpr(params) => {
+            let left = Box::new(to_expr(params[0].clone())?);
+            let op = match_data_node!(node_by_id, params[1], AnyExprOp);
+            let right = Box::new(to_expr(params[2].clone())?);
+            Expr::AnyExpr { left, op, right }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
             let left = Box::new(to_expr(params[0].clone())?);

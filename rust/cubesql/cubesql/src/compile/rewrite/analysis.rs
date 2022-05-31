@@ -205,6 +205,11 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AnyExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::BinaryExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
@@ -344,6 +349,17 @@ impl LogicalPlanAnalysis {
                 } else {
                     panic!("Expected ScalarFunctionExpr but got: {:?}", expr);
                 }
+            }
+            LogicalPlanLanguage::AnyExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+
+                Self::eval_constant_expr(&egraph, &expr)
             }
             LogicalPlanLanguage::BinaryExpr(_) => {
                 let expr = node_to_expr(
