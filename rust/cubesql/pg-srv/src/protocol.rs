@@ -344,6 +344,9 @@ impl RowDescription {
     pub fn new(fields: Vec<RowDescriptionField>) -> Self {
         Self { fields }
     }
+    pub fn len(&self) -> usize {
+        self.fields.len()
+    }
 }
 
 impl Serialize for RowDescription {
@@ -714,6 +717,12 @@ pub enum ErrorCode {
     InvalidSqlStatement,
     // 34
     InvalidCursorName,
+    // Class 42 — Syntax Error or Access Rule Violation
+    DuplicateCursor,
+    // Class 53 — Insufficient Resources
+    ConfigurationLimitExceeded,
+    // Class 55 — Object Not In Prerequisite State
+    ObjectNotInPrerequisiteState,
     // XX - Internal Error
     InternalError,
 }
@@ -728,6 +737,9 @@ impl Display for ErrorCode {
             Self::DataException => "22000",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::DuplicateCursor => "42P03",
+            Self::ConfigurationLimitExceeded => "53400",
+            Self::ObjectNotInPrerequisiteState => "55000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)

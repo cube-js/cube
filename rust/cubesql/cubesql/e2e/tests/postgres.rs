@@ -379,6 +379,60 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors(&self) -> RunResult<()> {
+        self.test_simple_query(
+            r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 10000);"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 1 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                // Row | Selection - 2
+                // Row 1 | .. | Row 10 | Selection - 11
+                assert_eq!(messages.len(), 13);
+
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("1"));
+                } else {
+                    panic!("Must be Row command, 0")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[1] {
+                    assert_eq!(rows, 1_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 1")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[2] {
+                    assert_eq!(row.get(0), Some("2"));
+                } else {
+                    panic!("Must be Row command, 2")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[11] {
+                    assert_eq!(row.get(0), Some("11"));
+                } else {
+                    panic!("Must be Row command, 11")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[12] {
+                    assert_eq!(rows, 10_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 12")
+                }
+            },
+        )
+        .await?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -392,6 +446,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
+        self.test_simple_cursors().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
