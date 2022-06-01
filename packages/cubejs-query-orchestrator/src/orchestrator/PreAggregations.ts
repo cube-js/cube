@@ -24,6 +24,7 @@ import { BaseDriver, DownloadTableData, StreamOptions, UnloadOptions } from '../
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
+import { concurrencyDecorator } from './helpers';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -1594,14 +1595,11 @@ export class PreAggregations {
 
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
-      const concurrency = this.driverFactory(dataSource, undefined, true) as number;
-      const options = ((typeof this.options.queueOptions === 'function')
-        ? this.options.queueOptions(dataSource)
-        : this.options.queueOptions) || {};
-        
-      if (!options.concurrency && concurrency > 0) {
-        options.concurrency = concurrency;
-      }
+      const options = concurrencyDecorator(
+        this.driverFactory,
+        this.options.queueOptions,
+        dataSource,
+      );
 
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
@@ -1648,12 +1646,11 @@ export class PreAggregations {
 
   public getLoadCacheQueue(dataSource: string = 'default') {
     if (!this.loadCacheQueue[dataSource]) {
-      const concurrency = this.driverFactory(dataSource, undefined, true) as number;
-      const options = this.options.loadCacheQueueOptions || {};
-
-      if (!options.concurrency && concurrency > 0) {
-        options.concurrency = concurrency;
-      }
+      const options = concurrencyDecorator(
+        this.driverFactory,
+        this.options.queueOptions,
+        dataSource,
+      );
 
       this.loadCacheQueue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,

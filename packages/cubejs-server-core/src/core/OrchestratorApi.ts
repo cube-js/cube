@@ -39,13 +39,6 @@ export class OrchestratorApi {
   }
 
   /**
-   * Returns concurrency evaluated for the specified datasource.
-   */
-  public getConcurrencyByDatasource(ds: string): number {
-    return this.driverFactory(ds, undefined, true) as number;
-  }
-
-  /**
    * Returns QueryOrchestrator instance.
    */
   public getQueryOrchestrator(): QueryOrchestrator {

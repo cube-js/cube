@@ -661,13 +661,23 @@ export class CubejsServerCore {
     const orchestratorApi = this.createOrchestratorApi(
       /**
        * Returns promise which will be resolved with a driver instance if
-       * `concurrency` flag is not specified or equal to false, queue
+       * `maxpoolOrConcurrency` flag is not specified or equal to false, queue
        * concurrency value otherwise.
        */
-      (dataSource = 'default', maxPool?: number, concurrency?: boolean):
+      (dataSource = 'default', maxpoolOrConcurrency?: number | boolean):
         | number
         | BaseDriver
         | Promise<BaseDriver> => {
+        let concurrency;
+        let maxPool;
+        if (maxpoolOrConcurrency) {
+          if (typeof maxpoolOrConcurrency === 'boolean') {
+            concurrency = maxpoolOrConcurrency;
+          }
+          if (typeof maxpoolOrConcurrency === 'number') {
+            maxPool = maxpoolOrConcurrency;
+          }
+        }
         if (concurrency) {
           const envConcurrency: number = getEnv('concurrency');
           if (envConcurrency) {

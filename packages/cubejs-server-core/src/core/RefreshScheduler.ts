@@ -137,33 +137,17 @@ export class RefreshScheduler {
   /**
    * Evaluate and returns minimal QueryQueue concurrency value.
    */
-  protected async evalConcurrency(context: RequestContext): Promise<number> {
+  protected evalConcurrency(context: RequestContext): null | number {
     const queues = this.serverCore
       .getOrchestratorApi(context)
       .getQueryOrchestrator()
       .getQueryCache()
       .getQueues();
 
-    let concurrency: number;
+    let concurrency: null | number;
     
     if (!queues) { // first execution - no queues
-      const compilerApi = this.serverCore.getCompilerApi(context);
-      const compilers = await compilerApi.getCompilers();
-      const { cubeEvaluator } = compilers;
-      const processed = {};
-      const concurrencies: number[] = [];
-      cubeEvaluator.cubeNames().forEach((name) => {
-        const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
-        if (!processed[ds]) {
-          processed[ds] = true;
-          concurrencies.push(
-            this.serverCore
-              .getOrchestratorApi(context)
-              .getConcurrencyByDatasource(ds)
-          );
-        }
-      });
-      concurrency = Math.min(...concurrencies);
+      concurrency = null;
     } else { // further executions - queues ready
       const concurrencies: number[] = [];
       Object.keys(queues).forEach((name) => {
@@ -182,7 +166,7 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
-    const evalConcurrency = await this.evalConcurrency(context);
+    const evalConcurrency = this.evalConcurrency(context);
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],

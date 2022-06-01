@@ -10,6 +10,7 @@ import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { BaseDriver } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
+import { concurrencyDecorator } from './helpers';
 
 type QueryOptions = {
   external?: boolean;
@@ -223,14 +224,11 @@ export class QueryCache {
 
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
-      const concurrency = this.driverFactory(dataSource, undefined, true) as number;
-      const options = ((typeof this.options.queueOptions === 'function')
-        ? this.options.queueOptions(dataSource)
-        : this.options.queueOptions) || {};
-        
-      if (!options.concurrency && concurrency > 0) {
-        options.concurrency = concurrency;
-      }
+      const options = concurrencyDecorator(
+        this.driverFactory,
+        this.options.queueOptions,
+        dataSource,
+      );
 
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
