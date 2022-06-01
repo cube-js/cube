@@ -236,6 +236,7 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Close(body) => self.close(body).await,
                 protocol::FrontendMessage::Describe(body) => self.describe(body).await,
                 protocol::FrontendMessage::Sync => self.sync().await,
+                protocol::FrontendMessage::Flush => self.flush().await,
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 command_id => {
                     return Err(ConnectionError::Protocol(
@@ -401,6 +402,11 @@ impl AsyncPostgresShim {
         ))
         .await?;
 
+        Ok(())
+    }
+
+    pub async fn flush(&mut self) -> Result<(), ConnectionError> {
+        // TODO: flush network buffers here once buffering has been implemented
         Ok(())
     }
 

@@ -694,6 +694,8 @@ pub enum FrontendMessage {
     Describe(Describe),
     Execute(Execute),
     Close(Close),
+    /// Flush network buffer
+    Flush,
     /// Close connection
     Terminate,
     /// Finish
@@ -880,10 +882,10 @@ mod tests {
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
             0a 20 20 20 20 20 20 53 45 4c 45 43 54 20 6e 75   .      SELECT nu
-            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.   
+            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.
             20 20 20 46 52 4f 4d 20 74 65 73 74 64 61 74 61      FROM testdata
             0a 20 20 20 20 20 20 57 48 45 52 45 20 6e 75 6d   .      WHERE num
-            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str = 
+            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str =
             24 32 20 41 4e 44 20 62 6f 6f 6c 20 3d 20 24 33   $2 AND bool = $3
             0a 20 20 20 20 00 00 00                           .    ...
             "#
@@ -915,7 +917,7 @@ mod tests {
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
             00 00 00 00 03 00 00 00 01 35 00 00 00 04 74 65   .........5....te
-            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....            
+            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....
             "#
             .to_string(),
         );
@@ -980,7 +982,7 @@ mod tests {
     async fn test_frontend_message_parse_describe() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            44 00 00 00 08 53 73 30 00                        D....Ss0.          
+            44 00 00 00 08 53 73 30 00                        D....Ss0.
             "#
             .to_string(),
         );
@@ -1033,7 +1035,7 @@ mod tests {
     async fn test_frontend_message_execute() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            45 00 00 00 09 00 00 00 00 00                     E.........      
+            45 00 00 00 09 00 00 00 00 00                     E.........
             "#
             .to_string(),
         );
