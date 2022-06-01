@@ -8,6 +8,7 @@ pub mod key_column_usage;
 pub mod referential_constraints;
 pub mod table_constraints;
 pub mod tables;
+pub mod views;
 // pg_catalog
 mod pg_am;
 mod pg_attrdef;

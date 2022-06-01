@@ -6789,6 +6789,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_views_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "views_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.views".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_current_schema_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "current_schema_postgres",

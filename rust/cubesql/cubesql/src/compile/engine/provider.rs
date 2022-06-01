@@ -43,7 +43,8 @@ use super::information_schema::postgres::{
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
-    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
     PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
     PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
@@ -309,6 +310,8 @@ impl DatabaseProtocol {
             "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
+            "information_schema.views".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -397,6 +400,7 @@ impl DatabaseProtocol {
                 "constraint_column_usage" => {
                     return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
                 }
+                "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
                 _ => return None,
             },
             "pg_catalog" => match table.as_str() {
