@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -133,46 +131,41 @@ pub fn parse_sql_to_statements(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    let result =
-        parse_result.map_err(|err| CompilationError::User(format!("Unable to parse: {:?}", err)));
+    parse_result.map_err(|err| {
+        let err = CompilationError::user(format!("Unable to parse: {:?}", err));
 
-    match result {
-        Err(err) => Err(CompilationError::Extended(
-            Box::new(err),
-            HashMap::from([("stage".to_string(), "parsing".to_string())]),
-        )),
-        _ => result,
-    }
+        log::error!("{}", err.to_string());
+
+        err
+    })
 }
 
 pub fn parse_sql_to_statement(
     query: &String,
     protocol: DatabaseProtocol,
 ) -> CompilationResult<Statement> {
-    let result = match parse_sql_to_statements(query, protocol)? {
+    match parse_sql_to_statements(query, protocol)? {
         stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
-            } else if stmts.is_empty() {
-                Err(CompilationError::User(format!(
-                    "Invalid query, no statements was specified: {}",
-                    &query
-                )))
             } else {
-                Err(CompilationError::Unsupported(format!(
-                    "Multiple statements was specified in one query: {}",
-                    &query
-                )))
+                let err = if stmts.is_empty() {
+                    CompilationError::user(format!(
+                        "Invalid query, no statements was specified: {}",
+                        &query
+                    ))
+                } else {
+                    CompilationError::unsupported(format!(
+                        "Multiple statements was specified in one query: {}",
+                        &query
+                    ))
+                };
+
+                log::error!("{}", err.to_string());
+
+                Err(err)
             }
         }
-    };
-
-    match result {
-        Err(err) => Err(CompilationError::Extended(
-            Box::new(err),
-            HashMap::from([("stage".to_string(), "parsing".to_string())]),
-        )),
-        _ => result,
     }
 }
 

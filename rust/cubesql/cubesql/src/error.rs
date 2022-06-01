@@ -20,16 +20,15 @@ pub struct CubeError {
 
 #[derive(Debug, Clone)]
 pub enum CubeErrorCauseType {
-    User,
-    Internal,
-    Extended(Box<CubeErrorCauseType>, HashMap<String, String>),
+    User(Option<HashMap<String, String>>),
+    Internal(Option<HashMap<String, String>>),
 }
 
 impl CubeError {
     pub fn user(message: String) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::User,
+            cause: CubeErrorCauseType::User(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
@@ -37,7 +36,7 @@ impl CubeError {
     pub fn internal(message: String) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::Internal,
+            cause: CubeErrorCauseType::Internal(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
@@ -45,7 +44,7 @@ impl CubeError {
     pub fn internal_with_bt(message: String, backtrace: Option<Backtrace>) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::Internal,
+            cause: CubeErrorCauseType::Internal(None),
             backtrace,
         }
     }
@@ -68,12 +67,13 @@ impl fmt::Display for CubeError {
             message: String,
             f: &mut Formatter<'_>,
         ) -> fmt::Result {
-            match cause {
-                CubeErrorCauseType::User => f.write_fmt(format_args!("{}", message)),
-                CubeErrorCauseType::Internal => {
-                    f.write_fmt(format_args!("{:?}: {}", cause, message))
+            match &cause {
+                CubeErrorCauseType::User(meta) => {
+                    f.write_fmt(format_args!("{} {:?}", message, meta))
                 }
-                CubeErrorCauseType::Extended(e, _) => write_fmt(*e, message, f),
+                CubeErrorCauseType::Internal(meta) => {
+                    f.write_fmt(format_args!("{:?}: {} {:?}", cause, message, meta))
+                }
             }
         }
 
@@ -113,15 +113,17 @@ impl From<cubeclient::apis::Error<MetaV1Error>> for CubeError {
 
 impl From<crate::compile::CompilationError> for CubeError {
     fn from(v: crate::compile::CompilationError) -> Self {
-        match v {
-            crate::compile::CompilationError::Extended(e, props) => {
-                let mut v = Self::from(*e);
-                v.cause = CubeErrorCauseType::Extended(Box::new(v.cause), props.clone());
-
-                v
+        let cause = match &v {
+            crate::compile::CompilationError::User(_, meta)
+            | crate::compile::CompilationError::Unsupported(_, meta) => {
+                CubeErrorCauseType::Internal(meta.clone())
             }
-            _ => CubeError::internal_with_bt(v.to_string(), v.to_backtrace()),
-        }
+            _ => CubeErrorCauseType::Internal(None),
+        };
+        let mut err = CubeError::internal_with_bt(v.to_string(), v.to_backtrace());
+        err.cause = cause;
+
+        err
     }
 }
 

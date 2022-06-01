@@ -86,13 +86,9 @@ impl MySqlConnection {
         match self.execute_query(query).await {
             Err(e) => {
                 let (message, props) = match &e.cause {
-                    CubeErrorCauseType::Extended(_, props) => {
-                        (e.message.clone(), Some(props.clone()))
+                    CubeErrorCauseType::Internal(meta) | CubeErrorCauseType::User(meta) => {
+                        (e.message.clone(), meta.clone())
                     }
-                    _ => (
-                        format!("Error during processing MySQL {}: {}", query, e.to_string()),
-                        None,
-                    ),
                 };
 
                 self.logger.error(message.as_str(), props);
@@ -423,7 +419,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
-                    log::warn!("Error during authentication MySQL connection: {}", e);
+                    log::error!("Error during authentication MySQL connection: {}", e);
                 };
 
                 io::Error::new(io::ErrorKind::Other, e.to_string())

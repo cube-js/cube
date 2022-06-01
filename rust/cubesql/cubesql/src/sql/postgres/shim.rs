@@ -125,19 +125,18 @@ impl ConnectionError {
             ConnectionError::CompilationError(e) => {
                 fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
                     match e {
-                        CompilationError::Internal(_, _) => protocol::ErrorResponse::error(
+                        CompilationError::Internal(_, _, _) => protocol::ErrorResponse::error(
                             protocol::ErrorCode::InternalError,
                             e.to_string(),
                         ),
-                        CompilationError::User(_) => protocol::ErrorResponse::error(
+                        CompilationError::User(_, _) => protocol::ErrorResponse::error(
                             protocol::ErrorCode::InvalidSqlStatement,
                             e.to_string(),
                         ),
-                        CompilationError::Unsupported(_) => protocol::ErrorResponse::error(
+                        CompilationError::Unsupported(_, _) => protocol::ErrorResponse::error(
                             protocol::ErrorCode::FeatureNotSupported,
                             e.to_string(),
                         ),
-                        CompilationError::Extended(e, _) => to_error_response(*e),
                     }
                 }
 
@@ -268,7 +267,9 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(err) => match err {
-                CompilationError::Extended(err, props) => (err.to_string(), Some(props.clone())),
+                CompilationError::Unsupported(msg, meta) | CompilationError::User(msg, meta) => {
+                    (msg.clone(), meta.clone())
+                }
                 _ => (
                     format!("Error during processing PostgreSQL message: {}", err),
                     None,

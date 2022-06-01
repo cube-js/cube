@@ -183,7 +183,10 @@ impl CubeScanExecutionPlan {
                                     builder.append_value(v.to_string())?
                                 }
                                 v => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Utf8 (returning null)", v).as_str());
+                                    log::error!(
+                                        "Unable to map value {:?} to DataType::Utf8 (returning null)",
+                                        v
+                                    );
 
                                     builder.append_null()?
                                 }
@@ -224,7 +227,10 @@ impl CubeScanExecutionPlan {
                                     }
                                 },
                                 v => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Int64 (returning null)", v).as_str());
+                                    log::error!(
+                                        "Unable to map value {:?} to DataType::Int64 (returning null)",
+                                        v
+                                    );
 
                                     builder.append_null()?
                                 }
@@ -265,7 +271,7 @@ impl CubeScanExecutionPlan {
                                     }
                                 },
                                 v => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Float64 (returning null)", v).as_str());
+                                    log::error!("Unable to map value {:?} to DataType::Float64 (returning null)", v);
 
                                     builder.append_null()?
                                 }
@@ -296,13 +302,13 @@ impl CubeScanExecutionPlan {
                                     "true" | "1" => builder.append_value(true)?,
                                     "false" | "0" => builder.append_value(false)?,
                                     _ => {
-                                        self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
+                                        log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
 
                                         builder.append_null()?
                                     }
                                 },
                                 v => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
+                                    log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
 
                                     builder.append_null()?
                                 }
@@ -339,7 +345,7 @@ impl CubeScanExecutionPlan {
                                     builder.append_value(timestamp.timestamp_nanos())?;
                                 }
                                 v => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)", v).as_str());
+                                    log::error!("Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)", v);
 
                                     builder.append_null()?
                                 }

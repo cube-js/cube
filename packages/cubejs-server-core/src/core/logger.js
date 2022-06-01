@@ -35,6 +35,11 @@ export const devLogger = (level) => (type, { error, warning, ...message }) => {
   const logError = () => console.log(`${withColor(type, colors.red)}: ${format({ ...message, allSqlLines: true, showRestParams: true })} \n${error}`);
   const logDetails = (showRestParams) => console.log(`${withColor(type)}: ${format({ ...message, showRestParams })}`);
 
+  // We have to send this events to APM, but don't to STDOUT, because it happens on SQL API side
+  if (type === 'Cube SQL Error') {
+    return;
+  }
+
   if (error) {
     logError();
     return;
@@ -80,6 +85,11 @@ export const devLogger = (level) => (type, { error, warning, ...message }) => {
 
 export const prodLogger = (level) => (msg, params) => {
   const { error, warning } = params;
+
+  // We have to send this events to APM, but don't to STDOUT, because it happens on SQL API side
+  if (msg === 'Cube SQL Error') {
+    return;
+  }
 
   const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
   // eslint-disable-next-line default-case
