@@ -124,6 +124,7 @@ export type PreAggregationDescription = {
   invalidateKeyQueries: QueryWithParams[];
   sql: QueryWithParams;
   loadSql: QueryWithParams;
+  highWatermarkSql: QueryWithParams;
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   granularity: string;
@@ -131,6 +132,7 @@ export type PreAggregationDescription = {
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
   expandedPartition: boolean;
+  lambdaView: boolean;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -1099,6 +1101,8 @@ export class PreAggregationPartitionRangeLoader {
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
 
+    console.log('LLL', query, values);
+
     return this.queryCache.cacheQueryResult(
       query,
       values,
@@ -1124,11 +1128,11 @@ export class PreAggregationPartitionRangeLoader {
     );
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery) => (
-          this.loadCache.keyQueryResult(
-            this.replacePartitionSqlAndParams(sqlQuery, range, partitionTableName), this.waitForRenew, this.priority(10)
-          )
-        )
+        (sql0) => {
+          const sql1 = this.replacePartitionSqlAndParams(sql0, range, partitionTableName);
+          const result = this.loadCache.keyQueryResult(sql1, this.waitForRenew, this.priority(10));
+          return result;
+        }
       )
     );
   }
@@ -1193,7 +1197,7 @@ export class PreAggregationPartitionRangeLoader {
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
 
-    return {
+    const result = {
       ...this.preAggregation,
       tableName: partitionTableName,
       loadSql: this.preAggregation.loadSql &&
@@ -1207,6 +1211,16 @@ export class PreAggregationPartitionRangeLoader {
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName)
     };
+
+    console.log('DDD', range);
+    console.log('DDD tableName', this.preAggregation.tableName, result.tableName);
+    // console.log('DDD loadSql', this.preAggregation.loadSql, result.loadSql);
+    // console.log('DDD sql', this.preAggregation.sql, result.sql);
+    // console.log('DDD invalidateKeyQueries', this.preAggregation.invalidateKeyQueries, result.invalidateKeyQueries);
+    // console.log('DDD indexesSql', this.preAggregation.indexesSql, result.indexesSql);
+    // console.log('DDD previewSql', this.preAggregation.previewSql, result.previewSql);
+
+    return result;
   }
 
   public async loadPreAggregations(): Promise<LoadPreAggregationResult> {
@@ -1224,15 +1238,51 @@ export class PreAggregationPartitionRangeLoader {
         this.options
       ));
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
-      const allTableTargetNames = loadResults
-        .map(
-          targetTableName => targetTableName.targetTableName
-        );
+      const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}`)
         .join(' UNION ALL ');
+      const targetTableName = allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`;
+
+      console.log('QQQ', loadResults);
+
+      if (this.preAggregation.lambdaView) {
+        const [sql0, params] = this.preAggregation.highWatermarkSql;
+        const sql = sql0.replace(this.preAggregation.tableName, targetTableName);
+        const result = await this.queryCache.queryWithRetryAndRelease(sql, params, { cacheKey: [sql, params], external: true, dataSource: this.dataSource });
+        const highWatermark = new Date(result[0].watermark);
+        console.log('EEE', highWatermark);
+
+        const externalLoadResults = [];
+        const sourceLoaders = [];
+        for (const [i, range] of partitionRanges.entries()) {
+          const end = new Date(range[1]);
+          if (end.getTime() < highWatermark.getTime()) {
+            externalLoadResults.push(loadResults[i]);
+          } else {
+            sourceLoaders.push(new PreAggregationLoader(
+              this.redisPrefix,
+              this.driverFactory,
+              this.logger,
+              this.queryCache,
+              this.preAggregations,
+              this.partitionPreAggregationDescription(range),
+              [],
+              this.loadCache,
+              {
+                ...this.options,
+                forceBuild: true,
+              }
+            ));
+          }
+        }
+        const sourceLoadResults = await Promise.all(sourceLoaders.map(l => l.loadPreAggregation()));
+
+        console.log('PPP', externalLoadResults, sourceLoadResults);
+      }
+
       return {
-        targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
+        targetTableName,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
         lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
       };
@@ -1262,6 +1312,7 @@ export class PreAggregationPartitionRangeLoader {
 
   private async partitionRanges() {
     const buildRange = await this.loadBuildRange();
+    console.log('BBB', buildRange);
     if (!buildRange[0] || !buildRange[1]) {
       return [];
     }
@@ -1508,7 +1559,6 @@ export class PreAggregations {
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
 
     return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => {
-      console.log('TTT', preAggregationsTablesToTempTables);
       return {
         preAggregationsTablesToTempTables,
         values: queryParamsReplacement

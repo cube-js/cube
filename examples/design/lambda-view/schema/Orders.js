@@ -4,6 +4,17 @@ cube(`Orders`, {
     measures: {
         count: {
             type: `count`,
+            filters: [
+                // Last partition
+                { sql: `${CUBE}.completed_at >= DATE('2020-01-01')` },
+            ],
+        },
+        count2: {
+            type: `count`,
+            filters: [
+                // Last partition
+                { sql: `${CUBE}.completed_at >= DATE('2020-01-02')` },
+            ],
         },
     },
 
@@ -62,14 +73,15 @@ cube(`Orders`, {
         // },
 
         ordersByCompletedAtBuildRange: {
-            measures: [count],
+            lambdaView: true,
+            measures: [count, count2],
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `year`,
             buildRangeStart: { sql: `SELECT DATE('2019-07-01')` },
-            buildRangeEnd: { sql: `SELECT DATE('2020-07-01')` },
+            // buildRangeEnd: { sql: `SELECT DATE('2021-07-01')` },
             refreshKey: {
-                every: '1 minute',
+                every: '1 hour',
             },
         }
     },

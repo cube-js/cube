@@ -155,6 +155,7 @@ export class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
+      highWatermarkSql: this.query.highWatermarkSql(cube, preAggregation, tableName),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       partitionGranularity: preAggregation.partitionGranularity,
@@ -182,7 +183,8 @@ export class PreAggregations {
           };
         }
       ),
-      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
+      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
+      lambdaView: preAggregation.lambdaView,
     };
   }
 
@@ -715,6 +717,12 @@ export class PreAggregations {
         useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
       }
     );
+  }
+
+  highWatermarkSql(cube, aggregation, tableName) {
+    const references = this.evaluateAllReferences(cube, aggregation);
+    const columns = references.timeDimensions.map(d => d.highWatermarkColumn());
+    return `SELECT ${columns.join(', ')} FROM ${tableName}`;
   }
 
   mergePartitionTimeDimensions(aggregation, partitionTimeDimensions) {

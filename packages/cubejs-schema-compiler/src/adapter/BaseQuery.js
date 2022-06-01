@@ -477,6 +477,16 @@ class BaseQuery {
       : sql;
   }
 
+  buildHighWatermarkSql() {
+    const query = this.newSubQuery({
+      measures: [],
+      dimensions: [],
+      rowLimit: [],
+      order: [],
+    });
+    return query.buildSqlAndParams();
+  }
+
   /**
    * Generate SQL query to calculate total number of rows of the
    * specified SQL query.
@@ -541,13 +551,18 @@ class BaseQuery {
       }
     }
 
+    console.log('BBB', this.options.preAggregationQuery, this.options);
+
     return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
         ['buildSqlAndParams'],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql()
-        ),
+        () => {
+          const sql0 = this.buildParamAnnotatedSql();
+          const sql1 = this.paramAllocator.buildSqlAndParams(sql0);
+          console.log('SSS', '\n', sql0, '\n', sql1);
+          return sql1;
+        },
         { cache: this.queryCache }
       )
     );
@@ -2120,6 +2135,17 @@ class BaseQuery {
     return this.paramAllocator.buildSqlAndParams(`SELECT * FROM ${tableName} LIMIT 1000`);
   }
 
+  highWatermarkSql(cube, preAggregation, tableName) {
+    const sql = this.cacheValue(
+      ['highWatermarkSql', cube, JSON.stringify(preAggregation)],
+      () => {
+        const d = this.timeDimensions[0];
+        return `SELECT max(${d.aliasName()}) watermark FROM ${tableName}`;
+      }
+    );
+    return this.paramAllocator.buildSqlAndParams(sql);
+  }
+
   indexSql(cube, preAggregation, index, indexName, tableName) {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
@@ -2541,6 +2567,11 @@ class BaseQuery {
   preAggregationStartEndQueries(cube, preAggregation) {
     const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
+    console.log(
+      'RRR', references,
+      preAggregation.buildRangeStart, preAggregation.buildRangeEnd,
+      preAggregation.refreshRangeStart, preAggregation.refreshRangeEnd
+    );
 
     return this.evaluateSymbolSqlWithContext(() => [
       this.paramAllocator.buildSqlAndParams(

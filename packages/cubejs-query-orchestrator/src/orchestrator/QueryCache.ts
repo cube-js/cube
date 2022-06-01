@@ -90,6 +90,10 @@ export class QueryCache {
       );
 
     const query = replacePreAggregationTableNames(queryBody.query);
+
+    console.log('QQQ0', queryBody.query);
+    console.log('QQQ1', query);
+
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {
       // eslint-disable-next-line prefer-destructuring

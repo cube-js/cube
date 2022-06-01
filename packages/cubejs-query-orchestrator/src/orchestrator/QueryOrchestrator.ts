@@ -103,6 +103,8 @@ export class QueryOrchestrator {
   public async fetchQuery(queryBody: any): Promise<any> {
     const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
+    console.log('TTT', JSON.stringify({ preAggregationsTablesToTempTables, values }, null, 4));
+
     if (values) {
       queryBody = {
         ...queryBody,
