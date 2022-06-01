@@ -6775,6 +6775,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "constraint_column_usage_postgres",
+            execute_query(
+                "SELECT * FROM information_schema.constraint_column_usage".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_current_schema_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "current_schema_postgres",

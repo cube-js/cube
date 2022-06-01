@@ -3,6 +3,7 @@ pub mod ext;
 // information schema
 pub mod character_sets;
 pub mod columns;
+pub mod constraint_column_usage;
 pub mod key_column_usage;
 pub mod referential_constraints;
 pub mod table_constraints;
