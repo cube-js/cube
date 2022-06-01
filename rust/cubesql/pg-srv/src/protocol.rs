@@ -67,6 +67,45 @@ impl Serialize for StartupMessage {
     }
 }
 
+#[derive(Debug)]
+pub struct NoticeResponse {
+    // https://www.postgresql.org/docs/14/protocol-error-fields.html
+    pub severity: NoticeSeverity,
+    pub code: ErrorCode,
+    pub message: String,
+}
+
+impl NoticeResponse {
+    pub fn warning(code: ErrorCode, message: String) -> Self {
+        Self {
+            severity: NoticeSeverity::Warning,
+            code,
+            message,
+        }
+    }
+}
+
+impl Serialize for NoticeResponse {
+    const CODE: u8 = b'N';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
+
+        let severity = self.severity.to_string();
+        buffer.push(b'S');
+        buffer::write_string(&mut buffer, &severity);
+
+        buffer.push(b'C');
+        buffer::write_string(&mut buffer, &self.code.to_string());
+
+        buffer.push(b'M');
+        buffer::write_string(&mut buffer, &self.message);
+        buffer.push(0);
+
+        Some(buffer)
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub struct ErrorResponse {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
@@ -715,6 +754,8 @@ pub enum ErrorCode {
     InvalidPassword,
     // 22
     DataException,
+    // Class 25 — Invalid Transaction State
+    ActiveSqlTransaction,
     // 26
     InvalidSqlStatement,
     // 34
@@ -737,6 +778,7 @@ impl Display for ErrorCode {
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
+            Self::ActiveSqlTransaction => "25001",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
@@ -749,11 +791,34 @@ impl Display for ErrorCode {
 }
 
 #[derive(Debug)]
+pub enum NoticeSeverity {
+    // https://www.postgresql.org/docs/14/protocol-error-fields.html
+    Warning,
+    Notice,
+    Debug,
+    Info,
+    Log,
+}
+
+impl Display for NoticeSeverity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Self::Warning => "WARNING",
+            Self::Notice => "NOTICE",
+            Self::Debug => "DEBUG",
+            Self::Info => "INFO",
+            Self::Log => "LOG",
+        };
+        write!(f, "{}", string)
+    }
+}
+
+#[derive(Debug)]
 pub enum ErrorSeverity {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
     Error,
     Fatal,
-    // Panic,
+    Panic,
 }
 
 impl Display for ErrorSeverity {
@@ -761,7 +826,7 @@ impl Display for ErrorSeverity {
         let string = match self {
             Self::Error => "ERROR",
             Self::Fatal => "FATAL",
-            // Self::Panic => "PANIC",
+            Self::Panic => "PANIC",
         };
         write!(f, "{}", string)
     }
@@ -769,7 +834,7 @@ impl Display for ErrorSeverity {
 
 pub enum TransactionStatus {
     Idle,
-    // InTransactionBlock,
+    InTransactionBlock,
     // InFailedTransactionBlock,
 }
 
@@ -777,7 +842,7 @@ impl TransactionStatus {
     pub fn to_byte(&self) -> u8 {
         match self {
             Self::Idle => b'I',
-            // Self::InTransactionBlock => b'T',
+            Self::InTransactionBlock => b'T',
             // Self::InFailedTransactionBlock => b'E',
         }
     }
