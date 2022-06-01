@@ -239,15 +239,18 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::CaseExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[1], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
-            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
+            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
@@ -260,21 +263,14 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
-            LogicalPlanLanguage::SortExp(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
-                Some(vec)
-            }
-            LogicalPlanLanguage::AggregateGroupExpr(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
-                Some(vec)
-            }
-            LogicalPlanLanguage::AggregateAggrExpr(params) => {
+            LogicalPlanLanguage::SortExp(params)
+            | LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::CaseExprWhenThenExpr(params)
+            | LogicalPlanLanguage::CaseExprElseExpr(params)
+            | LogicalPlanLanguage::CaseExprExpr(params)
+            | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }

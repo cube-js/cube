@@ -307,7 +307,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?aliases",
                         "?table_name",
-                        "?split",
+                        "CubeScanSplit:false",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -324,7 +324,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
-                    "?split",
+                    "CubeScanSplit:false",
                 ),
                 self.push_down_non_empty_aggregate(
                     "?table_name",
@@ -376,7 +376,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?cube_aliases",
                         "?table_name",
-                        "?split",
+                        "CubeScanSplit:false",
                     ),
                     "?alias",
                 ),
@@ -389,7 +389,7 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?cube_aliases",
                     "?new_table_name",
-                    "?split",
+                    "CubeScanSplit:false",
                 ),
                 self.push_down_projection(
                     "?expr",
@@ -911,7 +911,8 @@ impl MemberRules {
                                 )
                                 .into_iter(),
                             );
-                            if columns == member_column_names {
+                            // TODO default count member is not in the columns set but it should be there
+                            if columns.iter().all(|c| member_column_names.contains(c)) {
                                 return true;
                             }
                         }

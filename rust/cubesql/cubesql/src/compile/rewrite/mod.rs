@@ -592,6 +592,29 @@ fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
 
+fn case_expr_var_arg(
+    expr: impl Display,
+    when_then: impl Display,
+    else_expr: impl Display,
+) -> String {
+    format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
+}
+
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+    case_expr_var_arg(
+        "CaseExprExpr",
+        list_expr(
+            "CaseExprWhenThenExpr",
+            when_then
+                .into_iter()
+                .map(|(when, then)| vec![when, then])
+                .flatten()
+                .collect(),
+        ),
+        list_expr("CaseExprElseExpr", vec![else_expr]),
+    )
+}
+
 fn literal_string(literal_str: impl Display) -> String {
     format!("(LiteralExpr LiteralExprValue:{})", literal_str)
 }
