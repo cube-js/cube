@@ -654,6 +654,40 @@ impl AsyncPostgresShim {
         meta: Arc<MetaContext>,
     ) -> Result<(), ConnectionError> {
         match stmt {
+            Statement::StartTransaction { .. } => {
+                if !self.session.state.begin_transaction() {
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::ActiveSqlTransaction,
+                        "there is already a transaction in progress".to_string(),
+                    ))
+                    .await?
+                }
+            }
+            Statement::Rollback { .. } | Statement::Commit { .. } => {
+                if let Some(_) = self.session.state.end_transaction() {
+                    // Portals + Cursors which we want to remove
+                    let mut to_remove = Vec::new();
+
+                    for (key, cursor) in &self.cursors {
+                        if !cursor.hold {
+                            to_remove.push(key.clone());
+                        }
+                    }
+
+                    for key in &to_remove {
+                        self.cursors.remove(key);
+                        self.portals.remove(key);
+
+                        trace!("Closing cursor/portal {}", key);
+                    }
+                } else {
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::ActiveSqlTransaction,
+                        "there is already a transaction in progress".to_string(),
+                    ))
+                    .await?
+                }
+            }
             Statement::Fetch {
                 name,
                 direction,
@@ -724,7 +758,7 @@ impl AsyncPostgresShim {
                     }
                 } else {
                     trace!(
-                        r#"Unable to find portal for cursor: "{}". Maybe it was not created."#,
+                        r#"Unable to find portal for cursor: "{}". Maybe it was not created. Opening..."#,
                         &name.value
                     );
                 }
@@ -742,7 +776,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                let cursor = self.cursors.remove(&name.value).ok_or_else(|| {
+                let cursor = self.cursors.get(&name.value).ok_or_else(|| {
                     ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
                             protocol::ErrorCode::ProtocolViolation,
@@ -790,16 +824,6 @@ impl AsyncPostgresShim {
                             protocol::ErrorCode::FeatureNotSupported,
                             "INSENSITIVE|ASENSITIVE is not supported for DECLARE statement"
                                 .to_string(),
-                        )
-                        .into(),
-                    ));
-                };
-
-                if Some(false) == hold {
-                    return Err(ConnectionError::Protocol(
-                        protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            "HOLD is not supported for DECLARE statement".to_string(),
                         )
                         .into(),
                     ));
@@ -933,7 +957,11 @@ impl AsyncPostgresShim {
         };
 
         self.write(protocol::ReadyForQuery::new(
-            protocol::TransactionStatus::Idle,
+            if self.session.state.is_in_transaction() {
+                protocol::TransactionStatus::InTransactionBlock
+            } else {
+                protocol::TransactionStatus::Idle
+            },
         ))
         .await?;
 
