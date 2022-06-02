@@ -31,7 +31,7 @@
     "react-dom": "^16.13.1",
     "react-grid-layout": "^0.18.3",
     "react-resizable": "^1.10.1",
-    "react-scripts": "3.4.4"
+    "react-scripts": "^4.0.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.2"
@@ -41,8 +41,8 @@
     "build": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
-    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy",
+    "deploy": "npm run preview -- --prod"
   },
   "eslintConfig": {
     "extends": "react-app"

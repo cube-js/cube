@@ -5,15 +5,17 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int32Array, Int64Array, Int64Builder,
-            IntervalDayTimeArray, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
-            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampNanosecondArray,
-            UInt32Array, UInt32Builder,
+            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
+            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt32Array,
+            UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
-            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
+            DataType, Field, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type,
+            IntervalDayTimeType, IntervalUnit, TimeUnit, TimestampNanosecondType, UInt16Type,
+            UInt32Type, UInt64Type, UInt8Type,
         },
     },
     error::{DataFusionError, Result},
@@ -30,11 +32,12 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
+use itertools::izip;
 use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
-        coerce::{if_coercion, least_coercion},
+        coerce::{if_coercion, is_numeric, least_coercion},
         columar::if_then_else,
     },
     sql::SessionState,
@@ -99,11 +102,15 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
-            builder.append_value(user.clone() + "@%").unwrap();
+            if with_host {
+                builder.append_value(user.clone() + "@%").unwrap();
+            } else {
+                builder.append_value(user.clone()).unwrap();
+            }
         } else {
             builder.append_null()?;
         }
@@ -952,6 +959,21 @@ pub fn create_date_add_udf() -> ScalarUDF {
     )
 }
 
+fn postgres_datetime_format_to_iso(format: String) -> String {
+    format
+        .replace("%i", "%M")
+        .replace("%s", "%S")
+        .replace(".%f", "%.f")
+        .replace("YYYY", "%Y")
+        .replace("DD", "%d")
+        .replace("HH24", "%H")
+        .replace("MI", "%M")
+        .replace("SS", "%S")
+        .replace(".US", "%.f")
+        .replace("MM", "%m")
+        .replace(".MS", "%.3f")
+}
+
 pub fn create_str_to_date_udf() -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |args: &[ColumnarValue]| {
@@ -977,17 +999,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
                 }
             };
 
-            let format = format
-                .replace("%i", "%M")
-                .replace("%s", "%S")
-                .replace(".%f", "%.f")
-                .replace("YYYY", "%Y")
-                .replace("DD", "%d")
-                .replace("HH24", "%H")
-                .replace("MI", "%M")
-                .replace("SS", "%S")
-                .replace(".US", "%.f")
-                .replace("MM", "%m");
+            let format = postgres_datetime_format_to_iso(format.clone());
 
             let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
@@ -1030,6 +1042,85 @@ pub fn create_current_timestamp_udf() -> ScalarUDF {
     )
 }
 
+macro_rules! parse_timestamp_arr {
+    ($ARR:expr, $ARR_TYPE: ident, $FN_NAME: ident) => {{
+        let arr = $ARR.as_any().downcast_ref::<$ARR_TYPE>();
+        if arr.is_some() {
+            let mut result = Vec::new();
+            let arr = arr.unwrap();
+            for i in 0..arr.len() {
+                result.push(Duration::$FN_NAME(arr.value(i)));
+            }
+
+            Some(result)
+        } else {
+            None
+        }
+    }};
+}
+
+pub fn create_to_char_udf() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        make_scalar_function(move |args: &[ArrayRef]| {
+            let arr = &args[0];
+            let (durations, timezone) = match arr.data_type() {
+                DataType::Timestamp(TimeUnit::Nanosecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampNanosecondArray, nanoseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Millisecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampMillisecondArray, milliseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Microsecond, str) => (
+                    parse_timestamp_arr!(arr, TimestampMicrosecondArray, microseconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                DataType::Timestamp(TimeUnit::Second, str) => (
+                    parse_timestamp_arr!(arr, TimestampSecondArray, seconds),
+                    str.clone().unwrap_or_default(),
+                ),
+                _ => (None, "".to_string()),
+            };
+
+            if durations.is_none() {
+                return Err(DataFusionError::Execution(
+                    "unsupported datetime format for to_char".to_string(),
+                ));
+            }
+
+            let durations = durations.unwrap();
+            let formats = downcast_string_arg!(&args[1], "format_str", i32);
+
+            let mut builder = StringBuilder::new(durations.len());
+
+            for (i, duration) in durations.iter().enumerate() {
+                let format = formats.value(i);
+                let replaced_format =
+                    postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
+
+                let secs = duration.num_seconds();
+                let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
+                let timestamp = NaiveDateTime::from_timestamp(secs, nanosecs as u32);
+
+                builder
+                    .append_value(timestamp.format(&replaced_format).to_string())
+                    .unwrap();
+            }
+
+            Ok(Arc::new(builder.finish()) as ArrayRef)
+        });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "to_char",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_current_schemas_udf() -> ScalarUDF {
     let current_schemas = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
@@ -1065,7 +1156,8 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 pub fn create_format_type_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
-        let typemods = args[1].as_any().downcast_ref::<Int32Array>().unwrap();
+        // TODO: See pg_attribute.atttypmod
+        let typemods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
 
         let result = oids
             .iter()
@@ -1115,6 +1207,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::ARRAYINT8 => "bigint[]".to_string(),
                             PgTypeId::ARRAYFLOAT4 => "real[]".to_string(),
                             PgTypeId::ARRAYFLOAT8 => "double precision[]".to_string(),
+                            PgTypeId::ACLITEM => format!("aclitem{}", typemod_str()),
+                            PgTypeId::ARRAYACLITEM => format!("aclitem{}[]", typemod_str()),
                             PgTypeId::BPCHAR => match typemod {
                                 Some(typemod) if typemod < 0 => "bpchar".to_string(),
                                 _ => format!("character{}", typemod_str()),
@@ -1262,6 +1356,59 @@ pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
     create_udf(
         "information_schema._pg_numeric_precision",
         vec![DataType::Int64, DataType::Int64],
+        Arc::new(DataType::Int64),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_truetypid_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let atttypids = downcast_primitive_arg!(args[0], "atttypid", UInt32Type);
+        let typtypes = downcast_string_arg!(args[1], "typtype", i32);
+        let typbasetypes = downcast_primitive_arg!(args[2], "typbasetype", UInt32Type);
+
+        let result = izip!(atttypids, typtypes, typbasetypes)
+            .map(|(atttypid, typtype, typbasetype)| match typtype {
+                Some("d") => typbasetype,
+                _ => atttypid,
+            })
+            .collect::<PrimitiveArray<UInt32Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "information_schema._pg_truetypid",
+        vec![DataType::UInt32, DataType::Utf8, DataType::UInt32],
+        Arc::new(DataType::UInt32),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_truetypmod_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        // TODO: See pg_attribute.atttypmod
+        let atttypmods = downcast_primitive_arg!(args[0], "atttypmod", Int64Type);
+        let typtypes = downcast_string_arg!(args[1], "typtype", i32);
+        // TODO: See pg_attribute.atttypmod
+        let typtypmods = downcast_primitive_arg!(args[2], "typtypmod", Int64Type);
+
+        let result = izip!(atttypmods, typtypes, typtypmods)
+            .map(|(atttypmod, typtype, typtypmod)| match typtype {
+                Some("d") => typtypmod,
+                _ => atttypmod,
+            })
+            .collect::<PrimitiveArray<Int64Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "information_schema._pg_truetypmod",
+        vec![DataType::Int64, DataType::Utf8, DataType::Int64],
+        // TODO: See pg_attribute.atttypmod
         Arc::new(DataType::Int64),
         Volatility::Immutable,
         fun,
@@ -1605,6 +1752,192 @@ pub fn create_unnest_udtf() -> TableUDF {
     TableUDF::new(
         "unnest",
         &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+macro_rules! impl_array_list_fn_iter {
+    ($INPUT:expr, $INPUT_DT:ty, $FN:ident) => {{
+        let mut builder = PrimitiveBuilder::<$INPUT_DT>::new($INPUT.len());
+
+        for i in 0..$INPUT.len() {
+            let current_row = $INPUT.value(i);
+
+            if $INPUT.is_null(i) {
+                builder.append_null()?;
+            } else {
+                let arr = current_row
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<$INPUT_DT>>()
+                    .unwrap();
+                if let Some(Some(v)) = arr.into_iter().$FN() {
+                    builder.append_value(v)?;
+                } else {
+                    builder.append_null()?;
+                }
+            }
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    }};
+}
+
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_lower_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() >= 1);
+
+        let input_arr_list_dt = match args[0].data_type() {
+            DataType::List(field) => match field.data_type() {
+                dt if is_numeric(dt) => field.data_type(),
+                other => {
+                    return Err(DataFusionError::Execution(format!(
+                        "anyarray argument must be a List of numeric values, actual: List<{}>",
+                        other
+                    )));
+                }
+            },
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "anyarray argument must be a List of numeric values, actual: {}",
+                    other
+                )));
+            }
+        };
+
+        let input_arr = downcast_list_arg!(args[0], "anyarray");
+        if args.len() == 2 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "bound argument is not supported right now"
+            )));
+        };
+
+        match input_arr_list_dt {
+            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, min),
+            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, min),
+            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, min),
+            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, min),
+            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, min),
+            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, min),
+            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, min),
+            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, min),
+            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
+            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, min),
+            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, min),
+            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, min),
+            dt => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unable to extract lower element from the List of {}",
+                    dt
+                )))
+            }
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        assert!(args.len() >= 1);
+
+        match &args[0] {
+            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
+            other => Err(DataFusionError::Execution(format!(
+                "anyarray argument must be a List of numeric values, actual: {}",
+                other
+            ))),
+        }
+    });
+
+    ScalarUDF::new(
+        "array_lower",
+        &Signature::one_of(
+            vec![
+                // array anyarray
+                TypeSignature::Any(1),
+                // array anyarray, bound integer
+                TypeSignature::Any(2),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_upper_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() >= 1);
+
+        let input_arr_list_dt = match args[0].data_type() {
+            DataType::List(field) => match field.data_type() {
+                dt if is_numeric(dt) => field.data_type(),
+                other => {
+                    return Err(DataFusionError::Execution(format!(
+                        "anyarray argument must be a List of numeric values, actual: List<{}>",
+                        other
+                    )));
+                }
+            },
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "anyarray argument must be a List of numeric values, actual: {}",
+                    other
+                )));
+            }
+        };
+
+        let input_arr = downcast_list_arg!(args[0], "anyarray");
+        if args.len() == 2 {
+            return Err(DataFusionError::NotImplemented(format!(
+                "bound argument is not supported right now"
+            )));
+        };
+
+        match input_arr_list_dt {
+            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, max),
+            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, max),
+            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, max),
+            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, max),
+            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, max),
+            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, max),
+            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, max),
+            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, max),
+            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
+            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, max),
+            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, max),
+            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, max),
+            dt => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unable to extract lower element from the List of {}",
+                    dt
+                )))
+            }
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        assert!(args.len() >= 1);
+
+        match &args[0] {
+            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
+            other => Err(DataFusionError::Execution(format!(
+                "anyarray argument must be a List of numeric values, actual: {}",
+                other
+            ))),
+        }
+    });
+
+    ScalarUDF::new(
+        "array_upper",
+        &Signature::one_of(
+            vec![
+                // array anyarray
+                TypeSignature::Any(1),
+                // array anyarray, bound integer
+                TypeSignature::Any(2),
+            ],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )

@@ -3,7 +3,7 @@ import { useCubeQuery } from '@cubejs-client/react';
 
 import Line from './Line';
 
-export default () => {
+const SingleQuery = () => {
   const [data, setData] = useState([]);
 
   const { resultSet: result } = useCubeQuery({
@@ -35,3 +35,5 @@ export default () => {
 
   return <Line data={data} title={'the single query'} />;
 };
+
+export default SingleQuery;

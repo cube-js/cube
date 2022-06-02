@@ -2,7 +2,6 @@ import React from "react";
 import { Layout, Menu } from "antd";
 import { Link } from "react-router-dom";
 import styled from 'styled-components';
-import logo from './logo.svg';
 
 const StyledHeader = styled(Layout.Header)`
   padding: 0 28px
@@ -11,6 +10,7 @@ const StyledHeader = styled(Layout.Header)`
 const StyledMenu = styled(Menu)`
   background: transparent;
   line-height: 41px;
+  border: none;
 `
 
 const MenuItemStyled = styled(Menu.Item)`
@@ -43,34 +43,8 @@ const MenuItemStyled = styled(Menu.Item)`
   }
 `
 
-const Logo = styled.div`
-  float: left;
-  margin-right 40px;
-`
-
-const Button = styled.a`
-  && {
-    background: rgba(237, 237, 255, 0.2);
-    border-radius: 4px;
-    padding: 8px 10px;
-    opacity: 1 !important;
-    line-height: 16px;
-    min-width: 71px;
-    text-align: center;
-    margin-top: 5px;
-    font-size: 13px;
-
-    &:hover {
-      background: rgba(243, 243, 251, 0.15);
-    }
-  }
-`
-
 const Header = ({ location }) => (
   <StyledHeader >
-    <Logo>
-      <img src={logo} alt='logo' />
-    </Logo>
     <StyledMenu
       mode="horizontal"
       selectedKeys={[location.pathname]}
@@ -80,15 +54,6 @@ const Header = ({ location }) => (
       </MenuItemStyled>
       <MenuItemStyled key="/">
         <Link to="/">Dashboard</Link>
-      </MenuItemStyled>
-      <MenuItemStyled style={{ float: "right", paddingRight: 0, paddingLeft: 8 }} key="sign-out">
-        <Button href="https://slack.cube.dev">Slack</Button>
-      </MenuItemStyled>
-      <MenuItemStyled style={{ float: "right", paddingRight: 0, paddingLeft: 8 }} key="sign-out">
-        <Button href="https://github.com/cube-js/cube.js/tree/master/examples/react-dashboard">GitHub</Button>
-      </MenuItemStyled>
-      <MenuItemStyled style={{ float: "right", paddingRight: 0, paddingLeft: 8 }} key="sign-out">
-        <Button href="https://cube.dev/docs">Docs</Button>
       </MenuItemStyled>
     </StyledMenu>
   </StyledHeader>

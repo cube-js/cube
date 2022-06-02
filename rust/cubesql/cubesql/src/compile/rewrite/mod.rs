@@ -133,6 +133,11 @@ crate::plan_to_language! {
             op: Operator,
             right: Box<Expr>,
         },
+        AnyExpr {
+            left: Box<Expr>,
+            op: Operator,
+            right: Box<Expr>,
+        },
         NotExpr { expr: Box<Expr>, },
         IsNotNullExpr { expr: Box<Expr>, },
         IsNullExpr { expr: Box<Expr>, },
@@ -264,6 +269,9 @@ crate::plan_to_language! {
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
         },
+        SaveDateRangeReplacer {
+            members: Vec<LogicalPlan>,
+        },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
@@ -273,6 +281,7 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
             table_name: Option<String>,
+            target_table_name: Option<String>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -586,6 +595,29 @@ fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
 
+fn case_expr_var_arg(
+    expr: impl Display,
+    when_then: impl Display,
+    else_expr: impl Display,
+) -> String {
+    format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
+}
+
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+    case_expr_var_arg(
+        "CaseExprExpr",
+        list_expr(
+            "CaseExprWhenThenExpr",
+            when_then
+                .into_iter()
+                .map(|(when, then)| vec![when, then])
+                .flatten()
+                .collect(),
+        ),
+        list_expr("CaseExprElseExpr", vec![else_expr]),
+    )
+}
+
 fn literal_string(literal_str: impl Display) -> String {
     format!("(LiteralExpr LiteralExprValue:{})", literal_str)
 }
@@ -605,9 +637,13 @@ fn filter(expr: impl Display, input: impl Display) -> String {
 fn column_alias_replacer(
     members: impl Display,
     aliases: impl Display,
-    cube: impl Display,
+    table_name: impl Display,
+    target_table_name: impl Display,
 ) -> String {
-    format!("(ColumnAliasReplacer {} {} {})", members, aliases, cube)
+    format!(
+        "(ColumnAliasReplacer {} {} {} {})",
+        members, aliases, table_name, target_table_name
+    )
 }
 
 fn member_replacer(members: impl Display, aliases: impl Display) -> String {
@@ -631,6 +667,10 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn save_date_range_replacer(members: impl Display) -> String {
+    format!("(SaveDateRangeReplacer {})", members)
 }
 
 fn filter_cast_unwrap_replacer(members: impl Display) -> String {
@@ -747,11 +787,10 @@ pub fn original_expr_name(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
 ) -> Option<String> {
-    egraph[id]
-        .data
-        .original_expr
-        .as_ref()
-        .map(|e| e.name(&DFSchema::empty()).unwrap())
+    egraph[id].data.original_expr.as_ref().map(|e| match e {
+        Expr::Column(c) => c.name.to_string(),
+        _ => e.name(&DFSchema::empty()).unwrap(),
+    })
 }
 
 pub struct ChainSearcher {

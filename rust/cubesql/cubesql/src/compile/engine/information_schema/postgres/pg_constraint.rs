@@ -2,12 +2,11 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::arrow::array::Int16Builder;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int32Builder, ListBuilder, StringBuilder,
-            UInt32Builder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, ListBuilder,
+            StringBuilder, UInt32Builder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,

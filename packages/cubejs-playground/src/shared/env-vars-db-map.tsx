@@ -2,6 +2,7 @@ import logoPostgres from '../img/db/postgres.svg';
 import logoMysql from '../img/db/mysql.svg';
 import logoAthena from '../img/db/athena.svg';
 import logoClickhouse from '../img/db/clickhouse.svg';
+import logoFirebolt from '../img/db/firebolt.svg';
 import logoHive from '../img/db/hive.svg';
 import logoRedshift from '../img/db/redshift.svg';
 import logoPresto from '../img/db/presto.svg';
@@ -93,6 +94,14 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       { env: 'CUBEJS_DB_BQ_PROJECT_ID', title: 'Project ID' },
       { env: 'CUBEJS_DB_BQ_CREDENTIALS', title: 'Encoded Key File' },
     ],
+  },
+  {
+    databases: [{ title: 'Firebolt', driver: 'firebolt', logo: logoFirebolt }],
+    settings: [
+      ...BASE_CRED,
+      DB_NAME,
+      { env: 'CUBEJS_FIREBOLT_ENGINE_ENDPOINT', title: 'Engine Endpoint' },
+    ]
   },
   {
     databases: [{ title: 'MongoDB', driver: 'mongobi', logo: logoMongodb }],

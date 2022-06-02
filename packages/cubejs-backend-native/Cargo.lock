@@ -79,7 +79,7 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 [[package]]
 name = "arrow"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=01aa59d11110fd33b389cab0bf679b99db9e10e2#01aa59d11110fd33b389cab0bf679b99db9e10e2"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=f541e13c7b847b3fb6935602182e08b41ba3d9db#f541e13c7b847b3fb6935602182e08b41ba3d9db"
 dependencies = [
  "bitflags",
  "chrono",
@@ -510,8 +510,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cube-ext"
+version = "1.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
+dependencies = [
+ "arrow",
+ "datafusion-common",
+ "datafusion-expr",
+]
+
+[[package]]
 name = "cubeclient"
-version = "0.28.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -558,6 +568,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "comfy-table 4.1.1",
+ "csv",
  "cubeclient",
  "datafusion",
  "egg",
@@ -589,7 +600,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=5ee92140f026524639ed3675942af62b45dc2913#5ee92140f026524639ed3675942af62b45dc2913"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
 dependencies = [
  "ahash",
  "arrow",
@@ -621,7 +632,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=5ee92140f026524639ed3675942af62b45dc2913#5ee92140f026524639ed3675942af62b45dc2913"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -632,7 +643,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=5ee92140f026524639ed3675942af62b45dc2913#5ee92140f026524639ed3675942af62b45dc2913"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
 dependencies = [
  "async-trait",
  "chrono",
@@ -645,7 +656,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=5ee92140f026524639ed3675942af62b45dc2913#5ee92140f026524639ed3675942af62b45dc2913"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
 dependencies = [
  "ahash",
  "arrow",
@@ -656,13 +667,14 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=5ee92140f026524639ed3675942af62b45dc2913#5ee92140f026524639ed3675942af62b45dc2913"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=122a3c614ca4f763ff6e03045c1fd8a325b1ac32#122a3c614ca4f763ff6e03045c1fd8a325b1ac32"
 dependencies = [
  "ahash",
  "arrow",
  "blake2",
  "blake3",
  "chrono",
+ "cube-ext",
  "datafusion-common",
  "datafusion-expr",
  "hashbrown 0.12.0",
@@ -1851,7 +1863,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=01aa59d11110fd33b389cab0bf679b99db9e10e2#01aa59d11110fd33b389cab0bf679b99db9e10e2"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=f541e13c7b847b3fb6935602182e08b41ba3d9db#f541e13c7b847b3fb6935602182e08b41ba3d9db"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2586,7 +2598,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.16.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=81217ce0dccc446d3d2f42582717b9e8fe960113#81217ce0dccc446d3d2f42582717b9e8fe960113"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=a4628ce6fcd5f8e536bf62090a2b7e49f88e84ce#a4628ce6fcd5f8e536bf62090a2b7e49f88e84ce"
 dependencies = [
  "log",
 ]
@@ -2911,9 +2923,9 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.32"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1bdf54a7c28a2bbf701e1d2233f6c77f473486b94bee4f9678da5a148dca7f"
+checksum = "5d0ecdcb44a79f0fe9844f0c4f33a342cbcbb5117de8001e6ba0dc2351327d09"
 dependencies = [
  "cfg-if 1.0.0",
  "pin-project-lite",

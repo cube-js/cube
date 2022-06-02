@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8091
+expression: "execute_query(\"SELECT n.nspname = ANY(current_schemas(true)), n.nspname, t.typname\n                FROM pg_catalog.pg_type t\n                JOIN pg_catalog.pg_namespace n\n                ON t.typnamespace = n.oid WHERE t.oid = 25;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------------------------------+------------+---------+
+| n.nspname = ANY(current_schemas(Boolean(true))) | nspname    | typname |
++-------------------------------------------------+------------+---------+
+| true                                            | pg_catalog | text    |
++-------------------------------------------------+------------+---------+

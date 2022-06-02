@@ -35,6 +35,9 @@
       "path": "packages/cubejs-druid-driver"
     },
     {
+      "path": "packages/cubejs-firebolt-driver"
+    },
+    {
       "path": "packages/cubejs-mysql-driver"
     },
     {

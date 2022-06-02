@@ -2187,6 +2187,10 @@ class BaseQuery {
     );
   }
 
+  preAggregationReadOnly(cube, preAggregation) {
+    return false;
+  }
+
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {

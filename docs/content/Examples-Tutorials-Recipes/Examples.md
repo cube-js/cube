@@ -7,9 +7,9 @@ redirect_from:
 ---
 
 <InfoBox>
-  <b>Building Data Applications with Cube</b> workshop on May 18, 2022.<br/>
-  Learn all about building a modern data app with Cube.<br />
-  <a href="https://us02web.zoom.us/webinar/register/WN_DUeCHp5fRESAXsV_A1C_eg">Register for the workshop now</a> or see the agenda at the <a href="https://cube.dev/events/building-data-app/">event page</a>. 👈
+  <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
+  You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
+  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
 </InfoBox>
 
 Below you can find tutorials to help you get started with Cube.js.

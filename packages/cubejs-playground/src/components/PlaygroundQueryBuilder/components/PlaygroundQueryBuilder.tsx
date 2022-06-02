@@ -4,6 +4,7 @@ import {
   PivotConfig,
   PreAggregationType,
   Query,
+  validateQuery,
   TransformedQuery,
 } from '@cubejs-client/core';
 import {
@@ -149,7 +150,7 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useDeepEffect(() => {
-    if (!areQueriesEqual(query1, query2)) {
+    if (!areQueriesEqual(validateQuery(query1), validateQuery(query2))) {
       onChange();
     }
   }, [query1, query2]);
@@ -532,8 +533,8 @@ export function PlaygroundQueryBuilder({
                         <ChartRenderer
                           queryId={queryId}
                           areQueriesEqual={areQueriesEqual(
-                            query,
-                            queryRef.current
+                            validateQuery(query),
+                            validateQuery(queryRef.current)
                           )}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
@@ -552,7 +553,7 @@ export function PlaygroundQueryBuilder({
                               await refreshToken();
 
                               handleRunButtonClick({
-                                query,
+                                query: validateQuery(query),
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });

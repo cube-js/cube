@@ -10,7 +10,6 @@ use crate::{
         MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
         SqlAuthService,
     },
-    telemetry::{start_track_event_loop, stop_track_event_loop},
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -79,11 +78,6 @@ impl CubeServices {
             }));
         }
 
-        futures.push(tokio::spawn(async move {
-            start_track_event_loop().await;
-            Ok(())
-        }));
-
         Ok(futures)
     }
 
@@ -104,7 +98,6 @@ impl CubeServices {
                 .await?;
         }
 
-        stop_track_event_loop().await;
         Ok(())
     }
 }
@@ -283,6 +276,7 @@ impl Config {
 
     pub async fn configure(&self) -> CubeServices {
         self.configure_injector().await;
+
         self.cube_services().await
     }
 }

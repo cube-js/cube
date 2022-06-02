@@ -167,6 +167,7 @@ export class RefreshScheduler {
           this.refreshPreAggregations(context, compilerApi, queryingOptions)
         ]);
       }
+      await this.forceReconcile(context, compilerApi);
       return {
         finished: true
       };
@@ -184,6 +185,25 @@ export class RefreshScheduler {
       }
     }
     return { finished: false };
+  }
+
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  protected async forceReconcile(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+  ) {
+    const compilers = await compilerApi.getCompilers();
+    const { cubeEvaluator } = compilers;
+    const processed = [];
+    await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
+      const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
+      if (processed.indexOf(ds) === -1) {
+        processed.push(ds);
+        await this.serverCore.getOrchestratorApi(context).forceReconcile(ds);
+      }
+    }));
   }
 
   protected async refreshCubesRefreshKey(
@@ -224,7 +244,7 @@ export class RefreshScheduler {
           renewQuery: true,
           requestId: context.requestId,
           scheduledRefresh: true,
-          loadRefreshKeysOnly: true
+          loadRefreshKeysOnly: true,
         });
       }));
     }));

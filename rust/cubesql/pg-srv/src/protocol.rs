@@ -253,6 +253,7 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Plain(String),
@@ -343,6 +344,9 @@ impl RowDescription {
     pub fn new(fields: Vec<RowDescriptionField>) -> Self {
         Self { fields }
     }
+    pub fn len(&self) -> usize {
+        self.fields.len()
+    }
 }
 
 impl Serialize for RowDescription {
@@ -361,7 +365,7 @@ impl Serialize for RowDescription {
             buffer.extend_from_slice(&field.data_type_oid.to_be_bytes());
             buffer.extend_from_slice(&field.data_type_size.to_be_bytes());
             buffer.extend_from_slice(&field.type_modifier.to_be_bytes());
-            buffer.extend_from_slice(&0_i16.to_be_bytes());
+            buffer.extend_from_slice(&(field.format as i16).to_be_bytes());
         }
 
         Some(buffer)
@@ -377,10 +381,11 @@ pub struct RowDescriptionField {
     data_type_oid: i32,
     data_type_size: i16,
     type_modifier: i32,
+    format: Format,
 }
 
 impl RowDescriptionField {
-    pub fn new(name: String, typ: &PgType) -> Self {
+    pub fn new(name: String, typ: &PgType, format: Format) -> Self {
         Self {
             name,
             table_oid: 0,
@@ -388,6 +393,24 @@ impl RowDescriptionField {
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
+            format: if format == Format::Binary {
+                // TODO: Introduce new function for PgType that checks for binary support
+                if typ.oid == PgTypeId::INT4 as u32
+                    || typ.oid == PgTypeId::INT2 as u32
+                    || typ.oid == PgTypeId::INT8 as u32
+                    || typ.oid == PgTypeId::BOOL as u32
+                    || typ.oid == PgTypeId::FLOAT4 as u32
+                    || typ.oid == PgTypeId::FLOAT8 as u32
+                    || typ.oid == PgTypeId::TIMESTAMP as u32
+                    || typ.oid == PgTypeId::TIMESTAMPTZ as u32
+                {
+                    Format::Binary
+                } else {
+                    Format::Text
+                }
+            } else {
+                Format::Text
+            },
         }
     }
 }
@@ -671,6 +694,8 @@ pub enum FrontendMessage {
     Describe(Describe),
     Execute(Execute),
     Close(Close),
+    /// Flush network buffer
+    Flush,
     /// Close connection
     Terminate,
     /// Finish
@@ -694,6 +719,12 @@ pub enum ErrorCode {
     InvalidSqlStatement,
     // 34
     InvalidCursorName,
+    // Class 42 — Syntax Error or Access Rule Violation
+    DuplicateCursor,
+    // Class 53 — Insufficient Resources
+    ConfigurationLimitExceeded,
+    // Class 55 — Object Not In Prerequisite State
+    ObjectNotInPrerequisiteState,
     // XX - Internal Error
     InternalError,
 }
@@ -708,6 +739,9 @@ impl Display for ErrorCode {
             Self::DataException => "22000",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::DuplicateCursor => "42P03",
+            Self::ConfigurationLimitExceeded => "53400",
+            Self::ObjectNotInPrerequisiteState => "55000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -848,10 +882,10 @@ mod tests {
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
             0a 20 20 20 20 20 20 53 45 4c 45 43 54 20 6e 75   .      SELECT nu
-            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.   
+            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.
             20 20 20 46 52 4f 4d 20 74 65 73 74 64 61 74 61      FROM testdata
             0a 20 20 20 20 20 20 57 48 45 52 45 20 6e 75 6d   .      WHERE num
-            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str = 
+            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str =
             24 32 20 41 4e 44 20 62 6f 6f 6c 20 3d 20 24 33   $2 AND bool = $3
             0a 20 20 20 20 00 00 00                           .    ...
             "#
@@ -883,7 +917,7 @@ mod tests {
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
             00 00 00 00 03 00 00 00 01 35 00 00 00 04 74 65   .........5....te
-            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....            
+            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....
             "#
             .to_string(),
         );
@@ -948,7 +982,7 @@ mod tests {
     async fn test_frontend_message_parse_describe() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            44 00 00 00 08 53 73 30 00                        D....Ss0.          
+            44 00 00 00 08 53 73 30 00                        D....Ss0.
             "#
             .to_string(),
         );
@@ -1001,7 +1035,7 @@ mod tests {
     async fn test_frontend_message_execute() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            45 00 00 00 09 00 00 00 00 00                     E.........      
+            45 00 00 00 09 00 00 00 00 00                     E.........
             "#
             .to_string(),
         );
@@ -1058,9 +1092,21 @@ mod tests {
     async fn test_frontend_message_write_row_description() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
         let desc = RowDescription::new(vec![
-            RowDescriptionField::new("num".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
-            RowDescriptionField::new("str".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
-            RowDescriptionField::new("bool".to_string(), PgType::get_by_tid(PgTypeId::INT8)),
+            RowDescriptionField::new(
+                "num".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
+            RowDescriptionField::new(
+                "str".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
+            RowDescriptionField::new(
+                "bool".to_string(),
+                PgType::get_by_tid(PgTypeId::INT8),
+                Format::Text,
+            ),
         ]);
         buffer::write_message(&mut cursor, desc).await?;
 

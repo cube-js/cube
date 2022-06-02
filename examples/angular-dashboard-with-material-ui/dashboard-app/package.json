@@ -4,12 +4,12 @@
   "scripts": {
     "ng": "ng",
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true ng serve",
-    "build": "SKIP_PREFLIGHT_CHECK=true ng build --prod",
+    "build": "cross-env SKIP_PREFLIGHT_CHECK=true ng build --prod",
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist/dashboard-app",
-    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir dist/dashboard-app"
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy",
+    "deploy": "npm run preview -- --prod"
   },
   "private": true,
   "dependencies": {
@@ -44,7 +44,7 @@
     "cross-env": "^7.0.2",
     "jasmine-core": "~3.6.0",
     "jasmine-spec-reporter": "~5.0.0",
-    "karma": "~5.0.0",
+    "karma": "~6.3.16",
     "karma-chrome-launcher": "~3.1.0",
     "karma-coverage-istanbul-reporter": "~3.0.2",
     "karma-jasmine": "~4.0.0",

@@ -127,15 +127,16 @@ databases [in this guide][link-connecting-to-db].
 
 ## Export Bucket
 
-| Environment variable                 | Description                                                                                  | Possible Values                                                  |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `CUBEJS_DB_EXPORT_BUCKET`            | The name of a bucket in cloud storage                                                        | `exports-20210505`                                               |
-| `CUBEJS_DB_EXPORT_BUCKET_TYPE`       | The cloud provider where the bucket is hosted                                                | `gcp`, `s3`                                                      |
-| `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`    | The AWS Access Key ID to use for the export bucket                                           | A valid AWS Access Key ID                                        |
-| `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET` | The AWS Secret Access Key to use for the export bucket                                       | A valid AWS Secret Access Key                                    |
-| `CUBEJS_DB_EXPORT_BUCKET_AWS_REGION` | The AWS region of the export bucket                                                          | [A valid AWS region][link-aws-regions]                           |
-| `CUBEJS_DB_EXPORT_GCS_CREDENTIALS`   | A Base64 encoded JSON key file for connecting to Google Cloud                                | A valid Google Cloud JSON key file encoded as a Base64 string    |
-| `CUBEJS_DB_EXPORT_INTEGRATION`       | The name of the integration used in the database. Only required when using Snowflake and GCS | A valid string matching the name of the integration in Snowflake |
+| Environment variable                   | Description                                                                                  | Possible Values                                                  |
+|----------------------------------------|----------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| `CUBEJS_DB_EXPORT_BUCKET`              | The name of a bucket in cloud storage                                                        | `exports-20210505`                                               |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE`         | The cloud provider where the bucket is hosted                                                | `gcp`, `s3`                                                      |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`      | The AWS Access Key ID to use for the export bucket                                           | A valid AWS Access Key ID                                        |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET`   | The AWS Secret Access Key to use for the export bucket                                       | A valid AWS Secret Access Key                                    |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_REGION`   | The AWS region of the export bucket                                                          | [A valid AWS region][link-aws-regions]                           |
+| `CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN` | ARN of iam_role with permission to write to the provided `bucket`                            | A valid ARN to an IAM Role associated to the target Redshift DB  |
+| `CUBEJS_DB_EXPORT_GCS_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google Cloud                                | A valid Google Cloud JSON key file encoded as a Base64 string    |
+| `CUBEJS_DB_EXPORT_INTEGRATION`         | The name of the integration used in the database. Only required when using Snowflake and GCS | A valid string matching the name of the integration in Snowflake |
 
 ## Cube Store
 
@@ -176,6 +177,7 @@ databases [in this guide][link-connecting-to-db].
 | `CUBESTORE_MINIO_ACCESS_KEY_ID`            | The Access Key ID for minIO. Required when using minIO                                                                                  | A valid minIO Access Key ID                                                             |
 | `CUBESTORE_MINIO_SECRET_ACCESS_KEY`        | The Secret Access Key for minIO. Required when using minIO                                                                              | A valid minIO Secret Access Key                                                         |     |
 | `CUBESTORE_MINIO_BUCKET`                   | The name of the bucket that you want to use minIO. Required when using minIO                                                            | A valid bucket name in the AWS account                                                  |
+| `CUBESTORE_MINIO_REGION`                   | The region of a bucket in S3 that you want to use minIO. Optional when using minIO                                                      | A valid S3 region name, an empty string if not present                                  |
 | `CUBESTORE_MINIO_SERVER_ENDPOINT`          | The minIO server endpoint. Required when using minIO                                                                                    | A valid minIO endpoint e.g. `http://localhost:9000`                                     |
 | `CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS` | The number of minutes after which Cube Store should refresh minIO credentials. Default is `180`                                         | A valid number in minutes                                                               |
 

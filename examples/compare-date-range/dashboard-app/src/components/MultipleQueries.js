@@ -4,7 +4,7 @@ import * as moment from 'moment';
 
 import Line from './Line';
 
-export default () => {
+const MultipleQueries = () => {
   const [data, setData] = useState([]);
 
   const { resultSet: result22 } = useCubeQuery({
@@ -63,3 +63,5 @@ export default () => {
 
   return <Line data={data} title={'multiple queries'} />;
 };
+
+export default MultipleQueries;

@@ -178,6 +178,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
   buildRangeEnd: {
     sql: Joi.func().required()
   },
+  readOnly: Joi.boolean().strict(),
   lambdaView: Joi.boolean().strict(),
 };
 
@@ -199,11 +200,13 @@ const OriginalSqlSchema = condition(
       type: Joi.any().valid('originalSql').required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimensionReference: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
@@ -239,6 +242,7 @@ const RollUpJoinSchema = condition(
       type: Joi.any().valid('rollupJoin').required(),
       scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
+      allowNonStrictDateRangeMatch: Joi.bool(),
       timeDimensionReference: Joi.func().required(),
       rollupReferences: Joi.func().required(),
       measureReferences: Joi.func(),
@@ -251,6 +255,7 @@ const RollUpJoinSchema = condition(
       scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
       rollups: Joi.func().required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
@@ -291,6 +296,7 @@ const RollUpSchema = condition(
       type: Joi.any().valid('rollup').required(),
       timeDimensionReference: Joi.func().required(),
       granularity: GranularitySchema,
+      allowNonStrictDateRangeMatch: Joi.bool(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
@@ -299,6 +305,7 @@ const RollUpSchema = condition(
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
       granularity: GranularitySchema,
       measures: Joi.func(),
       dimensions: Joi.func(),

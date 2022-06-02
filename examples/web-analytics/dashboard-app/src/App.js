@@ -9,19 +9,19 @@ import { ApolloProvider } from '@apollo/react-hooks';
 import MomentUtils from '@date-io/moment';
 
 import client from "./graphql/client";
-import Header from "./components/Header";
 import SidePanel from "./components/SidePanel";
 
 const API_URL = process.env.NODE_ENV === 'production' ? 'https://salmon-fox.gcp-us-central1.cubecloudapp.dev' : "http://localhost:4000";
 const CUBEJS_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1ODE0NzY4MjZ9.31_4J0M0oqqkwtur2_gaX7fhL6vOOLjKk_HvFEZjeq0";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTMzOTYyMDd9.VY_vW2zZ_2NC295CBMeNJtl8zMI5CkXNiKfwp8WImf8";
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`
 });
 
 const useStyles = makeStyles(theme => ({
   root: {
-    display: 'flex'
+    display: 'flex',
+    backgroundColor: theme.palette.grey[50]
   },
   content: {
     flexGrow: 1,
@@ -35,10 +35,8 @@ const AppLayout = ({ children }) => {
 
   return (
     <div className={classes.root}>
-      <Header />
       <SidePanel />
       <div className={classes.content}>
-        <div className={classes.toolbar} />
         {children}
       </div>
     </div>

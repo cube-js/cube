@@ -4,7 +4,18 @@ const util = require('util');
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
-native.setLogLevel('trace');
+let logger = jest.fn(({ event }) => {
+  if (!event.error.includes('load - strange response, success which contains error')) {
+      expect(event.apiType).toEqual('sql');
+      expect(event.protocol).toEqual('mysql');
+  }
+  console.log(event);
+});
+
+native.setupLogger(
+  logger,
+  'trace',
+);
 
 describe('SQLInteface', () => {
   jest.setTimeout(10 * 1000);
@@ -74,7 +85,8 @@ describe('SQLInteface', () => {
         expect(checkAuth.mock.calls.length).toEqual(1);
         expect(checkAuth.mock.calls[0][0]).toEqual({
           request: {
-            id: expect.any(String)
+            id: expect.any(String),
+            meta: null,
           },
           user: user || null,
         });
@@ -124,7 +136,8 @@ describe('SQLInteface', () => {
       expect(checkAuth.mock.calls.length).toEqual(1);
       expect(checkAuth.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
         user: 'allowed_user',
       });
@@ -132,7 +145,8 @@ describe('SQLInteface', () => {
       expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
         user: 'allowed_user',
       });
@@ -148,6 +162,11 @@ describe('SQLInteface', () => {
         }
       }
 
+      // Increment it in case you throw Error
+      setTimeout(_ => {
+        expect(logger.mock.calls.length).toEqual(3);
+      },1000);
+      
       connection.destroy();
     } finally {
       await native.shutdownInterface(instance)
