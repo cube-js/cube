@@ -2592,55 +2592,71 @@ async fn partitioned_index(service: Box<dyn SqlClient>) {
 }
 
 async fn partitioned_index_join(service: Box<dyn SqlClient>) {
+    let f11 = write_tmp_file(indoc! {"
+        0,a,10
+        2,c,30
+    "}).unwrap();
+    let f12 = write_tmp_file(indoc! {"
+        1,a,20
+        3,c,40
+    "}).unwrap();
+
+    let f21 = write_tmp_file(indoc! {"
+        0,a,Mars
+        1,c,Earth
+    "}).unwrap();
+    let f22 = write_tmp_file(indoc! {"
+        2,c,Moon
+        3,d,Venus
+    "}).unwrap();
+
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE PARTITIONED INDEX s.ind(id int, url text)")
         .await
         .unwrap();
     service
-        .exec_query(r#"
-            CREATE TABLE s.Data1(id int, url text, hits int)
-            -- ADD TO PARTITIONED INDEX s.ind(id, url)
-        "#)
+        .exec_query(&format!(
+            r#"
+                CREATE TABLE s.Data1(id int, url text, hits int)
+                WITH (input_format = 'csv_no_header') LOCATION '{}', '{}'
+                ADD TO PARTITIONED INDEX s.ind(id, url)
+            "#,
+            f11.path().to_string_lossy(),
+            f12.path().to_string_lossy(),
+        ))
         .await
         .unwrap();
     service
-        .exec_query(r#"
-            CREATE TABLE s.Data2(id2 int, url2 text, location text)
-            -- ADD TO PARTITIONED INDEX s.ind(id2, url2)
-        "#)
-        .await
-        .unwrap();
-
-    service
-        .exec_query(r#"
-            INSERT INTO s.Data1(id, url, hits)
-            VALUES (0, 'a', 10), (1, 'a', 20), (2, 'c', 30)
-        "#)
-        .await
-        .unwrap();
-    service
-        .exec_query(r#"
-            INSERT INTO s.Data2(id2, url2, location)
-            VALUES (0, 'a', 'Mars'), (1, 'c', 'Earth'), (2, 'c', 'Moon')
-        "#)
+        .exec_query(&format!(
+            r#"
+                CREATE TABLE s.Data2(id2 int, url2 text, location text)
+                WITH (input_format = 'csv_no_header') LOCATION '{}', '{}'
+                ADD TO PARTITIONED INDEX s.ind(id2, url2)
+            "#,
+            f21.path().to_string_lossy(),
+            f22.path().to_string_lossy(),
+        ))
         .await
         .unwrap();
 
     let r = service
         .exec_query(r#"
             SELECT id, url, hits, location
-            FROM s.Data1 `l` JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2
+            FROM s.Data1 `l`
+            LEFT JOIN s.Data2 `r` ON l.id = r.id2 AND l.url = r.url2
             ORDER BY 1, 2
         "#)
         .await
         .unwrap();
     assert_eq!(
         to_rows(&r),
-        rows(&[
-            (0, "a", 10, "Mars"),
-            (2, "c", 30, "Moon")
-        ])
+        vec![
+            vec![TableValue::Int(0), TableValue::String("a".to_string()), TableValue::Int(10), TableValue::String("Mars".to_string())],
+            vec![TableValue::Int(1), TableValue::String("a".to_string()), TableValue::Int(20), TableValue::Null],
+            vec![TableValue::Int(2), TableValue::String("c".to_string()), TableValue::Int(30), TableValue::String("Moon".to_string())],
+            vec![TableValue::Int(3), TableValue::String("c".to_string()), TableValue::Int(40), TableValue::Null],
+        ]
     );
 }
 

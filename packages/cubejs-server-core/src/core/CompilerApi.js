@@ -126,6 +126,8 @@ export class CompilerApi {
       canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
     }));
 
+    this.sqlCache = false;
+
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
