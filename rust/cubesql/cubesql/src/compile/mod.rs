@@ -6821,6 +6821,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgmatviews_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgmatviews_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_matviews".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "constraint_column_usage_postgres",
@@ -8350,6 +8364,35 @@ ORDER BY \"COUNT(count)\" DESC"
                     table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and
                     table_schema NOT IN ('pg_catalog', 'information_schema') and
                     table_schema ilike '%'
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sigma_computing_pg_matviews_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_pg_matviews_query",
+            execute_query(
+                "
+                SELECT table_name FROM (
+                    select table_name
+                    from information_schema.tables
+                    where
+                        table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and
+                        table_schema = 'public'
+                    UNION
+                    select matviewname as table_name
+                    from pg_catalog.pg_matviews
+                    where schemaname = 'public'
+                ) t
+                ORDER BY table_name ASC
                 ;
                 "
                 .to_string(),
