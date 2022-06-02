@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import fs from 'fs';
 import path from 'path';
-import fetch, { Headers, Request } from 'node-fetch';
+import fetch, { Headers, Request, Response } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -62,6 +62,14 @@ const DatabricksToGenericType: Record<string, string> = {
 };
 
 const jdbcDriverResolver: Promise<string> | null = null;
+
+function databricksAPIError(response: Response): Error {
+  return new Error(`Databricks API call error: ${
+    response.status
+  } - ${
+    response.statusText
+  }: ${response.text()}`);
+}
 
 async function resolveJDBCDriver(): Promise<string> {
   if (jdbcDriverResolver) {
@@ -276,11 +284,7 @@ export class DatabricksDriver extends JDBCDriver {
     const response = await fetch(request);
 
     if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
+      throw databricksAPIError(response);
     }
 
     const body: {
@@ -321,11 +325,7 @@ export class DatabricksDriver extends JDBCDriver {
     });
     const response = await fetch(request);
     if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
+      throw databricksAPIError(response);
     }
     const body = (await response.json()) as { id: string };
     return body.id;
@@ -359,11 +359,7 @@ export class DatabricksDriver extends JDBCDriver {
     });
     const response = await fetch(request);
     if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
+      throw databricksAPIError(response);
     }
     const body = (await response.json()) as { id: string };
     return body.id;
@@ -397,11 +393,7 @@ export class DatabricksDriver extends JDBCDriver {
       fetch(request).then((response) => {
         if (!response.ok) {
           reject();
-          throw new Error(`Databricks API call error: ${
-            response.status
-          } - ${
-            response.statusText
-          }`);
+          throw databricksAPIError(response);
         }
         response.json().then((body) => {
           const b = body as {
