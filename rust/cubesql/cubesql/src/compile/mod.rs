@@ -4034,6 +4034,52 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
+    fn powerbi_contains_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select \"rows\".\"customer_gender\" as \"customer_gender\",
+\n    count(1) as \"a0\"\
+\nfrom\
+\n(\
+\n    select \"_\".\"count\",\
+\n        \"_\".\"customer_gender\"\
+\n    from \"public\".\"KibanaSampleDataEcommerce\" \"_\"\
+\n    where strpos((case\
+\n        when \"_\".\"customer_gender\" is not null\
+\n        then \"_\".\"customer_gender\"\
+\n        else ''\
+\n    end), 'fem') > 0\
+\n) \"rows\"\
+\ngroup by \"customer_gender\"\
+\nlimit 1000001"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000001),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["fem".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[test]
     fn test_select_aggregations() {
         let variants = vec![
             (
