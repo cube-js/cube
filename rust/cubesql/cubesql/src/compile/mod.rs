@@ -8332,4 +8332,27 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_ilike_query",
+            execute_query(
+                "
+                select distinct table_schema
+                from information_schema.tables
+                where
+                    table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and
+                    table_schema NOT IN ('pg_catalog', 'information_schema') and
+                    table_schema ilike '%'
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
