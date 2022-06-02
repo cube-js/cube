@@ -8220,4 +8220,43 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_metabase_table_cat_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_table_cat_query",
+            execute_query(
+                "
+                SELECT  result.table_cat,
+                        result.table_schem,
+                        result.table_name,
+                        result.column_name,
+                        result.key_seq,
+                        result.pk_name
+                    FROM (
+                        SELECT  NULL AS table_cat,
+                                n.nspname AS table_schem,
+                                ct.relname AS table_name,
+                                a.attname AS column_name,
+                                (information_schema._pg_expandarray(i.indkey)).n as key_seq,
+                                ci.relname AS pk_name,
+                                information_schema._pg_expandarray(i.indkey) AS keys,
+                                a.attnum AS a_attnum
+                            FROM   pg_catalog.pg_class ct
+                            JOIN   pg_catalog.pg_attribute a ON(ct.oid = a.attrelid)
+                            JOIN   pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
+                            JOIN   pg_catalog.pg_index i ON (a.attrelid = i.indrelid)
+                            JOIN   pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
+                        WHERE true AND ct.relname = 'actor' AND i.indisprimary) result
+                WHERE result.a_attnum = (result.keys).x
+                ORDER BY result.table_name, result.pk_name, result.key_seq;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
