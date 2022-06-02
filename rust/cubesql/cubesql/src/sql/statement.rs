@@ -695,7 +695,7 @@ impl<'ast> Visitor<'ast> for SensitiveDataSanitizer {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
             | ast::Value::NationalStringLiteral(str) => {
-                if vec!["f", "false", "t", "true"].contains(&str.as_str()) {
+                if vec!["f", "false", "t", "true"].contains(&str.as_str()) || str.len() < 4 {
                     return;
                 }
                 *str = "[REPLACED]".to_string();
