@@ -34,7 +34,7 @@ node pg-api.js
 ### Run the k6 load test for 1 virtual user.
 
 ```bash
-k6 run -e vus=1 k6-bq.js
+k6 run -e vus=1 k6-pg.js
 ```
 
 My tests returned:
@@ -88,7 +88,7 @@ p(95)=257.74ms
 ### Run the k6 load test for 10 virtual users.
 
 ```bash
-k6 run -e vus=10 k6-bq.js
+k6 run -e vus=10 k6-pg.js
 ```
 
 My tests returned:
