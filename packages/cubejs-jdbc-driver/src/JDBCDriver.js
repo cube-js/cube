@@ -134,7 +134,7 @@ export class JDBCDriver extends BaseDriver {
    * @return {Promise<*>}
    */
   testConnection() {
-    return this.query('SELECT 1', []);
+    return this.withConnection((conn) => conn);
   }
 
   /**
