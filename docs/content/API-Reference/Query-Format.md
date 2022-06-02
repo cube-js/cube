@@ -206,6 +206,36 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
+### <--{"id" : "Filters Operators"}--> startsWith
+
+The `startsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the begging. In
+the majority of SQL backends it uses `ILIKE` operator with `%` at the begging of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "startsWith",
+  values: ["ruby"]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> endsWith
+
+The `endsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the end. In
+the majority of SQL backends it uses `ILIKE` operator with `%` at the end of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "endsWith",
+  values: ["ruby"]
+}
+```
+
 ### <--{"id" : "Filters Operators"}--> gt
 
 The `gt` operator means **greater than** and is used with measures or dimensions
