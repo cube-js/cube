@@ -269,6 +269,9 @@ crate::plan_to_language! {
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
         },
+        SaveDateRangeReplacer {
+            members: Vec<LogicalPlan>,
+        },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
@@ -664,6 +667,10 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn save_date_range_replacer(members: impl Display) -> String {
+    format!("(SaveDateRangeReplacer {})", members)
 }
 
 fn filter_cast_unwrap_replacer(members: impl Display) -> String {

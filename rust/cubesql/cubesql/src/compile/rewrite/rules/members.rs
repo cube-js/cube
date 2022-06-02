@@ -10,14 +10,15 @@ use crate::{
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
             measure_expr, member_replacer, original_expr_name, projection, projection_expr,
             projection_expr_empty_tail, referenced_columns, rewrite, rewriter::RewriteRules,
-            table_scan, time_dimension_expr, transforming_chain_rewrite, transforming_rewrite,
-            udaf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            ColumnAliasReplacerAliases, ColumnAliasReplacerTableName,
-            ColumnAliasReplacerTargetTableName, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
-            CubeScanTableName, DimensionName, LimitN, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, MemberErrorPriority, ProjectionAlias,
-            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+            save_date_range_replacer, table_scan, time_dimension_expr, transforming_chain_rewrite,
+            transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AliasExprAlias, ColumnAliasReplacerAliases,
+            ColumnAliasReplacerTableName, ColumnAliasReplacerTargetTableName, ColumnExprColumn,
+            CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName, LimitN,
+            LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
+            MemberErrorPriority, ProjectionAlias, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -315,8 +316,11 @@ impl RewriteRules for MemberRules {
                 cube_scan(
                     "?source_table_name",
                     cube_scan_members(
-                        member_replacer("?group_expr", "?source_table_name"),
-                        member_replacer("?aggr_expr", "?source_table_name"),
+                        cube_scan_members(
+                            member_replacer("?group_expr", "?source_table_name"),
+                            member_replacer("?aggr_expr", "?source_table_name"),
+                        ),
+                        save_date_range_replacer("?old_members"),
                     ),
                     "?filters",
                     "?orders",
@@ -598,6 +602,67 @@ impl RewriteRules for MemberRules {
                 ),
                 cube_scan_members_empty_tail(),
             ),
+            // SaveDateRangeReplacer
+            rewrite(
+                "save-date-range-replacer-push-down",
+                save_date_range_replacer(cube_scan_members("?left", "?right")),
+                cube_scan_members(
+                    save_date_range_replacer("?left"),
+                    save_date_range_replacer("?right"),
+                ),
+            ),
+            rewrite(
+                "save-date-range-replacer-push-down-empty-tail",
+                save_date_range_replacer(cube_scan_members_empty_tail()),
+                cube_scan_members_empty_tail(),
+            ),
+            rewrite(
+                "save-date-range-replacer-push-down-measure",
+                save_date_range_replacer(measure_expr("?name", "?expr")),
+                cube_scan_members_empty_tail(),
+            ),
+            rewrite(
+                "save-date-range-replacer-push-down-dimension",
+                save_date_range_replacer(dimension_expr("?name", "?expr")),
+                cube_scan_members_empty_tail(),
+            ),
+            transforming_rewrite(
+                "save-date-range-replacer-push-down-time-dimension",
+                save_date_range_replacer(time_dimension_expr(
+                    "?name",
+                    "?granularity",
+                    "?date_range",
+                    "?expr",
+                )),
+                "?new_time_dimension".to_string(),
+                self.save_date_range("?name", "?date_range", "?expr", "?new_time_dimension"),
+            ),
+            // Empty tail merges
+            rewrite(
+                "merge-member-empty-tails",
+                cube_scan_members(
+                    cube_scan_members_empty_tail(),
+                    cube_scan_members_empty_tail(),
+                ),
+                cube_scan_members_empty_tail(),
+            ),
+            rewrite(
+                "merge-member-empty-tails-right",
+                cube_scan_members(
+                    cube_scan_members_empty_tail(),
+                    cube_scan_members("?left", "?right"),
+                ),
+                cube_scan_members("?left", "?right"),
+            ),
+            rewrite(
+                "merge-member-empty-tails-left",
+                cube_scan_members(
+                    cube_scan_members("?left", "?right"),
+                    cube_scan_members_empty_tail(),
+                ),
+                cube_scan_members("?left", "?right"),
+            ),
+            // Binary expression associative properties
             rewrite(
                 "binary-expr-addition-assoc",
                 binary_expr(binary_expr("?a", "+", "?b"), "+", "?c"),
@@ -1298,6 +1363,47 @@ impl MemberRules {
                         }
                     }
                 }
+            }
+            false
+        }
+    }
+
+    fn save_date_range(
+        &self,
+        name_var: &'static str,
+        date_range_var: &'static str,
+        expr_var: &'static str,
+        new_time_dimension_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let name_var = var!(name_var);
+        let date_range_var = var!(date_range_var);
+        let expr_var = var!(expr_var);
+        let new_time_dimension_var = var!(new_time_dimension_var);
+        move |egraph, subst| {
+            for date_range in
+                var_iter!(egraph[subst[date_range_var]], TimeDimensionDateRange).cloned()
+            {
+                if let Some(_) = date_range {
+                    let new_granularity =
+                        egraph.add(LogicalPlanLanguage::TimeDimensionGranularity(
+                            TimeDimensionGranularity(None),
+                        ));
+                    subst.insert(
+                        new_time_dimension_var,
+                        egraph.add(LogicalPlanLanguage::TimeDimension([
+                            subst[name_var],
+                            new_granularity,
+                            subst[date_range_var],
+                            subst[expr_var],
+                        ])),
+                    );
+                } else {
+                    subst.insert(
+                        new_time_dimension_var,
+                        egraph.add(LogicalPlanLanguage::CubeScanMembers(Vec::new())),
+                    );
+                }
+                return true;
             }
             false
         }
