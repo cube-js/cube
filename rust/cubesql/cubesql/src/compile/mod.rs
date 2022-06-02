@@ -7327,7 +7327,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 "
                 SELECT
                     array_lower(ARRAY[1,2,3,4,5]) v1,
-                    array_lower(ARRAY[5,4,3,2,1]) v2
+                    array_lower(ARRAY[5,4,3,2,1]) v2,
+                    array_lower(ARRAY[5,4,3,2,1], 1) v3
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -7363,7 +7364,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 "
                 SELECT
                     array_upper(ARRAY[1,2,3,4,5]) v1,
-                    array_upper(ARRAY[5,4,3,2,1]) v2
+                    array_upper(ARRAY[5,4,3]) v2,
+                    array_upper(ARRAY[5,4], 1) v3
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -7378,8 +7380,11 @@ ORDER BY \"COUNT(count)\" DESC"
                 SELECT
                     array_upper(t.v) q
                 FROM (
-                    SELECT ARRAY[1,2,3,4,5] as v UNION ALL
-                    SELECT ARRAY[5,4,3,2,1] as v
+                    SELECT ARRAY[1,2,3,4,5] as v
+                    UNION ALL
+                    SELECT ARRAY[5,4,3,2] as v
+                    UNION ALL
+                    SELECT ARRAY[5,4,3] as v
                 ) t
                 "
                 .to_string(),
