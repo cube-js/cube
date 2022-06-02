@@ -1,11 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom";
+import createExampleWrapper from "cube-example-wrapper";
 import "./index.css";
 import App from "./App";
-import { HashRouter as Router, Route } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 
-import createExampleWrapper from "cube-example-wrapper"
 const exampleDescription = {
   title: "Real-Time Dashboard",
   text: `
@@ -18,10 +17,8 @@ const exampleDescription = {
 createExampleWrapper(exampleDescription)
 
 ReactDOM.render(
-  <Router>
-    <App>
-      <Route key="index" exact path="/" component={DashboardPage} />
-    </App>
-  </Router>,
+  <App>
+    <DashboardPage/>
+  </App>,
   document.getElementById("root")
 );
