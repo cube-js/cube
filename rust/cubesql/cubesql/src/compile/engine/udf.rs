@@ -13,9 +13,8 @@ use datafusion::{
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Field, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type,
-            IntervalDayTimeType, IntervalUnit, TimeUnit, TimestampNanosecondType, UInt16Type,
-            UInt32Type, UInt64Type, UInt8Type,
+            DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
+            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -37,13 +36,15 @@ use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
-        coerce::{if_coercion, is_numeric, least_coercion},
+        coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
     sql::SessionState,
 };
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
+pub type ScalarFunctionImplementation =
+    Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync>;
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -1757,6 +1758,7 @@ pub fn create_unnest_udtf() -> TableUDF {
     )
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_array_list_fn_iter {
     ($INPUT:expr, $INPUT_DT:ty, $FN:ident) => {{
         let mut builder = PrimitiveBuilder::<$INPUT_DT>::new($INPUT.len());
@@ -1783,21 +1785,12 @@ macro_rules! impl_array_list_fn_iter {
     }};
 }
 
-/// array_lower ( anyarray, integer ) → integer
-pub fn create_array_lower_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
+    make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() >= 1);
 
-        let input_arr_list_dt = match args[0].data_type() {
-            DataType::List(field) => match field.data_type() {
-                dt if is_numeric(dt) => field.data_type(),
-                other => {
-                    return Err(DataFusionError::Execution(format!(
-                        "anyarray argument must be a List of numeric values, actual: List<{}>",
-                        other
-                    )));
-                }
-            },
+        match args[0].data_type() {
+            DataType::List(_) => {}
             other => {
                 return Err(DataFusionError::Execution(format!(
                     "anyarray argument must be a List of numeric values, actual: {}",
@@ -1807,33 +1800,58 @@ pub fn create_array_lower_udf() -> ScalarUDF {
         };
 
         let input_arr = downcast_list_arg!(args[0], "anyarray");
-        if args.len() == 2 {
-            return Err(DataFusionError::NotImplemented(format!(
-                "bound argument is not supported right now"
-            )));
+        let dims = if args.len() == 2 {
+            Some(downcast_primitive_arg!(args[1], "dim", Int64Type))
+        } else {
+            None
         };
 
-        match input_arr_list_dt {
-            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, min),
-            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, min),
-            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, min),
-            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, min),
-            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, min),
-            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, min),
-            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, min),
-            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, min),
-            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
-            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, min),
-            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, min),
-            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, min),
-            dt => {
+        let mut builder = Int64Builder::new(input_arr.len());
+
+        for (idx, element) in input_arr.iter().enumerate() {
+            let element_dim = if let Some(d) = dims {
+                if d.is_null(idx) {
+                    -1
+                } else {
+                    d.value(idx)
+                }
+            } else {
+                1
+            };
+
+            if element_dim > 1 {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unable to extract lower element from the List of {}",
-                    dt
-                )))
+                    "argument dim > 1 is not supported right now, actual: {}",
+                    element_dim
+                )));
+            } else if element_dim < 1 {
+                builder.append_null()?;
+            } else {
+                match element {
+                    None => builder.append_null()?,
+                    Some(arr) => {
+                        if arr.len() == 0 {
+                            builder.append_null()?
+                        } else if upper {
+                            builder.append_value(arr.len() as i64)?
+                        } else {
+                            // PostgreSQL allows to define array with n-based arrays,
+                            // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
+                            builder.append_value(1)?
+                        }
+                    }
+                }
             }
         }
-    });
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    })
+}
+
+/// returns lower bound of the requested array dimension
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_lower_udf() -> ScalarUDF {
+    let fun = create_array_lower_upper_fun(false);
 
     let return_type: ReturnTypeFunction = Arc::new(move |args| {
         assert!(args.len() >= 1);
@@ -1863,57 +1881,10 @@ pub fn create_array_lower_udf() -> ScalarUDF {
     )
 }
 
+/// returns upper bound of the requested array dimension
 /// array_lower ( anyarray, integer ) → integer
 pub fn create_array_upper_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() >= 1);
-
-        let input_arr_list_dt = match args[0].data_type() {
-            DataType::List(field) => match field.data_type() {
-                dt if is_numeric(dt) => field.data_type(),
-                other => {
-                    return Err(DataFusionError::Execution(format!(
-                        "anyarray argument must be a List of numeric values, actual: List<{}>",
-                        other
-                    )));
-                }
-            },
-            other => {
-                return Err(DataFusionError::Execution(format!(
-                    "anyarray argument must be a List of numeric values, actual: {}",
-                    other
-                )));
-            }
-        };
-
-        let input_arr = downcast_list_arg!(args[0], "anyarray");
-        if args.len() == 2 {
-            return Err(DataFusionError::NotImplemented(format!(
-                "bound argument is not supported right now"
-            )));
-        };
-
-        match input_arr_list_dt {
-            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, max),
-            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, max),
-            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, max),
-            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, max),
-            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, max),
-            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, max),
-            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, max),
-            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, max),
-            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
-            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, max),
-            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, max),
-            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, max),
-            dt => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unable to extract lower element from the List of {}",
-                    dt
-                )))
-            }
-        }
-    });
+    let fun = create_array_lower_upper_fun(true);
 
     let return_type: ReturnTypeFunction = Arc::new(move |args| {
         assert!(args.len() >= 1);
