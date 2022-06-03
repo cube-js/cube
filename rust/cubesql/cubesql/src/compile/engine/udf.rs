@@ -1832,14 +1832,12 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
                     Some(arr) => {
                         if arr.len() == 0 {
                             builder.append_null()?
+                        } else if upper {
+                            builder.append_value(arr.len() as i64)?
                         } else {
-                            if upper {
-                                builder.append_value(arr.len() as i64)?
-                            } else {
-                                // PostgreSQL allows to define array with n-based arrays,
-                                // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
-                                builder.append_value(1)?
-                            }
+                            // PostgreSQL allows to define array with n-based arrays,
+                            // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
+                            builder.append_value(1)?
                         }
                     }
                 }
