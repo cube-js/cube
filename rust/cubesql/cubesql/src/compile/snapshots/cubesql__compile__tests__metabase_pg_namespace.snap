@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8188
+expression: "execute_query(\"SELECT nspname AS TABLE_SCHEM, NULL AS TABLE_CATALOG\n                FROM pg_catalog.pg_namespace\n                WHERE nspname <> 'pg_toast'\n                AND (nspname !~ '^pg_temp_'  OR nspname = (pg_catalog.current_schemas(true))[1])\n                AND (nspname !~ '^pg_toast_temp_'  OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_'))\n                ORDER BY TABLE_SCHEM;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+---------------+
+| TABLE_SCHEM        | TABLE_CATALOG |
++--------------------+---------------+
+| information_schema | NULL          |
+| pg_catalog         | NULL          |
+| public             | NULL          |
++--------------------+---------------+

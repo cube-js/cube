@@ -8198,6 +8198,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_pg_namespace_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_pg_namespace",
+            execute_query(
+                "SELECT nspname AS TABLE_SCHEM, NULL AS TABLE_CATALOG
+                FROM pg_catalog.pg_namespace
+                WHERE nspname <> 'pg_toast'
+                AND (nspname !~ '^pg_temp_'  OR nspname = (pg_catalog.current_schemas(true))[1])
+                AND (nspname !~ '^pg_toast_temp_'  OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_'))
+                ORDER BY TABLE_SCHEM;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_pg_class_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "metabase_pg_class_query",
