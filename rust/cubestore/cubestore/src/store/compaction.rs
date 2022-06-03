@@ -413,15 +413,20 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        let compaction_in_memory_chunks_size_limit = self.config.compaction_in_memory_chunks_size_limit();
-        
-        // Get all in_memory and active chunks 
+        let compaction_in_memory_chunks_size_limit =
+            self.config.compaction_in_memory_chunks_size_limit();
+
+        // Get all in_memory and active chunks
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
-            .filter(|c| c.get_row().in_memory() && c.get_row().active() && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit)
+            .filter(|c| {
+                c.get_row().in_memory()
+                    && c.get_row().active()
+                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
+            })
             .collect::<Vec<_>>();
 
         // Prepare merge params
@@ -431,25 +436,35 @@ impl CompactionService for CompactionServiceImpl {
         let schema = Arc::new(arrow_schema(index.get_row()));
         // Use empty execution plan for main_table, read only from memory chunks
         let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
-        let in_memory_columns = prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
+        let in_memory_columns =
+            prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
 
         // Get merged RecordBatch
-        let batches_stream = merge_chunks(key_size, main_table, in_memory_columns, unique_key).await?;
+        let batches_stream =
+            merge_chunks(key_size, main_table, in_memory_columns, unique_key).await?;
         let batches = collect(batches_stream).await?;
         let batch = RecordBatch::concat(&schema, &batches).unwrap();
 
         // Create chunk, writer RecordBatch into memory, swap chunks
         let old_chunks_ids: Vec<u64> = chunks.iter().map(|c| c.get_id()).collect::<Vec<u64>>();
-        let old_chunks_size: u64 = chunks.iter().map(|c| c.get_row().get_row_count()).sum::<u64>();
+        let old_chunks_size: u64 = chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .sum::<u64>();
         let chunk = self
             .meta_store
             .create_chunk(partition_id, old_chunks_size as usize, true)
             .await?;
-        self.chunk_store.add_memory_chunk(chunk.get_id(), batch).await?;
-        self.meta_store
-            .swap_chunks(old_chunks_ids, vec![(chunk.get_id(), Some(chunk.get_row().get_row_count()))])
+        self.chunk_store
+            .add_memory_chunk(chunk.get_id(), batch)
             .await?;
-        
+        self.meta_store
+            .swap_chunks(
+                old_chunks_ids,
+                vec![(chunk.get_id(), Some(chunk.get_row().get_row_count()))],
+            )
+            .await?;
+
         Ok(())
     }
 
@@ -570,7 +585,7 @@ async fn prepare_in_memory_columns(
     chunk_store: &Arc<dyn ChunkDataStore>,
     num_columns: usize,
     key_size: usize,
-    chunks: &Vec<IdRow<Chunk>>
+    chunks: &Vec<IdRow<Chunk>>,
 ) -> Result<Vec<ArrayRef>, CubeError> {
     let mut data: Vec<RecordBatch> = Vec::new();
     for chunk in chunks.iter() {
@@ -583,9 +598,8 @@ async fn prepare_in_memory_columns(
         // Concat rows from all chunks.
         let mut columns = Vec::with_capacity(num_columns);
         for i in 0..num_columns {
-            let v = arrow::compute::concat(
-                &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
-            )?;
+            let v =
+                arrow::compute::concat(&data.iter().map(|a| a.column(i).as_ref()).collect_vec())?;
             columns.push(v);
         }
         // Sort rows from all chunks.

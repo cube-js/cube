@@ -612,8 +612,14 @@ impl Config {
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
                     1048576 * 2,
                 ),
-                compaction_in_memory_chunks_size_limit: env_parse("CUBESTORE_IN_MEMORY_CHUNKS_SIZE_LIMIT", 262_144),
-                compaction_in_memory_chunks_count_threshold: env_parse("CUBESTORE_IN_MEMORY_CHUNKS_COUNT_THRESHOLD", 10),
+                compaction_in_memory_chunks_size_limit: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_SIZE_LIMIT",
+                    262_144,
+                ),
+                compaction_in_memory_chunks_count_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_COUNT_THRESHOLD",
+                    10,
+                ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {

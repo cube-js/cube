@@ -604,29 +604,35 @@ impl Cluster for ClusterImpl {
         node_name: &str,
         partition_id: u64,
     ) -> Result<(), CubeError> {
-        let compaction_in_memory_chunks_count_threshold = self.config().compaction_in_memory_chunks_count_threshold();
-        let compaction_in_memory_chunks_size_limit = self.config().compaction_in_memory_chunks_size_limit();
+        let compaction_in_memory_chunks_count_threshold =
+            self.config().compaction_in_memory_chunks_count_threshold();
+        let compaction_in_memory_chunks_size_limit =
+            self.config().compaction_in_memory_chunks_size_limit();
 
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
-            .filter(|c| c.get_row().in_memory() && c.get_row().active() && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit)
+            .filter(|c| {
+                c.get_row().in_memory()
+                    && c.get_row().active()
+                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
+            })
             .collect::<Vec<_>>();
 
         if chunks.len() > compaction_in_memory_chunks_count_threshold {
             let job = self
-            .meta_store
-            .add_job(Job::new(
-                RowKey::Table(TableId::Partitions, partition_id),
-                JobType::InMemoryChunksCompaction,
-                node_name.to_string(),
-            ))
-            .await?;
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node_name.to_string(),
+                ))
+                .await?;
             if job.is_some() {
                 self.notify_job_runner(node_name.to_string()).await?;
-            }                
+            }
         }
 
         Ok(())
@@ -876,7 +882,9 @@ impl JobRunner {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     Ok(cube_ext::spawn(async move {
-                        compaction_service.compact_in_memory_chunks(partition_id).await
+                        compaction_service
+                            .compact_in_memory_chunks(partition_id)
+                            .await
                     }))
                 } else {
                     Self::fail_job_row_key(job)
