@@ -19,6 +19,7 @@ import {
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
 import { getEnv, pausePromise } from '@cubejs-backend/shared';
+import { v1, v5 } from 'uuid';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -802,6 +803,8 @@ export class DatabricksDriver extends JDBCDriver {
     columns: string,
     pathname: string,
   ): Promise<string[]> {
+    let result: string[];
+    const filename = `/${v5(pathname, v1()).toString()}.scala`;
     const storage = pathname.split('@')[1].split('.')[0];
     const content = Buffer.from(
       `spark.conf.set(
@@ -817,13 +820,16 @@ export class DatabricksDriver extends JDBCDriver {
       'utf-8',
     ).toString('base64');
     const cluster = (await this.getClustersIds())[0];
-    await this.importNotebook('/cubejs-unload.scala', content);
-    const job = await this.createJob(cluster, '/cubejs-unload.scala');
-    const run = await this.runJob(job);
-    await this.waitRun(run);
-    await this.deleteJob(job);
-    await this.deleteNotebook('/cubejs-unload.scala');
-    const result = await this.getSignedWasbsUrls(pathname);
+    await this.importNotebook(filename, content);
+    try {
+      const job = await this.createJob(cluster, filename);
+      const run = await this.runJob(job);
+      await this.waitRun(run);
+      await this.deleteJob(job);
+      result = await this.getSignedWasbsUrls(pathname);
+    } finally {
+      await this.deleteNotebook(filename);
+    }
     return result;
   }
 
