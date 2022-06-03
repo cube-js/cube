@@ -18,6 +18,7 @@ use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::cube_ext;
+use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{Column, Count, Literal};
 use datafusion::physical_plan::hash_aggregate::{
@@ -46,6 +47,7 @@ use tokio::task::JoinHandle;
 #[async_trait]
 pub trait CompactionService: DIService + Send + Sync {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError>;
     /// Process partitions that were added concurrently with multi-split.
@@ -387,6 +389,71 @@ impl CompactionService for CompactionServiceImpl {
         Ok(())
     }
 
+    async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError> {
+        let (partition, index, table, multi_part) = self
+            .meta_store
+            .get_partition_for_compaction(partition_id)
+            .await?;
+
+        // Test invariants
+        if !partition.get_row().is_active() && !multi_part.is_some() {
+            log::trace!(
+                "Cannot compact inactive partition: {:?}",
+                partition.get_row()
+            );
+            return Ok(());
+        }
+        if let Some(mp) = &multi_part {
+            if mp.get_row().prepared_for_split() {
+                log::debug!(
+                    "Cancelled compaction of {}. It runs concurrently with multi-split",
+                    partition_id
+                );
+                return Ok(());
+            }
+        }
+
+        let compaction_in_memory_chunks_size_limit = self.config.compaction_in_memory_chunks_size_limit();
+        
+        // Get all in_memory and active chunks 
+        let chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| c.get_row().in_memory() && c.get_row().active() && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit)
+            .collect::<Vec<_>>();
+
+        // Prepare merge params
+        let unique_key = table.get_row().unique_key_columns();
+        let num_columns = index.get_row().columns().len();
+        let key_size = index.get_row().sort_key_size() as usize;
+        let old_chunks_ids: Vec<u64> = chunks.iter().map(|c| c.get_id()).collect::<Vec<u64>>();
+        let old_chunks_size: u64 = chunks.iter().map(|c| c.get_row().get_row_count()).sum::<u64>();
+        let schema = Arc::new(arrow_schema(index.get_row()));
+
+        // Use empty execution plan for main_table, read only from memory chunks
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+        let in_memory_columns = prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
+
+        // Get merged RecordBatch
+        let batches_stream = merge_chunks(key_size, main_table, in_memory_columns, unique_key).await?;
+        let batches = collect(batches_stream).await?;
+        let batch = RecordBatch::concat(&schema, &batches).unwrap();
+
+        // Create chunk, writer RecordBatch into memory, swap chunks
+        let chunk = self
+            .meta_store
+            .create_chunk(partition_id, old_chunks_size as usize, true)
+            .await?;
+        self.chunk_store.add_memory_chunk(chunk.get_id(), batch).await?;
+        self.meta_store
+            .swap_chunks(old_chunks_ids, vec![(chunk.get_id(), Some(chunk.get_row().get_row_count()))])
+            .await?;
+        
+        Ok(())
+    }
+
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError> {
         let (multi_index, multi_partition, partitions) = self
             .meta_store
@@ -497,6 +564,52 @@ impl CompactionService for CompactionServiceImpl {
         s.split_single_partition(data).await?;
         s.finish(false).await
     }
+}
+
+// TODO: re-use it in the compact function?
+async fn prepare_in_memory_columns(
+    chunk_store: &Arc<dyn ChunkDataStore>,
+    num_columns: usize,
+    key_size: usize,
+    chunks: &Vec<IdRow<Chunk>>
+) -> Result<Vec<ArrayRef>, CubeError> {
+    let mut data: Vec<RecordBatch> = Vec::new();
+    for chunk in chunks.iter() {
+        for b in chunk_store.get_chunk_columns(chunk.clone()).await? {
+            data.push(b)
+        }
+    }
+
+    let new = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+        // Concat rows from all chunks.
+        let mut columns = Vec::with_capacity(num_columns);
+        for i in 0..num_columns {
+            let v = arrow::compute::concat(
+                &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
+            )?;
+            columns.push(v);
+        }
+        // Sort rows from all chunks.
+        let mut sort_key = Vec::with_capacity(key_size);
+        for i in 0..key_size {
+            sort_key.push(SortColumn {
+                values: columns[i].clone(),
+                options: Some(SortOptions {
+                    descending: false,
+                    nulls_first: true,
+                }),
+            });
+        }
+        let indices = lexsort_to_indices(&sort_key, None)?;
+        let mut new = Vec::with_capacity(num_columns);
+        for c in columns {
+            new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+        }
+        Ok(new)
+    })
+    .await??;
+
+    Ok(new)
 }
 
 /// Compute keys that partitions must be split by.

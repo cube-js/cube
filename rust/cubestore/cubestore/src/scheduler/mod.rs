@@ -567,7 +567,7 @@ impl SchedulerImpl {
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
             || chunks.len()
             > self.config.compaction_chunks_count_threshold() as usize
-            // TODO config
+            // TODO: We need to update conditions consider in-memory compaction, and add env variables to config thresholds
             || in_memory_chunks.len() > 100
             || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
             || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)

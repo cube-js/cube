@@ -289,6 +289,10 @@ pub trait ConfigObj: DIService {
 
     fn compaction_chunks_count_threshold(&self) -> u64;
 
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64;
+
+    fn compaction_in_memory_chunks_count_threshold(&self) -> usize;
+
     fn wal_split_threshold(&self) -> u64;
 
     fn select_worker_pool_size(&self) -> usize;
@@ -358,6 +362,8 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_in_memory_chunks_size_limit: u64,
+    pub compaction_in_memory_chunks_count_threshold: usize,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
@@ -411,6 +417,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
         self.compaction_chunks_count_threshold
+    }
+
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
+        self.compaction_in_memory_chunks_size_limit
+    }
+
+    fn compaction_in_memory_chunks_count_threshold(&self) -> usize {
+        self.compaction_in_memory_chunks_count_threshold
     }
 
     fn wal_split_threshold(&self) -> u64 {
@@ -598,6 +612,8 @@ impl Config {
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
                     1048576 * 2,
                 ),
+                compaction_in_memory_chunks_size_limit: env_parse("CUBESTORE_IN_MEMORY_CHUNKS_SIZE_LIMIT", 262_144),
+                compaction_in_memory_chunks_count_threshold: env_parse("CUBESTORE_IN_MEMORY_CHUNKS_COUNT_THRESHOLD", 10),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -694,6 +710,8 @@ impl Config {
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
+                compaction_in_memory_chunks_size_limit: 262_144,
+                compaction_in_memory_chunks_count_threshold: 10,
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(
                         env::current_dir()
