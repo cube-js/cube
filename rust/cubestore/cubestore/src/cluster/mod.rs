@@ -604,8 +604,8 @@ impl Cluster for ClusterImpl {
         node_name: &str,
         partition_id: u64,
     ) -> Result<(), CubeError> {
-        let compaction_in_memory_chunks_count_threshold = self.config().compaction_in_memory_chunks_count_threshold(); // use env CUBESTORE_IN_MEMORY_CHUNKS_COMPACTION_COUNT_THRESHOLD
-        let compaction_in_memory_chunks_size_limit = self.config().compaction_in_memory_chunks_size_limit(); // use env CUBESTORE_IN_MEMORY_CHUNKS_COMPACTION_SIZE_LIMIT
+        let compaction_in_memory_chunks_count_threshold = self.config().compaction_in_memory_chunks_count_threshold();
+        let compaction_in_memory_chunks_size_limit = self.config().compaction_in_memory_chunks_size_limit();
 
         let chunks = self
             .meta_store

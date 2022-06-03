@@ -428,10 +428,7 @@ impl CompactionService for CompactionServiceImpl {
         let unique_key = table.get_row().unique_key_columns();
         let num_columns = index.get_row().columns().len();
         let key_size = index.get_row().sort_key_size() as usize;
-        let old_chunks_ids: Vec<u64> = chunks.iter().map(|c| c.get_id()).collect::<Vec<u64>>();
-        let old_chunks_size: u64 = chunks.iter().map(|c| c.get_row().get_row_count()).sum::<u64>();
         let schema = Arc::new(arrow_schema(index.get_row()));
-
         // Use empty execution plan for main_table, read only from memory chunks
         let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
         let in_memory_columns = prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
@@ -442,6 +439,8 @@ impl CompactionService for CompactionServiceImpl {
         let batch = RecordBatch::concat(&schema, &batches).unwrap();
 
         // Create chunk, writer RecordBatch into memory, swap chunks
+        let old_chunks_ids: Vec<u64> = chunks.iter().map(|c| c.get_id()).collect::<Vec<u64>>();
+        let old_chunks_size: u64 = chunks.iter().map(|c| c.get_row().get_row_count()).sum::<u64>();
         let chunk = self
             .meta_store
             .create_chunk(partition_id, old_chunks_size as usize, true)
