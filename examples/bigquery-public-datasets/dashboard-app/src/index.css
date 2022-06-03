@@ -26,12 +26,5 @@ body {
   font-family: 'Roboto', sans-serif;
   font-weight: 400;
   font-size: var(--font-size);
-  line-height: 1.1em;
   margin: 0 auto;
-}
-
-a {
-  color: inherit;
-  border-bottom: solid 1px var(--color-link-underline);
-  text-decoration: inherit;
 }

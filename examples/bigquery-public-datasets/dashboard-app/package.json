@@ -10,6 +10,7 @@
     "@testing-library/user-event": "^7.2.1",
     "antd": "^4.12.3",
     "chart.js": "^2.9.3",
+    "cube-example-wrapper": "^1.0.26",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
     "react-chartjs-2": "^2.9.0",

@@ -2,10 +2,10 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            analysis::LogicalPlanAnalysis, between_expr, binary_expr, cast_expr, column_expr,
-            cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-            dimension_expr, filter, filter_cast_unwrap_replacer, filter_member, filter_op,
-            filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            analysis::LogicalPlanAnalysis, between_expr, binary_expr, case_expr, case_expr_var_arg,
+            cast_expr, column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
+            cube_scan_members, dimension_expr, filter, filter_cast_unwrap_replacer, filter_member,
+            filter_op, filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
             is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
             not_expr, projection, rewrite, rewriter::RewriteRules, scalar_fun_expr_args,
             scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
@@ -312,10 +312,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                literal_expr("?value"),
-                            ],
+                            vec![column_expr("?column"), literal_expr("?value")],
                         ),
                         ">",
                         literal_expr("?zero"),
@@ -327,6 +324,69 @@ impl RewriteRules for FilterRules {
                     "?cube",
                 ),
             ),
+            rewrite(
+                "filter-str-lower-to-column",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Strpos",
+                            vec![
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                literal_expr("?value"),
+                            ],
+                        ),
+                        ">",
+                        literal_expr("?zero"),
+                    ),
+                    "?cube",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Strpos",
+                            vec![column_expr("?column"), literal_expr("?value")],
+                        ),
+                        ">",
+                        literal_expr("?zero"),
+                    ),
+                    "?cube",
+                ),
+            ),
+            rewrite(
+                "filter-str-not-null-case-to-column",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Strpos",
+                            vec![
+                                case_expr(
+                                    vec![(
+                                        is_not_null_expr(column_expr("?column")),
+                                        column_expr("?column"),
+                                    )],
+                                    literal_string(""),
+                                ),
+                                literal_expr("?value"),
+                            ],
+                        ),
+                        ">",
+                        literal_expr("?zero"),
+                    ),
+                    "?cube",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Strpos",
+                            vec![column_expr("?column"), literal_expr("?value")],
+                        ),
+                        ">",
+                        literal_expr("?zero"),
+                    ),
+                    "?cube",
+                ),
+            ),
+            // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
                 "filter-cast-unwrap",
                 filter_cast_unwrap_replacer(cast_expr("?expr", "?data_type")),
@@ -390,6 +450,21 @@ impl RewriteRules for FilterRules {
                 filter_cast_unwrap_replacer(scalar_fun_expr_args_empty_tail()),
                 scalar_fun_expr_args_empty_tail(),
             ),
+            rewrite(
+                "filter-cast-unwrap-case-push-down",
+                filter_cast_unwrap_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+                case_expr_var_arg(
+                    filter_cast_unwrap_replacer("?expr"),
+                    filter_cast_unwrap_replacer("?when_then"),
+                    filter_cast_unwrap_replacer("?else"),
+                ),
+            ),
+            filter_unwrap_cast_push_down("CaseExprExpr"),
+            filter_unwrap_cast_push_down_tail("CaseExprExpr"),
+            filter_unwrap_cast_push_down("CaseExprWhenThenExpr"),
+            filter_unwrap_cast_push_down_tail("CaseExprWhenThenExpr"),
+            filter_unwrap_cast_push_down("CaseExprElseExpr"),
+            filter_unwrap_cast_push_down_tail("CaseExprElseExpr"),
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
@@ -1341,5 +1416,30 @@ fn filter_flatten_rewrite_right(
             filter_op_filters("?tail", filter_op_filters("?left", "?right")),
             op,
         ),
+    )
+}
+
+fn filter_unwrap_cast_push_down(
+    node_type: impl Display,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    rewrite(
+        &format!("filter-cast-unwrap-{}-push-down", node_type),
+        filter_cast_unwrap_replacer(format!("({} ?left ?right)", node_type)),
+        format!(
+            "({} {} {})",
+            node_type,
+            filter_cast_unwrap_replacer("?left"),
+            filter_cast_unwrap_replacer("?right")
+        ),
+    )
+}
+
+fn filter_unwrap_cast_push_down_tail(
+    node_type: impl Display,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    rewrite(
+        &format!("filter-cast-unwrap-{}-empty-tail-push-down", node_type),
+        filter_cast_unwrap_replacer(node_type.to_string()),
+        node_type.to_string(),
     )
 }

@@ -6,25 +6,9 @@ import { Layout, Menu } from 'antd';
 const Header = ({
   location
 }) => <Layout.Header style={{
-  padding: '0 32px'
+  padding: '0 8px'
 }}>
-    <div style={{
-    float: 'left'
-  }}>
-      <h2 style={{
-      color: '#fff',
-      margin: 0,
-      marginRight: '1em',
-      display: 'inline',
-      width: 100,
-      lineHeight: '54px'
-    }}>
-        My Dashboard
-      </h2>
-    </div>
-    <Menu theme="dark" mode="horizontal" selectedKeys={[location.pathname]} style={{
-    lineHeight: '64px'
-  }}>
+    <Menu theme="dark" mode="horizontal" selectedKeys={[location.pathname]}>
       <Menu.Item key="/explore">
         <Link to="/explore">Explore</Link>
       </Menu.Item>

@@ -39,15 +39,17 @@ use super::information_schema::mysql::{
 use super::information_schema::postgres::{
     character_sets::InfoSchemaCharacterSetsProvider as PostgresSchemaCharacterSetsProvider,
     columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
+    constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
-    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
     PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
-    PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
+    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogSettingsProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -304,8 +306,14 @@ impl DatabaseProtocol {
             "pg_catalog.pg_am".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogEnumProvider>() {
             "pg_catalog.pg_enum".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogMatviewsProvider>() {
+            "pg_catalog.pg_matviews".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
+            "information_schema.constraint_column_usage".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
+            "information_schema.views".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -391,6 +399,10 @@ impl DatabaseProtocol {
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
                 }
+                "constraint_column_usage" => {
+                    return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
+                }
+                "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
                 _ => return None,
             },
             "pg_catalog" => match table.as_str() {
@@ -423,6 +435,7 @@ impl DatabaseProtocol {
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
                 "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
+                "pg_matviews" => return Some(Arc::new(PgCatalogMatviewsProvider::new())),
                 _ => return None,
             },
             _ => return None,

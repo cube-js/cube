@@ -3,7 +3,7 @@ import { useCubeQuery } from '@cubejs-client/react';
 
 import Stack from './Stack';
 
-export default () => {
+const SchemaCube = () => {
   const [data, setData] = useState([]);
 
   const { resultSet: result } = useCubeQuery({
@@ -53,3 +53,5 @@ export default () => {
 
   return <Stack data={data} title={'a Data Blending cube'} />;
 };
+
+export default SchemaCube;

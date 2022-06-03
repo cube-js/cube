@@ -1,0 +1,20 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    att.attname,\n                    att.attnum,\n                    cl.oid\n                FROM pg_attribute att\n                JOIN pg_class cl ON\n                    cl.oid = attrelid AND (\n                        cl.relkind = 's' OR\n                        cl.relkind = 'r'\n                    )\n                ORDER BY\n                    cl.oid ASC,\n                    att.attnum ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+--------+-------+
+| attname            | attnum | oid   |
++--------------------+--------+-------+
+| count              | 1      | 18000 |
+| maxPrice           | 2      | 18000 |
+| minPrice           | 3      | 18000 |
+| avgPrice           | 4      | 18000 |
+| order_date         | 5      | 18000 |
+| customer_gender    | 6      | 18000 |
+| taxful_total_price | 7      | 18000 |
+| has_subscription   | 8      | 18000 |
+| is_male            | 9      | 18000 |
+| is_female          | 10     | 18000 |
+| agentCount         | 1      | 18013 |
+| agentCountApprox   | 2      | 18013 |
++--------------------+--------+-------+

@@ -133,6 +133,11 @@ crate::plan_to_language! {
             op: Operator,
             right: Box<Expr>,
         },
+        AnyExpr {
+            left: Box<Expr>,
+            op: Operator,
+            right: Box<Expr>,
+        },
         NotExpr { expr: Box<Expr>, },
         IsNotNullExpr { expr: Box<Expr>, },
         IsNullExpr { expr: Box<Expr>, },
@@ -263,6 +268,9 @@ crate::plan_to_language! {
         },
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
+        },
+        SaveDateRangeReplacer {
+            members: Vec<LogicalPlan>,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
@@ -587,6 +595,29 @@ fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
 
+fn case_expr_var_arg(
+    expr: impl Display,
+    when_then: impl Display,
+    else_expr: impl Display,
+) -> String {
+    format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
+}
+
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+    case_expr_var_arg(
+        "CaseExprExpr",
+        list_expr(
+            "CaseExprWhenThenExpr",
+            when_then
+                .into_iter()
+                .map(|(when, then)| vec![when, then])
+                .flatten()
+                .collect(),
+        ),
+        list_expr("CaseExprElseExpr", vec![else_expr]),
+    )
+}
+
 fn literal_string(literal_str: impl Display) -> String {
     format!("(LiteralExpr LiteralExprValue:{})", literal_str)
 }
@@ -636,6 +667,10 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
 
 fn filter_replacer(members: impl Display, cube: impl Display) -> String {
     format!("(FilterReplacer {} {})", members, cube)
+}
+
+fn save_date_range_replacer(members: impl Display) -> String {
+    format!("(SaveDateRangeReplacer {})", members)
 }
 
 fn filter_cast_unwrap_replacer(members: impl Display) -> String {

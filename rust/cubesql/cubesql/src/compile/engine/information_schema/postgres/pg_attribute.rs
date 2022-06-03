@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, StringBuilder,
-            UInt32Builder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, Int64Builder,
+            StringBuilder, UInt32Builder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
@@ -27,7 +27,8 @@ struct PgCatalogAttributeBuilder {
     attnum: Int16Builder,
     attndims: UInt32Builder,
     attcacheoff: Int32Builder,
-    atttypmod: Int32Builder,
+    // TODO: Add support for casts within case and switch back to Int32
+    atttypmod: Int64Builder,
     attbyval: BooleanBuilder,
     attalign: StringBuilder,
     attstorage: StringBuilder,
@@ -60,7 +61,7 @@ impl PgCatalogAttributeBuilder {
             attnum: Int16Builder::new(capacity),
             attndims: UInt32Builder::new(capacity),
             attcacheoff: Int32Builder::new(capacity),
-            atttypmod: Int32Builder::new(capacity),
+            atttypmod: Int64Builder::new(capacity),
             attbyval: BooleanBuilder::new(capacity),
             attalign: StringBuilder::new(capacity),
             attstorage: StringBuilder::new(capacity),
@@ -204,7 +205,7 @@ impl TableProvider for PgCatalogAttributeProvider {
             Field::new("attnum", DataType::Int16, true),
             Field::new("attndims", DataType::UInt32, false),
             Field::new("attcacheoff", DataType::Int32, false),
-            Field::new("atttypmod", DataType::Int32, false),
+            Field::new("atttypmod", DataType::Int64, false),
             Field::new("attbyval", DataType::Boolean, false),
             Field::new("attalign", DataType::Utf8, false),
             Field::new("attstorage", DataType::Utf8, false),

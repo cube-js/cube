@@ -26,6 +26,7 @@ const useStyles = makeStyles(theme => ({
     flexShrink: 0,
   },
   drawerPaper: {
+    position: 'relative',
     whiteSpace: 'nowrap',
     width: drawerWidth
   },
@@ -54,7 +55,6 @@ const SidePanel = () => {
       variant="permanent"
       open={true}
     >
-      <div className={classes.toolbar} />
       <List>
         <MenuItem to="/" icon={<PersonIcon />} title="Audience" />
         <MenuItem to="/behavior" icon={<WebIcon />} title="Behavior" />

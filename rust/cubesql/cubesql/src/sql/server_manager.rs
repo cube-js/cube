@@ -15,12 +15,18 @@ use super::{database_variables::DatabaseVariables, session::DatabaseProtocol};
 pub struct ServerConfiguration {
     /// Max number of prepared statements which can be allocated per connection
     pub connection_max_prepared_statements: usize,
+    /// Max number of prepared statements which can be allocated per connection
+    pub connection_max_cursors: usize,
+    /// Max number of prepared statements which can be allocated per connection
+    pub connection_max_portals: usize,
 }
 
 impl Default for ServerConfiguration {
     fn default() -> Self {
         Self {
             connection_max_prepared_statements: 50,
+            connection_max_cursors: 15,
+            connection_max_portals: 15,
         }
     }
 }

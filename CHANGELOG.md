@@ -3,6 +3,67 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.10](https://github.com/cube-js/cube.js/compare/v0.30.9...v0.30.10) (2022-06-01)
+
+
+### Bug Fixes
+
+* **cubesql:** Handle `Flush` pg-wire message ([f779e75](https://github.com/cube-js/cube.js/commit/f779e75fb4e6ba5a12d7b751c5f53313d33753bc))
+* **cubesql:** Store description on Portal in Finished state ([f5f6566](https://github.com/cube-js/cube.js/commit/f5f65663cb01fdbc222e38ec8d3fb6813d5466ae))
+
+
+### Features
+
+* **cubesql:** information_schema.constraint_column_usage meta table ([1fe8312](https://github.com/cube-js/cube.js/commit/1fe83127b2601bf7ef9f3b63ff63b4026958e8c8))
+* **cubesql:** information_schema.views meta table ([490d721](https://github.com/cube-js/cube.js/commit/490d721b4bcd90ae059996bdac177d707935f58e))
+* **cubesql:** Support ANY expressions ([77e0672](https://github.com/cube-js/cube.js/commit/77e06727a2a4039d7297538d9bace9498a0fc1a2))
+* **cubesql:** Support current_database(), current_schema(), current_user for pg-wire ([a18f68c](https://github.com/cube-js/cube.js/commit/a18f68c8a6538c38c8985b512996a9fec2292da2))
+* **cubesql:** Support string for NULLIF (metabase pg_class query) ([#4638](https://github.com/cube-js/cube.js/issues/4638)) ([ef962e7](https://github.com/cube-js/cube.js/commit/ef962e71fe9955c359a044ea83736cac1748c4a4))
+* Initial support for FETCH/DECLARE (cursors) for simple query in pg-wire ([#4601](https://github.com/cube-js/cube.js/issues/4601)) ([b160773](https://github.com/cube-js/cube.js/commit/b160773d9a208c2b794a34e6e36f4ce73a83a53e))
+
+
+
+
+
+## [0.30.9](https://github.com/cube-js/cube.js/compare/v0.30.8...v0.30.9) (2022-05-31)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow `CASE` with `pg_attribute.atttypmod` offset ([fc09160](https://github.com/cube-js/cube.js/commit/fc091609e6f3512d5a078501279e8b9064048b54))
+
+
+### Features
+
+* **cubesql:** Support comparison between strings and booleans ([#4618](https://github.com/cube-js/cube.js/issues/4618)) ([e4352c3](https://github.com/cube-js/cube.js/commit/e4352c3930e6c948e98bae764920f5d6e21103e8))
+
+
+
+
+
+## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
+
+
+### Bug Fixes
+
+* **cubesql:** Empty results on `JOIN` with `AND` + `OR` in `WHERE` ([#4608](https://github.com/cube-js/cube.js/issues/4608)) ([96c2f15](https://github.com/cube-js/cube.js/commit/96c2f157f03b95106b509b677fc3d4d6af36b0a2))
+* **cubesql:** fix log error standalone ([#4606](https://github.com/cube-js/cube.js/issues/4606)) ([3e3e010](https://github.com/cube-js/cube.js/commit/3e3e010403dc83ca34f7b2ca95c7b46a2a2f1e2d))
+* **driver-materialize:** filter non-materialized objects from schema ([#4584](https://github.com/cube-js/cube.js/issues/4584)) ([a32a9a9](https://github.com/cube-js/cube.js/commit/a32a9a94f9eabb9f5a4c7f7201d902f88fbe321b))
+
+
+### Features
+
+* **cubesql:** Allow `::information_schema.cardinal_number` casting ([b198fb3](https://github.com/cube-js/cube.js/commit/b198fb3a70b3d075ccdfaff638dc8f36e6530944))
+* **cubesql:** excel subquery column with same name ([#4602](https://github.com/cube-js/cube.js/issues/4602)) ([ea3a0bc](https://github.com/cube-js/cube.js/commit/ea3a0bc4a944cd724672056f5885110c7cee90cd))
+* **cubesql:** PowerBI basic queries support ([455ae07](https://github.com/cube-js/cube.js/commit/455ae076880f305ed73d1d217a87f908837070f5))
+* **cubesql:** Support array_upper, array_lower UDFs ([5a3b6bb](https://github.com/cube-js/cube.js/commit/5a3b6bb31c5af920c706b56a8e3c5046f272f8ca))
+* **cubesql:** Support to_char UDF ([#4600](https://github.com/cube-js/cube.js/issues/4600)) ([48077a9](https://github.com/cube-js/cube.js/commit/48077a95fccf48309085e6f1f9b2652c581ab3a3))
+* **schema-compiler:** allowNonStrictDateRangeMatch flag support for the pre-aggregations with time dimension ([#4582](https://github.com/cube-js/cube.js/issues/4582)) ([31d9fae](https://github.com/cube-js/cube.js/commit/31d9faea762f2103a19e6d3062e272b9dbc88dc8))
+
+
+
+
+
 ## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
 
 

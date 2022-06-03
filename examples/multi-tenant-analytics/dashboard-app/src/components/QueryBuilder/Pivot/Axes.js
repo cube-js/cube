@@ -16,7 +16,7 @@ export default function Axes({
     ...props
   }) => {
     if (!destination) {
-      return;
+      return null;
     }
 
     onMove({

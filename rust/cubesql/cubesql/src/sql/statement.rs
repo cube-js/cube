@@ -285,6 +285,7 @@ trait Visitor<'ast> {
         match statement {
             ast::Statement::Query(query) => self.visit_query(query),
             ast::Statement::Explain { statement, .. } => self.visit_statement(statement),
+            ast::Statement::Declare { query, .. } => self.visit_query(query),
             // TODO:
             _ => {}
         }
