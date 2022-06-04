@@ -66,6 +66,16 @@ services:
       - 5432:5432 # Cube SQL API
 ```
 
+Or running docker from command line:
+
+```bash
+docker run -p 4000:4000 -p 5432:5432 \
+  -v ${PWD}:/cube/conf \
+  -e CUBEJS_DEV_MODE=true \
+  -e CUBEJS_PG_SQL_PORT=5432 \
+  cubejs/cube
+```
+
 Then, set Cube SQL credentials auth:
 
 ```
