@@ -131,6 +131,7 @@ export type PreAggregationDescription = {
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
   expandedPartition: boolean;
+  lambdaView: boolean;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -246,6 +247,7 @@ class PreAggregationLoadCache {
     }
 
     const newTables = await this.fetchTablesNoCache(preAggregation);
+    console.log('TTT', newTables);
     await this.cacheDriver.set(
       this.tablesRedisKey(preAggregation),
       newTables,
@@ -279,9 +281,10 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
+    const tables = await this.getTablesQuery(preAggregation);
     let versionEntries = tablesToVersionEntries(
       preAggregation.preAggregationsSchema,
-      await this.getTablesQuery(preAggregation)
+      tables
     );
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
@@ -515,6 +518,60 @@ export class PreAggregationLoader {
     }
   }
 
+  /**
+   * Downloads lambda tables from the source DB and uploads them as temp tables into CubeStore.
+   *
+   * @see loadPreAggregationWithKeys
+   * @see refreshImplStreamExternalStrategy
+   */
+  public async loadLambdaTable(): Promise<LoadPreAggregationResult> {
+    const client = await this.driverFactory();
+    const lambdaSchema = this.useLambdaSchema(this.preAggregation.preAggregationsSchema);
+    const invalidationKeys = await this.getInvalidationKeyValues();
+    const contentVersion = this.contentVersion(invalidationKeys);
+    const structureVersion = getStructureVersion(this.preAggregation);
+    const newVersionEntry: VersionEntry = {
+      table_name: this.useLambdaSchema(this.preAggregation.tableName),
+      structure_version: structureVersion,
+      content_version: contentVersion,
+      last_updated_at: nowTimestamp(client),
+      naming_version: 2,
+    };
+    const targetTableName = this.targetTableName(newVersionEntry);
+
+
+
+    await cancelCombinator(
+      async saveCancelFn => {
+        const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
+        try {
+          const externalDriver: DriverInterface = await this.externalDriverFactory();
+          await externalDriver.createSchemaIfNotExists(lambdaSchema);
+          this.logger('Uploading lambda table', queryOptions);
+          await saveCancelFn(
+            externalDriver.uploadTableWithIndexes(
+              targetTableName, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry, queryOptions), this.preAggregation.uniqueKeyColumns, queryOptions
+            )
+          ).catch((error: any) => {
+            this.logger('Uploading lambda table error', { ...queryOptions, error: error?.stack || error?.message });
+            throw error;
+          });
+          this.logger('Uploading lambda table completed', queryOptions);
+        } finally {
+          if (tableData.release) {
+            await tableData.release();
+          }
+        }
+      }
+    );
+
+    return {
+      targetTableName,
+      refreshKeyValues: [],
+      lastUpdatedAt: newVersionEntry.last_updated_at
+    };
+  }
+
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
     const invalidationKeys = await this.getInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
@@ -701,32 +758,35 @@ export class PreAggregationLoader {
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
+  /// Promotes a schema/table name to lambda schema by prefixing the name with `lambda_`.
+  protected useLambdaSchema(name: string) {
+    return `lambda_${name}`;
+  }
+
   protected targetTableName(versionEntry): string {
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(preAggregation: any, newVersionEntry, invalidationKeys) {
-    return (client) => {
-      let refreshStrategy = this.refreshImplStoreInSourceStrategy;
-      if (this.preAggregation.external) {
-        const readOnly =
-          this.preAggregation.readOnly ||
-          client.config && client.config.readOnly ||
-          client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
-        refreshStrategy = readOnly ?
-          this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
-      }
-      return cancelCombinator(
-        saveCancelFn => refreshStrategy.bind(this)(
-          client,
-          newVersionEntry,
-          saveCancelFn,
-          preAggregation,
-          invalidationKeys
-        )
-      );
-    };
+  public refresh(newVersionEntry, invalidationKeys, client) {
+    console.log('RRR', newVersionEntry, invalidationKeys);
+    let refreshStrategy = this.refreshImplStoreInSourceStrategy;
+    if (this.preAggregation.external) {
+      const readOnly =
+        this.preAggregation.readOnly ||
+        client.config && client.config.readOnly ||
+        client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
+      refreshStrategy = readOnly ?
+        this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
+    }
+    return cancelCombinator(
+      saveCancelFn => refreshStrategy.bind(this)(
+        client,
+        newVersionEntry,
+        saveCancelFn,
+        invalidationKeys
+      )
+    );
   }
 
   protected logExecutingSql(payload) {
@@ -790,7 +850,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -815,7 +874,6 @@ export class PreAggregationLoader {
       const tableData = await this.downloadTempExternalPreAggregation(
         client,
         newVersionEntry,
-        preAggregation,
         saveCancelFn,
         queryOptions
       );
@@ -844,32 +902,7 @@ export class PreAggregationLoader {
     preAggregation,
     invalidationKeys
   ) {
-    const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
-
-    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
-    if (!client.downloadQueryResults) {
-      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadQueryResults()');
-    }
-
-    const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
-    this.logExecutingSql(queryOptions);
-    this.logger('Downloading external pre-aggregation via query', queryOptions);
-    const externalDriver = await this.externalDriverFactory();
-    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
-
-    const tableData = await saveCancelFn(client.downloadQueryResults(
-      sql,
-      params, {
-        ...queryOptions,
-        ...capabilities,
-        ...this.getStreamingOptions(),
-      }
-    )).catch((error: any) => {
-      this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
-      throw error;
-    });
-    this.logger('Downloading external pre-aggregation via query completed', queryOptions);
+    const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
 
     try {
       await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
@@ -896,13 +929,48 @@ export class PreAggregationLoader {
     };
   }
 
+  protected async downloadPreAggregation(
+    client: DriverInterface,
+    newVersionEntry: VersionEntry,
+    saveCancelFn,
+    invalidationKeys
+  ) {
+    const [sql, params] =
+      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+
+    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
+    if (!client.downloadQueryResults) {
+      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadQueryResults()');
+    }
+
+    const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
+    this.logExecutingSql(queryOptions);
+    this.logger('Downloading external pre-aggregation via query', queryOptions);
+    const externalDriver = await this.externalDriverFactory();
+    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+
+    const tableData = await saveCancelFn(client.downloadQueryResults(
+      sql,
+      params, {
+        ...queryOptions,
+        ...capabilities,
+        ...this.getStreamingOptions(),
+      }
+    )).catch((error: any) => {
+      this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
+      throw error;
+    });
+    this.logger('Downloading external pre-aggregation via query completed', queryOptions);
+
+    return { queryOptions, tableData };
+  }
+
   /**
    * Create table (for db with write permissions) and extract data via memory/stream/unload
    */
   protected async downloadTempExternalPreAggregation(
     client: DriverInterface,
     newVersionEntry,
-    preAggregation,
     saveCancelFn: SaveCancelFn,
     queryOptions: any
   ) {
@@ -928,7 +996,7 @@ export class PreAggregationLoader {
         );
 
         if (client.unload) {
-          const stream = new LargeStreamWarning(preAggregation.preAggregationId, (msg) => {
+          const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
             this.logger('Downloading external pre-aggregation warning', {
               ...queryOptions,
               error: msg
@@ -1223,7 +1291,18 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options
       ));
-      const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
+
+      let loadResults;
+      if (this.preAggregation.lambdaView) {
+      // if (false) {
+        loadResults = await Promise.all(partitionLoaders.map(l => l.loadLambdaTable()));
+      } else {
+        loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
+      }
+
+      console.log('PPP', partitionRanges);
+      console.log('ZZZ', loadResults);
+
       const allTableTargetNames = loadResults
         .map(
           targetTableName => targetTableName.targetTableName
@@ -1603,7 +1682,7 @@ export class PreAggregations {
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
-        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
+        return loader.refresh(newVersionEntry, invalidationKeys, client);
       }, {
         concurrency: 1,
         logger: this.logger,
