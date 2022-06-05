@@ -261,9 +261,49 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             rewrite(
+                "filter-replacer-equals-negation",
+                filter_replacer(
+                    not_expr(binary_expr(
+                        column_expr("?column"),
+                        "=",
+                        literal_expr("?literal"),
+                    )),
+                    "?cube",
+                ),
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "!=", literal_expr("?literal")),
+                    "?cube",
+                ),
+            ),
+            rewrite(
+                "filter-replacer-not-equals-negation",
+                filter_replacer(
+                    not_expr(binary_expr(
+                        column_expr("?column"),
+                        "!=",
+                        literal_expr("?literal"),
+                    )),
+                    "?cube",
+                ),
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "=", literal_expr("?literal")),
+                    "?cube",
+                ),
+            ),
+            rewrite(
                 "filter-replacer-is-null-negation",
                 filter_replacer(not_expr(is_null_expr("?expr")), "?cube"),
                 filter_replacer(is_not_null_expr("?expr"), "?cube"),
+            ),
+            rewrite(
+                "filter-replacer-is-not-null-negation",
+                filter_replacer(not_expr(is_not_null_expr("?expr")), "?cube"),
+                filter_replacer(is_null_expr("?expr"), "?cube"),
+            ),
+            rewrite(
+                "filter-replacer-double-negation",
+                filter_replacer(not_expr(not_expr("?expr")), "?cube"),
+                filter_replacer("?expr", "?cube"),
             ),
             transforming_rewrite(
                 "filter-replacer-between",

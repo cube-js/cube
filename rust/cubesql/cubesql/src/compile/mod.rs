@@ -3772,6 +3772,71 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
+    fn power_bi_is_not_empty() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select sum(\"rows\".\"count\") as \"a0\" from (select \"_\".\"count\" from \"public\".\"KibanaSampleDataEcommerce\" \"_\" where (not \"_\".\"customer_gender\" is null and not \"_\".\"customer_gender\" = '' or not (not \"_\".\"customer_gender\" is null))) \"rows\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                    ),
+                                    operator: Some("set".to_string()),
+                                    values: None,
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                    ),
+                                    operator: Some("notEquals".to_string()),
+                                    values: Some(vec!["".to_string()]),
+                                    or: None,
+                                    and: None,
+                                })
+                            ])
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
+    }
+
+    #[test]
     fn non_cube_filters_cast_kept() {
         init_logger();
 
