@@ -6821,6 +6821,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgmatviews_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgmatviews_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_matviews".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "constraint_column_usage_postgres",
@@ -7327,7 +7341,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 "
                 SELECT
                     array_lower(ARRAY[1,2,3,4,5]) v1,
-                    array_lower(ARRAY[5,4,3,2,1]) v2
+                    array_lower(ARRAY[5,4,3,2,1]) v2,
+                    array_lower(ARRAY[5,4,3,2,1], 1) v3
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -7363,7 +7378,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 "
                 SELECT
                     array_upper(ARRAY[1,2,3,4,5]) v1,
-                    array_upper(ARRAY[5,4,3,2,1]) v2
+                    array_upper(ARRAY[5,4,3]) v2,
+                    array_upper(ARRAY[5,4], 1) v3
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -7378,8 +7394,11 @@ ORDER BY \"COUNT(count)\" DESC"
                 SELECT
                     array_upper(t.v) q
                 FROM (
-                    SELECT ARRAY[1,2,3,4,5] as v UNION ALL
-                    SELECT ARRAY[5,4,3,2,1] as v
+                    SELECT ARRAY[1,2,3,4,5] as v
+                    UNION ALL
+                    SELECT ARRAY[5,4,3,2] as v
+                    UNION ALL
+                    SELECT ARRAY[5,4,3] as v
                 ) t
                 "
                 .to_string(),
@@ -8179,6 +8198,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_pg_namespace_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_pg_namespace",
+            execute_query(
+                "SELECT nspname AS TABLE_SCHEM, NULL AS TABLE_CATALOG
+                FROM pg_catalog.pg_namespace
+                WHERE nspname <> 'pg_toast'
+                AND (nspname !~ '^pg_temp_'  OR nspname = (pg_catalog.current_schemas(true))[1])
+                AND (nspname !~ '^pg_toast_temp_'  OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_'))
+                ORDER BY TABLE_SCHEM;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_pg_class_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "metabase_pg_class_query",
@@ -8323,6 +8362,58 @@ ORDER BY \"COUNT(count)\" DESC"
                 AND     fkn.nspname = 'public'
                 AND     fkc.relname = 'actor'
                 ORDER BY pkn.nspname, pkc.relname, con.conname, pos.n;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_ilike_query",
+            execute_query(
+                "
+                select distinct table_schema
+                from information_schema.tables
+                where
+                    table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and
+                    table_schema NOT IN ('pg_catalog', 'information_schema') and
+                    table_schema ilike '%'
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sigma_computing_pg_matviews_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_pg_matviews_query",
+            execute_query(
+                "
+                SELECT table_name FROM (
+                    select table_name
+                    from information_schema.tables
+                    where
+                        table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and
+                        table_schema = 'public'
+                    UNION
+                    select matviewname as table_name
+                    from pg_catalog.pg_matviews
+                    where schemaname = 'public'
+                ) t
+                ORDER BY table_name ASC
+                ;
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL

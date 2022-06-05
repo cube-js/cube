@@ -1364,24 +1364,6 @@ impl LanguageToLogicalPlanConverter {
 
                 let schema = inputs[0].schema().as_ref().clone();
 
-                // TODO: temp solution. RM after DF union. is fixed
-                let inputs: Vec<LogicalPlan> = inputs
-                    .iter()
-                    .enumerate()
-                    .map(|(i, input)| {
-                        if i == 0 || schema == *input.schema().as_ref() {
-                            input.clone()
-                        } else {
-                            LogicalPlan::Projection(Projection {
-                                expr: input.expressions(),
-                                input: Arc::new(input.clone()),
-                                schema: Arc::new(schema.clone()),
-                                alias: None,
-                            })
-                        }
-                    })
-                    .collect::<Vec<LogicalPlan>>();
-
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
                 let schema = match alias {

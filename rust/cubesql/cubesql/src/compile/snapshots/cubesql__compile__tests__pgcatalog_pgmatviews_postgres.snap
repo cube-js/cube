@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_matviews\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------+-------------+--------------+------------+------------+-------------+------------+
+| schemaname | matviewname | matviewowner | tablespace | hasindexes | ispopulated | definition |
++------------+-------------+--------------+------------+------------+-------------+------------+
++------------+-------------+--------------+------------+------------+-------------+------------+
