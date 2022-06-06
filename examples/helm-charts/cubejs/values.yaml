@@ -28,6 +28,11 @@ image:
   ##
   pullPolicy: IfNotPresent
 
+  ## Specify a imagePullSecrets
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  ##
+  pullSecrets: []
+
 config:
   ## The port for a Cube.js deployment to listen to API connections on
   ##

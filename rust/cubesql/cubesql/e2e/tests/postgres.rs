@@ -302,13 +302,17 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_simple_query<AssertFn>(&self, query: String, f: AssertFn) -> RunResult<()>
+    async fn test_simple_query<AssertFn>(
+        &self,
+        query: String,
+        f: AssertFn,
+    ) -> Result<(), tokio_postgres::Error>
     where
         AssertFn: FnOnce(Vec<SimpleQueryMessage>) -> (),
     {
         print!("test {} .. ", query);
 
-        let res = self.client.simple_query(&query).await.unwrap();
+        let res = self.client.simple_query(&query).await?;
         f(res);
 
         println!("ok");
@@ -380,7 +384,6 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    // Tableau Desktop uses it
     async fn test_simple_cursors(&self) -> RunResult<()> {
         self.test_simple_query(
             r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 100);"#
@@ -460,12 +463,113 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_without_hold(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"begin; declare test_without_hold cursor for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"fetch 5 in test_without_hold; commit;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_without_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_without_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_specific(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE test_with_hold CURSOR WITH HOLD FOR SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"FETCH 5 IN test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(r#"CLOSE test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_with_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_with_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_all(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE cursor_1 CURSOR WITH HOLD for SELECT generate_series(1, 100); DECLARE cursor_2 CURSOR WITH HOLD for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+            .await?;
+
+        self.test_simple_query(
+            r#"FETCH 5 IN cursor_1; FETCH 5 IN cursor_2;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"CLOSE ALL;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor1 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_1;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_1\" does not exist"
+        );
+
+        // Assert that cursor2 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_2;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_2\" does not exist"
+        );
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl AsyncTestSuite for PostgresIntegrationTestSuite {
     async fn after_all(&mut self) -> RunResult<()> {
-        todo!()
+        // TODO: Close SQL API?
+        Ok(())
     }
 
     async fn run(&mut self) -> RunResult<()> {
@@ -474,6 +578,9 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_stream_all().await?;
         self.test_stream_single().await?;
         self.test_simple_cursors().await?;
+        self.test_simple_cursors_without_hold().await?;
+        self.test_simple_cursors_close_specific().await?;
+        self.test_simple_cursors_close_all().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,

@@ -29,6 +29,11 @@ image:
   ##
   pullPolicy: IfNotPresent
 
+  ## Specify a imagePullSecrets
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  ##
+  pullSecrets: []
+
 config:
   ## The logging level for Cube Store.
   ##
