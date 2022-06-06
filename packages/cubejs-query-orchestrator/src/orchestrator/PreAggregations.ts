@@ -766,7 +766,6 @@ export class PreAggregationLoader {
   }
 
   public refresh(newVersionEntry, invalidationKeys, client) {
-    console.log('RRR', newVersionEntry, invalidationKeys);
     let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
