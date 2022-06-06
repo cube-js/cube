@@ -86,6 +86,9 @@ async function resolveJDBCDriver(): Promise<string> {
   );
 }
 
+/**
+ * Databricks driver class.
+ */
 export class DatabricksDriver extends JDBCDriver {
   protected readonly config: DatabricksDriverConfiguration;
 
