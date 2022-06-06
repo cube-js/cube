@@ -35,42 +35,7 @@ cube(`Orders`, {
     },
 
     preAggregations: {
-        // // query: {
-        // //     measures: [count],
-        // //     dimensions: [status],
-        // // }
-        // ordersByStatus: {
-        //     // lambdaView: true,
-        //     measures: [count],
-        //     dimensions: [status],
-        //     // lambdaViewTimeDimension: completedAt,
-        //     granularity: `month`
-        // },
-        //
-        // // query: {
-        // //     measures: [count],
-        // //     dimensions: [status],
-        // // }
-        // ordersByStatus2: {
-        //     // lambdaView: true,
-        //     measures: [count],
-        //     dimensions: [status],
-        //     timeDimension: completedAt,
-        //     granularity: `month`,
-        // },
-        //
-        // // query: {
-        // //     measures: [count],
-        // //     timeDimension: completedAt,
-        // // }
-        // ordersByCompletedAt: {
-        //     // lambdaView: true,
-        //     measures: [count],
-        //     timeDimension: completedAt,
-        //     granularity: `month`,
-        // },
-
-        ordersByCompletedAtBuildRange: {
+        ordersByCompletedAt: {
             lambdaView: true,
             measures: [count, count2],
             timeDimension: completedAt,
