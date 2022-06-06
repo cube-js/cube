@@ -93,6 +93,8 @@ pub enum CommandCompletion {
     Set,
     Select(u32),
     DeclareCursor,
+    CloseCursor,
+    CloseCursorAll,
     Discard(String),
 }
 
@@ -107,6 +109,10 @@ impl CommandCompletion {
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
             CommandCompletion::DeclareCursor => {
                 CommandComplete::Plain("DECLARE CURSOR".to_string())
+            }
+            CommandCompletion::CloseCursor => CommandComplete::Plain("CLOSE CURSOR".to_string()),
+            CommandCompletion::CloseCursorAll => {
+                CommandComplete::Plain("CLOSE CURSOR ALL".to_string())
             }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT

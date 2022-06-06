@@ -90,7 +90,7 @@ impl SessionState {
     }
 
     pub fn is_in_transaction(&self) -> bool {
-        let mut guard = self
+        let guard = self
             .transaction
             .read()
             .expect("failed to unlock transaction for is_in_transaction");
