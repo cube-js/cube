@@ -706,27 +706,25 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(preAggregation: any, newVersionEntry, invalidationKeys) {
-    return (client) => {
-      let refreshStrategy = this.refreshImplStoreInSourceStrategy;
-      if (this.preAggregation.external) {
-        const readOnly =
-          this.preAggregation.readOnly ||
-          client.config && client.config.readOnly ||
-          client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
-        refreshStrategy = readOnly ?
-          this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
-      }
-      return cancelCombinator(
-        saveCancelFn => refreshStrategy.bind(this)(
-          client,
-          newVersionEntry,
-          saveCancelFn,
-          preAggregation,
-          invalidationKeys
-        )
-      );
-    };
+  public refresh(preAggregation: any, newVersionEntry, invalidationKeys, client) {
+    let refreshStrategy = this.refreshImplStoreInSourceStrategy;
+    if (this.preAggregation.external) {
+      const readOnly =
+        this.preAggregation.readOnly ||
+        client.config && client.config.readOnly ||
+        client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
+      refreshStrategy = readOnly ?
+        this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
+    }
+    return cancelCombinator(
+      saveCancelFn => refreshStrategy.bind(this)(
+        client,
+        newVersionEntry,
+        saveCancelFn,
+        preAggregation,
+        invalidationKeys
+      )
+    );
   }
 
   protected logExecutingSql(payload) {
@@ -751,7 +749,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry,
     saveCancelFn: SaveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -790,7 +787,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -815,7 +811,6 @@ export class PreAggregationLoader {
       const tableData = await this.downloadTempExternalPreAggregation(
         client,
         newVersionEntry,
-        preAggregation,
         saveCancelFn,
         queryOptions
       );
@@ -841,7 +836,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const [sql, params] =
@@ -902,7 +896,6 @@ export class PreAggregationLoader {
   protected async downloadTempExternalPreAggregation(
     client: DriverInterface,
     newVersionEntry,
-    preAggregation,
     saveCancelFn: SaveCancelFn,
     queryOptions: any
   ) {
@@ -928,7 +921,7 @@ export class PreAggregationLoader {
         );
 
         if (client.unload) {
-          const stream = new LargeStreamWarning(preAggregation.preAggregationId, (msg) => {
+          const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
             this.logger('Downloading external pre-aggregation warning', {
               ...queryOptions,
               error: msg
@@ -1603,7 +1596,7 @@ export class PreAggregations {
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
-        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
+        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys, client);
       }, {
         concurrency: 1,
         logger: this.logger,
