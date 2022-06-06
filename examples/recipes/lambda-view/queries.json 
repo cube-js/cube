@@ -1,0 +1,12 @@
+[
+  {
+    "measures": [ "Orders.count", "Orders.count2" ],
+    "timeDimensions": [
+      {
+        "dimension": "Orders.completedAt",
+        "granularity": "day"
+      }
+    ],
+    "limit": 3
+  }
+]

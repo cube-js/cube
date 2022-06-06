@@ -958,7 +958,8 @@ class ApiGateway {
           requestId: context.requestId
         });
 
-      const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
 
@@ -1110,12 +1111,7 @@ class ApiGateway {
       throw new UserError('query param is required');
     }
     if (typeof query === 'string') {
-      try {
-        query = JSON.parse(query);
-      } catch (ex) {
-        console.log('QQQ', ex);
-        throw ex;
-      }
+      query = JSON.parse(query);
     }
     return query as Query | Query[];
   }

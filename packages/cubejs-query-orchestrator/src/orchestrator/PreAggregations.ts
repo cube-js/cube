@@ -539,8 +539,6 @@ export class PreAggregationLoader {
     };
     const targetTableName = this.targetTableName(newVersionEntry);
 
-
-
     await cancelCombinator(
       async saveCancelFn => {
         const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
