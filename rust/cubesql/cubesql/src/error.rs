@@ -115,10 +115,10 @@ impl From<crate::compile::CompilationError> for CubeError {
     fn from(v: crate::compile::CompilationError) -> Self {
         let cause = match &v {
             crate::compile::CompilationError::User(_, meta)
-            | crate::compile::CompilationError::Unsupported(_, meta) => {
+            | crate::compile::CompilationError::Unsupported(_, meta)
+            | crate::compile::CompilationError::Internal(_, _, meta) => {
                 CubeErrorCauseType::Internal(meta.clone())
             }
-            _ => CubeErrorCauseType::Internal(None),
         };
         let mut err = CubeError::internal_with_bt(v.to_string(), v.to_backtrace());
         err.cause = cause;

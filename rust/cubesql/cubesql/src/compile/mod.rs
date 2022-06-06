@@ -1781,8 +1781,6 @@ impl QueryPlanner {
 
         match plan {
             Err(err) => {
-                log::error!("{}", err.to_string());
-
                 let meta = Some(HashMap::from([(
                     "query".to_string(),
                     SensitiveDataSanitizer::new().replace(stmt).to_string(),
@@ -2503,7 +2501,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
                     e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
                 ),
                 CubeErrorCauseType::User(_) => CompilationError::User(
-                    e.message.to_string(),
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
                     Some(HashMap::from([(
                         "query".to_string(),
                         SensitiveDataSanitizer::new().replace(&stmt).to_string(),
@@ -2512,7 +2513,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
             });
 
         if let Err(_) = &result {
-            log::error!("Can't rewrite plan: {:#?}", optimized_plan);
             log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.");
         }
 

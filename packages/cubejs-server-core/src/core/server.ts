@@ -226,6 +226,9 @@ export class CubejsServerCore {
 
           this.event(msg, props);
         }
+        if (msg === 'Cube SQL Error') {
+          params.message = params.query;
+        }
         oldLogger(msg, params);
       });
 

@@ -267,13 +267,9 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(err) => match err {
-                CompilationError::Unsupported(msg, meta) | CompilationError::User(msg, meta) => {
-                    (msg.clone(), meta.clone())
-                }
-                _ => (
-                    format!("Error during processing PostgreSQL message: {}", err),
-                    None,
-                ),
+                CompilationError::Unsupported(msg, meta)
+                | CompilationError::User(msg, meta)
+                | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
             },
             _ => (
                 format!("Error during processing PostgreSQL message: {}", err),
