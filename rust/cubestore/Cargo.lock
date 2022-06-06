@@ -130,7 +130,7 @@ dependencies = [
  "bitflags",
  "chrono",
  "csv",
- "flatbuffers 2.0.0",
+ "flatbuffers",
  "hex",
  "indexmap",
  "lazy_static",
@@ -1133,7 +1133,7 @@ dependencies = [
  "deadqueue",
  "deflate",
  "enum_primitive",
- "flatbuffers 0.7.0",
+ "flatbuffers",
  "flexbuffers",
  "futures 0.3.16",
  "futures-timer 3.0.2",
@@ -1467,16 +1467,6 @@ name = "fixedbitset"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
-
-[[package]]
-name = "flatbuffers"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbf606a9d6674ad82094652789cf69b0e6e598c2d3c9137c28970eec13f11644"
-dependencies = [
- "bitflags",
- "smallvec 1.8.0",
-]
 
 [[package]]
 name = "flatbuffers"
