@@ -706,7 +706,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(preAggregation: any, newVersionEntry, invalidationKeys, client) {
+  public refresh(newVersionEntry, invalidationKeys, client) {
     let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
@@ -721,7 +721,6 @@ export class PreAggregationLoader {
         client,
         newVersionEntry,
         saveCancelFn,
-        preAggregation,
         invalidationKeys
       )
     );
@@ -1596,7 +1595,7 @@ export class PreAggregations {
           ),
           { requestId, externalRefresh: this.externalRefresh }
         );
-        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys, client);
+        return loader.refresh(newVersionEntry, invalidationKeys, client);
       }, {
         concurrency: 1,
         logger: this.logger,
