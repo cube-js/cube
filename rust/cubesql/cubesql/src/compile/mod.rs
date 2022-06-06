@@ -8263,6 +8263,40 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_regproc_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_regproc_query",
+            execute_query(
+                "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid
+                FROM pg_catalog.pg_type
+                LEFT JOIN (
+                    select
+                        ns.oid as nspoid,
+                        ns.nspname,
+                        r.r
+                    from pg_namespace as ns
+                    join (
+                        select
+                            s.r,
+                            (current_schemas(false))[s.r] as nspname
+                        from generate_series(1, array_upper(current_schemas(false), 1)) as s(r)
+                    ) as r
+                    using ( nspname )
+                ) as sp
+                ON sp.nspoid = typnamespace
+                /* I've changed oid = to oid IN to verify is_array column */
+                WHERE pg_type.oid IN (25, 1016)
+                ORDER BY sp.r, pg_type.oid DESC;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_pg_namespace_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "metabase_pg_namespace",
