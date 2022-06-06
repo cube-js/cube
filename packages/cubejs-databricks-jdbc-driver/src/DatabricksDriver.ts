@@ -18,7 +18,7 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv, pausePromise } from '@cubejs-backend/shared';
+import { getEnv, pausePromise, CancelablePromise } from '@cubejs-backend/shared';
 import { v1, v5 } from 'uuid';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
@@ -260,206 +260,60 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
+   * Sleeper method.
+   */
+  private wait(ms: number): CancelablePromise<void> {
+    return pausePromise(ms);
+  }
+
+  /**
    * Assert http response.
    */
   private async assertResponse(response: Response): Promise<void> {
     if (!response.ok) {
+      const text = await response.text();
       throw new Error(`Databricks API call error: ${
         response.status
       } - ${
         response.statusText
       } - ${
-        await response.text()
+        text
       }`);
     }
   }
 
   /**
-   * Returns IDs of databricks runned clusters.
-   * Uses API v1.2.
-   * @deprecated
+   * Fetch API wrapper.
    */
-  private async getClustersIdsV12(): Promise<string[]> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/clusters/list`;
-
-    const request = new Request(url, {
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-
-    const response = await fetch(request);
-
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
-    }
-
-    const body: {
-      id: string,
-      status: string,
-    }[] = (await response.json()) as {
-      id: string,
-      status: string,
-    }[];
-    
-    return body
-      .filter(item => item.status === 'Running')
-      .map(item => item.id);
-  }
-
-  /**
-   * Returns execution context ("scala" by default) for spesified
-   * cluster.
-   * Uses API v1.2.
-   */
-  private async getContextId(
-    clusterId: string,
-    language = 'scala',
-  ): Promise<string> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/contexts/create`;
-
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        clusterId,
-        language,
-      }),
-    });
-    const response = await fetch(request);
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
-    }
-    const body = (await response.json()) as { id: string };
-    return body.id;
-  }
-
-  /**
-   * Running specified command.
-   * Uses API v1.2.
-   */
-  private async runCommand(
-    clusterId: string,
-    contextId: string,
-    language: string,
-    command: string,
-  ): Promise<string> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/commands/execute`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({
-        clusterId,
-        contextId,
-        language,
-        command,
-      }),
-    });
-    const response = await fetch(request);
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
-    }
-    const body = (await response.json()) as { id: string };
-    return body.id;
-  }
-
-  /**
-   * Resolves command result.
-   * TODO: timeout to cancel job?
-   * Uses API v1.2.
-   */
-  private async commandResult(
-    clusterId: string,
-    contextId: string,
-    commandId: string,
-  ): Promise<{resultType: string, data: string}> {
+  private async fetch(req: Request, count?: number, ms?: number): Promise<Response> {
+    count = count || 0;
+    ms = ms || 0;
     return new Promise((resolve, reject) => {
-      const url = `https://${
-        this.getApiUrl()
-      }/api/1.2/commands/status?clusterId=${
-        clusterId
-      }&contextId=${
-        contextId
-      }&commandId=${
-        commandId
-      }`;
-      const request = new Request(url, {
-        headers: new Headers({
-          Accept: '*/*',
-          Authorization: `Bearer ${this.getApiToken()}`,
-        }),
-      });
-      fetch(request).then((response) => {
-        if (!response.ok) {
-          reject();
-          throw new Error(`Databricks API call error: ${
-            response.status
-          } - ${
-            response.statusText
-          }`);
-        }
-        response.json().then((body) => {
-          const b = body as {
-            status: string,
-            results: {
-              resultType: string,
-              data: string,
-            }
-          };
-          if (b.status === 'Finished') {
-            resolve(b.results);
-          } else if (b.status === 'Error') {
-            reject(b.results);
-          } else if (b.status === 'Cancelled') {
-            reject(b.results);
-          } else {
-            pausePromise(this.config.pollInterval as number)
-              .then(() => {
-                this.commandResult(
-                  clusterId,
-                  contextId,
-                  commandId,
-                ).then((res) => {
-                  resolve(res);
-                }).catch((err) => {
-                  reject(err);
+      this
+        .wait(ms as number)
+        .then(() => {
+          fetch(req)
+            .then((res) => {
+              this
+                .assertResponse(res)
+                .then(() => { resolve(res); })
+                .catch((err) => {
+                  if (res.status === 429 && (count as number) < 5) {
+                    this
+                      .fetch(req, (count as number)++, (ms as number) + 5000)
+                      .then((_res) => { resolve(_res); })
+                      .catch((_err) => { reject(_err); });
+                  } else {
+                    reject(err);
+                  }
                 });
-              });
-          }
+            });
         });
-      });
     });
   }
 
   /**
    * Returns IDs of databricks runned clusters.
-   * Uses API v2.0.
    */
   private async getClustersIds(): Promise<string[]> {
     const url = `https://${
@@ -473,9 +327,7 @@ export class DatabricksDriver extends JDBCDriver {
       }),
     });
 
-    const response = await fetch(request);
-
-    await this.assertResponse(response);
+    const response = await this.fetch(request);
     
     const body: {
       clusters: {
@@ -492,7 +344,6 @@ export class DatabricksDriver extends JDBCDriver {
 
   /**
    * Import predefined nodebook to the databricks under specified path.
-   * Uses API v2.0.
    */
   private async importNotebook(p: string, content: string): Promise<void> {
     const url = `https://${
@@ -512,13 +363,11 @@ export class DatabricksDriver extends JDBCDriver {
         path: p,
       }),
     });
-    const response = await fetch(request);
-    await this.assertResponse(response);
+    await this.fetch(request);
   }
 
   /**
    * Create job and returns job id.
-   * Uses API v2.0.
    */
   private async createJob(cluster: string, p: string): Promise<number> {
     const url = `https://${
@@ -537,8 +386,7 @@ export class DatabricksDriver extends JDBCDriver {
         },
       }),
     });
-    const response = await fetch(request);
-    await this.assertResponse(response);
+    const response = await this.fetch(request);
     const body: {
       // eslint-disable-next-line camelcase
       job_id: number,
@@ -548,7 +396,6 @@ export class DatabricksDriver extends JDBCDriver {
 
   /**
    * Run job and returns run id.
-   * Uses API v2.0.
    */
   private async runJob(job: number): Promise<number> {
     const url = `https://${
@@ -564,8 +411,7 @@ export class DatabricksDriver extends JDBCDriver {
         job_id: job,
       }),
     });
-    const response = await fetch(request);
-    await this.assertResponse(response);
+    const response = await this.fetch(request);
     const body: {
       // eslint-disable-next-line camelcase
       run_id: number,
@@ -575,9 +421,10 @@ export class DatabricksDriver extends JDBCDriver {
 
   /**
    * Pooling databricks until run in progress and resolve when it's done.
-   * Uses API v2.0.
    */
-  private async waitRun(run: number): Promise<any> {
+  private async waitResult(run: number, ms?: number): Promise<any> {
+    ms = ms || 1000;
+    ms = ms <= 60000 ? ms * 2 : ms;
     return new Promise((resolve, reject) => {
       const url = `https://${
         this.getApiUrl()
@@ -588,47 +435,49 @@ export class DatabricksDriver extends JDBCDriver {
           Authorization: `Bearer ${this.getApiToken()}`,
         }),
       });
-      fetch(request).then((response) => {
-        this.assertResponse(response);
-        response.json().then((body: {
-          state: {
-            // eslint-disable-next-line camelcase
-            life_cycle_state: string,
-            // eslint-disable-next-line camelcase
-            result_state: string,
-          },
-        }) => {
-          const { state } = body;
-          if (
-            state.life_cycle_state === 'TERMINATED' &&
-            state.result_state === 'SUCCESS'
-          ) {
-            resolve(state.result_state);
-          } else if (
-            state.life_cycle_state === 'INTERNAL_ERROR' ||
-            state.result_state === 'FAILED' ||
-            state.result_state === 'TIMEDOUT' ||
-            state.result_state === 'CANCELED'
-          ) {
-            reject(state.result_state);
-          } else {
-            pausePromise(this.config.pollInterval as number)
-              .then(() => {
-                this.waitRun(run).then((res) => {
-                  resolve(res);
-                }).catch((err) => {
-                  reject(err);
+      this
+        .wait(ms as number)
+        .then(() => {
+          this
+            .fetch(request)
+            .then((response) => {
+              response
+                .json()
+                .then((body: {
+                  state: {
+                    // eslint-disable-next-line camelcase
+                    life_cycle_state: string,
+                    // eslint-disable-next-line camelcase
+                    result_state: string,
+                  },
+                }) => {
+                  const { state } = body;
+                  if (
+                    state.life_cycle_state === 'TERMINATED' &&
+                    state.result_state === 'SUCCESS'
+                  ) {
+                    resolve(state.result_state);
+                  } else if (
+                    state.life_cycle_state === 'INTERNAL_ERROR' ||
+                    state.result_state === 'FAILED' ||
+                    state.result_state === 'TIMEDOUT' ||
+                    state.result_state === 'CANCELED'
+                  ) {
+                    reject(state.result_state);
+                  } else {
+                    this
+                      .waitResult(run, ms)
+                      .then((res) => { resolve(res); })
+                      .catch((err) => { reject(err); });
+                  }
                 });
-              });
-          }
+            });
         });
-      });
     });
   }
 
   /**
    * Delete job.
-   * Uses API v2.0.
    */
   private async deleteJob(job: number): Promise<any> {
     const url = `https://${
@@ -644,13 +493,11 @@ export class DatabricksDriver extends JDBCDriver {
         job_id: job,
       }),
     });
-    const response = await fetch(request);
-    await this.assertResponse(response);
+    await this.fetch(request);
   }
 
   /**
    * Remove nodebook.
-   * Uses API v2.0.
    */
   private async deleteNotebook(p: string): Promise<any> {
     const url = `https://${
@@ -667,8 +514,7 @@ export class DatabricksDriver extends JDBCDriver {
         recursive: true,
       }),
     });
-    const response = await fetch(request);
-    await this.assertResponse(response);
+    await this.fetch(request);
   }
 
   /**
@@ -714,33 +560,41 @@ export class DatabricksDriver extends JDBCDriver {
     columns: string,
     pathname: string,
   ): Promise<string[]> {
-    const clusterId = (await this.getClustersIds())[0];
-    const contextId = await this.getContextId(clusterId);
-    const commandId = await this.runCommand(
-      clusterId,
-      contextId,
-      'scala',
-      `
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
-        )
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsSecretAccessKey","${this.config.awsSecret}"
-        )
-        sqlContext
-          .sql("SELECT ${columns} FROM ${table}")
-          .write
-          .format("com.databricks.spark.csv")
-          .option("header", "false")
-          .save("${pathname}")
-      `,
-    );
-    await this.commandResult(
-      clusterId,
-      contextId,
-      commandId,
-    );
-    const result = await this.getSignedS3Urls(pathname);
+    let result: string[] = [];
+    let notebook = true;
+    const filename = `/${v5(pathname, v1()).toString()}.scala`;
+    const content = Buffer.from(
+      `sc.hadoopConfiguration.set(
+        "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
+      )
+      sc.hadoopConfiguration.set(
+        "fs.s3n.awsSecretAccessKey","${this.config.awsSecret}"
+      )
+      sqlContext
+        .sql("SELECT ${columns} FROM ${table}")
+        .write
+        .format("com.databricks.spark.csv")
+        .option("header", "false")
+        .save("${pathname}")`,
+      'utf-8',
+    ).toString('base64');
+    const cluster = (await this.getClustersIds())[0];
+    try {
+      await this.importNotebook(filename, content);
+    } catch (e) {
+      notebook = false;
+    }
+    if (notebook) {
+      try {
+        const job = await this.createJob(cluster, filename);
+        const run = await this.runJob(job);
+        await this.waitResult(run);
+        await this.deleteJob(job);
+        result = await this.getSignedS3Urls(pathname);
+      } finally {
+        await this.deleteNotebook(filename);
+      }
+    }
     return result;
   }
 
@@ -750,10 +604,7 @@ export class DatabricksDriver extends JDBCDriver {
   private async getSignedWasbsUrls(
     pathname: string,
   ): Promise<string[]> {
-    // const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    // wasbs://cubejs-bucket@cubecloud.blob.core.windows.net/test/orderspa.csv
     const csvFile: string[] = [];
-
     const [container, account] =
       pathname.split('wasbs://')[1].split('.blob')[0].split('@');
     const foldername =
@@ -803,7 +654,8 @@ export class DatabricksDriver extends JDBCDriver {
     columns: string,
     pathname: string,
   ): Promise<string[]> {
-    let result: string[];
+    let result: string[] = [];
+    let notebook = true;
     const filename = `/${v5(pathname, v1()).toString()}.scala`;
     const storage = pathname.split('@')[1].split('.')[0];
     const content = Buffer.from(
@@ -819,16 +671,23 @@ export class DatabricksDriver extends JDBCDriver {
         .save("${pathname}")`,
       'utf-8',
     ).toString('base64');
+    // TODO: if there is no cluster should we create new one?
     const cluster = (await this.getClustersIds())[0];
-    await this.importNotebook(filename, content);
     try {
-      const job = await this.createJob(cluster, filename);
-      const run = await this.runJob(job);
-      await this.waitRun(run);
-      await this.deleteJob(job);
-      result = await this.getSignedWasbsUrls(pathname);
-    } finally {
-      await this.deleteNotebook(filename);
+      await this.importNotebook(filename, content);
+    } catch (e) {
+      notebook = false;
+    }
+    if (notebook) {
+      try {
+        const job = await this.createJob(cluster, filename);
+        const run = await this.runJob(job);
+        await this.waitResult(run);
+        await this.deleteJob(job);
+        result = await this.getSignedWasbsUrls(pathname);
+      } finally {
+        await this.deleteNotebook(filename);
+      }
     }
     return result;
   }
