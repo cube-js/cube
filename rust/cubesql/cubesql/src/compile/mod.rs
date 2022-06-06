@@ -8522,4 +8522,24 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "cast_decimal_default_precision",
+            execute_query(
+                "
+                SELECT \"rows\".b as \"plan\", count(1) as \"a0\"
+                FROM (SELECT * FROM (select 1 \"teamSize\", 2 b UNION ALL select 1011 \"teamSize\", 3 b) \"_\"
+                WHERE ((CAST(\"_\".\"teamSize\" as DECIMAL) = CAST(1011 as DECIMAL)))) \"rows\" 
+                GROUP BY \"plan\";
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
