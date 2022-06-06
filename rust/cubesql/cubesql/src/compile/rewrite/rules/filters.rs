@@ -1279,7 +1279,7 @@ impl FilterRules {
         for cube in var_iter!(egraph[subst[cube_var]], FilterReplacerCube) {
             if let Some(cube) = cube
                 .as_ref()
-                .and_then(|cube| meta_context.find_cube_with_name(cube.to_string()))
+                .and_then(|cube| meta_context.find_cube_with_name(cube))
             {
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                     for table_name in

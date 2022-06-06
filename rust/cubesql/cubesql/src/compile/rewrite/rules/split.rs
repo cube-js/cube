@@ -570,7 +570,7 @@ impl SplitRules {
                 for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun).cloned()
                 {
                     if fun == AggregateFunction::Min || fun == AggregateFunction::Max {
-                        if let Some(cube) = meta.find_cube_with_name(cube.to_string()) {
+                        if let Some(cube) = meta.find_cube_with_name(&cube) {
                             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
                                     if is_time_dimension && dimension._type == "time"
@@ -614,7 +614,7 @@ impl SplitRules {
             )
             .cloned()
             {
-                if let Some(cube) = meta.find_cube_with_name(cube) {
+                if let Some(cube) = meta.find_cube_with_name(&cube) {
                     for column in column_var
                         .map(|column_var| {
                             var_iter!(egraph[subst[column_var]], ColumnExprColumn)
@@ -646,7 +646,7 @@ impl SplitRules {
             )
             .cloned()
             {
-                if let Some(cube) = meta.find_cube_with_name(cube) {
+                if let Some(cube) = meta.find_cube_with_name(&cube) {
                     if cube
                         .lookup_measure(&MemberRules::default_count_measure_name())
                         .is_none()
@@ -769,7 +769,7 @@ impl SplitRules {
                     var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
                 {
                     if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
-                        if let Some(cube) = meta.find_cube_with_name(cube) {
+                        if let Some(cube) = meta.find_cube_with_name(&cube) {
                             for column in
                                 var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
                             {
@@ -830,7 +830,7 @@ impl SplitRules {
                     for cube in
                         var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
                     {
-                        if let Some(cube) = meta.find_cube_with_name(cube) {
+                        if let Some(cube) = meta.find_cube_with_name(&cube) {
                             if cube
                                 .lookup_measure(&MemberRules::default_count_measure_name())
                                 .is_none()
@@ -861,7 +861,7 @@ impl SplitRules {
             for cube in var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
             {
                 if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
-                    if let Some(cube) = meta.find_cube_with_name(cube) {
+                    if let Some(cube) = meta.find_cube_with_name(&cube) {
                         for column in
                             var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
                         {

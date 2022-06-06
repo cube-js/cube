@@ -1445,6 +1445,13 @@ struct QueryPlanner {
     session_manager: Arc<SessionManager>,
 }
 
+lazy_static! {
+    static ref METABASE_WORKAROUND: regex::Regex = regex::Regex::new(
+        r#"SELECT true AS "_" FROM "public"\."(?P<tblname>.*)" WHERE 1 <> 1 LIMIT 0"#
+    )
+    .unwrap();
+}
+
 impl QueryPlanner {
     pub fn new(
         state: Arc<SessionState>,
@@ -1466,6 +1473,24 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
     ) -> CompilationResult<QueryPlan> {
+        // Metabase
+        if let Some(c) = METABASE_WORKAROUND.captures(&stmt.to_string()) {
+            let tblname = c.name("tblname").unwrap().as_str();
+            if self.meta.find_cube_with_name(tblname).is_some() {
+                return Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Box::new(dataframe::DataFrame::new(
+                        vec![dataframe::Column::new(
+                            "_".to_string(),
+                            ColumnType::Int8,
+                            ColumnFlags::empty(),
+                        )],
+                        vec![],
+                    )),
+                ));
+            }
+        }
+
         // TODO move CUBESQL_REWRITE_ENGINE env to config
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
@@ -1619,7 +1644,7 @@ impl QueryPlanner {
             ));
         };
 
-        if let Some(cube) = self.meta.find_cube_with_name(table_name.clone()) {
+        if let Some(cube) = self.meta.find_cube_with_name(&table_name) {
             let mut ctx = QueryContext::new(&cube);
             let mut builder = compile_select(select, &mut ctx)?;
 
@@ -8692,6 +8717,21 @@ ORDER BY \"COUNT(count)\" DESC"
             DatabaseProtocol::PostgreSQL,
         )
         .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_table_exists() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_table_exists",
+            execute_query(
+                r#"SELECT TRUE AS "_" FROM "public"."KibanaSampleDataEcommerce" WHERE 1 <> 1 LIMIT 0;"#
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
 
         Ok(())
     }
