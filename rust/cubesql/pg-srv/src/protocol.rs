@@ -414,12 +414,18 @@ impl Serialize for RowDescription {
 #[derive(Debug, Clone)]
 pub struct RowDescriptionField {
     name: String,
-    // TODO: REWORK!
+    /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
     table_oid: i32,
+    /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
     attribute_number: i16,
+    // The object ID of the field's data type. PgTypeId
     data_type_oid: i32,
+    /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
     data_type_size: i16,
+    /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
+    /// select attrelid, attname, atttypmod from pg_attribute;
     type_modifier: i32,
+    /// The format code being used for the field. It depends on the client request and binary ecconding for specific type
     format: Format,
 }
 
@@ -427,26 +433,15 @@ impl RowDescriptionField {
     pub fn new(name: String, typ: &PgType, format: Format) -> Self {
         Self {
             name,
+            // TODO: REWORK!
             table_oid: 0,
+            // TODO: REWORK!
             attribute_number: 0,
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
-            format: if format == Format::Binary {
-                // TODO: Introduce new function for PgType that checks for binary support
-                if typ.oid == PgTypeId::INT4 as u32
-                    || typ.oid == PgTypeId::INT2 as u32
-                    || typ.oid == PgTypeId::INT8 as u32
-                    || typ.oid == PgTypeId::BOOL as u32
-                    || typ.oid == PgTypeId::FLOAT4 as u32
-                    || typ.oid == PgTypeId::FLOAT8 as u32
-                    || typ.oid == PgTypeId::TIMESTAMP as u32
-                    || typ.oid == PgTypeId::TIMESTAMPTZ as u32
-                {
-                    Format::Binary
-                } else {
-                    Format::Text
-                }
+            format: if format == Format::Binary && typ.is_binary_supported() {
+                Format::Binary
             } else {
                 Format::Text
             },
