@@ -27,7 +27,7 @@ use pg_srv::{
 };
 use sqlparser::{
     ast,
-    ast::{FetchDirection, Statement, Value},
+    ast::{CloseCursor, FetchDirection, Statement, Value},
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -884,6 +884,49 @@ impl AsyncPostgresShim {
                     StatusFlags::empty(),
                     CommandCompletion::Discard(object_type.to_string()),
                 );
+
+                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                    .await?;
+            }
+            Statement::Close { cursor } => {
+                let plan = match cursor {
+                    CloseCursor::All => {
+                        let mut portals_to_remove = Vec::new();
+
+                        for (key, _) in &self.cursors {
+                            portals_to_remove.push(key.clone());
+                        }
+
+                        self.cursors = HashMap::new();
+
+                        for key in portals_to_remove {
+                            self.portals.remove(&key);
+                        }
+
+                        Ok(QueryPlan::MetaOk(
+                            StatusFlags::empty(),
+                            CommandCompletion::CloseCursorAll,
+                        ))
+                    }
+                    CloseCursor::Specific { name } => {
+                        if self.cursors.remove(&name.value).is_some() {
+                            self.portals.remove(&name.value);
+
+                            Ok(QueryPlan::MetaOk(
+                                StatusFlags::empty(),
+                                CommandCompletion::CloseCursor,
+                            ))
+                        } else {
+                            Err(ConnectionError::Protocol(
+                                protocol::ErrorResponse::error(
+                                    protocol::ErrorCode::ProtocolViolation,
+                                    format!(r#"cursor "{}" does not exist"#, name.value),
+                                )
+                                .into(),
+                            ))
+                        }
+                    }
+                }?;
 
                 self.write_portal(&mut Portal::new(plan, Format::Text), 0)
                     .await?;

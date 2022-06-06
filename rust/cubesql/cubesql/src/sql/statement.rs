@@ -158,6 +158,7 @@ trait Visitor<'ast> {
                     self.visit_expr(expr);
                 }
             }
+            Expr::ArraySubquery(query) => self.visit_query(query),
             Expr::DotExpr { expr, field } => {
                 self.visit_expr(expr);
                 self.visit_identifier(field);
