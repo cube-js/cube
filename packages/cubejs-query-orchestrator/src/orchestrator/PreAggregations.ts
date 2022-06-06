@@ -247,7 +247,6 @@ class PreAggregationLoadCache {
     }
 
     const newTables = await this.fetchTablesNoCache(preAggregation);
-    console.log('TTT', newTables);
     await this.cacheDriver.set(
       this.tablesRedisKey(preAggregation),
       newTables,
