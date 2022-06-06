@@ -7690,6 +7690,85 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn tableau_desktop_constraints() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "tableau_desktop_constraints",
+            execute_query(
+                "select	'test'::name as PKTABLE_CAT,
+                n2.nspname as PKTABLE_SCHEM,
+                c2.relname as PKTABLE_NAME,
+                a2.attname as PKCOLUMN_NAME,
+                'test'::name as FKTABLE_CAT,
+                n1.nspname as FKTABLE_SCHEM,
+                c1.relname as FKTABLE_NAME,
+                a1.attname as FKCOLUMN_NAME,
+                i::int2 as KEY_SEQ,
+                case ref.confupdtype
+                    when 'c' then 0::int2
+                    when 'n' then 2::int2
+                    when 'd' then 4::int2
+                    when 'r' then 1::int2
+                    else 3::int2
+                end as UPDATE_RULE,
+                case ref.confdeltype
+                    when 'c' then 0::int2
+                    when 'n' then 2::int2
+                    when 'd' then 4::int2
+                    when 'r' then 1::int2
+                    else 3::int2
+                end as DELETE_RULE,
+                ref.conname as FK_NAME,
+                cn.conname as PK_NAME,
+                case
+                    when ref.condeferrable then
+                        case
+                        when ref.condeferred then 5::int2
+                        else 6::int2
+                        end
+                    else 7::int2
+                end as DEFERRABLITY
+             from
+             ((((((( (select cn.oid, conrelid, conkey, confrelid, confkey,
+                 generate_series(array_lower(conkey, 1), array_upper(conkey, 1)) as i,
+                 confupdtype, confdeltype, conname,
+                 condeferrable, condeferred
+              from pg_catalog.pg_constraint cn,
+                pg_catalog.pg_class c,
+                pg_catalog.pg_namespace n
+              where contype = 'f'
+               and  conrelid = c.oid
+               and  relname = 'KibanaSampleDataEcommerce'
+               and  n.oid = c.relnamespace
+               and  n.nspname = 'public'
+             ) ref
+             inner join pg_catalog.pg_class c1
+              on c1.oid = ref.conrelid)
+             inner join pg_catalog.pg_namespace n1
+              on  n1.oid = c1.relnamespace)
+             inner join pg_catalog.pg_attribute a1
+              on  a1.attrelid = c1.oid
+              and  a1.attnum = conkey[i])
+             inner join pg_catalog.pg_class c2
+              on  c2.oid = ref.confrelid)
+             inner join pg_catalog.pg_namespace n2
+              on  n2.oid = c2.relnamespace)
+             inner join pg_catalog.pg_attribute a2
+              on  a2.attrelid = c2.oid
+              and  a2.attnum = confkey[i])
+             left outer join pg_catalog.pg_constraint cn
+              on cn.conrelid = ref.confrelid
+              and cn.contype = 'p')
+              order by ref.oid, ref.i;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn tableau_get_expr_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "tableau_get_expr_query",
@@ -7986,60 +8065,6 @@ ORDER BY \"COUNT(count)\" DESC"
             )
             .await?
         );
-
-        // TODO: 'Boolean = Utf8' can't be evaluated because there isn't a common type to coerce the types to
-        // insta::assert_snapshot!(
-        //     "powerbi_introspection",
-        //     execute_query(
-        //         "SELECT
-        //           na.nspname as Schema,
-        //           cl.relname as Table,
-        //           att.attname AS Name,
-        //           att.attnum as Position,
-        //           CASE WHEN att.attnotnull = 'f' THEN 'true' ELSE 'false' END as Nullable,
-        //           CASE WHEN ty.typname Like 'bit' OR ty.typname Like 'varbit' and att.atttypmod > 0 THEN att.atttypmod
-        //                WHEN ty.typname Like 'interval' THEN -1
-        //                WHEN att.atttypmod > 0 THEN att.atttypmod - 4 ELSE att.atttypmod END as Length,
-        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_numeric_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Precision, */
-        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_numeric_scale(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS Scale , */
-        //           /* TODO: Row->struct packing + casting for DOMAIN types (information_schema._pg_datetime_precision(information_schema._pg_truetypid(att.*, ty.*), information_schema._pg_truetypmod(att.*, ty.*)))::information_schema.cardinal_number AS DatetimeLength, */
-        //           CASE WHEN att.attnotnull = 'f' THEN 'false' ELSE 'true' END as IsUnique,
-        //           att.atthasdef as HasDefaultValue,
-        //           att.attisdropped as IsDropped,
-        //           att.attinhcount as ancestorCount,
-        //           att.attndims as Dimension,
-        //           CASE WHEN attndims > 0 THEN true ELSE false END AS isarray,
-        //           CASE WHEN ty.typname = 'bpchar' THEN 'char'
-        //                WHEN ty.typname = '_bpchar' THEN '_char' ELSE ty.typname END as TypeName,
-        //           tn.nspname as TypeSchema,
-        //           et.typname as elementaltypename,
-        //           description as Comment,
-        //           cs.relname AS sername,
-        //           ns.nspname AS serschema,
-        //            att.attidentity as IdentityMode,
-        //           CAST(pg_get_expr(def.adbin, def.adrelid) AS varchar) as DefaultValue
-        //           /* TODO: correlated sub queries use same column names which is not supported (SELECT count(1) FROM pg_type t2 WHERE t2.typname=ty.typname) > 1 AS isdup */
-        //         FROM pg_attribute att
-        //         JOIN pg_type ty ON ty.oid=atttypid
-        //         JOIN pg_namespace tn ON tn.oid=ty.typnamespace
-        //         JOIN pg_class cl ON cl.oid=attrelid AND ((cl.relkind = 'r') OR (cl.relkind = 's') OR (cl.relkind = 'v') OR (cl.relkind = 'm') OR (cl.relkind = 'f'))
-        //         JOIN pg_namespace na ON na.oid=cl.relnamespace
-        //         LEFT OUTER JOIN pg_type et ON et.oid=ty.typelem
-        //         LEFT OUTER JOIN pg_attrdef def ON adrelid=attrelid AND adnum=attnum
-        //         LEFT OUTER JOIN pg_description des ON des.objoid=attrelid AND des.objsubid=attnum
-        //         LEFT OUTER JOIN (pg_depend JOIN pg_class cs ON objid=cs.oid AND cs.relkind='S' AND classid='pg_class'::regclass::oid) ON refobjid=attrelid AND refobjsubid=attnum
-        //         LEFT OUTER JOIN pg_namespace ns ON ns.oid=cs.relnamespace
-        //         WHERE attnum > 0
-        //           AND attisdropped IS FALSE
-        //           /* TODO AND cl.relname like E'users' */
-        //           /* TODO AND na.nspname like E'public' */
-        //           AND att.attname like '%'
-        //         ORDER BY attnum"
-        //         .to_string(),
-        //         DatabaseProtocol::PostgreSQL
-        //     )
-        //     .await?
-        // );
 
         Ok(())
     }
