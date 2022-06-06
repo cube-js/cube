@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.13](https://github.com/cube-js/cube.js/compare/v0.30.12...v0.30.13) (2022-06-05)
+
+
+### Features
+
+* **cubesql:** PowerBI is not empty filter ([e31ffdc](https://github.com/cube-js/cube.js/commit/e31ffdcd762236fb54d454ede7e892acb54bdcee))
+
+
+
+
+
+## [0.30.11](https://github.com/cube-js/cube.js/compare/v0.30.10...v0.30.11) (2022-06-03)
+
+
+### Features
+
+* **cubesql:** PowerBI contains filter support ([#4646](https://github.com/cube-js/cube.js/issues/4646)) ([3cbd753](https://github.com/cube-js/cube.js/commit/3cbd753b47dc1a20f3fede11bf0c01b784504869))
+
+
+
+
+
 ## [0.30.10](https://github.com/cube-js/cube.js/compare/v0.30.9...v0.30.10) (2022-06-01)
 
 

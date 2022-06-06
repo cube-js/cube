@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import fs from 'fs';
 import path from 'path';
-import fetch, { Headers, Request } from 'node-fetch';
+import fetch, { Headers, Request, Response } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -19,6 +19,7 @@ import {
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
 import { getEnv, pausePromise } from '@cubejs-backend/shared';
+import { v1, v5 } from 'uuid';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -259,9 +260,26 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns IDs of databricks runned clusters.
+   * Assert http response.
    */
-  private async getClustersIds(): Promise<string[]> {
+  private async assertResponse(response: Response): Promise<void> {
+    if (!response.ok) {
+      throw new Error(`Databricks API call error: ${
+        response.status
+      } - ${
+        response.statusText
+      } - ${
+        await response.text()
+      }`);
+    }
+  }
+
+  /**
+   * Returns IDs of databricks runned clusters.
+   * Uses API v1.2.
+   * @deprecated
+   */
+  private async getClustersIdsV12(): Promise<string[]> {
     const url = `https://${
       this.getApiUrl()
     }/api/1.2/clusters/list`;
@@ -299,6 +317,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns execution context ("scala" by default) for spesified
    * cluster.
+   * Uses API v1.2.
    */
   private async getContextId(
     clusterId: string,
@@ -333,6 +352,7 @@ export class DatabricksDriver extends JDBCDriver {
 
   /**
    * Running specified command.
+   * Uses API v1.2.
    */
   private async runCommand(
     clusterId: string,
@@ -372,6 +392,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Resolves command result.
    * TODO: timeout to cancel job?
+   * Uses API v1.2.
    */
   private async commandResult(
     clusterId: string,
@@ -434,6 +455,220 @@ export class DatabricksDriver extends JDBCDriver {
         });
       });
     });
+  }
+
+  /**
+   * Returns IDs of databricks runned clusters.
+   * Uses API v2.0.
+   */
+  private async getClustersIds(): Promise<string[]> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/clusters/list`;
+
+    const request = new Request(url, {
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+    });
+
+    const response = await fetch(request);
+
+    await this.assertResponse(response);
+    
+    const body: {
+      clusters: {
+      // eslint-disable-next-line camelcase
+        cluster_id: string,
+        state: string,
+      }[],
+    } = await response.json();
+    
+    return body.clusters
+      .filter(item => item.state === 'RUNNING')
+      .map(item => item.cluster_id);
+  }
+
+  /**
+   * Import predefined nodebook to the databricks under specified path.
+   * Uses API v2.0.
+   */
+  private async importNotebook(p: string, content: string): Promise<void> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/workspace/import`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        format: 'SOURCE',
+        language: 'SCALA',
+        overwrite: true,
+        content,
+        path: p,
+      }),
+    });
+    const response = await fetch(request);
+    await this.assertResponse(response);
+  }
+
+  /**
+   * Create job and returns job id.
+   * Uses API v2.0.
+   */
+  private async createJob(cluster: string, p: string): Promise<number> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/jobs/create`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        existing_cluster_id: cluster,
+        notebook_task: {
+          notebook_path: p,
+        },
+      }),
+    });
+    const response = await fetch(request);
+    await this.assertResponse(response);
+    const body: {
+      // eslint-disable-next-line camelcase
+      job_id: number,
+    } = await response.json();
+    return body.job_id;
+  }
+
+  /**
+   * Run job and returns run id.
+   * Uses API v2.0.
+   */
+  private async runJob(job: number): Promise<number> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/jobs/run-now`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        job_id: job,
+      }),
+    });
+    const response = await fetch(request);
+    await this.assertResponse(response);
+    const body: {
+      // eslint-disable-next-line camelcase
+      run_id: number,
+    } = await response.json();
+    return body.run_id;
+  }
+
+  /**
+   * Pooling databricks until run in progress and resolve when it's done.
+   * Uses API v2.0.
+   */
+  private async waitRun(run: number): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const url = `https://${
+        this.getApiUrl()
+      }/api/2.0/jobs/runs/get?run_id=${run}`;
+      const request = new Request(url, {
+        headers: new Headers({
+          Accept: '*/*',
+          Authorization: `Bearer ${this.getApiToken()}`,
+        }),
+      });
+      fetch(request).then((response) => {
+        this.assertResponse(response);
+        response.json().then((body: {
+          state: {
+            // eslint-disable-next-line camelcase
+            life_cycle_state: string,
+            // eslint-disable-next-line camelcase
+            result_state: string,
+          },
+        }) => {
+          const { state } = body;
+          if (
+            state.life_cycle_state === 'TERMINATED' &&
+            state.result_state === 'SUCCESS'
+          ) {
+            resolve(state.result_state);
+          } else if (
+            state.life_cycle_state === 'INTERNAL_ERROR' ||
+            state.result_state === 'FAILED' ||
+            state.result_state === 'TIMEDOUT' ||
+            state.result_state === 'CANCELED'
+          ) {
+            reject(state.result_state);
+          } else {
+            pausePromise(this.config.pollInterval as number)
+              .then(() => {
+                this.waitRun(run).then((res) => {
+                  resolve(res);
+                }).catch((err) => {
+                  reject(err);
+                });
+              });
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Delete job.
+   * Uses API v2.0.
+   */
+  private async deleteJob(job: number): Promise<any> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/jobs/delete`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        job_id: job,
+      }),
+    });
+    const response = await fetch(request);
+    await this.assertResponse(response);
+  }
+
+  /**
+   * Remove nodebook.
+   * Uses API v2.0.
+   */
+  private async deleteNotebook(p: string): Promise<any> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/workspace/delete`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        path: p,
+        recursive: true,
+      }),
+    });
+    const response = await fetch(request);
+    await this.assertResponse(response);
   }
 
   /**
@@ -568,15 +803,11 @@ export class DatabricksDriver extends JDBCDriver {
     columns: string,
     pathname: string,
   ): Promise<string[]> {
+    let result: string[];
+    const filename = `/${v5(pathname, v1()).toString()}.scala`;
     const storage = pathname.split('@')[1].split('.')[0];
-    const clusterId = (await this.getClustersIds())[0];
-    const contextId = await this.getContextId(clusterId);
-    const commandId = await this.runCommand(
-      clusterId,
-      contextId,
-      'scala',
-      `
-      spark.conf.set(
+    const content = Buffer.from(
+      `spark.conf.set(
         "fs.azure.account.key.${storage}.blob.core.windows.net",
         "${this.config.azureKey}"
       )
@@ -585,15 +816,20 @@ export class DatabricksDriver extends JDBCDriver {
         .write
         .format("com.databricks.spark.csv")
         .option("header", "false")
-        .save("${pathname}")
-      `,
-    );
-    await this.commandResult(
-      clusterId,
-      contextId,
-      commandId,
-    );
-    const result = await this.getSignedWasbsUrls(pathname);
+        .save("${pathname}")`,
+      'utf-8',
+    ).toString('base64');
+    const cluster = (await this.getClustersIds())[0];
+    await this.importNotebook(filename, content);
+    try {
+      const job = await this.createJob(cluster, filename);
+      const run = await this.runJob(job);
+      await this.waitRun(run);
+      await this.deleteJob(job);
+      result = await this.getSignedWasbsUrls(pathname);
+    } finally {
+      await this.deleteNotebook(filename);
+    }
     return result;
   }
 

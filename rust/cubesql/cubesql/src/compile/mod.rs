@@ -3772,6 +3772,71 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
+    fn power_bi_is_not_empty() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select sum(\"rows\".\"count\") as \"a0\" from (select \"_\".\"count\" from \"public\".\"KibanaSampleDataEcommerce\" \"_\" where (not \"_\".\"customer_gender\" is null and not \"_\".\"customer_gender\" = '' or not (not \"_\".\"customer_gender\" is null))) \"rows\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                    ),
+                                    operator: Some("set".to_string()),
+                                    values: None,
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                    ),
+                                    operator: Some("notEquals".to_string()),
+                                    values: Some(vec!["".to_string()]),
+                                    or: None,
+                                    and: None,
+                                })
+                            ])
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
+    }
+
+    #[test]
     fn non_cube_filters_cast_kept() {
         init_logger();
 
@@ -8188,6 +8253,26 @@ ORDER BY \"COUNT(count)\" DESC"
                 FROM pg_catalog.pg_type t
                 JOIN pg_catalog.pg_namespace n
                 ON t.typnamespace = n.oid WHERE t.oid = 25;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_pg_namespace_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_pg_namespace",
+            execute_query(
+                "SELECT nspname AS TABLE_SCHEM, NULL AS TABLE_CATALOG
+                FROM pg_catalog.pg_namespace
+                WHERE nspname <> 'pg_toast'
+                AND (nspname !~ '^pg_temp_'  OR nspname = (pg_catalog.current_schemas(true))[1])
+                AND (nspname !~ '^pg_toast_temp_'  OR nspname = replace((pg_catalog.current_schemas(true))[1], 'pg_temp_', 'pg_toast_temp_'))
+                ORDER BY TABLE_SCHEM;"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )

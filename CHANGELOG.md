@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.13](https://github.com/cube-js/cube.js/compare/v0.30.12...v0.30.13) (2022-06-05)
+
+
+### Features
+
+* **cubesql:** PowerBI is not empty filter ([e31ffdc](https://github.com/cube-js/cube.js/commit/e31ffdcd762236fb54d454ede7e892acb54bdcee))
+
+
+
+
+
+## [0.30.12](https://github.com/cube-js/cube.js/compare/v0.30.11...v0.30.12) (2022-06-03)
+
+
+### Features
+
+* **databricks-jdbc:** export bucket for azure via databricks api v2.0 ([3d6b8c6](https://github.com/cube-js/cube.js/commit/3d6b8c6e14ccaa784ed07bf13adcd72f948526a8))
+
+
+
+
+
+## [0.30.11](https://github.com/cube-js/cube.js/compare/v0.30.10...v0.30.11) (2022-06-03)
+
+
+### Bug Fixes
+
+* **cubesql:** array_lower, array_upper - correct behaviour ([#4677](https://github.com/cube-js/cube.js/issues/4677)) ([a3f29d4](https://github.com/cube-js/cube.js/commit/a3f29d4df9fc85e53406101bb73b7a7281a60846))
+
+
+### Features
+
+* **cubesql:** Add `pg_catalog.pg_matviews` meta layer table ([2fbc5f4](https://github.com/cube-js/cube.js/commit/2fbc5f43de312a85967dbd8be79bd92ee04141a7))
+* **cubesql:** PowerBI contains filter support ([#4646](https://github.com/cube-js/cube.js/issues/4646)) ([3cbd753](https://github.com/cube-js/cube.js/commit/3cbd753b47dc1a20f3fede11bf0c01b784504869))
+* **cubesql:** Support `[NOT] ILIKE` operator ([96b05c8](https://github.com/cube-js/cube.js/commit/96b05c843588aa96a935e5491667d77b3f456b82))
+* **cubesql:** Support ArrayIndex for scalars ([419689e](https://github.com/cube-js/cube.js/commit/419689e7d341e287596455d5c94b8225d627798b))
+
+
+
+
+
 ## [0.30.10](https://github.com/cube-js/cube.js/compare/v0.30.9...v0.30.10) (2022-06-01)
 
 
