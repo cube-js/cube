@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT \\\"rows\\\".b as \\\"plan\\\", count(1) as \\\"a0\\\"\n                FROM (SELECT * FROM (select 1 \\\"teamSize\\\", 2 b UNION ALL select 1011 \\\"teamSize\\\", 3 b) \\\"_\\\"\n                WHERE ((CAST(\\\"_\\\".\\\"teamSize\\\" as DECIMAL) = CAST(1011 as DECIMAL)))) \\\"rows\\\" \n                GROUP BY \\\"plan\\\";\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+----+
+| plan | a0 |
++------+----+
+| 2    | 1  |
+| 3    | 1  |
++------+----+

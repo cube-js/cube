@@ -8547,4 +8547,51 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "cast_decimal_default_precision",
+            execute_query(
+                "
+                SELECT \"rows\".b as \"plan\", count(1) as \"a0\"
+                FROM (SELECT * FROM (select 1 \"teamSize\", 2 b UNION ALL select 1011 \"teamSize\", 3 b) \"_\"
+                WHERE ((CAST(\"_\".\"teamSize\" as DECIMAL) = CAST(1011 as DECIMAL)))) \"rows\" 
+                GROUP BY \"plan\";
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT count FROM KibanaSampleDataEcommerce WHERE (CAST(maxPrice AS Decimal) = CAST(100 AS Decimal));"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["100".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+
+        Ok(())
+    }
 }
