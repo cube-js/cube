@@ -510,7 +510,7 @@ impl<'ast> Visitor<'ast> for CastReplacer {
         {
             match data_type {
                 ast::DataType::Custom(name) => match name.to_string().as_str() {
-                    "oid" | "information_schema.cardinal_number" => {
+                    "oid" | "information_schema.cardinal_number" | "regproc" => {
                         self.visit_expr(&mut *cast_expr);
 
                         *expr = *cast_expr.clone();

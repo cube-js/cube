@@ -35,8 +35,8 @@ struct PgCatalogTypeBuilder {
     typsubscript: StringBuilder,
     typelem: UInt32Builder,
     typarray: UInt32Builder,
-    // TODO: Check
     typinput: StringBuilder,
+    // TODO: Check
     typoutput: StringBuilder,
     // In real tables, it's an additional type, but in pg_proc it's an oid
     typreceive: UInt32Builder,
@@ -79,8 +79,8 @@ impl PgCatalogTypeBuilder {
             typarray: UInt32Builder::new(capacity),
             // In real tables, it's an additional type, but in pg_proc it's an oid
             typreceive: UInt32Builder::new(capacity),
-            // TODO: Check
             typinput: StringBuilder::new(capacity),
+            // TODO: Check
             typoutput: StringBuilder::new(capacity),
             typsend: StringBuilder::new(capacity),
             typmodin: StringBuilder::new(capacity),
@@ -116,8 +116,8 @@ impl PgCatalogTypeBuilder {
         self.typelem.append_value(typ.typelem).unwrap();
         self.typarray.append_value(typ.typarray).unwrap();
         self.typreceive.append_value(typ.typreceive_oid).unwrap();
+        self.typinput.append_value(typ.get_typinput()).unwrap();
         // TODO: Check
-        self.typinput.append_null().unwrap();
         self.typoutput.append_null().unwrap();
         self.typsend.append_null().unwrap();
         self.typmodin.append_null().unwrap();
@@ -271,8 +271,8 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typsubscript", DataType::Utf8, true),
             Field::new("typelem", DataType::UInt32, true),
             Field::new("typarray", DataType::UInt32, true),
+            Field::new("typinput", DataType::Utf8, false),
             // TODO: Check
-            Field::new("typinput", DataType::Utf8, true),
             Field::new("typoutput", DataType::Utf8, true),
             // In real tables, it's an additional type, but in pg_proc it's an oid
             Field::new("typreceive", DataType::UInt32, true),
