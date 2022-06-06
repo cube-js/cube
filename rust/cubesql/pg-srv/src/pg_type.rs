@@ -51,6 +51,11 @@ impl<'a> PgType<'a> {
             "record_in".to_string()
         }
     }
+
+    pub fn is_binary_supported(&self) -> bool {
+        // Right now, We assume that all types have binary encoding support
+        true
+    }
 }
 
 macro_rules! define_pg_types {
