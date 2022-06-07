@@ -10,5 +10,3 @@ updates:
       interval: "monthly"
     allow:
       - dependency-type: "production"
-    ignore:
-      - update-types: ["version-update:semver-patch"]
