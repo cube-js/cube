@@ -298,7 +298,6 @@ pub trait ConfigObj: DIService {
     fn compaction_in_memory_chunks_total_size_limit(&self) -> u64;
 
     fn compaction_in_memory_chunks_count_threshold(&self) -> usize;
-    
 
     fn wal_split_threshold(&self) -> u64;
 
@@ -432,7 +431,7 @@ impl ConfigObj for ConfigObjImpl {
     fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
         self.compaction_in_memory_chunks_size_limit
     }
-    
+
     fn compaction_chunks_max_lifetime_threshold(&self) -> u64 {
         self.compaction_chunks_max_lifetime_threshold
     }

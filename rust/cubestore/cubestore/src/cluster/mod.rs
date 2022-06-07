@@ -629,7 +629,9 @@ impl Cluster for ClusterImpl {
             .map(|c| c.get_row().get_row_count())
             .sum::<u64>();
 
-        if chunks.len() > compaction_in_memory_chunks_count_threshold && chunks_total_size < compaction_in_memory_chunks_total_size_limit {
+        if chunks.len() > compaction_in_memory_chunks_count_threshold
+            && chunks_total_size < compaction_in_memory_chunks_total_size_limit
+        {
             let job = self
                 .meta_store
                 .add_job(Job::new(

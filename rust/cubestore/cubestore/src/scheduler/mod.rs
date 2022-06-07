@@ -567,9 +567,9 @@ impl SchedulerImpl {
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
             || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
             // In memory chunks compacting in own job. Keep this condition just in case
-            || in_memory_chunks.len() > 100 
+            || in_memory_chunks.len() > 100
             // Force compaction if in_memory chunks were created far ago
-            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_chunks_max_lifetime_threshold()  as i64).unwrap_or(false) 
+            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_chunks_max_lifetime_threshold()  as i64).unwrap_or(false)
             // Force compaction if other chunks were created far ago
             || min_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_chunks_max_lifetime_threshold() as i64).unwrap_or(false)
         {
