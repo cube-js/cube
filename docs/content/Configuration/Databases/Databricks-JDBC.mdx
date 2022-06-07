@@ -1,0 +1,91 @@
+---
+title: Databricks JDBC
+permalink: /config/databases/databricks/jdbc
+---
+
+## Prerequisites
+
+- [A JDK installation][gh-cubejs-jdbc-install]
+- The [JDBC URL][databricks-docs-jdbc-url] for the [Databricks][databricks]
+  cluster
+
+## Setup
+
+### <--{"id" : "Setup"}--> Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=databricks-jdbc
+# CUBEJS_DB_NAME is optional
+CUBEJS_DB_NAME=default
+# You can find this inside the cluster's configuration
+CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token;PWD=XXXXX
+```
+
+## Environment Variables
+
+| Environment Variable       | Description                            | Possible Values       | Required |
+| -------------------------- | -------------------------------------- | --------------------- | :------: |
+| `CUBEJS_DB_NAME`           | The name of the database to connect to | A valid database name |    ✅    |
+| `CUBEJS_DB_DATABRICKS_URL` | The URL for a JDBC connection          | A valid JDBC URL      |    ✅    |
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Export Bucket |             ❌             |      ✅     |
+
+By default, Databricks JDBC uses the [export bucket][self-preaggs-export-bucket] strategy to build
+pre-aggregations.
+
+### Export Bucket
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube to use an object storage provider from below.
+
+#### AWS S3
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+#### Azure Blob Storage
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
+CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_KEY>
+```
+
+## SSL/TLS
+
+Cube does not require any additional configuration to enable SSL/TLS for Databricks JDBC connections.
+
+[databricks]: https://databricks.com/
+[databricks-docs-jdbc-url]:
+  https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
+[gh-cubejs-jdbc-install]:
+  https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[self-preaggs-export-bucket]: #export-bucket
