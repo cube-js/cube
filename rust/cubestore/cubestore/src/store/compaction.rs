@@ -1003,9 +1003,11 @@ async fn merge_chunks(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MockConfigObj;
+    use crate::cluster::MockCluster;
+    use crate::config::{Config, MockConfigObj};
     use crate::metastore::{Column, ColumnType, RocksMetaStore};
     use crate::store::MockChunkDataStore;
+    use crate::table::data::rows_to_columns;
     use crate::table::{cmp_same_types, Row, TableValue};
     use arrow::array::StringArray;
     use arrow::datatypes::Schema;
@@ -1197,6 +1199,141 @@ mod tests {
         assert_eq!(result, expected);
 
         RocksMetaStore::cleanup_test_metastore("compaction");
+    }
+
+    #[tokio::test]
+    async fn compact_in_memory_chunks() {
+        // arrange
+        let (remote_fs, metastore) =
+            RocksMetaStore::prepare_test_metastore("compact_in_memory_chunks");
+        let config = Config::test("compact_in_memory_chunks");
+        let mut cluster = MockCluster::new();
+        cluster
+            .expect_server_name()
+            .return_const("test".to_string());
+        cluster
+            .expect_node_name_by_partition()
+            .returning(move |_i| "test".to_string());
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs.clone(),
+            Arc::new(cluster),
+            config.config_obj(),
+            10,
+        );
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+        let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+        metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        metastore.get_default_index(1).await.unwrap();
+        let partition = metastore.get_partition(1).await.unwrap();
+
+        let rows = (0..5)
+            .map(|i| Row::new(vec![TableValue::String(format!("Foo {}", 4 - i))]))
+            .collect::<Vec<_>>();
+        let data = rows_to_columns(&cols, &rows);
+        let index = metastore
+            .get_index(partition.get_row().get_index_id())
+            .await
+            .unwrap();
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        let batch = RecordBatch::try_new(schema.clone(), data).unwrap();
+        let chunk_first = metastore
+            .create_chunk(partition.get_id(), 5, true)
+            .await
+            .unwrap();
+        let chunk_second = metastore
+            .create_chunk(partition.get_id(), 5, true)
+            .await
+            .unwrap();
+
+        metastore
+            .chunk_uploaded(chunk_first.get_id())
+            .await
+            .unwrap();
+        metastore
+            .chunk_uploaded(chunk_second.get_id())
+            .await
+            .unwrap();
+
+        chunk_store
+            .add_memory_chunk(chunk_first.get_id(), batch.clone())
+            .await
+            .unwrap();
+        chunk_store
+            .add_memory_chunk(chunk_second.get_id(), batch.clone())
+            .await
+            .unwrap();
+
+        // act
+        let compaction_service = CompactionServiceImpl::new(
+            metastore.clone(),
+            chunk_store.clone(),
+            remote_fs,
+            config.config_obj(),
+        );
+        compaction_service
+            .compact_in_memory_chunks(partition.get_id())
+            .await
+            .unwrap();
+
+        // assert
+        let chunks = metastore
+            .get_chunks_by_partition(partition.get_id(), false)
+            .await
+            .unwrap();
+
+        let chunks_row_count = chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .sum::<u64>();
+
+        let mut data = Vec::new();
+        for chunk in chunks.iter() {
+            for b in chunk_store.get_chunk_columns(chunk.clone()).await.unwrap() {
+                data.push(b)
+            }
+        }
+
+        let batch = data[0].clone();
+
+        let rows = (0..10)
+            .map(|i| Row::new(TableValue::from_columns(&batch.columns().clone(), i)))
+            .collect::<Vec<_>>();
+
+        let expected = vec![
+            Row::new(vec![TableValue::String("Foo 0".to_string())]),
+            Row::new(vec![TableValue::String("Foo 0".to_string())]),
+            Row::new(vec![TableValue::String("Foo 1".to_string())]),
+            Row::new(vec![TableValue::String("Foo 1".to_string())]),
+            Row::new(vec![TableValue::String("Foo 2".to_string())]),
+            Row::new(vec![TableValue::String("Foo 2".to_string())]),
+            Row::new(vec![TableValue::String("Foo 3".to_string())]),
+            Row::new(vec![TableValue::String("Foo 3".to_string())]),
+            Row::new(vec![TableValue::String("Foo 4".to_string())]),
+            Row::new(vec![TableValue::String("Foo 4".to_string())]),
+        ];
+
+        assert_eq!(1, chunks.len());
+        assert_eq!(10, chunks_row_count);
+        assert_eq!(expected, rows);
+
+        RocksMetaStore::cleanup_test_metastore("compact_in_memory_chunks");
     }
 }
 

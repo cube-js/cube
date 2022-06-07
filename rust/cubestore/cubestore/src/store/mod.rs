@@ -800,14 +800,15 @@ impl ChunkStore {
             let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
 
-            self.cluster
-                .schedule_compaction_in_memory_chunks_if_needed(&node_name, partition.get_id())
-                .await?;
-
             Ok(cube_ext::spawn(async move {
                 cluster
                     .add_memory_chunk(&node_name, chunk.get_id(), batch)
                     .await?;
+
+                cluster
+                    .schedule_compaction_in_memory_chunks_if_needed(&node_name, partition.get_id())
+                    .await?;
+
                 Ok((chunk, None))
             }))
         } else {
