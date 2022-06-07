@@ -35,18 +35,32 @@ cube(`Orders`, {
     },
 
     preAggregations: {
-        ordersByCompletedAt: {
+        lambda: {
             lambdaView: true,
-            measures: [count, count2],
+            measures: [count],
             timeDimension: completedAt,
             granularity: `day`,
-            partitionGranularity: `week`,
-            buildRangeStart: { sql: `SELECT DATE('2019-06-01')` },
-            buildRangeEnd: { sql: `SELECT DATE('2019-09-01')` },
-            refreshKey: {
-                every: '1 minute',
-                updateWindow: '3 week',
+            partitionGranularity: `month`,
+            buildRangeStart: {
+                sql: `SELECT NOW() - interval '365 day'`,
             },
-        }
+            buildRangeEnd: {
+                sql: `SELECT NOW() - interval '3 day'`,
+            }
+        },
+
+        // ordersByCompletedAt: {
+        //     lambdaView: true,
+        //     measures: [count, count2],
+        //     timeDimension: completedAt,
+        //     granularity: `day`,
+        //     partitionGranularity: `week`,
+        //     buildRangeStart: { sql: `SELECT DATE('2019-06-01')` },
+        //     buildRangeEnd: { sql: `SELECT DATE('2019-09-01')` },
+        //     refreshKey: {
+        //         every: '1 minute',
+        //         updateWindow: '3 week',
+        //     },
+        // }
     },
 });

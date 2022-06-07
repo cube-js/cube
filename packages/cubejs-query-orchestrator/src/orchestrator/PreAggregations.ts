@@ -1288,6 +1288,8 @@ export class PreAggregationPartitionRangeLoader {
         this.options
       ));
 
+      console.log('PPP', partitionRanges);
+
       let loadResults;
       if (this.preAggregation.lambdaView) {
       // if (false) {
