@@ -451,10 +451,18 @@ impl CompactionService for CompactionServiceImpl {
             .iter()
             .map(|c| c.get_row().get_row_count())
             .sum::<u64>();
+        let prev_created_at = chunks
+            .iter()
+            .filter_map(|c| c.get_row().created_at().clone())
+            .min();
         let chunk = self
             .meta_store
             .create_chunk(partition_id, old_chunks_size as usize, true)
             .await?;
+
+        // prev_created_at will be used to force compaction
+        chunk.get_row().set_prev_created_at(prev_created_at);
+
         self.chunk_store
             .add_memory_chunk(chunk.get_id(), batch)
             .await?;

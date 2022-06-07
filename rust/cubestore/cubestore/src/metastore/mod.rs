@@ -573,6 +573,8 @@ pub struct Chunk {
     #[serde(default)]
     created_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    prev_created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
     suffix: Option<String>,
     #[serde(default)]
     file_size: Option<u64>

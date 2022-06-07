@@ -557,20 +557,21 @@ impl SchedulerImpl {
             .collect::<Vec<_>>();
         let min_in_memory_created_at = in_memory_chunks
             .iter()
-            .filter_map(|c| c.get_row().created_at().clone())
+            .filter_map(|c| c.get_row().prev_created_at().clone())
             .min();
-        let max_created_at = chunks
+        let min_created_at = chunks
             .iter()
             .filter_map(|c| c.get_row().created_at().clone())
-            .max();
+            .min();
         let check_row_counts = partition.get_row().multi_partition_id().is_none();
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-            || chunks.len()
-            > self.config.compaction_chunks_count_threshold() as usize
-            // TODO: We need to update conditions consider in-memory compaction, and add env variables to config thresholds
-            || in_memory_chunks.len() > 100
-            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
-            || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)
+            || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
+            // In memory chunks compacting in own job. Keep this condition just in case
+            || in_memory_chunks.len() > 100 
+            // Force compaction if in_memory chunks were created far ago
+            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_chunks_max_lifetime_threshold()  as i64).unwrap_or(false) 
+            // Force compaction if other chunks were created far ago
+            || min_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_chunks_max_lifetime_threshold() as i64).unwrap_or(false)
         {
             self.schedule_partition_to_compact(partition).await?;
         }

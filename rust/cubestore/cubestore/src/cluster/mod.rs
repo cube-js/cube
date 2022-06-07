@@ -608,6 +608,9 @@ impl Cluster for ClusterImpl {
             self.config().compaction_in_memory_chunks_count_threshold();
         let compaction_in_memory_chunks_size_limit =
             self.config().compaction_in_memory_chunks_size_limit();
+        // Use total size limit to prevent heavy in-memory operation (out of memory)
+        let compaction_in_memory_chunks_total_size_limit =
+            self.config().compaction_in_memory_chunks_total_size_limit();
 
         let chunks = self
             .meta_store
@@ -621,7 +624,12 @@ impl Cluster for ClusterImpl {
             })
             .collect::<Vec<_>>();
 
-        if chunks.len() > compaction_in_memory_chunks_count_threshold {
+        let chunks_total_size = chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .sum::<u64>();
+
+        if chunks.len() > compaction_in_memory_chunks_count_threshold && chunks_total_size < compaction_in_memory_chunks_total_size_limit {
             let job = self
                 .meta_store
                 .add_job(Job::new(
