@@ -554,6 +554,8 @@ pub struct Index {
 pub enum AggregateFunction {
     SUM = 1,
     MAX = 2,
+    MIN = 3,
+    MERGE = 4,
 }
 
 impl FromStr for AggregateFunction {
@@ -563,6 +565,8 @@ impl FromStr for AggregateFunction {
         match s.to_uppercase().as_ref() {
             "SUM" => Ok(AggregateFunction::SUM),
             "MAX" => Ok(AggregateFunction::MAX),
+            "MIN" => Ok(AggregateFunction::MIN),
+            "MERGE" => Ok(AggregateFunction::MERGE),
             _ => Err(CubeError::user(format!(
                 "Function {} can't be used in aggregate index",
                 s
@@ -576,9 +580,30 @@ impl fmt::Display for AggregateFunction {
         let res = match self {
             Self::SUM => "SUM",
             Self::MAX => "MAX",
+            Self::MIN => "MIN",
+            Self::MERGE => "MERGE",
         };
 
         f.write_fmt(format_args!("{}", res))
+    }
+}
+
+impl AggregateFunction {
+    pub fn allowed_for_type(&self, col_type: &ColumnType) -> bool {
+        match self {
+            Self::MAX | Self::MIN => match col_type {
+                ColumnType::HyperLogLog(_) => false,
+                _ => true,
+            },
+            Self::SUM => match col_type {
+                ColumnType::Int | ColumnType::Decimal { .. } | ColumnType::Float => true,
+                _ => false,
+            },
+            Self::MERGE => match col_type {
+                ColumnType::HyperLogLog(_) => true,
+                _ => false,
+            },
+        }
     }
 }
 
@@ -2851,7 +2876,19 @@ impl RocksMetaStore {
         if aggregate_columns.is_empty() {
             //TODO check that index column is not in aggregate columns
             return Err(CubeError::user(format!(
-                    "Can't create aggregate index for table '{}' because aggregate columns not specified for the table",
+                    "Can't create aggregate index for table '{}' because aggregate columns (`AGGREGATIONS`) not specified for the table",
+                    table_id.get_row().get_table_name()
+                )));
+        }
+        if let Some(col_in_aggreations) = index_def.columns.iter().find(|dc| {
+            aggregate_columns
+                .iter()
+                .any(|c| c.column().name == dc.as_str())
+        }) {
+            return Err(CubeError::user(format!(
+                    "Column '{}' in aggregate index '{}' is in aggregations list for table '{}'. Aggregate index columns must be outside of aggregations list.",
+                    col_in_aggreations,
+                    index_def.name,
                     table_id.get_row().get_table_name()
                 )));
         }
@@ -3215,6 +3252,15 @@ impl MetaStore for RocksMetaStore {
                             }
                         }
                         let function = aggr.0.parse::<AggregateFunction>()?;
+
+                        if !function.allowed_for_type(&column.column_type) {
+                            return Err(CubeError::user(
+                                    format!(
+                                        "Aggregate function {} not allowed for column type {}",
+                                        function, &column.column_type
+                                        )
+))
+                        }
                         Ok(AggregateColumnIndex::new(index, function))
                     })
                 .collect::<Result<Vec<_>,_>>()?;

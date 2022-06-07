@@ -672,6 +672,7 @@ impl SqlService for SqlServiceImpl {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
+        println!("request {:?}", query);
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
             trace!("Query: '{}'", query);
@@ -3005,16 +3006,42 @@ mod tests {
                                   )
                     AGGREGATIONS (sum(cnt), max(max_id))
                     INDEX index1 (platform, age)
-                    AGGREGATE INDEX sum_index (age, gender)
+                    AGGREGATE INDEX aggr_index (platform, age)
                     LOCATION {}",
                     paths.into_iter().map(|p| format!("'{}'", p)).join(",")
                 );
                 service.exec_query(&query).await.unwrap();
-                let result = service
-                    .exec_query("SELECT count(*) as cnt from foo.Orders")
+
+                let indices = services.meta_store.get_table_indexes(1).await.unwrap();
+
+                let aggr_index = indices
+                    .iter()
+                    .find(|i| i.get_row().get_name() == "aggr_index")
+                    .unwrap();
+
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(aggr_index.get_id())
                     .await
                     .unwrap();
-                println!("res {:?}", result);
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(partitions[0].get_id(), false)
+                    .await
+                    .unwrap();
+
+                assert_eq!(chunks.len(), 1);
+                assert_eq!(chunks[0].get_row().get_row_count(), 4);
+
+                let p = service
+                    .plan_query(
+                        "SELECT platform, age, sum(cnt) FROM foo.Orders GROUP BY platform, age",
+                    )
+                    .await
+                    .unwrap();
+
+                let worker_plan = pp_phys_plan(p.worker.as_ref());
+                assert!(worker_plan.find("aggr_index").is_some());
             })
             .await;
     }
