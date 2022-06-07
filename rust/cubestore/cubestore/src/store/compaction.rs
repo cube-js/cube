@@ -453,7 +453,14 @@ impl CompactionService for CompactionServiceImpl {
             .sum::<u64>();
         let prev_created_at = chunks
             .iter()
-            .filter_map(|c| c.get_row().created_at().clone())
+            .filter_map(|c| {
+                Some(
+                    c.get_row()
+                        .prev_created_at()
+                        .clone()
+                        .unwrap_or(c.get_row().created_at().clone().unwrap()),
+                )
+            })
             .min();
         let chunk = self
             .meta_store
