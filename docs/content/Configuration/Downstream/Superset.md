@@ -16,6 +16,10 @@ API. [Apache Superset][superset] is an open-source data exploration and
 visualization platform, commonly used to visualize business metrics and
 performance.
 
+Here's a short video guide on how to connect Apache Superset to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
+
 ## Enable Cube SQL API
 
 <InfoBox>
@@ -55,7 +59,7 @@ CUBE_SQL_PASSWORD=mypassword
 
 Apache Superset connects to Cube as to a Postgres database.
 
-In Apache Superset, go to Data > Databases, then click '+ Database' to add a new
+In Apache Superset, go to **Data > Databases**, then click **+ Database** to add a new
 database:
 
 <div style="text-align: center">
@@ -121,10 +125,10 @@ Now, we can explore this dataset. Let's create a new chart of type line with
   />
 </div>
 
-We can select `COUNT(*)` as metric and `created` as time column with time grain
-**month**.
+We can select the `COUNT(*)` as a metric and `createdAt` as the time column with a time grain of
+`month`.
 
-`COUNT(*)` aggregate function is being mapped to measure with type [count](/schema/reference/types-and-formats#measures-types-count) in the cube.
+The `COUNT(*)` aggregate function is being mapped to a measure of type [count](/schema/reference/types-and-formats#measures-types-count) in Cube's **Orders** schema file.
 
 [ref-getting-started]: /cloud/getting-started
 [superset]: https://superset.apache.org/
