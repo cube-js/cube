@@ -462,13 +462,16 @@ impl CompactionService for CompactionServiceImpl {
                 )
             })
             .min();
-        let chunk = self
+        let new_chunk = self
             .meta_store
             .create_chunk(partition_id, old_chunks_size as usize, true)
             .await?;
 
         // prev_created_at will be used to force compaction
-        chunk.get_row().set_prev_created_at(prev_created_at);
+        let chunk = IdRow::new(
+            new_chunk.get_id(),
+            new_chunk.get_row().set_prev_created_at(prev_created_at),
+        );
 
         self.chunk_store
             .add_memory_chunk(chunk.get_id(), batch)
