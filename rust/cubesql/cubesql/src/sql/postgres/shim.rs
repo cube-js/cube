@@ -381,6 +381,11 @@ impl AsyncPostgresShim {
             ("server_encoding".to_string(), "UTF8".to_string()),
             ("client_encoding".to_string(), "UTF8".to_string()),
             ("DateStyle".to_string(), "ISO".to_string()),
+            // Reports whether PostgreSQL was built with support for 64-bit-integer dates and times.
+            ("integer_datetimes".to_string(), "on".to_string()),
+            ("TimeZone".to_string(), "Etc/UTC".to_string()),
+            // TODO: Right now we dont support intervals, but it's an important thing
+            // ("IntervalStyle".to_string(), "postgres".to_string()),
         ];
 
         for (key, value) in params {
