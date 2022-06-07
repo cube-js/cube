@@ -78,7 +78,9 @@ impl SessionLogger {
         meta_fields.insert("protocol".to_string(), protocol);
         meta_fields.insert("apiType".to_string(), "sql".to_string());
 
-        report(target.to_string(), meta_fields.clone(), level);
+        if !report(target.to_string(), meta_fields.clone(), level) {
+            log::log!(target: target, level, "{:?}", meta_fields);
+        }
     }
 }
 
