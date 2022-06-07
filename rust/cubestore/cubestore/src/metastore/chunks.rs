@@ -20,7 +20,7 @@ impl Chunk {
             last_used: None,
             in_memory,
             created_at: Some(Utc::now()),
-            prev_created_at: Some(Utc::now()),
+            oldest_insert_at: Some(Utc::now()),
             suffix: Some(
                 String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
                     .unwrap()
@@ -55,9 +55,9 @@ impl Chunk {
         to_update
     }
 
-    pub fn set_prev_created_at(&self, prev_created_at: Option<DateTime<Utc>>) -> Chunk {
+    pub fn set_oldest_insert_at(&self, oldest_insert_at: Option<DateTime<Utc>>) -> Chunk {
         let mut to_update = self.clone();
-        to_update.prev_created_at = prev_created_at;
+        to_update.oldest_insert_at = oldest_insert_at;
         to_update
     }
 
@@ -98,8 +98,8 @@ impl Chunk {
         &self.created_at
     }
 
-    pub fn prev_created_at(&self) -> &Option<DateTime<Utc>> {
-        &self.prev_created_at
+    pub fn oldest_insert_at(&self) -> &Option<DateTime<Utc>> {
+        &self.oldest_insert_at
     }
 
     pub fn suffix(&self) -> &Option<String> {

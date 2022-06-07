@@ -451,12 +451,12 @@ impl CompactionService for CompactionServiceImpl {
             .iter()
             .map(|c| c.get_row().get_row_count())
             .sum::<u64>();
-        let prev_created_at = chunks
+        let oldest_insert_at = chunks
             .iter()
             .filter_map(|c| {
                 Some(
                     c.get_row()
-                        .prev_created_at()
+                        .oldest_insert_at()
                         .clone()
                         .unwrap_or(c.get_row().created_at().clone().unwrap()),
                 )
@@ -467,10 +467,10 @@ impl CompactionService for CompactionServiceImpl {
             .create_chunk(partition_id, old_chunks_size as usize, true)
             .await?;
 
-        // prev_created_at will be used to force compaction
+        // oldest_insert_at will be used to force compaction
         let chunk = IdRow::new(
             new_chunk.get_id(),
-            new_chunk.get_row().set_prev_created_at(prev_created_at),
+            new_chunk.get_row().set_oldest_insert_at(oldest_insert_at),
         );
 
         self.chunk_store

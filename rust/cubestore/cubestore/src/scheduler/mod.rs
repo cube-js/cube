@@ -557,7 +557,7 @@ impl SchedulerImpl {
             .collect::<Vec<_>>();
         let min_in_memory_created_at = in_memory_chunks
             .iter()
-            .filter_map(|c| c.get_row().prev_created_at().clone())
+            .filter_map(|c| c.get_row().oldest_insert_at().clone())
             .min();
         let min_created_at = chunks
             .iter()

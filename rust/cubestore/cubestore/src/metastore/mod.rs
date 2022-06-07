@@ -573,7 +573,7 @@ pub struct Chunk {
     #[serde(default)]
     created_at: Option<DateTime<Utc>>,
     #[serde(default)]
-    prev_created_at: Option<DateTime<Utc>>,
+    oldest_insert_at: Option<DateTime<Utc>>,
     #[serde(default)]
     suffix: Option<String>,
     #[serde(default)]
