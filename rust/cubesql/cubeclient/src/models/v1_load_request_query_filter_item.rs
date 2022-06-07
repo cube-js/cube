@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct V1LoadRequestQueryFilterItem {
     #[serde(rename = "member", skip_serializing_if = "Option::is_none")]
     pub member: Option<String>,
@@ -13,8 +13,9 @@ pub struct V1LoadRequestQueryFilterItem {
 }
 
 impl V1LoadRequestQueryFilterItem {
-    pub fn new() -> V1LoadRequestQueryFilterItem {
-        V1LoadRequestQueryFilterItem {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             member: None,
             operator: None,
             values: None,

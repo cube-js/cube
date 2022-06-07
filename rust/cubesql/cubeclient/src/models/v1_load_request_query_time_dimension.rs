@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct V1LoadRequestQueryTimeDimension {
     #[serde(rename = "dimension")]
     pub dimension: String,
@@ -9,8 +9,9 @@ pub struct V1LoadRequestQueryTimeDimension {
 }
 
 impl V1LoadRequestQueryTimeDimension {
-    pub fn new(dimension: String) -> V1LoadRequestQueryTimeDimension {
-        V1LoadRequestQueryTimeDimension {
+    #[must_use]
+    pub fn new(dimension: String) -> Self {
+        Self {
             dimension,
             granularity: None,
             date_range: None,

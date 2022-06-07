@@ -1,13 +1,14 @@
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct V1CubeMetaDimension {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "type")]
-    pub _type: String,
+    pub ty: String,
 }
 
 impl V1CubeMetaDimension {
-    pub fn new(name: String, _type: String) -> V1CubeMetaDimension {
-        V1CubeMetaDimension { name, _type }
+    #[must_use]
+    pub fn new(name: String, ty: String) -> Self {
+        Self { name, ty }
     }
 }

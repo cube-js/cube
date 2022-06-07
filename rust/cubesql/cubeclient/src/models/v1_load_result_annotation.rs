@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct V1LoadResultAnnotation {
     #[serde(rename = "measures")]
     pub measures: serde_json::Value,
@@ -11,13 +11,14 @@ pub struct V1LoadResultAnnotation {
 }
 
 impl V1LoadResultAnnotation {
+    #[must_use]
     pub fn new(
         measures: serde_json::Value,
         dimensions: serde_json::Value,
         segments: serde_json::Value,
         time_dimensions: serde_json::Value,
-    ) -> V1LoadResultAnnotation {
-        V1LoadResultAnnotation {
+    ) -> Self {
+        Self {
             measures,
             dimensions,
             segments,
