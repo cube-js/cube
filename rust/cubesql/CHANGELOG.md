@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.16](https://github.com/cube-js/cube.js/compare/v0.30.15...v0.30.16) (2022-06-08)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow binary encoding for all types in pg-wire ([d456745](https://github.com/cube-js/cube.js/commit/d4567451c40c168076ef86ed055052f5490723c4))
+* **cubesql:** TIMESTAMP/TZ was wrong in some BIs (pg-wire) ([dfdb5ff](https://github.com/cube-js/cube.js/commit/dfdb5ffe611d0978258a5ae3eb3354366cd1f346))
+
+
+
+
+
 ## [0.30.14](https://github.com/cube-js/cube.js/compare/v0.30.13...v0.30.14) (2022-06-06)
 
 
