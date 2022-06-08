@@ -303,7 +303,7 @@ export class DatabricksDriver extends JDBCDriver {
                 .catch((err) => {
                   if (res.status === 429 && (count as number) < 5) {
                     this
-                      .fetch(req, (count as number)++, (ms as number) + 5000)
+                      .fetch(req, (count as number)++, (ms as number) + 1000)
                       .then((_res) => { resolve(_res); })
                       .catch((_err) => { reject(_err); });
                   } else {
@@ -427,7 +427,7 @@ export class DatabricksDriver extends JDBCDriver {
    */
   private async waitResult(run: number, ms?: number): Promise<any> {
     ms = ms || 1000;
-    ms = ms <= 60000 ? ms * 2 : ms;
+    ms = ms <= 10000 ? ms + 1000 : ms;
     return new Promise((resolve, reject) => {
       const url = `https://${
         this.getApiUrl()
