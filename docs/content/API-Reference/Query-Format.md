@@ -209,7 +209,7 @@ The opposite operator of `contains`. It supports multiple values.
 ### <--{"id" : "Filters Operators"}--> startsWith
 
 The `startsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the beginning. In
-the majority of SQL backends, it uses `ILIKE` operator with `%` at the begging of each value. It supports multiple values.
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the start of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
