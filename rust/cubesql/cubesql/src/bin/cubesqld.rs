@@ -25,7 +25,8 @@ fn main() {
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubeclient", log_level.to_level_filter())
-        .with_module_level("cubesql", log_level.to_level_filter());
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("datafusion", Level::Warn.to_level_filter());
     ReportingLogger::init(
         Box::new(logger),
         Box::new(LocalReporter::new()),
