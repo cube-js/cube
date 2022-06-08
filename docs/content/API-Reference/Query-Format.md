@@ -224,7 +224,7 @@ the majority of SQL backends, it uses the `ILIKE` operator with `%` at the start
 ### <--{"id" : "Filters Operators"}--> endsWith
 
 The `endsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the end. In
-the majority of SQL backends, it uses `ILIKE` operator with `%` at the end of each value. It supports multiple values.
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the end of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
