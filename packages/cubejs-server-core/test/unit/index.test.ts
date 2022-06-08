@@ -129,7 +129,7 @@ describe('index.test', () => {
     const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
 
     try {
-      await driverFactory('mongo');
+      await driverFactory('mongo', { poolSize: 1 });
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
     } catch (e: any) {
@@ -144,7 +144,7 @@ describe('index.test', () => {
     const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
 
     try {
-      await driverFactory('default');
+      await driverFactory('default', { poolSize: 1 });
 
       throw new Error('driverFactory will call dbType and dbType must throw an exception');
     } catch (e: any) {

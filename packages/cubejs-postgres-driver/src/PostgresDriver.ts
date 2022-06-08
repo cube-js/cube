@@ -51,10 +51,19 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
+} & {
+  poolSize: number
 };
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 40;
+  }
+
   protected readonly pool: Pool;
 
   protected readonly config: Partial<Config>;
@@ -65,7 +74,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     super();
 
     this.pool = new Pool({
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.poolSize ||
+        8,
       idleTimeoutMillis: 30000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
@@ -134,8 +146,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
-      if (e.toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${e.toString()}`);
+      if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
+        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
 
       throw e;
@@ -249,6 +261,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const result = await this.queryResponse(query, values);
     return result.rows;

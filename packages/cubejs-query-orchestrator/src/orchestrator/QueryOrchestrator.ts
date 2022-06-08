@@ -68,17 +68,24 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
+        preAggregationsQueueOptions: options.preAggregationsOptions.queueOptions,
       }
     );
     this.preAggregations = new PreAggregations(
-      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.logger,
+      this.queryCache,
+      {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
+        getQueueEventsBus:
+          getEnv('preAggregationsQueueEventsBus') &&
+          this.getQueueEventsBus.bind(this)
       }
     );
   }
@@ -91,6 +98,13 @@ export class QueryOrchestrator {
         new LocalQueueEventsBus();
     }
     return this.queueEventsBus;
+  }
+
+  /**
+   * Returns QueryCache instance.
+   */
+  public getQueryCache(): QueryCache {
+    return this.queryCache;
   }
 
   /**

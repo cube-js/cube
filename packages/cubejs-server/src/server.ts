@@ -5,6 +5,7 @@ import CubeCore, {
   CubejsServerCore,
   DatabaseType,
   DriverContext,
+  DriverOptions,
   SystemOptions
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
@@ -152,8 +153,8 @@ export class CubejsServer {
   }
 
   // @internal
-  public async getDriver(ctx: DriverContext): Promise<BaseDriver> {
-    return this.core.getDriver(ctx);
+  public async getDriver(ctx: DriverContext, opt: DriverOptions): Promise<BaseDriver> {
+    return this.core.getDriver(ctx, opt);
   }
 
   public async close() {
@@ -185,8 +186,8 @@ export class CubejsServer {
     }
   }
 
-  public static createDriver(dbType: DatabaseType) {
-    return CubeCore.createDriver(dbType);
+  public static createDriver(dbType: DatabaseType, opt: DriverOptions) {
+    return CubeCore.createDriver(dbType, opt);
   }
 
   public static driverDependencies(dbType: DatabaseType) {
