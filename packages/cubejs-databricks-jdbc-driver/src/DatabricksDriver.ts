@@ -292,16 +292,22 @@ export class DatabricksDriver extends JDBCDriver {
     count = count || 0;
     ms = ms || 0;
     return new Promise((resolve, reject) => {
+      this.reportQueryUsage({ msg: `waiting ${ms}ms before fetch` }, {});
       this
         .wait(ms as number)
         .then(() => {
+          this.reportQueryUsage({ msg: `fetching ${req.url}` }, {});
           fetch(req)
             .then((res) => {
               this
                 .assertResponse(res)
-                .then(() => { resolve(res); })
+                .then(() => {
+                  this.reportQueryUsage({ msg: `ready ${req.url}` }, {});
+                  resolve(res);
+                })
                 .catch((err) => {
                   if (res.status === 429 && (count as number) < 5) {
+                    this.reportQueryUsage({ msg: `retrying ${req.url}` }, {});
                     this
                       .fetch(req, (count as number)++, (ms as number) + 1000)
                       .then((_res) => { resolve(_res); })
@@ -428,6 +434,7 @@ export class DatabricksDriver extends JDBCDriver {
   private async waitResult(run: number, ms?: number): Promise<any> {
     ms = ms || 1000;
     ms = ms <= 10000 ? ms + 1000 : ms;
+    this.reportQueryUsage({ msg: `waiting ${ms}ms for result` }, {});
     return new Promise((resolve, reject) => {
       const url = `https://${
         this.getApiUrl()
@@ -675,20 +682,28 @@ export class DatabricksDriver extends JDBCDriver {
       'utf-8',
     ).toString('base64');
     // TODO: if there is no cluster should we create new one?
+    this.reportQueryUsage({ msg: `getting cluster ${Date.now()}` }, {});
     const cluster = (await this.getClustersIds())[0];
     try {
+      this.reportQueryUsage({ msg: `importing notebook ${Date.now()}` }, {});
       await this.importNotebook(filename, content);
     } catch (e) {
       notebook = false;
     }
     if (notebook) {
       try {
+        this.reportQueryUsage({ msg: `creating job ${Date.now()}` }, {});
         const job = await this.createJob(cluster, filename);
+        this.reportQueryUsage({ msg: `running job ${Date.now()}` }, {});
         const run = await this.runJob(job);
+        this.reportQueryUsage({ msg: `waiting for result ${Date.now()}` }, {});
         await this.waitResult(run);
+        this.reportQueryUsage({ msg: `deleting job ${Date.now()}` }, {});
         await this.deleteJob(job);
+        this.reportQueryUsage({ msg: `signing urls ${Date.now()}` }, {});
         result = await this.getSignedWasbsUrls(pathname);
       } finally {
+        this.reportQueryUsage({ msg: `deleting notebook ${Date.now()}` }, {});
         await this.deleteNotebook(filename);
       }
     }
@@ -726,14 +741,17 @@ export class DatabricksDriver extends JDBCDriver {
   public async unload(
     tableName: string,
   ): Promise<DownloadTableCSVData> {
+    this.reportQueryUsage({ msg: `unload start ${Date.now()}` }, {});
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    this.reportQueryUsage({ msg: `running unloadCommand ${Date.now()}` }, {});
     const csvFile = await this.unloadCommand(
       tableName,
       columns,
       pathname,
     );
+    this.reportQueryUsage({ msg: `unload end ${Date.now()}` }, {});
     return {
       csvFile,
       types,
