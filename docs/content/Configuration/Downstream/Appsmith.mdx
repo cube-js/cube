@@ -3,7 +3,11 @@ title: Connecting to Appsmith
 permalink: /config/downstream/appsmith
 ---
 
-[Appsmith](https://www.appsmith.com) is an open source framework for building internal tools. You can connect a Cube deployment to Appsmith using Cube’s [REST API](https://cube.dev/docs/rest-api).
+[Appsmith](https://www.appsmith.com) is an open-source framework for building internal tools. You can connect a Cube deployment to Appsmith using Cube’s [REST API](https://cube.dev/docs/rest-api).
+
+Here's a short video guide on how to connect Appsmith to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/eae86cdeb6c94546b0e7ad93e2fb3c8a" />
 
 ## Use REST API in Cube
 
@@ -51,7 +55,11 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Create a POST request, paste the JSON Query in the Body and hit Run.
+Create a POST request, paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+
+Because you saved the data source as `HOST/cubejs-api/v1`, don't forget to add a `/load` endpoint to the end of the data source API.
+
+Next, hit Run.
 
 <div style="text-align: center">
   <img
