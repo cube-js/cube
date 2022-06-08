@@ -38,6 +38,13 @@ export class OrchestratorApi {
   }
 
   /**
+   * Returns QueryOrchestrator instance.
+   */
+  public getQueryOrchestrator(): QueryOrchestrator {
+    return this.orchestrator;
+  }
+
+  /**
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
@@ -159,7 +166,7 @@ export class OrchestratorApi {
 
   public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
+      const driver = await driverFn(dataSource, { poolSize: 1 }); // TODO (buntarb): check this point!
       await driver.testConnection();
     }
   }
@@ -174,7 +181,7 @@ export class OrchestratorApi {
 
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
+      const driver = await driverFn(dataSource, { poolSize: 1 }); // TODO (buntarb): check this point!
       if (driver.release) {
         await driver.release();
       }

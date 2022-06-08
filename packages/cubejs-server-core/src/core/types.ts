@@ -27,7 +27,7 @@ export interface QueryCacheOptions {
 }
 
 export interface PreAggregationsOptions {
-  queueOptions?: QueueOptions;
+  queueOptions?: QueueOptions | ((dataSource: string) => QueueOptions);
   externalRefresh?: boolean;
 }
 
@@ -88,7 +88,11 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
+export type DriverOptions = {
+  poolSize: number
+};
+export type DriverFactoryFn =
+  (context: DriverContext, options: DriverOptions) => Promise<BaseDriver> | BaseDriver;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external

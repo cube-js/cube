@@ -110,6 +110,8 @@ export class DevServer {
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
+      }, {
+        poolSize: 1, // TODO (buntarb): check this point!!!
       });
 
       const tablesSchema = await driver.tablesSchema();
@@ -148,6 +150,8 @@ export class DevServer {
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
+      }, {
+        poolSize: 1, // TODO (buntarb): check this point!
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
@@ -434,7 +438,10 @@ export class DevServer {
           process.env[envName] = <string>value;
         }
 
-        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE);
+        driver = CubejsServerCore.createDriver(
+          variables.CUBEJS_DB_TYPE,
+          { poolSize: 1 }, // TODO (buntar): check this point!
+        );
 
         // Restore original process.env
         process.env = originalProcessEnv;

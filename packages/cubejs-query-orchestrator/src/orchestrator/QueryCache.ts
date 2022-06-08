@@ -59,6 +59,9 @@ export class QueryCache {
       cacheAndQueueDriver?: 'redis' | 'memory';
       maxInMemoryCacheEntries?: number;
       skipExternalCacheAndQueue?: boolean;
+      preAggregationsQueueOptions?: ((dataSource: String) => {
+        concurrency: number,
+      });
     } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
@@ -221,26 +224,51 @@ export class QueryCache {
     });
   }
 
+  /**
+   * Calculate driver config object.
+   */
+  private getDriverConfig(dataSource: string = 'default') {
+    const queryQueueOptions = (
+      this.options.queueOptions as ((dataSource: String) => {
+        concurrency: number,
+      })
+    )(dataSource);
+
+    const preAggregationsQueueOptions =
+      this.options.preAggregationsQueueOptions(dataSource);
+
+    const poolSize = 2 * (
+      queryQueueOptions.concurrency +
+      preAggregationsQueueOptions.concurrency
+    );
+    return { poolSize };
+  }
+
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
+      const queueOptions = (
+        this.options.queueOptions as ((dataSource: String) => {
+          concurrency: number,
+        })
+      )(dataSource);
+      const driverConfig = this.getDriverConfig(dataSource);
+      
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource),
+        () => this.driverFactory(dataSource, driverConfig),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
           });
           return client.query(q.query, q.values, q);
-        }, {
+        },
+        {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
-          )
+          ...queueOptions,
         }
       );
     }
@@ -312,6 +340,17 @@ export class QueryCache {
     queue.cancelHandlerCounter = 0;
     queue.handles = {};
     return queue;
+  }
+
+  /**
+   * Returns registered queries queues hash table if any, false otherwise.
+   */
+  public getQueues(): false | {[dataSource: string]: QueryQueue} {
+    if (Object.keys(this.queue).length > 0) {
+      return this.queue;
+    } else {
+      return false;
+    }
   }
 
   public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
