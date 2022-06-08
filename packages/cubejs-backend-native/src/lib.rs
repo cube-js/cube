@@ -69,7 +69,8 @@ fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
-        .with_module_level("cubejs_native", log_level.to_level_filter());
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", Level::Warn.to_level_filter());
 
     ReportingLogger::init(
         Box::new(logger),

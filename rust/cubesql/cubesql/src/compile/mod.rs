@@ -2683,7 +2683,8 @@ mod tests {
             let logger = SimpleLogger::new()
                 .with_level(Level::Error.to_level_filter())
                 .with_module_level("cubeclient", log_level.to_level_filter())
-                .with_module_level("cubesql", log_level.to_level_filter());
+                .with_module_level("cubesql", log_level.to_level_filter())
+                .with_module_level("datafusion", Level::Warn.to_level_filter());
             log::set_boxed_logger(Box::new(logger)).unwrap();
             log::set_max_level(log_level.to_level_filter());
             *initialized = true;
@@ -6380,6 +6381,109 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "excel_exists_query",
+            execute_query(
+                "
+                SELECT
+                    a.attname as fieldname,
+                    a.attnum  as fieldordinal,
+                    a.atttypid as datatype,
+                    a.atttypmod as fieldmod,
+                    a.attnotnull as isnull,
+                    c.relname as tablename,
+                    n.nspname as schema,
+                    CASE
+                        WHEN exists(
+                            select null
+                            from pg_constraint c1
+                            where
+                                c1.conrelid = c.oid and
+                                c1.contype = 'p' and
+                                a.attnum = ANY (c1.conkey)
+                        ) THEN true
+                        ELSE false
+                    END as iskey,
+                    CASE
+                        WHEN exists(
+                            select null
+                            from pg_constraint c1
+                            where
+                                c1.conrelid = c.oid and
+                                c1.contype = 'u' and
+                                a.attnum = ANY (c1.conkey)
+                        ) THEN true
+                        ELSE false
+                    END as isunique,
+                    CAST(pg_get_expr(d.adbin, d.adrelid) AS varchar) as defvalue,
+                    CASE
+                        WHEN t.typtype = 'd' THEN t.typbasetype
+                        ELSE a.atttypid
+                    END as basetype,
+                    CASE
+                        WHEN a.attidentity = 'a' THEN true
+                        ELSE false
+                    END as IsAutoIncrement,
+                    CASE
+                        WHEN
+                            t.typname Like 'bit' OR
+                            t.typname Like 'varbit' and
+                            a.atttypmod > 0
+                        THEN a.atttypmod
+                        WHEN
+                            t.typname Like 'interval' OR
+                            t.typname Like 'timestamp' OR
+                            t.typname Like 'timestamptz' OR
+                            t.typname Like 'time' OR
+                            t.typname Like 'timetz'
+                        THEN -1
+                        WHEN a.atttypmod > 0 THEN a.atttypmod - 4
+                        ELSE a.atttypmod
+                    END as Length,
+                    (information_schema._pg_numeric_precision(
+                        information_schema._pg_truetypid(a .*, t.*),
+                        information_schema._pg_truetypmod(a .*, t.*)
+                    ))::information_schema.cardinal_number AS Precision,
+                    (information_schema._pg_numeric_scale(
+                        information_schema._pg_truetypid(a .*, t.*),
+                        information_schema._pg_truetypmod(a .*, t.*)
+                    ))::information_schema.cardinal_number AS Scale,
+                    (information_schema._pg_datetime_precision(
+                        information_schema._pg_truetypid(a .*, t.*),
+                        information_schema._pg_truetypmod(a .*, t.*)
+                    ))::information_schema.cardinal_number AS DatetimePrecision
+                FROM pg_namespace n
+                INNER JOIN pg_class c ON c.relnamespace = n.oid
+                INNER JOIN pg_attribute a on c.oid = a.attrelid
+                LEFT JOIN pg_attrdef d on
+                    d.adrelid = a.attrelid and
+                    d.adnum =a.attnum
+                LEFT JOIN pg_type t on t.oid = a.atttypid
+                WHERE
+                    a.attisdropped = false AND
+                    (
+                        (c.relkind = 'r') OR
+                        (c.relkind = 's') OR
+                        (c.relkind = 'v') OR
+                        (c.relkind = 'm') OR
+                        (c.relkind = 'f')
+                    ) AND
+                    a.attnum > 0 AND
+                    ((
+                        c.relname LIKE 'KibanaSampleDataEcommerce' AND
+                        n.nspname LIKE 'public'
+                    ))
+                ORDER BY
+                    tablename,
+                    fieldordinal
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -8549,6 +8653,67 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_sigma_computing_array_subquery_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_array_subquery_query",
+            execute_query(
+                r#"
+                select
+                    cl.relname as "source_table",
+                    array(
+                        select (
+                            select attname::text
+                            from pg_attribute
+                            where
+                                attrelid = con.conrelid and
+                                attnum = con.conkey[i]
+                        )
+                        from generate_series(array_lower(con.conkey, 1), array_upper(con.conkey, 1)) i
+                    ) as "source_keys",
+                    (
+                        select nspname
+                        from pg_namespace ns2
+                        join pg_class cl2 on ns2.oid = cl2.relnamespace
+                        where cl2.oid = con.confrelid
+                    ) as "target_schema",
+                    (
+                        select relname
+                        from pg_class
+                        where oid = con.confrelid
+                    ) as "target_table",
+                    array(
+                        select (
+                            select attname::text
+                            from pg_attribute
+                            where
+                                attrelid = con.confrelid and
+                                attnum = con.confkey[i]
+                        )
+                        from generate_series(array_lower(con.confkey, 1), array_upper(con.confkey, 1)) i
+                    ) as "target_keys"
+                from pg_class cl
+                join pg_namespace ns on cl.relnamespace = ns.oid
+                join pg_constraint con on con.conrelid = cl.oid
+                where
+                    ns.nspname = 'public' and
+                    cl.relname >= 'A' and
+                    cl.relname <= 'z' and
+                    con.contype = 'f'
+                order by
+                    "source_table",
+                    con.conname
+                ;
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
@@ -8556,7 +8721,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 "
                 SELECT \"rows\".b as \"plan\", count(1) as \"a0\"
                 FROM (SELECT * FROM (select 1 \"teamSize\", 2 b UNION ALL select 1011 \"teamSize\", 3 b) \"_\"
-                WHERE ((CAST(\"_\".\"teamSize\" as DECIMAL) = CAST(1011 as DECIMAL)))) \"rows\" 
+                WHERE ((CAST(\"_\".\"teamSize\" as DECIMAL) = CAST(1011 as DECIMAL)))) \"rows\"
                 GROUP BY \"plan\";
                 "
                 .to_string(),
