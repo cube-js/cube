@@ -2493,11 +2493,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
-                let message = format!(
-                    "Initial planning error: {} QUERY: {}",
-                    err,
-                    SensitiveDataSanitizer::new().replace(&stmt).to_string()
-                );
+                let message = format!("Initial planning error: {}", err,);
                 let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
 
                 CompilationError::internal(message).with_meta(meta)
