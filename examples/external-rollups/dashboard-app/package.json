@@ -15,15 +15,16 @@
     "react-scripts": "3.4.4"
   },
   "devDependencies": {
-    "cross-env": "^7.0.2"
+    "cross-env": "^7.0.2",
+    "netlify-cli": "^10.5.0"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
-    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
+    "deploy": "netlify deploy --prod --dir build",
+    "preview": "netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
