@@ -6761,6 +6761,51 @@ Array [
 ]
 `;
 
+exports[`postgres driver tests using postgres for the pre-aggregations querying Customers: dimentions + order + limit + total + offset: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+]
+`;
+
 exports[`postgres driver tests using postgres for the pre-aggregations querying Customers: dimentions + order + limit + total: query 1`] = `
 Array [
   Object {
@@ -6802,6 +6847,15 @@ Array [
   Object {
     "Customers.customerId": "EM-14140",
     "Customers.customerName": "Customer 18",
+  },
+]
+`;
+
+exports[`postgres driver tests using postgres for the pre-aggregations querying Customers: dimentions + order + total + offset: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
   },
 ]
 `;
@@ -8068,6 +8122,161 @@ Array [
     "ECommerce.quantity": 11,
     "ECommerce.rowId": 2661,
     "ECommerce.sales": "1979.89000",
+    "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`postgres driver tests using postgres for the pre-aggregations querying ECommerce: dimentions + order + limit + total + offset: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Glendale",
+    "ECommerce.customerId": "EM-14140",
+    "ECommerce.customerName": "Customer 18",
+    "ECommerce.discount": "0.20000",
+    "ECommerce.orderDate": "2020-11-12T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-134915",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.profit": "9.96520",
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 2952,
+    "ECommerce.sales": "113.88800",
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.profit": "10.39040",
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3059,
+    "ECommerce.sales": "30.56000",
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0.20000",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.profit": "-3.35060",
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3060,
+    "ECommerce.sales": "24.36800",
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Louisville",
+    "ECommerce.customerId": "DW-13480",
+    "ECommerce.customerName": "Customer 17",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-05-27T00:00:00.000",
+    "ECommerce.orderId": "US-2017-132297",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.profit": "134.99250",
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 3083,
+    "ECommerce.sales": "539.97000",
+    "ECommerce.subCategory": "Phones",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Auburn",
+    "ECommerce.customerId": "KN-16705",
+    "ECommerce.customerName": "Customer 28",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-06-11T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-102554",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "1.09040",
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3448,
+    "ECommerce.sales": "3.76000",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Omaha",
+    "ECommerce.customerId": "JO-15550",
+    "ECommerce.customerName": "Customer 24",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-05-29T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-144568",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.profit": "1.17750",
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3717,
+    "ECommerce.sales": "23.55000",
+    "ECommerce.subCategory": "Fasteners",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.customerId": "AW-10840",
+    "ECommerce.customerName": "Customer 4",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123001",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "2.72600",
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3934,
+    "ECommerce.sales": "9.40000",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.customerId": "CC-12475",
+    "ECommerce.customerName": "Customer 12",
+    "ECommerce.discount": "0.20000",
+    "ECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-100811",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.profit": "3.92960",
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4012,
+    "ECommerce.sales": "39.29600",
+    "ECommerce.subCategory": "Storage",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Lafayette",
+    "ECommerce.customerId": "CS-12355",
+    "ECommerce.customerName": "Customer 14",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-12-24T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-124296",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.profit": "60.54880",
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4031,
+    "ECommerce.sales": "232.88000",
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "New York City",
+    "ECommerce.customerId": "AH-10465",
+    "ECommerce.customerName": "Customer 1",
+    "ECommerce.discount": "0.00000",
+    "ECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-115546",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.profit": "134.99250",
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 4161,
+    "ECommerce.sales": "539.97000",
     "ECommerce.subCategory": "Phones",
   },
 ]

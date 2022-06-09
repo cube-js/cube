@@ -114,6 +114,49 @@ export function executeTestSuiteFor(type: string) {
           ).toEqual(41);
         },
       );
+      test(
+        'querying Customers: dimentions + order + total + offset',
+        async () => {
+          const response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            order: {
+              'Customers.customerName': 'asc'
+            },
+            total: true,
+            offset: 40
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(1);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
+        },
+      );
+      test(
+        'querying Customers: dimentions + order + limit + total + offset',
+        async () => {
+          const response = await client.load({
+            dimensions: [
+              'Customers.customerId',
+              'Customers.customerName'
+            ],
+            order: {
+              'Customers.customerName': 'asc'
+            },
+            limit: 10,
+            total: true,
+            offset: 10
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(41);
+        },
+      );
 
       // filtering Customers cube
       test(
@@ -704,6 +747,72 @@ export function executeTestSuiteFor(type: string) {
             },
             limit: 10,
             total: true
+          });
+          expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(10);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
+        }
+      );
+      test(
+        'querying ECommerce: dimentions + order + total + offset',
+        async () => {
+          const response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            order: {
+              'ECommerce.rowId': 'asc'
+            },
+            // limit: 10,
+            total: true,
+            offset: 43
+          });
+          // expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData().length).toEqual(1);
+          expect(
+            response.serialize().loadResponse.results[0].total
+          ).toEqual(44);
+        }
+      );
+      test(
+        'querying ECommerce: dimentions + order + limit + total + offset',
+        async () => {
+          const response = await client.load({
+            dimensions: [
+              'ECommerce.rowId',
+              'ECommerce.orderId',
+              'ECommerce.orderDate',
+              'ECommerce.customerId',
+              'ECommerce.customerName',
+              'ECommerce.city',
+              'ECommerce.category',
+              'ECommerce.subCategory',
+              'ECommerce.productName',
+              'ECommerce.sales',
+              'ECommerce.quantity',
+              'ECommerce.discount',
+              'ECommerce.profit'
+            ],
+            order: {
+              'ECommerce.rowId': 'asc'
+            },
+            limit: 10,
+            total: true,
+            offset: 10
           });
           expect(response.rawData()).toMatchSnapshot('query');
           expect(response.rawData().length).toEqual(10);
