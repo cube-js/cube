@@ -90,7 +90,8 @@
     "start": "node scripts/start.js",
     "build": "node scripts/build.js",
     "test": "node scripts/test.js",
-    "deploy": "npm run build && netlify deploy --prod --dir build"
+    "preview": "netlify deploy --dir build",
+    "deploy": "netlify deploy --dir build --prod"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -159,5 +160,8 @@
     "presets": [
       "react-app"
     ]
+  },
+  "devDependencies": {
+    "netlify-cli": "^10.5.0"
   }
 }
