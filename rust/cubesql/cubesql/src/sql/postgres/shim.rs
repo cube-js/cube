@@ -653,6 +653,30 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    pub fn end_transaction(&mut self) -> Result<bool, ConnectionError> {
+        if let Some(_) = self.session.state.end_transaction() {
+            // Portals + Cursors which we want to remove
+            let mut to_remove = Vec::new();
+
+            for (key, cursor) in &self.cursors {
+                if !cursor.hold {
+                    to_remove.push(key.clone());
+                }
+            }
+
+            for key in &to_remove {
+                self.cursors.remove(key);
+                self.portals.remove(key);
+
+                trace!("Closing cursor/portal {}", key);
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub async fn process_simple_query(
         &mut self,
         stmt: ast::Statement,
@@ -666,32 +690,42 @@ impl AsyncPostgresShim {
                         "there is already a transaction in progress".to_string(),
                     ))
                     .await?
-                }
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                    .await?;
             }
-            Statement::Rollback { .. } | Statement::Commit { .. } => {
-                if let Some(_) = self.session.state.end_transaction() {
-                    // Portals + Cursors which we want to remove
-                    let mut to_remove = Vec::new();
-
-                    for (key, cursor) in &self.cursors {
-                        if !cursor.hold {
-                            to_remove.push(key.clone());
-                        }
-                    }
-
-                    for key in &to_remove {
-                        self.cursors.remove(key);
-                        self.portals.remove(key);
-
-                        trace!("Closing cursor/portal {}", key);
-                    }
-                } else {
+            Statement::Rollback { .. } => {
+                if self.end_transaction()? == false {
+                    // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
-                        ErrorCode::ActiveSqlTransaction,
-                        "there is already a transaction in progress".to_string(),
+                        ErrorCode::NoActiveSqlTransaction,
+                        "there is no transaction in progress".to_string(),
                     ))
                     .await?
-                }
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                    .await?;
+            }
+            Statement::Commit { .. } => {
+                if self.end_transaction()? == false {
+                    // PostgreSQL returns command completion anyway
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::NoActiveSqlTransaction,
+                        "there is no transaction in progress".to_string(),
+                    ))
+                    .await?
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                    .await?;
             }
             Statement::Fetch {
                 name,

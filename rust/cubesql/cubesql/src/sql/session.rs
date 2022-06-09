@@ -118,14 +118,17 @@ impl SessionState {
     }
 
     pub fn end_transaction(&self) -> Option<u64> {
-        let guard = self
+        let mut guard = self
             .transaction
-            .read()
-            .expect("failed to unlock transaction for checking is_in_transaction");
+            .write()
+            .expect("failed to unlock transaction for checking end_transaction");
 
-        match *guard {
-            TransactionState::None => None,
-            TransactionState::Active(n) => Some(n),
+        if let TransactionState::Active(n) = *guard {
+            *guard = TransactionState::None;
+
+            Some(n)
+        } else {
+            None
         }
     }
 

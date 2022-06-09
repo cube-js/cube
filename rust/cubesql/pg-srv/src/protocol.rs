@@ -751,6 +751,7 @@ pub enum ErrorCode {
     DataException,
     // Class 25 — Invalid Transaction State
     ActiveSqlTransaction,
+    NoActiveSqlTransaction,
     // 26
     InvalidSqlStatement,
     // 34
@@ -774,6 +775,7 @@ impl Display for ErrorCode {
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
             Self::ActiveSqlTransaction => "25001",
+            Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
