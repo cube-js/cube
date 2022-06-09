@@ -116,6 +116,13 @@ pub fn parse_sql_to_statements(
         "and ix.indisprimary = false",
     );
 
+    // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "left outer join pg_attrdef d on a.atthasdef and",
+        "left outer join pg_attrdef d on",
+    );
+
     let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
     let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
 
