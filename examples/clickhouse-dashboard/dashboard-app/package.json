@@ -34,10 +34,12 @@
     "web-vitals": "^1.1.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "cross-env NODE_ENV=development react-scripts start",
+    "build": "cross-env NODE_ENV=production react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "netlify deploy --prod --dir build",
+    "preview": "netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": [
@@ -63,5 +65,8 @@
     "bizcharts-charts": "0.0.1",
     "antd-tables": "0.0.1",
     "react-credentials": "0.0.1"
+  },
+  "devDependencies": {
+    "netlify-cli": "^10.5.0"
   }
 }
