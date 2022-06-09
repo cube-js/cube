@@ -569,7 +569,7 @@ impl AsyncPostgresShim {
             )?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-            Some(Portal::new(plan, format))
+            Some(Portal::new(plan, format, true))
         } else {
             None
         };
@@ -694,7 +694,7 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             Statement::Rollback { .. } => {
@@ -709,7 +709,7 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             Statement::Commit { .. } => {
@@ -724,7 +724,7 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             Statement::Fetch {
@@ -832,7 +832,7 @@ impl AsyncPostgresShim {
                     self.logger.clone(),
                 )?;
 
-                let mut portal = Portal::new(plan, cursor.format);
+                let mut portal = Portal::new(plan, cursor.format, false);
 
                 self.write_portal(&mut portal, limit).await?;
                 self.portals.insert(name.value, Some(portal));
@@ -911,7 +911,7 @@ impl AsyncPostgresShim {
                 let plan =
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             Statement::Discard { object_type } => {
@@ -924,7 +924,7 @@ impl AsyncPostgresShim {
                     CommandCompletion::Discard(object_type.to_string()),
                 );
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             Statement::Close { cursor } => {
@@ -967,7 +967,7 @@ impl AsyncPostgresShim {
                     }
                 }?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
             other => {
@@ -978,7 +978,7 @@ impl AsyncPostgresShim {
                     self.logger.clone(),
                 )?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text), 0)
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
             }
         };
