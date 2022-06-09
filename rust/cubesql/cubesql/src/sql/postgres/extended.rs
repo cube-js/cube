@@ -114,6 +114,9 @@ pub enum PortalState {
 pub struct Portal {
     // Format which is used to return data
     format: protocol::Format,
+    // If true = Selection
+    // If false = Fetch
+    is_select: bool,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
 }
@@ -122,9 +125,10 @@ unsafe impl Send for Portal {}
 unsafe impl Sync for Portal {}
 
 impl Portal {
-    pub fn new(plan: QueryPlan, format: protocol::Format) -> Self {
+    pub fn new(plan: QueryPlan, format: protocol::Format, is_select: bool) -> Self {
         Self {
             format,
+            is_select,
             state: Some(PortalState::Prepared(PreparedState { plan })),
         }
     }
@@ -172,7 +176,7 @@ impl Portal {
                 PortalState::Finished(FinishedState {
                     description: frame_state.description,
                 }),
-                protocol::CommandComplete::Select(writer.num_rows() as u32),
+                protocol::CommandComplete::new_selection(self.is_select, writer.num_rows() as u32),
             ))
         }
     }
@@ -261,7 +265,7 @@ impl Portal {
         if max_rows > 0 && left == 0 {
             return Ok((
                 PortalState::InExecutionStream(stream_state),
-                protocol::CommandComplete::Select(writer.num_rows() as u32),
+                protocol::CommandComplete::new_selection(self.is_select, writer.num_rows() as u32),
             ));
         }
 
@@ -272,7 +276,10 @@ impl Portal {
                         PortalState::Finished(FinishedState {
                             description: stream_state.description,
                         }),
-                        protocol::CommandComplete::Select(writer.num_rows() as u32),
+                        protocol::CommandComplete::new_selection(
+                            self.is_select,
+                            writer.num_rows() as u32,
+                        ),
                     ))
                 }
                 Some(res) => match res {
@@ -283,7 +290,10 @@ impl Portal {
                         if max_rows > 0 && left == 0 {
                             return Ok((
                                 PortalState::InExecutionStream(stream_state),
-                                protocol::CommandComplete::Select(writer.num_rows() as u32),
+                                protocol::CommandComplete::new_selection(
+                                    self.is_select,
+                                    writer.num_rows() as u32,
+                                ),
                             ));
                         }
                     }
@@ -355,7 +365,7 @@ impl Portal {
                 PortalState::Finished(finish_state) => {
                     self.state = Some(PortalState::Finished(finish_state));
 
-                    Ok(protocol::CommandComplete::Select(0))
+                    Ok(protocol::CommandComplete::new_selection(self.is_select, 0))
                 }
             }
         } else {
@@ -404,6 +414,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
+            is_select: true,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -423,6 +434,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
+            is_select: true,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -447,6 +459,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
+            is_select: true,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -469,6 +482,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
+            is_select: true,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream, None,
             ))),
@@ -499,6 +513,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
+            is_select: true,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream, None,
             ))),

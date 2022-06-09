@@ -295,7 +295,17 @@ impl Serialize for ParseComplete {
 #[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
+    Fetch(u32),
     Plain(String),
+}
+
+impl CommandComplete {
+    pub fn new_selection(is_select: bool, rows: u32) -> Self {
+        match is_select {
+            true => CommandComplete::Select(rows),
+            false => CommandComplete::Fetch(rows),
+        }
+    }
 }
 
 impl Serialize for CommandComplete {
@@ -306,6 +316,9 @@ impl Serialize for CommandComplete {
         match self {
             CommandComplete::Select(rows) => {
                 buffer::write_string(&mut buffer, &format!("SELECT {}", rows))
+            }
+            CommandComplete::Fetch(rows) => {
+                buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
             CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
         }
