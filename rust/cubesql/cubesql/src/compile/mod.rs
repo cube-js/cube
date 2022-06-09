@@ -7006,6 +7006,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgdatabase_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgdatabase_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_database ORDER BY oid ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "constraint_column_usage_postgres",
@@ -8861,6 +8875,107 @@ ORDER BY \"COUNT(count)\" DESC"
                     con.conname
                 ;
                 "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "google_sheets_pg_database_query",
+            execute_query(
+                "
+                SELECT
+                    cl.relname as Table,
+                    att.attname AS Name,
+                    att.attnum as Position,
+                    CASE
+                        WHEN att.attnotnull = 'f' THEN 'true'
+                        ELSE 'false'
+                    END as Nullable,
+                    CASE
+                        WHEN exists(
+                            select null
+                            from pg_constraint c
+                            where
+                                c.conrelid = cl.oid and
+                                c.contype = 'p' and
+                                att.attnum = ANY (c.conkey)
+                        ) THEN true
+                        ELSE false
+                    END as IsKey,
+                    CASE
+                        WHEN cs.relname IS NULL THEN 'false'
+                        ELSE 'true'
+                    END as IsAutoIncrement,
+                    CASE
+                        WHEN ty.typname = 'bpchar' THEN 'char'
+                        WHEN ty.typname = '_bpchar' THEN '_char'
+                        ELSE ty.typname
+                    END as TypeName,
+                    CASE
+                        WHEN
+                            ty.typname Like 'bit' OR
+                            ty.typname Like 'varbit' and
+                            att.atttypmod > 0
+                        THEN att.atttypmod
+                        WHEN
+                            ty.typname Like 'interval' OR
+                            ty.typname Like 'timestamp' OR
+                            ty.typname Like 'timestamptz' OR
+                            ty.typname Like 'time' OR
+                            ty.typname Like 'timetz' THEN -1
+                        WHEN att.atttypmod > 0 THEN att.atttypmod - 4
+                        ELSE att.atttypmod
+                    END as Length,
+                    (information_schema._pg_numeric_precision(
+                        information_schema._pg_truetypid(att.*, ty.*),
+                        information_schema._pg_truetypmod(att.*, ty.*)
+                    ))::information_schema.cardinal_number AS Precision,
+                    (information_schema._pg_numeric_scale(
+                        information_schema._pg_truetypid(att.*, ty.*),
+                        information_schema._pg_truetypmod(att.*, ty.*)
+                    ))::information_schema.cardinal_number AS Scale,
+                    (information_schema._pg_datetime_precision(
+                        information_schema._pg_truetypid(att.*, ty.*),
+                        information_schema._pg_truetypmod(att.*, ty.*)
+                    ))::information_schema.cardinal_number AS DatetimeLength
+                FROM pg_attribute att
+                JOIN pg_type ty ON ty.oid = atttypid
+                JOIN pg_namespace tn ON tn.oid = ty.typnamespace
+                JOIN pg_class cl ON
+                    cl.oid = attrelid AND
+                    (
+                        (cl.relkind = 'r') OR
+                        (cl.relkind = 's') OR
+                        (cl.relkind = 'v') OR
+                        (cl.relkind = 'm') OR
+                        (cl.relkind = 'f')
+                    )
+                JOIN pg_namespace na ON na.oid = cl.relnamespace
+                LEFT OUTER JOIN (
+                    pg_depend
+                    JOIN pg_class cs ON
+                        objid = cs.oid AND
+                        cs.relkind = 'S' AND
+                        classid = 'pg_class'::regclass::oid
+                ) ON
+                    refobjid = attrelid AND
+                    refobjsubid = attnum
+                LEFT JOIN pg_database db ON db.datname = current_database()
+                WHERE
+                    attnum > 0 AND
+                    attisdropped IS FALSE AND
+                    na.nspname = 'public' AND
+                    cl.relname = 'KibanaSampleDataEcommerce'
+                ORDER BY attnum
+                ;
+                "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
