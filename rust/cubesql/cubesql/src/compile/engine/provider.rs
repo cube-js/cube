@@ -46,10 +46,10 @@ use super::information_schema::postgres::{
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
     views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider, PgCatalogAttrdefProvider,
     PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
-    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
-    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
-    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogSettingsProvider,
-    PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogDatabaseProvider, PgCatalogDependProvider, PgCatalogDescriptionProvider,
+    PgCatalogEnumProvider, PgCatalogIndexProvider, PgCatalogMatviewsProvider,
+    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
+    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -308,6 +308,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_enum".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogMatviewsProvider>() {
             "pg_catalog.pg_matviews".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogDatabaseProvider>() {
+            "pg_catalog.pg_database".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
@@ -436,6 +438,11 @@ impl DatabaseProtocol {
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
                 "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
                 "pg_matviews" => return Some(Arc::new(PgCatalogMatviewsProvider::new())),
+                "pg_database" => {
+                    return Some(Arc::new(PgCatalogDatabaseProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
                 _ => return None,
             },
             _ => return None,
