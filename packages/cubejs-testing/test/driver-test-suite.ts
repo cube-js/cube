@@ -777,11 +777,10 @@ export function executeTestSuiteFor(type: string) {
             order: {
               'ECommerce.rowId': 'asc'
             },
-            // limit: 10,
             total: true,
             offset: 43
           });
-          // expect(response.rawData()).toMatchSnapshot('query');
+          expect(response.rawData()).toMatchSnapshot('query');
           expect(response.rawData().length).toEqual(1);
           expect(
             response.serialize().loadResponse.results[0].total

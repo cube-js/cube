@@ -8437,6 +8437,26 @@ Array [
 ]
 `;
 
+exports[`postgres driver tests using postgres for the pre-aggregations querying ECommerce: dimentions + order + total + offset: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bowling",
+    "ECommerce.customerId": "BS-11380",
+    "ECommerce.customerName": "Customer 9",
+    "ECommerce.discount": "0.20000",
+    "ECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-160633",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.profit": "5.39700",
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 9619,
+    "ECommerce.sales": "86.35200",
+    "ECommerce.subCategory": "Art",
+  },
+]
+`;
+
 exports[`postgres driver tests using postgres for the pre-aggregations querying ECommerce: dimentions + order: query 1`] = `
 Array [
   Object {
