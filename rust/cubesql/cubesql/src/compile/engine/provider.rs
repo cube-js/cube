@@ -16,6 +16,7 @@ use crate::{
     compile::{
         engine::information_schema::postgres::{
             testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+            PgCatalogRolesProvider,
         },
         MetaContext,
     },
@@ -310,6 +311,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_matviews".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogDatabaseProvider>() {
             "pg_catalog.pg_database".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogRolesProvider>() {
+            "pg_catalog.pg_roles".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
@@ -441,6 +444,11 @@ impl DatabaseProtocol {
                 "pg_database" => {
                     return Some(Arc::new(PgCatalogDatabaseProvider::new(
                         &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
+                "pg_roles" => {
+                    return Some(Arc::new(PgCatalogRolesProvider::new(
+                        &context.session_state.user().unwrap_or("test".to_string()),
                     )))
                 }
                 _ => return None,
