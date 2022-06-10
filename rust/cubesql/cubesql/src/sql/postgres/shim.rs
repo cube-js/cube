@@ -1024,8 +1024,12 @@ impl AsyncPostgresShim {
 
         let statements = parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL)?;
 
-        for statement in statements {
-            self.process_simple_query(statement, meta.clone()).await?;
+        if statements.len() == 0 {
+            self.write(protocol::EmptyQuery::new()).await?;
+        } else {
+            for statement in statements {
+                self.process_simple_query(statement, meta.clone()).await?;
+            }
         }
 
         Ok(())

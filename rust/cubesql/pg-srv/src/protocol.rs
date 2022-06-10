@@ -219,6 +219,22 @@ impl Serialize for ReadyForQuery {
     }
 }
 
+pub struct EmptyQuery {}
+
+impl EmptyQuery {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for EmptyQuery {
+    const CODE: u8 = b'I';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 pub struct ParameterStatus {
     name: String,
     value: String,
