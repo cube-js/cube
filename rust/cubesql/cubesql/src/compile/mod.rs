@@ -6829,6 +6829,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgroles_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgroles_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_roles ORDER BY oid ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgnamespace_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgnamespace_postgres",
