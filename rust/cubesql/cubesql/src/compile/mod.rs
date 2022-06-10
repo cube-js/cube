@@ -60,7 +60,11 @@ use self::{
     parser::parse_sql_to_statement,
 };
 use crate::{
-    compile::{builder::QueryBuilder, rewrite::converter::LogicalPlanToLanguageConverter},
+    compile::{
+        builder::QueryBuilder,
+        engine::udf::{create_pg_is_other_temp_schema, create_pg_my_temp_schema},
+        rewrite::converter::LogicalPlanToLanguageConverter,
+    },
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
@@ -2401,6 +2405,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_to_char_udf());
         ctx.register_udf(create_array_lower_udf());
         ctx.register_udf(create_array_upper_udf());
+        ctx.register_udf(create_pg_my_temp_schema());
+        ctx.register_udf(create_pg_is_other_temp_schema());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -8075,6 +8081,27 @@ ORDER BY \"COUNT(count)\" DESC"
             "datagrip_introspection",
             execute_query(
                 "select current_database(), current_schema(), current_user;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn postico1_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "postico1_schemas",
+            execute_query(
+                "SELECT
+                    oid,
+                    nspname,
+                    nspname = ANY (current_schemas(true)) AS is_on_search_path,
+                    oid = pg_my_temp_schema() AS is_my_temp_schema,
+                    pg_is_other_temp_schema(oid) AS is_other_temp_schema
+                FROM pg_namespace"
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

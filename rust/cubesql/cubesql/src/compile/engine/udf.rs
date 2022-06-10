@@ -1881,6 +1881,47 @@ pub fn create_array_lower_udf() -> ScalarUDF {
     )
 }
 
+/// Returns the OID of the current session's temporary schema, or zero if it has none (because it has not created any temporary tables).
+pub fn create_pg_my_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = Int64Builder::new(1);
+        builder.append_value(0).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_my_temp_schema",
+        &Signature::any(0, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+/// Returns true if the given OID is the OID of another session's temporary schema.
+/// pg_is_other_temp_schema ( oid ) → boolean
+pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids = downcast_primitive_arg!(args[0], "oid", Int64Type);
+        let result = oids.iter().map(|_| Some(false)).collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_is_other_temp_schema",
+        &Signature::exact(vec![DataType::Int64], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 /// returns upper bound of the requested array dimension
 /// array_lower ( anyarray, integer ) → integer
 pub fn create_array_upper_udf() -> ScalarUDF {
