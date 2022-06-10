@@ -831,6 +831,7 @@ class ApiGateway {
       normalizedTotal.totalQuery = true;
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
+      normalizedTotal.offset = null;
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
         [normalizedTotal],
