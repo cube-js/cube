@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+
+### Features
+
+* **cubesql:** Support pg_catalog.pg_roles table ([eed0727](https://github.com/cube-js/cube.js/commit/eed0727fe70b9fddfaddf8c32821fc721c911ae8))
+
+
+
+
+
 ## [0.30.18](https://github.com/cube-js/cube.js/compare/v0.30.17...v0.30.18) (2022-06-10)
 
 **Note:** Version bump only for package @cubejs-backend/native
