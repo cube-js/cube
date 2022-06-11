@@ -1,5 +1,6 @@
 import { getEnv } from '@cubejs-backend/shared';
-import { Agent } from 'http';
+import http from 'http';
+import https from 'https';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import WebSocket from 'ws';
@@ -103,14 +104,17 @@ class WebSocketTransport implements AgentTransport {
 }
 
 class HttpTransport implements AgentTransport {
-  private agent = new Agent({
-    keepAlive: true,
-    maxSockets: getEnv('agentMaxSockets')
-  });
+  private agent: http.Agent | https.Agent;
 
   public constructor(
-    private endpointUrl: string
-  ) {}
+    private readonly endpointUrl: string
+  ) {
+    const AgentClass = endpointUrl.startsWith('https') ? https.Agent : http.Agent;
+    this.agent = new AgentClass({
+      keepAlive: true,
+      maxSockets: getEnv('agentMaxSockets')
+    });
+  }
 
   public ready() {
     return true;
