@@ -1,4 +1,5 @@
 import { getEnv } from '@cubejs-backend/shared';
+import { Agent } from 'http';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import WebSocket from 'ws';
@@ -102,6 +103,11 @@ class WebSocketTransport implements AgentTransport {
 }
 
 class HttpTransport implements AgentTransport {
+  private agent = new Agent({
+    keepAlive: true,
+    maxSockets: getEnv('agentMaxSockets')
+  });
+
   public constructor(
     private endpointUrl: string
   ) {}
@@ -112,6 +118,7 @@ class HttpTransport implements AgentTransport {
 
   public async send(data: any[]) {
     const result = await fetch(this.endpointUrl, {
+      agent: this.agent,
       method: 'post',
       body: JSON.stringify(data),
       headers: { 'Content-Type': 'application/json' },

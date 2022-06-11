@@ -304,6 +304,9 @@ const variables: Record<string, (...args: any) => any> = {
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
     .asInt(),
+  agentMaxSockets: () => get('CUBEJS_AGENT_MAX_SOCKETS')
+    .default(100)
+    .asInt(),
   instanceId: () => get('CUBEJS_INSTANCE_ID')
     .asString(),
   telemetry: () => get('CUBEJS_TELEMETRY')
