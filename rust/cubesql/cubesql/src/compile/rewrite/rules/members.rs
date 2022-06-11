@@ -4,32 +4,34 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_alias_replacer, column_expr, column_name_to_member_name,
-            cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
+            binary_expr, cast_expr, column_alias_replacer, column_expr, column_name_to_member,
+            column_name_to_member_name, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
-            measure_expr, member_replacer, original_expr_name, projection, projection_expr,
-            projection_expr_empty_tail, referenced_columns, rewrite, rewriter::RewriteRules,
+            measure_expr, member_pushdown_replacer, member_replacer, original_expr_name,
+            projection, projection_expr, projection_expr_empty_tail, referenced_columns, rewrite,
+            rewriter::RewriteRules, rules::replacer_push_down_node_substitute_rules,
             save_date_range_replacer, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, ColumnAliasReplacerAliases,
             ColumnAliasReplacerTableName, ColumnAliasReplacerTargetTableName, ColumnExprColumn,
             CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName, LimitN,
             LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
-            MemberErrorPriority, ProjectionAlias, TableScanSourceTableName, TableScanTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            WithColumnRelation,
+            MemberErrorPriority, MemberPushdownReplacerTableName, ProjectionAlias,
+            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var, var_iter, CubeError,
 };
+use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
-    logical_plan::{Column, DFSchema},
+    logical_plan::{Column, DFSchema, Expr},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id, Rewrite, Subst};
+use egg::{EGraph, Id, Rewrite, Subst, Var};
 use std::{collections::HashSet, ops::Index, sync::Arc};
 
 pub struct MemberRules {
@@ -38,7 +40,7 @@ pub struct MemberRules {
 
 impl RewriteRules for MemberRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let mut rules = vec![
             transforming_rewrite(
                 "cube-scan",
                 table_scan(
@@ -317,8 +319,16 @@ impl RewriteRules for MemberRules {
                     "?source_table_name",
                     cube_scan_members(
                         cube_scan_members(
-                            member_replacer("?group_expr", "?source_table_name"),
-                            member_replacer("?aggr_expr", "?source_table_name"),
+                            member_pushdown_replacer(
+                                "?group_expr",
+                                "?old_members",
+                                "?member_pushdown_replacer_table_name",
+                            ),
+                            member_pushdown_replacer(
+                                "?aggr_expr",
+                                "?old_members",
+                                "?member_pushdown_replacer_table_name",
+                            ),
                         ),
                         save_date_range_replacer("?old_members"),
                     ),
@@ -335,6 +345,7 @@ impl RewriteRules for MemberRules {
                     "?group_expr",
                     "?aggr_expr",
                     "?old_members",
+                    "?member_pushdown_replacer_table_name",
                 ),
             ),
             transforming_rewrite(
@@ -673,7 +684,92 @@ impl RewriteRules for MemberRules {
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
                 binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
             ),
-        ]
+        ];
+
+        let member_replacer_fn =
+            |members| member_pushdown_replacer(members, "?old_members", "?table_name");
+
+        fn member_column_pushdown(
+            name: &str,
+            member_fn: impl Fn(&str) -> String,
+        ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+            rewrite(
+                &format!("member-pushdown-replacer-column-{}", name),
+                member_pushdown_replacer(
+                    column_expr("?column"),
+                    member_fn("?old_alias"),
+                    "?table_name",
+                ),
+                member_fn(&column_expr("?column")),
+            )
+        }
+
+        let find_matching_old_member = |name: &str, column_expr: String| {
+            transforming_rewrite(
+                &format!(
+                    "member-pushdown-replacer-column-find-matching-old-member-{}",
+                    name
+                ),
+                member_pushdown_replacer(
+                    column_expr.clone(),
+                    cube_scan_members("?left_old_members", "?right_old_members"),
+                    "?table_name",
+                ),
+                member_pushdown_replacer(column_expr, "?old_members", "?table_name"),
+                self.find_matching_old_member(
+                    "?column",
+                    "?left_old_members",
+                    "?right_old_members",
+                    "?table_name",
+                    "?old_members",
+                ),
+            )
+        };
+
+        rules.extend(replacer_push_down_node_substitute_rules(
+            "member-pushdown-replacer-aggregate-group",
+            "AggregateGroupExpr",
+            "CubeScanMembers",
+            member_replacer_fn.clone(),
+        ));
+        rules.extend(replacer_push_down_node_substitute_rules(
+            "member-pushdown-replacer-aggregate-aggr",
+            "AggregateAggrExpr",
+            "CubeScanMembers",
+            member_replacer_fn.clone(),
+        ));
+        rules.push(find_matching_old_member("column", column_expr("?column")));
+        rules.push(find_matching_old_member(
+            "agg-fun",
+            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+        ));
+        rules.push(transforming_chain_rewrite(
+            "member-pushdown-replacer-agg-fun",
+            member_pushdown_replacer(
+                "?aggr_expr",
+                measure_expr("?name", "?old_alias"),
+                "?table_name",
+            ),
+            vec![(
+                "?aggr_expr",
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            )],
+            "?measure".to_string(),
+            self.pushdown_measure(
+                "?name",
+                Some("?fun_name"),
+                Some("?distinct"),
+                "?aggr_expr",
+                "?measure",
+            ),
+        ));
+        rules.push(member_column_pushdown("dimension", |column| {
+            dimension_expr("?name", column)
+        }));
+        rules.push(member_column_pushdown("time-dimension", |column| {
+            time_dimension_expr("?name", "?granularity", "?date_range", column)
+        }));
+        rules
     }
 }
 
@@ -935,13 +1031,15 @@ impl MemberRules {
         group_expr_var: &'static str,
         aggregate_expr_var: &'static str,
         members_var: &'static str,
+        member_pushdown_replacer_table_name_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let table_name_var = var!(table_name_var);
         let group_expr_var = var!(group_expr_var);
         let aggregate_expr_var = var!(aggregate_expr_var);
         let members_var = var!(members_var);
+        let member_pushdown_replacer_table_name_var = var!(member_pushdown_replacer_table_name_var);
         move |egraph, subst| {
-            for table_name in var_iter!(egraph[subst[table_name_var]], CubeScanTableName) {
+            for table_name in var_iter!(egraph[subst[table_name_var]], CubeScanTableName).cloned() {
                 if let Some(referenced_group_expr) =
                     &egraph.index(subst[group_expr_var]).data.referenced_expr
                 {
@@ -978,6 +1076,14 @@ impl MemberRules {
                             );
                             // TODO default count member is not in the columns set but it should be there
                             if columns.iter().all(|c| member_column_names.contains(c)) {
+                                let table_name_id = egraph.add(
+                                    LogicalPlanLanguage::MemberPushdownReplacerTableName(
+                                        MemberPushdownReplacerTableName(table_name.to_string()),
+                                    ),
+                                );
+                                subst
+                                    .insert(member_pushdown_replacer_table_name_var, table_name_id);
+
                                 return true;
                             }
                         }
@@ -1443,6 +1549,123 @@ impl MemberRules {
         )
     }
 
+    fn find_matching_old_member(
+        &self,
+        column_var: &'static str,
+        left_old_members_var: &'static str,
+        right_old_members_var: &'static str,
+        table_name_var: &'static str,
+        old_members_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let left_old_members_var = var!(left_old_members_var);
+        let right_old_members_var = var!(right_old_members_var);
+        let table_name_var = var!(table_name_var);
+        let old_members_var = var!(old_members_var);
+        move |egraph, subst| {
+            for table_name in var_iter!(
+                egraph[subst[table_name_var]],
+                MemberPushdownReplacerTableName
+            )
+            .cloned()
+            {
+                for alias_column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
+                {
+                    let alias_name =
+                        expr_column_name(Expr::Column(alias_column), &Some(table_name.to_string()));
+
+                    if let Some(left_member_name_to_expr) = egraph
+                        .index(subst[left_old_members_var])
+                        .data
+                        .member_name_to_expr
+                        .clone()
+                    {
+                        let column_name_to_member =
+                            column_name_to_member(left_member_name_to_expr, table_name.to_string());
+                        if let Some(_) = column_name_to_member.get(&alias_name) {
+                            subst.insert(old_members_var, subst[left_old_members_var]);
+                            return true;
+                        }
+                    }
+
+                    if let Some(right_member_name_to_expr) = egraph
+                        .index(subst[right_old_members_var])
+                        .data
+                        .member_name_to_expr
+                        .clone()
+                    {
+                        let column_name_to_member = column_name_to_member(
+                            right_member_name_to_expr,
+                            table_name.to_string(),
+                        );
+                        if let Some(_) = column_name_to_member.get(&alias_name) {
+                            subst.insert(old_members_var, subst[right_old_members_var]);
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn pushdown_measure(
+        &self,
+        measure_name_var: &'static str,
+        fun_var: Option<&'static str>,
+        distinct_var: Option<&'static str>,
+        original_expr_var: &'static str,
+        measure_out_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let measure_name_var = var!(measure_name_var);
+        let fun_var = fun_var.map(|fun_var| var!(fun_var));
+        let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
+        let original_expr_var = var!(original_expr_var);
+        let measure_out_var = var!(measure_out_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
+                for measure_name in var_iter!(egraph[subst[measure_name_var]], MeasureName).cloned()
+                {
+                    if let Some(measure) = meta_context.find_measure_with_name(measure_name) {
+                        for fun in fun_var
+                            .map(|fun_var| {
+                                var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                                    .map(|fun| Some(fun))
+                                    .collect()
+                            })
+                            .unwrap_or(vec![None])
+                        {
+                            for distinct in distinct_var
+                                .map(|distinct_var| {
+                                    var_iter!(
+                                        egraph[subst[distinct_var]],
+                                        AggregateFunctionExprDistinct
+                                    )
+                                    .map(|d| *d)
+                                    .collect()
+                                })
+                                .unwrap_or(vec![false])
+                            {
+                                let call_agg_type = Self::get_agg_type(fun, distinct);
+                                Self::measure_output(
+                                    egraph,
+                                    subst,
+                                    &measure,
+                                    call_agg_type,
+                                    alias,
+                                    measure_out_var,
+                                );
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
     fn transform_measure(
         &self,
         cube_var: &'static str,
@@ -1493,24 +1716,7 @@ impl MemberRules {
                                 })
                                 .unwrap_or(vec![None])
                             {
-                                let call_agg_type = {
-                                    fun.map(|fun| match fun {
-                                        AggregateFunction::Count => {
-                                            if distinct {
-                                                "countDistinct"
-                                            } else {
-                                                "count"
-                                            }
-                                        }
-                                        AggregateFunction::Sum => "sum",
-                                        AggregateFunction::Min => "min",
-                                        AggregateFunction::Max => "max",
-                                        AggregateFunction::Avg => "avg",
-                                        AggregateFunction::ApproxDistinct => "countDistinctApprox",
-                                        // TODO: Fix me
-                                        _ => "unknown_aggregation_type_hardcoded",
-                                    })
-                                };
+                                let call_agg_type = Self::get_agg_type(fun, distinct);
 
                                 let measure_name = format!("{}.{}", cube_name, measure_name);
                                 if let Some(measure) = cube
@@ -1521,35 +1727,14 @@ impl MemberRules {
                                     if let Some(alias) =
                                         original_expr_name(egraph, subst[aggr_expr_var])
                                     {
-                                        if call_agg_type.is_some()
-                                            && !measure
-                                                .is_same_agg_type(call_agg_type.as_ref().unwrap())
-                                        {
-                                            subst.insert(
-                                                measure_out_var,
-                                                add_member_error(egraph, format!(
-                                                    "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
-                                                    measure.get_real_name(),
-                                                    measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
-                                                    call_agg_type.unwrap().to_uppercase(),
-                                                ), 1),
-                                            );
-                                        } else {
-                                            let measure_name =
-                                                egraph.add(LogicalPlanLanguage::MeasureName(
-                                                    MeasureName(measure.name.to_string()),
-                                                ));
-
-                                            let alias_expr = Self::add_alias_column(egraph, alias);
-
-                                            subst.insert(
-                                                measure_out_var,
-                                                egraph.add(LogicalPlanLanguage::Measure([
-                                                    measure_name,
-                                                    alias_expr,
-                                                ])),
-                                            );
-                                        }
+                                        Self::measure_output(
+                                            egraph,
+                                            subst,
+                                            measure,
+                                            call_agg_type,
+                                            alias,
+                                            measure_out_var,
+                                        );
                                     }
 
                                     return true;
@@ -1578,6 +1763,60 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    fn measure_output(
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: &mut Subst,
+        measure: &V1CubeMetaMeasure,
+        call_agg_type: Option<String>,
+        alias: String,
+        measure_out_var: Var,
+    ) {
+        if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
+            subst.insert(
+                measure_out_var,
+                add_member_error(egraph, format!(
+                    "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
+                    measure.get_real_name(),
+                    measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
+                    call_agg_type.unwrap().to_uppercase(),
+                ), 1),
+            );
+        } else {
+            let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
+                measure.name.to_string(),
+            )));
+
+            let alias_expr = Self::add_alias_column(egraph, alias);
+
+            subst.insert(
+                measure_out_var,
+                egraph.add(LogicalPlanLanguage::Measure([measure_name, alias_expr])),
+            );
+        }
+    }
+
+    fn get_agg_type(fun: Option<&AggregateFunction>, distinct: bool) -> Option<String> {
+        fun.map(|fun| {
+            match fun {
+                AggregateFunction::Count => {
+                    if distinct {
+                        "countDistinct"
+                    } else {
+                        "count"
+                    }
+                }
+                AggregateFunction::Sum => "sum",
+                AggregateFunction::Min => "min",
+                AggregateFunction::Max => "max",
+                AggregateFunction::Avg => "avg",
+                AggregateFunction::ApproxDistinct => "countDistinctApprox",
+                // TODO: Fix me
+                _ => "unknown_aggregation_type_hardcoded",
+            }
+            .to_string()
+        })
     }
 
     pub fn default_count_measure_name() -> String {

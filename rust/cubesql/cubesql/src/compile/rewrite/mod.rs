@@ -5,7 +5,10 @@ pub mod language;
 mod rewriter;
 mod rules;
 
-use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
+use crate::{
+    compile::rewrite::analysis::{LogicalPlanAnalysis, Member},
+    CubeError,
+};
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
@@ -257,6 +260,11 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             cube: Arc<LogicalPlan>,
         },
+        MemberPushdownReplacer {
+            members: Vec<LogicalPlan>,
+            old_members: Arc<LogicalPlan>,
+            table_name: String,
+        },
         TimeDimensionDateRangeReplacer {
             members: Vec<LogicalPlan>,
             member: String,
@@ -332,13 +340,24 @@ impl ExprRewriter for WithColumnRelation {
 }
 
 fn column_name_to_member_name(
-    member_name_to_expr: Vec<(String, Expr)>,
+    member_name_to_expr: Vec<(String, Expr, Member)>,
     table_name: String,
 ) -> HashMap<String, String> {
     let mut relation = WithColumnRelation(table_name);
     member_name_to_expr
         .into_iter()
-        .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
+        .map(|(member, expr, _)| (expr_column_name_with_relation(expr, &mut relation), member))
+        .collect::<HashMap<_, _>>()
+}
+
+fn column_name_to_member(
+    member_name_to_expr: Vec<(String, Expr, Member)>,
+    table_name: String,
+) -> HashMap<String, Member> {
+    let mut relation = WithColumnRelation(table_name);
+    member_name_to_expr
+        .into_iter()
+        .map(|(_, expr, member)| (expr_column_name_with_relation(expr, &mut relation), member))
         .collect::<HashMap<_, _>>()
 }
 
@@ -648,6 +667,17 @@ fn column_alias_replacer(
 
 fn member_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(MemberReplacer {} {})", members, aliases)
+}
+
+fn member_pushdown_replacer(
+    members: impl Display,
+    old_members: impl Display,
+    table_name: impl Display,
+) -> String {
+    format!(
+        "(MemberPushdownReplacer {} {} {})",
+        members, old_members, table_name
+    )
 }
 
 fn time_dimension_date_range_replacer(

@@ -4104,7 +4104,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let query_plan = convert_select_to_query_plan(
             "select \"rows\".\"customer_gender\" as \"customer_gender\",
-\n    count(1) as \"a0\"\
+\n    sum(\"rows\".\"count\") as \"a0\"\
 \nfrom\
 \n(\
 \n    select \"_\".\"count\",\
@@ -4140,6 +4140,49 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+            }
+        );
+    }
+
+    #[test]
+    fn powerbi_inner_wrapped_dates() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select \"_\".\"created_at_day\",\
+\n    \"_\".\"a0\"\
+\nfrom \
+\n(\
+\n    select \"rows\".\"created_at_day\" as \"created_at_day\",\
+\n        sum(\"rows\".\"cnt\") as \"a0\"\
+\n    from \
+\n    (\
+\n        select count(*) cnt,date_trunc('day', order_date) as created_at_day, date_trunc('month', order_date) as created_at_month from public.KibanaSampleDataEcommerce group by 2, 3\
+\n    ) \"rows\"\
+\n    group by \"created_at_day\"\
+\n) \"_\"\
+\nwhere not \"_\".\"a0\" is null\
+\nlimit 1000001"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None, // TODO this test will fail with 'Some(1000001)' diff when filter push down for aliased fields is done
+                offset: None,
+                filters: None,
             }
         );
     }

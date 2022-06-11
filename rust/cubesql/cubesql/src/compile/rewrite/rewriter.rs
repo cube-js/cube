@@ -172,7 +172,7 @@ impl IterDebugInfo {
         I: IntoIterator<Item = S>,
     {
         use std::process::{Command, Stdio};
-        let mut child = Command::new("dot")
+        let mut child = Command::new(env::var("CUBESQL_DOT_PATH").unwrap_or("dot".to_string()))
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
