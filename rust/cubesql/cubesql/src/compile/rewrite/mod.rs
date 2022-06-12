@@ -5,10 +5,7 @@ pub mod language;
 mod rewriter;
 mod rules;
 
-use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member},
-    CubeError,
-};
+use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
@@ -26,7 +23,7 @@ use egg::{
     rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
     Symbol, Var,
 };
-use std::{collections::HashMap, fmt::Display, slice::Iter, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Index, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -273,6 +270,8 @@ crate::plan_to_language! {
         FilterReplacer {
             filters: Vec<LogicalPlan>,
             cube: Option<String>,
+            members: Vec<LogicalPlan>,
+            table_name: String,
         },
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
@@ -340,25 +339,29 @@ impl ExprRewriter for WithColumnRelation {
 }
 
 fn column_name_to_member_name(
-    member_name_to_expr: Vec<(String, Expr, Member)>,
+    member_name_to_expr: Vec<(String, Expr)>,
     table_name: String,
 ) -> HashMap<String, String> {
     let mut relation = WithColumnRelation(table_name);
     member_name_to_expr
         .into_iter()
-        .map(|(member, expr, _)| (expr_column_name_with_relation(expr, &mut relation), member))
+        .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
         .collect::<HashMap<_, _>>()
 }
 
-fn column_name_to_member(
-    member_name_to_expr: Vec<(String, Expr, Member)>,
+fn member_name_by_alias(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+    alias: &str,
     table_name: String,
-) -> HashMap<String, Member> {
-    let mut relation = WithColumnRelation(table_name);
-    member_name_to_expr
-        .into_iter()
-        .map(|(_, expr, member)| (expr_column_name_with_relation(expr, &mut relation), member))
-        .collect::<HashMap<_, _>>()
+) -> Option<String> {
+    if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
+        let column_name_to_member =
+            column_name_to_member_name(member_name_to_expr.clone(), table_name);
+        column_name_to_member.get(alias).cloned()
+    } else {
+        None
+    }
 }
 
 fn referenced_columns(referenced_expr: Vec<Expr>, table_name: String) -> Vec<String> {
@@ -695,8 +698,16 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
     format!("(OrderReplacer {} {} {})", members, aliases, cube)
 }
 
-fn filter_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(FilterReplacer {} {})", members, cube)
+fn filter_replacer(
+    members: impl Display,
+    cube: impl Display,
+    cube_members: impl Display,
+    table_name: impl Display,
+) -> String {
+    format!(
+        "(FilterReplacer {} {} {} {})",
+        members, cube, cube_members, table_name
+    )
 }
 
 fn save_date_range_replacer(members: impl Display) -> String {

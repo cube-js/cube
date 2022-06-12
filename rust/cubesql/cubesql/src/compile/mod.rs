@@ -3588,7 +3588,13 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("gt".to_string()),
+                    values: Some(vec!["0".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
             }
         );
 
@@ -3608,13 +3614,22 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["false".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["false".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                        operator: Some("gt".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ]),
             }
         );
     }
@@ -3875,7 +3890,13 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("gt".to_string()),
+                    values: Some(vec!["0".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
             }
         );
 
@@ -4180,9 +4201,15 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: None,
-                limit: None, // TODO this test will fail with 'Some(1000001)' diff when filter push down for aliased fields is done
+                limit: Some(1000001),
                 offset: None,
-                filters: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
             }
         );
     }

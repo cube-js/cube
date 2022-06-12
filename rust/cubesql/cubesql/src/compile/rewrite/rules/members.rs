@@ -4,8 +4,8 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_alias_replacer, column_expr, column_name_to_member,
-            column_name_to_member_name, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
+            binary_expr, cast_expr, column_alias_replacer, column_expr, column_name_to_member_name,
+            cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit, literal_expr,
             measure_expr, member_pushdown_replacer, member_replacer, original_expr_name,
@@ -1580,8 +1580,10 @@ impl MemberRules {
                         .member_name_to_expr
                         .clone()
                     {
-                        let column_name_to_member =
-                            column_name_to_member(left_member_name_to_expr, table_name.to_string());
+                        let column_name_to_member = column_name_to_member_name(
+                            left_member_name_to_expr,
+                            table_name.to_string(),
+                        );
                         if let Some(_) = column_name_to_member.get(&alias_name) {
                             subst.insert(old_members_var, subst[left_old_members_var]);
                             return true;
@@ -1594,7 +1596,7 @@ impl MemberRules {
                         .member_name_to_expr
                         .clone()
                     {
-                        let column_name_to_member = column_name_to_member(
+                        let column_name_to_member = column_name_to_member_name(
                             right_member_name_to_expr,
                             table_name.to_string(),
                         );

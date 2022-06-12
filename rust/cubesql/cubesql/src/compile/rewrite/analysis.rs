@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ColumnExprColumn, DimensionName, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, TableScanSourceTableName, TimeDimensionGranularity, TimeDimensionName,
+            MeasureName, TableScanSourceTableName, TimeDimensionName,
         },
     },
     var_iter, CubeError,
@@ -27,7 +27,7 @@ use std::{fmt::Debug, ops::Index, sync::Arc};
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     pub original_expr: Option<Expr>,
-    pub member_name_to_expr: Option<Vec<(String, Expr, Member)>>,
+    pub member_name_to_expr: Option<Vec<(String, Expr)>>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String)>>,
     pub referenced_expr: Option<Vec<Expr>>,
@@ -44,20 +44,6 @@ pub struct LogicalPlanAnalysis {
 
 pub struct SingleNodeIndex<'a> {
     egraph: &'a EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Member {
-    Measure {
-        name: String,
-    },
-    Dimension {
-        name: String,
-    },
-    TimeDimension {
-        name: String,
-        granularity: Option<String>,
-    },
 }
 
 impl<'a> Index<Id> for SingleNodeIndex<'a> {
@@ -111,7 +97,7 @@ impl LogicalPlanAnalysis {
     fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(String, Expr, Member)>> {
+    ) -> Option<Vec<(String, Expr)>> {
         let column_name = |id| egraph.index(id).data.column.clone();
         let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
@@ -121,13 +107,7 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let measure_name = var_iter!(egraph[params[0]], MeasureName).next().unwrap();
-                    map.push((
-                        measure_name.to_string(),
-                        expr.clone(),
-                        Member::Measure {
-                            name: measure_name.to_string(),
-                        },
-                    ));
+                    map.push((measure_name.to_string(), expr.clone()));
                     Some(map)
                 } else {
                     None
@@ -138,13 +118,7 @@ impl LogicalPlanAnalysis {
                     let expr = original_expr(params[1])?;
                     let dimension_name =
                         var_iter!(egraph[params[0]], DimensionName).next().unwrap();
-                    map.push((
-                        dimension_name.to_string(),
-                        expr,
-                        Member::Dimension {
-                            name: dimension_name.to_string(),
-                        },
-                    ));
+                    map.push((dimension_name.to_string(), expr));
                     Some(map)
                 } else {
                     None
@@ -156,18 +130,7 @@ impl LogicalPlanAnalysis {
                     let time_dimension_name = var_iter!(egraph[params[0]], TimeDimensionName)
                         .next()
                         .unwrap();
-                    let time_dimension_granularity =
-                        var_iter!(egraph[params[1]], TimeDimensionGranularity)
-                            .next()
-                            .unwrap();
-                    map.push((
-                        time_dimension_name.to_string(),
-                        expr,
-                        Member::TimeDimension {
-                            name: time_dimension_name.to_string(),
-                            granularity: time_dimension_granularity.clone(),
-                        },
-                    ));
+                    map.push((time_dimension_name.to_string(), expr));
                     Some(map)
                 } else {
                     None
