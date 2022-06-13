@@ -3,20 +3,19 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             analysis::LogicalPlanAnalysis, between_expr, binary_expr, case_expr, case_expr_var_arg,
-            cast_expr, column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
-            cube_scan_members, dimension_expr, expr_column_name, filter,
-            filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
-            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, limit, literal_expr, literal_string, measure_expr, member_name_by_alias,
-            not_expr, projection, rewrite, rewriter::RewriteRules, scalar_fun_expr_args,
-            scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
-            time_dimension_expr, transforming_rewrite, BetweenExprNegated, BinaryExprOp,
-            ColumnExprColumn, CubeScanLimit, CubeScanTableName, FilterMemberMember, FilterMemberOp,
-            FilterMemberValues, FilterReplacerCube, FilterReplacerTableName, InListExprNegated,
-            LimitN, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
-            TableScanSourceTableName, TimeDimensionDateRange,
-            TimeDimensionDateRangeReplacerDateRange, TimeDimensionDateRangeReplacerMember,
-            TimeDimensionGranularity, TimeDimensionName,
+            cast_expr, column_expr, cube_scan, cube_scan_filters, cube_scan_members,
+            dimension_expr, expr_column_name, filter, filter_cast_unwrap_replacer, filter_member,
+            filter_op, filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
+            member_name_by_alias, not_expr, projection, rewrite, rewriter::RewriteRules,
+            scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
+            time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
+            BetweenExprNegated, BinaryExprOp, ColumnExprColumn, CubeScanLimit, CubeScanTableName,
+            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerCube,
+            FilterReplacerTableName, InListExprNegated, LimitN, LiteralExprValue,
+            LogicalPlanLanguage, SegmentMemberMember, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
         },
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
@@ -679,21 +678,6 @@ impl RewriteRules for FilterRules {
                     "and",
                 ),
             ),
-            // transforming_rewrite(
-            //     "in-date-range-to-time-dimension",
-            //     filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-            //     time_dimension_date_range_replacer(
-            //         cube_scan_filters_empty_tail(),
-            //         "?time_dimension_member",
-            //         "?time_dimension_date_range",
-            //     ),
-            //     self.filter_to_time_dimension_range(
-            //         "?member",
-            //         "?date_range",
-            //         "?time_dimension_member",
-            //         "?time_dimension_date_range",
-            //     ),
-            // ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
@@ -1427,46 +1411,6 @@ impl FilterRules {
                             result,
                         ))),
                     );
-                    return true;
-                }
-            }
-
-            false
-        }
-    }
-
-    fn filter_to_time_dimension_range(
-        &self,
-        member_var: &'static str,
-        date_range_var: &'static str,
-        time_dimension_member_var: &'static str,
-        time_dimension_date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let member_var = member_var.parse().unwrap();
-        let date_range_var = date_range_var.parse().unwrap();
-        let time_dimension_member_var = time_dimension_member_var.parse().unwrap();
-        let time_dimension_date_range_var = time_dimension_date_range_var.parse().unwrap();
-        move |egraph, subst| {
-            for member in var_iter!(egraph[subst[member_var]], FilterMemberMember) {
-                let member = member.to_string();
-                for date_range in var_iter!(egraph[subst[date_range_var]], FilterMemberValues) {
-                    let date_range = date_range.clone();
-                    subst.insert(
-                        time_dimension_member_var,
-                        egraph.add(LogicalPlanLanguage::TimeDimensionDateRangeReplacerMember(
-                            TimeDimensionDateRangeReplacerMember(member.to_string()),
-                        )),
-                    );
-
-                    subst.insert(
-                        time_dimension_date_range_var,
-                        egraph.add(
-                            LogicalPlanLanguage::TimeDimensionDateRangeReplacerDateRange(
-                                TimeDimensionDateRangeReplacerDateRange(date_range.clone()),
-                            ),
-                        ),
-                    );
-
                     return true;
                 }
             }

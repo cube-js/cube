@@ -281,19 +281,10 @@ crate::plan_to_language! {
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
         },
-        SaveDateRangeReplacer {
-            members: Vec<LogicalPlan>,
-        },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
             cube: Option<String>,
-        },
-        ColumnAliasReplacer {
-            members: Vec<LogicalPlan>,
-            aliases: Vec<(String, String)>,
-            table_name: Option<String>,
-            target_table_name: Option<String>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -704,10 +695,6 @@ fn filter_replacer(
     )
 }
 
-fn save_date_range_replacer(members: impl Display) -> String {
-    format!("(SaveDateRangeReplacer {})", members)
-}
-
 fn filter_cast_unwrap_replacer(members: impl Display) -> String {
     format!("(FilterCastUnwrapReplacer {})", members)
 }
@@ -778,10 +765,6 @@ fn dimension_expr(name: impl Display, expr: impl Display) -> String {
 
 fn segment_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Segment {} {})", name, expr)
-}
-
-fn member_error(error: impl Display, priority: impl Display) -> String {
-    format!("(MemberError {} {})", error, priority)
 }
 
 fn time_dimension_expr(
