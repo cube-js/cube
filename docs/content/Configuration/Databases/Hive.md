@@ -3,6 +3,10 @@ title: Hive/SparkSQL
 permalink: /config/databases/hive-sparksql
 ---
 
+<InfoBox>
+  The driver for Hive/SparkSQL is <b>community supported</b>. 
+</InfoBox>
+
 ## Prerequisites
 
 - The hostname for the [Hive][hive] database server
