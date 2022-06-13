@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.21](https://github.com/cube-js/cube.js/compare/v0.30.20...v0.30.21) (2022-06-13)
+
+
+### Features
+
+* **databricks-jdbc:** improving performance ([1ef4504](https://github.com/cube-js/cube.js/commit/1ef45040f912d7f81b76a0495ddfa5db28ad9067))
+
+
+
+
+
 ## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
 
 
