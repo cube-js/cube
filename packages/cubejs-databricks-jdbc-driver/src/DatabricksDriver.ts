@@ -291,11 +291,9 @@ export class DatabricksDriver extends JDBCDriver {
     count = count || 0;
     ms = ms || 0;
     return new Promise((resolve, reject) => {
-      this.reportQueryUsage({ msg: `waiting ${ms}ms before fetch` }, {});
       this
         .wait(ms as number)
         .then(() => {
-          this.reportQueryUsage({ msg: `fetching ${req.url}` }, {});
           fetch(req)
             .then((res) => {
               this
@@ -305,7 +303,6 @@ export class DatabricksDriver extends JDBCDriver {
                 })
                 .catch((err) => {
                   if (res.status === 429 && (count as number) < 5) {
-                    this.reportQueryUsage({ msg: `retrying ${req.url}` }, {});
                     this
                       .fetch(req, (count as number)++, (ms as number) + 1000)
                       .then((_res) => { resolve(_res); })
@@ -837,17 +834,14 @@ export class DatabricksDriver extends JDBCDriver {
   public async unload(
     tableName: string,
   ): Promise<DownloadTableCSVData> {
-    this.reportQueryUsage({ msg: `unload start ${Date.now()}` }, {});
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    this.reportQueryUsage({ msg: `running unloadCommand ${Date.now()}` }, {});
     const csvFile = await this.unloadCommand(
       tableName,
       columns,
       pathname,
     );
-    this.reportQueryUsage({ msg: `unload end ${Date.now()}` }, {});
     return {
       csvFile,
       types,
