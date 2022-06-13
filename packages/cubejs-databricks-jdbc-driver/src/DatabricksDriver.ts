@@ -292,22 +292,18 @@ export class DatabricksDriver extends JDBCDriver {
     count = count || 0;
     ms = ms || 0;
     return new Promise((resolve, reject) => {
-      this.reportQueryUsage({ msg: `waiting ${ms}ms before fetch` }, {});
       this
         .wait(ms as number)
         .then(() => {
-          this.reportQueryUsage({ msg: `fetching ${req.url}` }, {});
           fetch(req)
             .then((res) => {
               this
                 .assertResponse(res)
                 .then(() => {
-                  this.reportQueryUsage({ msg: `ready ${req.url}` }, {});
                   resolve(res);
                 })
                 .catch((err) => {
                   if (res.status === 429 && (count as number) < 5) {
-                    this.reportQueryUsage({ msg: `retrying ${req.url}` }, {});
                     this
                       .fetch(req, (count as number)++, (ms as number) + 1000)
                       .then((_res) => { resolve(_res); })
@@ -352,6 +348,28 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
+   * Determine whether notebook exist or no.
+   */
+  private async checkNotebook(p: string): Promise<boolean> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/workspace/list?path=${p}`;
+    const request = new Request(url, {
+      method: 'GET',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+    });
+    try {
+      await this.fetch(request);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * Import predefined nodebook to the databricks under specified path.
    */
   private async importNotebook(p: string, content: string): Promise<void> {
@@ -374,6 +392,11 @@ export class DatabricksDriver extends JDBCDriver {
     });
     await this.fetch(request);
   }
+
+  /**
+   * Job identifier.
+   */
+  private _job?: number;
 
   /**
    * Create job and returns job id.
@@ -404,9 +427,63 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
+   * Determine whether job exist or no.
+   */
+  private async checkJob(job: number): Promise<boolean> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/workspace/jobs/get?job_id=${job}`;
+    const request = new Request(url, {
+      method: 'GET',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+    });
+    try {
+      await this.fetch(request);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Delete job.
+   */
+  private async deleteJob(job: number): Promise<any> {
+    const url = `https://${
+      this.getApiUrl()
+    }/api/2.0/jobs/delete`;
+    const request = new Request(url, {
+      method: 'POST',
+      headers: new Headers({
+        Accept: '*/*',
+        Authorization: `Bearer ${this.getApiToken()}`,
+      }),
+      body: JSON.stringify({
+        job_id: job,
+      }),
+    });
+    await this.fetch(request);
+  }
+
+  /**
    * Run job and returns run id.
    */
-  private async runJob(job: number): Promise<number> {
+  private async runJob(
+    job: number,
+    type: string,
+    columns: string,
+    table: string,
+    pathname: string,
+
+    awsKey?: string,
+    awsSecret?: string,
+
+    azureStorage?: string,
+    azureKey?: string,
+  ): Promise<number> {
     const url = `https://${
       this.getApiUrl()
     }/api/2.0/jobs/run-now`;
@@ -418,6 +495,18 @@ export class DatabricksDriver extends JDBCDriver {
       }),
       body: JSON.stringify({
         job_id: job,
+        notebook_params: {
+          type,
+          columns,
+          table,
+          pathname,
+          // aws
+          awsKey,
+          awsSecret,
+          // azure
+          azureStorage,
+          azureKey,
+        }
       }),
     });
     const response = await this.fetch(request);
@@ -433,8 +522,7 @@ export class DatabricksDriver extends JDBCDriver {
    */
   private async waitResult(run: number, ms?: number): Promise<any> {
     ms = ms || 1000;
-    ms = ms <= 10000 ? ms + 1000 : ms;
-    this.reportQueryUsage({ msg: `waiting ${ms}ms for result` }, {});
+    ms = ms <= 5000 ? ms + 1000 : ms;
     return new Promise((resolve, reject) => {
       const url = `https://${
         this.getApiUrl()
@@ -487,26 +575,6 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Delete job.
-   */
-  private async deleteJob(job: number): Promise<any> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/jobs/delete`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        job_id: job,
-      }),
-    });
-    await this.fetch(request);
-  }
-
-  /**
    * Remove nodebook.
    */
   private async deleteNotebook(p: string): Promise<any> {
@@ -550,7 +618,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
     const csvFile = await Promise.all(
       list.Contents
-        .filter(file => file.Key && /.csv$/i.test(file.Key))
+        .filter(file => file.Key && /.csv.gz$/i.test(file.Key))
         .map(async (file) => {
           const command = new GetObjectCommand({
             Bucket: url.host,
@@ -571,8 +639,7 @@ export class DatabricksDriver extends JDBCDriver {
     pathname: string,
   ): Promise<string[]> {
     let result: string[] = [];
-    let notebook = true;
-    const filename = `/${v5(pathname, v1()).toString()}.scala`;
+    const filename = '/unload-preaggs.scala';
     const content = Buffer.from(
       `sc.hadoopConfiguration.set(
         "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
@@ -585,26 +652,36 @@ export class DatabricksDriver extends JDBCDriver {
         .write
         .format("com.databricks.spark.csv")
         .option("header", "false")
+        .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
         .save("${pathname}")`,
       'utf-8',
     ).toString('base64');
+
     const cluster = (await this.getClustersIds())[0];
-    try {
+    const notebook = await this.checkNotebook(filename);
+    if (!notebook) {
       await this.importNotebook(filename, content);
-    } catch (e) {
-      notebook = false;
     }
-    if (notebook) {
-      try {
-        const job = await this.createJob(cluster, filename);
-        const run = await this.runJob(job);
-        await this.waitResult(run);
-        await this.deleteJob(job);
-        result = await this.getSignedS3Urls(pathname);
-      } finally {
-        await this.deleteNotebook(filename);
+    if (!this._job) {
+      this._job = await this.createJob(cluster, filename);
+    } else {
+      const exist = await this.checkJob(this._job);
+      if (!exist) {
+        this._job = await this.createJob(cluster, filename);
       }
     }
+    const run = await this.runJob(
+      this._job,
+      's3',
+      columns,
+      table,
+      pathname,
+      this.config.awsKey,
+      this.config.awsSecret,
+    );
+    await this.waitResult(run);
+    // await this.deleteJob(job);
+    result = await this.getSignedS3Urls(pathname);
     return result;
   }
 
@@ -619,7 +696,7 @@ export class DatabricksDriver extends JDBCDriver {
       pathname.split('wasbs://')[1].split('.blob')[0].split('@');
     const foldername =
       pathname.split(`${this.config.exportBucket}/`)[1];
-    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
+    const expr = new RegExp(`${foldername}\\/.*\\.csv.gz$`, 'i');
 
     const credential = new StorageSharedKeyCredential(
       account,
@@ -665,48 +742,65 @@ export class DatabricksDriver extends JDBCDriver {
     pathname: string,
   ): Promise<string[]> {
     let result: string[] = [];
-    let notebook = true;
-    const filename = `/${v5(pathname, v1()).toString()}.scala`;
+    const filename = '/unload-preaggs.scala';
     const storage = pathname.split('@')[1].split('.')[0];
     const content = Buffer.from(
-      `spark.conf.set(
-        "fs.azure.account.key.${storage}.blob.core.windows.net",
-        "${this.config.azureKey}"
+      `
+      dbutils.widgets.text("azureStorage", "azureStorage", "azureStorage")
+      dbutils.widgets.text("azureKey", "azureKey", "azureKey")
+      dbutils.widgets.text("columns", "columns", "columns")
+      dbutils.widgets.text("table", "table", "table")
+      dbutils.widgets.text("pathname", "pathname", "pathname")
+
+      val azureStorage = dbutils.widgets.get("azureStorage")
+      val azureKey = dbutils.widgets.get("azureKey")
+      val columns = dbutils.widgets.get("columns")
+      val table = dbutils.widgets.get("table")
+      val pathname = dbutils.widgets.get("pathname")
+
+      spark.conf.set(
+        "fs.azure.account.key." + azureStorage + ".blob.core.windows.net",
+        azureKey
       )
+
       sqlContext
-        .sql("SELECT ${columns} FROM ${table}")
+        .sql("SELECT " + columns + " FROM " + table)
         .write
         .format("com.databricks.spark.csv")
         .option("header", "false")
-        .save("${pathname}")`,
+        .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
+        .save(pathname)
+      `,
       'utf-8',
     ).toString('base64');
-    // TODO: if there is no cluster should we create new one?
-    this.reportQueryUsage({ msg: `getting cluster ${Date.now()}` }, {});
+
     const cluster = (await this.getClustersIds())[0];
-    try {
-      this.reportQueryUsage({ msg: `importing notebook ${Date.now()}` }, {});
+    const notebook = await this.checkNotebook(filename);
+    if (!notebook) {
       await this.importNotebook(filename, content);
-    } catch (e) {
-      notebook = false;
     }
-    if (notebook) {
-      try {
-        this.reportQueryUsage({ msg: `creating job ${Date.now()}` }, {});
-        const job = await this.createJob(cluster, filename);
-        this.reportQueryUsage({ msg: `running job ${Date.now()}` }, {});
-        const run = await this.runJob(job);
-        this.reportQueryUsage({ msg: `waiting for result ${Date.now()}` }, {});
-        await this.waitResult(run);
-        this.reportQueryUsage({ msg: `deleting job ${Date.now()}` }, {});
-        await this.deleteJob(job);
-        this.reportQueryUsage({ msg: `signing urls ${Date.now()}` }, {});
-        result = await this.getSignedWasbsUrls(pathname);
-      } finally {
-        this.reportQueryUsage({ msg: `deleting notebook ${Date.now()}` }, {});
-        await this.deleteNotebook(filename);
+    if (!this._job) {
+      this._job = await this.createJob(cluster, filename);
+    } else {
+      const exist = await this.checkJob(this._job);
+      if (!exist) {
+        this._job = await this.createJob(cluster, filename);
       }
     }
+    const run = await this.runJob(
+      this._job,
+      'azure',
+      columns,
+      table,
+      pathname,
+      undefined,
+      undefined,
+      storage,
+      this.config.azureKey,
+    );
+    await this.waitResult(run);
+    // await this.deleteJob(job);
+    result = await this.getSignedWasbsUrls(pathname);
     return result;
   }
 
@@ -741,17 +835,14 @@ export class DatabricksDriver extends JDBCDriver {
   public async unload(
     tableName: string,
   ): Promise<DownloadTableCSVData> {
-    this.reportQueryUsage({ msg: `unload start ${Date.now()}` }, {});
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    this.reportQueryUsage({ msg: `running unloadCommand ${Date.now()}` }, {});
     const csvFile = await this.unloadCommand(
       tableName,
       columns,
       pathname,
     );
-    this.reportQueryUsage({ msg: `unload end ${Date.now()}` }, {});
     return {
       csvFile,
       types,
