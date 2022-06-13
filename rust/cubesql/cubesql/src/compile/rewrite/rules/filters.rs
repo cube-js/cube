@@ -662,21 +662,38 @@ impl RewriteRules for FilterRules {
                 filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
                 self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
             ),
-            transforming_rewrite(
-                "in-date-range-to-time-dimension",
-                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                time_dimension_date_range_replacer(
-                    cube_scan_filters_empty_tail(),
-                    "?time_dimension_member",
-                    "?time_dimension_date_range",
+            rewrite(
+                "filter-replacer-in-date-range-inverse",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
+                    ),
+                    "and",
                 ),
-                self.filter_to_time_dimension_range(
-                    "?member",
-                    "?date_range",
-                    "?time_dimension_member",
-                    "?time_dimension_date_range",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
+                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                    ),
+                    "and",
                 ),
             ),
+            // transforming_rewrite(
+            //     "in-date-range-to-time-dimension",
+            //     filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+            //     time_dimension_date_range_replacer(
+            //         cube_scan_filters_empty_tail(),
+            //         "?time_dimension_member",
+            //         "?time_dimension_date_range",
+            //     ),
+            //     self.filter_to_time_dimension_range(
+            //         "?member",
+            //         "?date_range",
+            //         "?time_dimension_member",
+            //         "?time_dimension_date_range",
+            //     ),
+            // ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
@@ -724,7 +741,7 @@ impl RewriteRules for FilterRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
-                    "?split",
+                    "CubeScanSplit:false",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -739,7 +756,7 @@ impl RewriteRules for FilterRules {
                     "?offset",
                     "?aliases",
                     "?table_name",
-                    "?split",
+                    "CubeScanSplit:false",
                 ),
             ),
             transforming_rewrite(

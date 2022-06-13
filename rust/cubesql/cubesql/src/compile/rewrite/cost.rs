@@ -86,6 +86,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::OuterAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::ColumnAliasReplacer(_) => 1,
             LogicalPlanLanguage::MemberPushdownReplacer(_) => 1,
+            LogicalPlanLanguage::SaveDateRangeReplacer(_) => 1,
             _ => 0,
         };
 

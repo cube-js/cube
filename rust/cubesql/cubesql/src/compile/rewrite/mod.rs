@@ -224,6 +224,10 @@ crate::plan_to_language! {
             name: String,
             expr: Arc<Expr>,
         },
+        Segment {
+            name: String,
+            expr: Arc<Expr>,
+        },
         Order {
             member: String,
             asc: bool,
@@ -261,6 +265,7 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             old_members: Arc<LogicalPlan>,
             table_name: String,
+            target_table_name: String,
         },
         TimeDimensionDateRangeReplacer {
             members: Vec<LogicalPlan>,
@@ -656,18 +661,6 @@ fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
 }
 
-fn column_alias_replacer(
-    members: impl Display,
-    aliases: impl Display,
-    table_name: impl Display,
-    target_table_name: impl Display,
-) -> String {
-    format!(
-        "(ColumnAliasReplacer {} {} {} {})",
-        members, aliases, table_name, target_table_name
-    )
-}
-
 fn member_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(MemberReplacer {} {})", members, aliases)
 }
@@ -676,10 +669,11 @@ fn member_pushdown_replacer(
     members: impl Display,
     old_members: impl Display,
     table_name: impl Display,
+    target_table_name: impl Display,
 ) -> String {
     format!(
-        "(MemberPushdownReplacer {} {} {})",
-        members, old_members, table_name
+        "(MemberPushdownReplacer {} {} {} {})",
+        members, old_members, table_name, target_table_name
     )
 }
 
@@ -780,6 +774,14 @@ fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
 
 fn dimension_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Dimension {} {})", name, expr)
+}
+
+fn segment_expr(name: impl Display, expr: impl Display) -> String {
+    format!("(Segment {} {})", name, expr)
+}
+
+fn member_error(error: impl Display, priority: impl Display) -> String {
+    format!("(MemberError {} {})", error, priority)
 }
 
 fn time_dimension_expr(

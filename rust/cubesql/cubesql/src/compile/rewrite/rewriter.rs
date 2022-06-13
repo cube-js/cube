@@ -252,7 +252,7 @@ impl Rewriter {
             self.cube_context.clone(),
             Arc::new(DefaultPhysicalPlanner::default()),
         ))
-        .with_iter_limit(100)
+        .with_iter_limit(300)
         .with_node_limit(10000)
         .with_egraph(self.graph.clone())
     }

@@ -1626,7 +1626,7 @@ impl QueryPlanner {
                     schema
                         .fields()
                         .iter()
-                        .map(|f| f.name().to_string())
+                        .map(|f| Some(f.name().to_string()))
                         .collect(),
                     query.request,
                     // @todo Remove after split!
@@ -3907,17 +3907,11 @@ ORDER BY \"COUNT(count)\" DESC"
                 .iter()
                 .map(|f| f.name().to_string())
                 .collect::<Vec<_>>(),
-            vec![
-                "SUM(KibanaSampleDataEcommerce.count)".to_string(),
-                "COUNT(UInt8(1))".to_string()
-            ]
+            vec!["sum:count:ok".to_string(),]
         );
         assert_eq!(
             &cube_scan.member_fields,
-            &vec![
-                "KibanaSampleDataEcommerce.count".to_string(),
-                "KibanaSampleDataEcommerce.count".to_string()
-            ]
+            &vec![Some("KibanaSampleDataEcommerce.count".to_string())]
         );
     }
 
@@ -4152,7 +4146,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
-                limit: Some(1000001),
+                limit: Some(50000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -4201,7 +4195,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: None,
-                limit: Some(1000001),
+                limit: Some(50000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
@@ -4210,6 +4204,59 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+            }
+        );
+    }
+
+    #[test]
+    fn powerbi_inner_wrapped_asterisk() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select \"rows\".\"customer_gender\" as \"customer_gender\",\
+\n    \"rows\".\"created_at_month\" as \"created_at_month\"\
+\nfrom \
+\n(\
+\n    select \"_\".\"count\",\
+\n        \"_\".\"minPrice\",\
+\n        \"_\".\"maxPrice\",\
+\n        \"_\".\"avgPrice\",\
+\n        \"_\".\"order_date\",\
+\n        \"_\".\"customer_gender\",\
+\n        \"_\".\"created_at_day\",\
+\n        \"_\".\"created_at_month\"\
+\n    from \
+\n    (\
+\n        select *, date_trunc('day', order_date) created_at_day, date_trunc('month', order_date) created_at_month from public.KibanaSampleDataEcommerce\
+\n    ) \"_\"\
+\n    where \"_\".\"created_at_month\" < timestamp '2022-06-13 00:00:00' and \"_\".\"created_at_month\" >= timestamp '2021-12-16 00:00:00'\
+\n) \"rows\"\
+\ngroup by \"customer_gender\",\
+\n    \"created_at_month\"\
+\nlimit 1000001"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-12-16 00:00:00".to_string(),
+                        "2022-06-13 00:00:00".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: Some(50000),
+                offset: None,
+                filters: None,
             }
         );
     }
@@ -4365,10 +4412,10 @@ ORDER BY \"COUNT(count)\" DESC"
             //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
             //     CompilationError::User("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
             // ),
-            (
-                "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                CompilationError::User("Unable to use segment 'is_male' in GROUP BY".to_string()),
-            ),
+            // (
+            //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
+            //     CompilationError::User("Unable to use segment 'is_male' in GROUP BY".to_string()),
+            // ),
             // (
             //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
             //     CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
@@ -4678,7 +4725,6 @@ ORDER BY \"COUNT(count)\" DESC"
                     ""
                 }
             );
-            println!("Query: {}", query);
             let logical_plan =
                 convert_select_to_query_plan(query, DatabaseProtocol::MySQL).as_logical_plan();
 
