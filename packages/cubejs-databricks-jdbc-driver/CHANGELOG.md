@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.24](https://github.com/cube-js/cube.js/compare/v0.30.23...v0.30.24) (2022-06-14)
+
+
+### Features
+
+* **databricks-jdbc-driver:** Export bucket mount dir setting ([483d094](https://github.com/cube-js/cube.js/commit/483d0947401687d0c492a6f98f63bc915d648428))
+
+
+
+
+
 ## [0.30.23](https://github.com/cube-js/cube.js/compare/v0.30.22...v0.30.23) (2022-06-14)
 
 
