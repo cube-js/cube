@@ -707,7 +707,7 @@ export class DatabricksDriver extends JDBCDriver {
       credential,
     );
     const containerClient = blobClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat();
+    const blobsList = containerClient.listBlobsFlat({ prefix: foldername });
     for await (const blob of blobsList) {
       if (blob.name && expr.test(blob.name)) {
         const sas = generateBlobSASQueryParameters(
