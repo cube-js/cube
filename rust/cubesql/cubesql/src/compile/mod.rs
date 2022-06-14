@@ -9081,6 +9081,49 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_sigma_computing_with_subquery_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_with_subquery_query",
+            execute_query(
+                "
+                with
+                    nsp as (
+                        select oid
+                        from pg_catalog.pg_namespace
+                        where nspname = 'public'
+                    ),
+                    tbl as (
+                        select oid
+                        from pg_catalog.pg_class
+                        where
+                            relname = 'KibanaSampleDataEcommerce' and
+                            relnamespace = (select oid from nsp)
+                    )
+                select
+                    attname,
+                    typname,
+                    description
+                from pg_attribute a
+                join pg_type on atttypid = pg_type.oid
+                left join pg_description on
+                    attrelid = objoid and
+                    attnum = objsubid
+                where
+                    attnum > 0 and
+                    attrelid = (select oid from tbl)
+                order by attnum
+                ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "google_sheets_pg_database_query",
@@ -9232,7 +9275,7 @@ ORDER BY \"COUNT(count)\" DESC"
     async fn test_triple_ident() -> Result<(), CubeError> {
         let query_plan = convert_select_to_query_plan(
             "select count
-            from \"public\".\"KibanaSampleDataEcommerce\" 
+            from \"public\".\"KibanaSampleDataEcommerce\"
             where (\"public\".\"KibanaSampleDataEcommerce\".\"maxPrice\" > 100 and \"public\".\"KibanaSampleDataEcommerce\".\"maxPrice\" < 150);
             ".to_string(),
             DatabaseProtocol::PostgreSQL,
