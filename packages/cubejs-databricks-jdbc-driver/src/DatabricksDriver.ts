@@ -1,7 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import fs from 'fs';
 import path from 'path';
-import fetch, { Headers, Request, Response } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -18,7 +17,7 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv, pausePromise, CancelablePromise } from '@cubejs-backend/shared';
+import { getEnv } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -90,11 +89,6 @@ async function resolveJDBCDriver(): Promise<string> {
  */
 export class DatabricksDriver extends JDBCDriver {
   protected readonly config: DatabricksDriverConfiguration;
-
-  /**
-   * Whether bucket is mounted or not.
-   */
-  private _bucketMounted?: boolean;
 
   public static dialectClass() {
     return DatabricksQuery;
@@ -210,8 +204,6 @@ export class DatabricksDriver extends JDBCDriver {
     return metadata;
   }
 
-  // Unload ----------------------------------------------------------
-
   /**
    * Determines whether export bucket feature is configured or no.
    * @returns {boolean}
@@ -233,7 +225,7 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    const csvFile = await this.unloadWithJdbc(
+    const csvFile = await this.getCsvFiles(
       tableName,
       columns,
       pathname,
@@ -249,9 +241,10 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload table to bucket using Databricks JDBC query.
+   * Unload table to bucket using Databricks JDBC query and returns (async)
+   * csv files signed URLs array.
    */
-  private async unloadWithJdbc(
+  private async getCsvFiles(
     table: string,
     columns: string,
     pathname: string,
@@ -259,7 +252,10 @@ export class DatabricksDriver extends JDBCDriver {
     let res;
     switch (this.config.bucketType) {
       case 'azure':
-        res = await this.unloadWasbWithJdbc(table, columns, pathname);
+        res = await this.getAzureCsvFiles(table, columns, pathname);
+        break;
+      case 's3':
+        res = await this.getS3CsvFiles(table, columns, pathname);
         break;
       default:
         throw new Error(`Unsupported export bucket type: ${
@@ -269,678 +265,23 @@ export class DatabricksDriver extends JDBCDriver {
     return res;
   }
 
-  // Unload ----------------------------------------------------------
-
   /**
-   * Returns databricks API base URL.
+   * Saves specified table to the Azure blob storage and returns (async)
+   * csv files signed URLs array.
    */
-  private getApiUrl(): string {
-    let res: string;
-    try {
-      // eslint-disable-next-line prefer-destructuring
-      res = this.config.url
-        .split(';')
-        .filter(node => /^jdbc/i.test(node))[0]
-        .split('/')[2]
-        .split(':')[0];
-    } catch (e) {
-      res = '';
-    }
-    if (!res.length) {
-      throw new Error(
-        `Error parsing API URL from the CUBEJS_DB_DATABRICKS_URL = ${
-          this.config.url
-        }`
-      );
-    }
-    return res;
-  }
-
-  /**
-   * Returns databricks API token.
-   */
-  private getApiToken(): string {
-    let res: string;
-    try {
-      // eslint-disable-next-line prefer-destructuring
-      res = this.config.url
-        .split(';')
-        .filter(node => /^PWD/i.test(node))[0]
-        .split('=')[1];
-    } catch (e) {
-      res = '';
-    }
-    if (!res.length) {
-      throw new Error(
-        'Error parsing API token from the CUBEJS_DB_DATABRICKS_URL' +
-        ` = ${this.config.url}`
-      );
-    }
-    return res;
-  }
-
-  /**
-   * Sleeper method.
-   */
-  private wait(ms: number): CancelablePromise<void> {
-    return pausePromise(ms);
-  }
-
-  /**
-   * Assert http response.
-   */
-  private async assertResponse(response: Response): Promise<void> {
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      } - ${
-        text
-      }`);
-    }
-  }
-
-  /**
-   * Fetch API wrapper.
-   */
-  private async fetch(req: Request, count?: number, ms?: number): Promise<Response> {
-    count = count || 0;
-    ms = ms || 0;
-    return new Promise((resolve, reject) => {
-      this
-        .wait(ms as number)
-        .then(() => {
-          fetch(req)
-            .then((res) => {
-              this
-                .assertResponse(res)
-                .then(() => {
-                  resolve(res);
-                })
-                .catch((err) => {
-                  if (res.status === 429 && (count as number) < 5) {
-                    this
-                      .fetch(req, (count as number)++, (ms as number) + 1000)
-                      .then((_res) => { resolve(_res); })
-                      .catch((_err) => { reject(_err); });
-                  } else {
-                    reject(err);
-                  }
-                });
-            });
-        });
-    });
-  }
-
-  /**
-   * Returns IDs of databricks runned clusters.
-   */
-  private async getClustersIds(): Promise<string[]> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/clusters/list`;
-
-    const request = new Request(url, {
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-
-    const response = await this.fetch(request);
-    
-    const body: {
-      clusters: {
-      // eslint-disable-next-line camelcase
-        cluster_id: string,
-        state: string,
-      }[],
-    } = await response.json();
-    
-    return body.clusters
-      .filter(item => item.state === 'RUNNING')
-      .map(item => item.cluster_id);
-  }
-
-  /**
-   * Determine whether notebook exist or no.
-   */
-  private async checkNotebook(p: string): Promise<boolean> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/workspace/list?path=${p}`;
-    const request = new Request(url, {
-      method: 'GET',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-    try {
-      await this.fetch(request);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /**
-   * Import predefined nodebook to the databricks under specified path.
-   */
-  private async importNotebook(p: string, content: string): Promise<void> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/workspace/import`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        format: 'SOURCE',
-        language: 'SCALA',
-        overwrite: true,
-        content,
-        path: p,
-      }),
-    });
-    await this.fetch(request);
-  }
-
-  /**
-   * Create job and returns job id.
-   */
-  private async createJob(cluster: string, p: string): Promise<number> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/jobs/create`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        existing_cluster_id: cluster,
-        notebook_task: {
-          notebook_path: p,
-        },
-        max_concurrent_runs: 1000,
-      }),
-    });
-    const response = await this.fetch(request);
-    const body: {
-      // eslint-disable-next-line camelcase
-      job_id: number,
-    } = await response.json();
-    return body.job_id;
-  }
-
-  /**
-   * Determine whether job exist or no.
-   */
-  private async checkJob(job: number): Promise<boolean> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/workspace/jobs/get?job_id=${job}`;
-    const request = new Request(url, {
-      method: 'GET',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-    try {
-      await this.fetch(request);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /**
-   * Delete job.
-   */
-  private async deleteJob(job: number): Promise<any> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/jobs/delete`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        job_id: job,
-      }),
-    });
-    await this.fetch(request);
-  }
-
-  /**
-   * Run job and returns run id.
-   */
-  private async runJob(
-    job: number,
-    type: string,
-    columns: string,
-    table: string,
-    pathname: string,
-
-    awsKey?: string,
-    awsSecret?: string,
-
-    azureStorage?: string,
-    azureKey?: string,
-  ): Promise<number> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/jobs/run-now`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        job_id: job,
-        notebook_params: {
-          type,
-          columns,
-          table,
-          pathname,
-          // aws
-          awsKey,
-          awsSecret,
-          // azure
-          azureStorage,
-          azureKey,
-        }
-      }),
-    });
-    const response = await this.fetch(request);
-    const body: {
-      // eslint-disable-next-line camelcase
-      run_id: number,
-    } = await response.json();
-    return body.run_id;
-  }
-
-  /**
-   * Pooling databricks until run in progress and resolve when it's done.
-   */
-  private async waitResult(run: number, ms?: number): Promise<any> {
-    ms = ms || 1000;
-    ms = ms <= 5000 ? ms + 1000 : ms;
-    return new Promise((resolve, reject) => {
-      const url = `https://${
-        this.getApiUrl()
-      }/api/2.0/jobs/runs/get?run_id=${run}`;
-      const request = new Request(url, {
-        headers: new Headers({
-          Accept: '*/*',
-          Authorization: `Bearer ${this.getApiToken()}`,
-        }),
-      });
-      this
-        .wait(ms as number)
-        .then(() => {
-          this
-            .fetch(request)
-            .then((response) => {
-              response
-                .json()
-                .then((body: {
-                  state: {
-                    // eslint-disable-next-line camelcase
-                    life_cycle_state: string,
-                    // eslint-disable-next-line camelcase
-                    result_state: string,
-                  },
-                }) => {
-                  const { state } = body;
-                  if (
-                    state.life_cycle_state === 'TERMINATED' &&
-                    state.result_state === 'SUCCESS'
-                  ) {
-                    resolve(state.result_state);
-                  } else if (
-                    state.life_cycle_state === 'INTERNAL_ERROR' ||
-                    state.result_state === 'FAILED' ||
-                    state.result_state === 'TIMEDOUT' ||
-                    state.result_state === 'CANCELED'
-                  ) {
-                    reject(state.result_state);
-                  } else {
-                    this
-                      .waitResult(run, ms)
-                      .then((res) => { resolve(res); })
-                      .catch((err) => { reject(err); });
-                  }
-                });
-            });
-        });
-    });
-  }
-
-  /**
-   * Determine whether specified point is already mounted or not.
-   */
-  private async checkMountPoint(p: string): Promise<boolean> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/dbfs/get-status?path=${p}`;
-    const request = new Request(url, {
-      method: 'GET',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-    try {
-      await this.fetch(request);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /**
-   * Remove nodebook.
-   */
-  private async deleteNotebook(p: string): Promise<any> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/workspace/delete`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        path: p,
-        recursive: true,
-      }),
-    });
-    await this.fetch(request);
-  }
-
-  // AWS -------------------------------------------------------------
-
-  /**
-   * Returns signed temporary URLs for AWS S3 objects.
-   */
-  private async getSignedS3Urls(
-    pathname: string,
-  ): Promise<string[]> {
-    const client = new S3({
-      credentials: {
-        accessKeyId: this.config.awsKey as string,
-        secretAccessKey: this.config.awsSecret as string,
-      },
-      region: this.config.awsRegion,
-    });
-    const url = new URL(pathname);
-    const list = await client.listObjectsV2({
-      Bucket: url.host,
-      Prefix: url.pathname.slice(1),
-    });
-    if (list.Contents === undefined) {
-      throw new Error(`No content in specified path: ${pathname}`);
-    }
-    const csvFile = await Promise.all(
-      list.Contents
-        .filter(file => file.Key && /.csv.gz$/i.test(file.Key))
-        .map(async (file) => {
-          const command = new GetObjectCommand({
-            Bucket: url.host,
-            Key: file.Key,
-          });
-          return getSignedUrl(client, command, { expiresIn: 3600 });
-        })
-    );
-    return csvFile;
-  }
-
-  /**
-   * Unload to AWS S3 bucket.
-   */
-  private async unloadS3WithAPI(
+  private async getAzureCsvFiles(
     table: string,
     columns: string,
     pathname: string,
   ): Promise<string[]> {
-    let result: string[] = [];
-    const filename = '/unload-preaggs.scala';
-    const content = Buffer.from(
-      `sc.hadoopConfiguration.set(
-        "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
-      )
-      sc.hadoopConfiguration.set(
-        "fs.s3n.awsSecretAccessKey","${this.config.awsSecret}"
-      )
-      sqlContext
-        .sql("SELECT ${columns} FROM ${table}")
-        .write
-        .format("com.databricks.spark.csv")
-        .option("header", "false")
-        .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
-        .save("${pathname}")`,
-      'utf-8',
-    ).toString('base64');
-
-    const cluster = (await this.getClustersIds())[0];
-    const notebook = await this.checkNotebook(filename);
-    if (!notebook) {
-      await this.importNotebook(filename, content);
-    }
-    const job = await this.createJob(cluster, filename);
-    const run = await this.runJob(
-      job,
-      's3',
-      columns,
-      table,
-      pathname,
-      this.config.awsKey,
-      this.config.awsSecret,
-    );
-    await this.waitResult(run);
-    await this.deleteJob(job);
-    result = await this.getSignedS3Urls(pathname);
-    return result;
-  }
-
-  // Azure -----------------------------------------------------------
-
-  private async runMountAzureJob(
-    job: number,
-    exportBucket: string,
-    azureStorage?: string,
-    azureKey?: string,
-  ): Promise<number> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/2.0/jobs/run-now`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        job_id: job,
-        notebook_params: {
-          exportBucket,
-          azureStorage,
-          azureKey,
-        }
-      }),
-    });
-    const response = await this.fetch(request);
-    const body: {
-      // eslint-disable-next-line camelcase
-      run_id: number,
-    } = await response.json();
-    return body.run_id;
-  }
-
-  private async mountAzure(
-    exportBucket: string,
-    pathname: string,
-  ) {
-    const filename = '/cubejs-mount-azure.scala';
-    const storage = pathname.split('@')[1].split('.')[0];
-    const content = Buffer.from(
-      `
-      dbutils.widgets.text("exportBucket", "exportBucket", "exportBucket")
-      dbutils.widgets.text("azureStorage", "azureStorage", "azureStorage")
-      dbutils.widgets.text("azureKey", "azureKey", "azureKey")
-
-      val exportBucket = dbutils.widgets.get("exportBucket")
-      val azureStorage = dbutils.widgets.get("azureStorage")
-      val azureKey = dbutils.widgets.get("azureKey")
-
-      dbutils.fs.mount(
-        source = exportBucket,
-        mountPoint = "/mnt/cubejs-bucket",
-        extraConfigs = Map(
-          "fs.azure.account.key." + azureStorage + ".blob.core.windows.net" -> azureKey
-        )
-      )
-      `,
-      'utf-8',
-    ).toString('base64');
-
-    const cluster = (await this.getClustersIds())[0];
-    const notebook = await this.checkNotebook(filename);
-    if (!notebook) {
-      await this.importNotebook(filename, content);
-    }
-    const job = await this.createJob(cluster, filename);
-    const run = await this.runMountAzureJob(
-      job,
-      exportBucket,
-      storage,
-      this.config.azureKey,
-    );
-    await this.waitResult(run);
-    await this.deleteJob(job);
-  }
-
-  private async unloadJdbcQuery(table: string, columns: string,) {
-    await this.query(
-      `
-      CREATE TABLE ${table}_csv_export
-      USING CSV LOCATION '/mnt/cubejs-bucket/${table}.csv'
-      AS SELECT ${columns} FROM ${table}
-      `,
-      [],
-    );
-  }
-
-  private async unloadConfiguredJdbcQuery(table: string, columns: string,) {
-    await this.query(
-      `
-      CREATE TABLE ${table}_csv_export
-      USING CSV LOCATION '${this.config.exportBucket}/${table}.csv'
-      AS SELECT ${columns} FROM ${table}
-      `,
-      [],
-    );
-  }
-
-  private async unloadWasbWithJdbc(
-    table: string,
-    columns: string,
-    pathname: string,
-  ) {
-    // this._bucketMounted =
-    //   this._bucketMounted || await this.checkMountPoint('/mnt/cubejs-bucket');
-    // if (!this._bucketMounted) {
-    //   await this.mountAzure(
-    //     this.config.exportBucket as string,
-    //     pathname,
-    //   );
-    //   this._bucketMounted = true;
-    // }
-    await this.unloadConfiguredJdbcQuery(table, columns);
-    const result = await this.getSignedWasbsUrls(pathname);
-    return result;
+    await this.createExternalTable(table, columns);
+    return this.getSignedAzureUrls(pathname);
   }
 
   /**
-   * Unload to Azure Blob Container bucket.
+   * Returns Azure signed URLs of unloaded scv files.
    */
-  private async unloadWasbsWithAPI(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    let result: string[] = [];
-    const filename = '/unload-preaggs.scala';
-    const storage = pathname.split('@')[1].split('.')[0];
-    const content = Buffer.from(
-      `
-      dbutils.widgets.text("azureStorage", "azureStorage", "azureStorage")
-      dbutils.widgets.text("azureKey", "azureKey", "azureKey")
-      dbutils.widgets.text("columns", "columns", "columns")
-      dbutils.widgets.text("table", "table", "table")
-      dbutils.widgets.text("pathname", "pathname", "pathname")
-
-      val azureStorage = dbutils.widgets.get("azureStorage")
-      val azureKey = dbutils.widgets.get("azureKey")
-      val columns = dbutils.widgets.get("columns")
-      val table = dbutils.widgets.get("table")
-      val pathname = dbutils.widgets.get("pathname")
-
-      spark.conf.set(
-        "fs.azure.account.key." + azureStorage + ".blob.core.windows.net",
-        azureKey
-      )
-
-      sqlContext
-        .sql("SELECT " + columns + " FROM " + table)
-        .write
-        .format("com.databricks.spark.csv")
-        .option("header", "false")
-        .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
-        .save(pathname)
-      `,
-      'utf-8',
-    ).toString('base64');
-
-    const cluster = (await this.getClustersIds())[0];
-    const notebook = await this.checkNotebook(filename);
-    if (!notebook) {
-      await this.importNotebook(filename, content);
-    }
-    const job = await this.createJob(cluster, filename);
-    const run = await this.runJob(
-      job,
-      'azure',
-      columns,
-      table,
-      pathname,
-      undefined,
-      undefined,
-      storage,
-      this.config.azureKey,
-    );
-    await this.waitResult(run);
-    await this.deleteJob(job);
-    result = await this.getSignedWasbsUrls(pathname);
-    return result;
-  }
-
-  /**
-   * Returns signed temporary URLs for Azure container objects.
-   */
-  private async getSignedWasbsUrls(
+  private async getSignedAzureUrls(
     pathname: string,
   ): Promise<string[]> {
     const csvFile: string[] = [];
@@ -985,29 +326,79 @@ export class DatabricksDriver extends JDBCDriver {
     return csvFile;
   }
 
-  // Unload entries --------------------------------------------------
-
   /**
-   * Unload table to bucket using Databricks REST API.
+   * Saves specified table to the S3 bucket and returns (async) csv files
+   * signed URLs array.
    */
-  private async unloadWithAPI(
+  private async getS3CsvFiles(
     table: string,
     columns: string,
     pathname: string,
   ): Promise<string[]> {
-    let res;
-    switch (this.config.bucketType) {
-      case 's3':
-        res = await this.unloadS3WithAPI(table, columns, pathname);
-        break;
-      case 'azure':
-        res = await this.unloadWasbsWithAPI(table, columns, pathname);
-        break;
-      default:
-        throw new Error(`Unsupported export bucket type: ${
-          this.config.bucketType
-        }`);
+    await this.createExternalTable(table, columns);
+    return this.getSignedS3Urls(pathname);
+  }
+
+  /**
+   * Returns S3 signed URLs of unloaded scv files.
+   */
+  private async getSignedS3Urls(
+    pathname: string,
+  ): Promise<string[]> {
+    const client = new S3({
+      credentials: {
+        accessKeyId: this.config.awsKey as string,
+        secretAccessKey: this.config.awsSecret as string,
+      },
+      region: this.config.awsRegion,
+    });
+    const url = new URL(pathname);
+    const list = await client.listObjectsV2({
+      Bucket: url.host,
+      Prefix: url.pathname.slice(1),
+    });
+    if (list.Contents === undefined) {
+      throw new Error(`No content in specified path: ${pathname}`);
     }
-    return res;
+    const csvFile = await Promise.all(
+      list.Contents
+        .filter(file => file.Key && /.csv$/i.test(file.Key))
+        .map(async (file) => {
+          const command = new GetObjectCommand({
+            Bucket: url.host,
+            Key: file.Key,
+          });
+          return getSignedUrl(client, command, { expiresIn: 3600 });
+        })
+    );
+    return csvFile;
+  }
+
+  /**
+   * Saves specified table to the configured bucket. This requires Databricks
+   * cluster to be configured.
+   *
+   * For Azure blob storage you need to configure account access key in
+   * Cluster -> Configuration -> Advanced options
+   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   *
+   * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
+   *
+   * For S3 bucket storage you need to configure AWS access key and secret in
+   * Cluster -> Configuration -> Advanced options
+   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   *
+   * `fs.s3a.access.key <aws-access-key>`
+   * `fs.s3a.secret.key <aws-secret-key>`
+   */
+  private async createExternalTable(table: string, columns: string,) {
+    await this.query(
+      `
+      CREATE TABLE ${table}_csv_export
+      USING CSV LOCATION '${this.config.exportBucket}/${table}.csv'
+      AS SELECT ${columns} FROM ${table}
+      `,
+      [],
+    );
   }
 }
