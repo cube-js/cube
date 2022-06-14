@@ -27,6 +27,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
+    exportBucketMountDir?: string,
     pollInterval?: number,
     // AWS bucket config
     awsKey?: string,
@@ -110,6 +111,7 @@ export class DatabricksDriver extends JDBCDriver {
         conf?.bucketType ||
         getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
       exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
+      exportBucketMountDir: conf?.exportBucketMountDir || process.env.CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR,
       pollInterval: (
         conf?.pollInterval || getEnv('dbPollMaxInterval')
       ) * 1000,
@@ -389,7 +391,7 @@ export class DatabricksDriver extends JDBCDriver {
     await this.query(
       `
       CREATE TABLE ${table}_csv_export
-      USING CSV LOCATION '${this.config.exportBucket}/${table}.csv'
+      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
       AS SELECT ${columns} FROM ${table}
       `,
       [],
