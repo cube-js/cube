@@ -219,9 +219,6 @@ export class DatabricksDriver extends JDBCDriver {
   public async unload(
     tableName: string,
   ): Promise<DownloadTableCSVData> {
-    this.logger('SQL Query Usage', {
-      msg: `unload start ${Date.now()}`
-    });
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
@@ -230,9 +227,6 @@ export class DatabricksDriver extends JDBCDriver {
       columns,
       pathname,
     );
-    this.logger('SQL Query Usage', {
-      msg: `unload end ${Date.now()}`
-    });
     return {
       csvFile,
       types,
