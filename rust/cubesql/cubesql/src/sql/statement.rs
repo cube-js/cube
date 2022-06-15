@@ -583,7 +583,6 @@ impl<'ast> Visitor<'ast> for ToTimestampReplacer {
         }
     }
 }
-
 // Some Postgres UDFs accept rows (records) as arguments.
 // We simplify the expression, passing only the required values
 pub struct UdfWildcardArgReplacer {}
@@ -669,6 +668,39 @@ impl<'a> Visitor<'a> for UdfWildcardArgReplacer {
             for order_expr in over.order_by.iter_mut() {
                 self.visit_expr(&mut order_expr.expr);
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SensitiveDataSanitizer {}
+
+impl SensitiveDataSanitizer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result);
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast> for SensitiveDataSanitizer {
+    fn visit_value(&mut self, val: &mut ast::Value) {
+        match val {
+            ast::Value::SingleQuotedString(str)
+            | ast::Value::DoubleQuotedString(str)
+            | ast::Value::NationalStringLiteral(str) => {
+                if vec!["false", "true"].contains(&str.as_str()) || str.len() < 4 {
+                    return;
+                }
+                *str = "[REPLACED]".to_string();
+            }
+            _ => (),
         }
     }
 }
@@ -841,6 +873,27 @@ mod tests {
     #[test]
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
+
+        Ok(())
+    }
+
+    fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let binder = SensitiveDataSanitizer::new();
+        let result = binder.replace(&stmts[0]);
+
+        assert_eq!(result.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sensitive_data_sanitizer() -> Result<(), CubeError> {
+        assert_sensitive_data_sanitizer(
+            "SELECT * FROM testdata WHERE email = 'to@replace.com'",
+            "SELECT * FROM testdata WHERE email = '[REPLACED]'",
+        )?;
 
         Ok(())
     }

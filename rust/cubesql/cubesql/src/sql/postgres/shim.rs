@@ -122,20 +122,26 @@ impl ConnectionError {
             ConnectionError::Cube(e) => {
                 protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
             }
-            ConnectionError::CompilationError(e) => match e {
-                CompilationError::Internal(_, _) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InternalError,
-                    e.to_string(),
-                ),
-                CompilationError::User(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InvalidSqlStatement,
-                    e.to_string(),
-                ),
-                CompilationError::Unsupported(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::FeatureNotSupported,
-                    e.to_string(),
-                ),
-            },
+            ConnectionError::CompilationError(e) => {
+                fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
+                    match e {
+                        CompilationError::Internal(_, _, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InternalError,
+                            e.to_string(),
+                        ),
+                        CompilationError::User(_, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InvalidSqlStatement,
+                            e.to_string(),
+                        ),
+                        CompilationError::Unsupported(_, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            e.to_string(),
+                        ),
+                    }
+                }
+
+                to_error_response(e)
+            }
             ConnectionError::Protocol(e) => e.to_error_response(),
         }
     }
@@ -186,6 +192,7 @@ impl AsyncPostgresShim {
             Err(e) => {
                 shim.logger.error(
                     format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                    None,
                 );
 
                 if let Some(bt) = e.backtrace() {
@@ -258,8 +265,19 @@ impl AsyncPostgresShim {
         &mut self,
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
-        self.logger
-            .error(format!("Error during processing PostgreSQL message: {}", err).as_str());
+        let (message, props) = match &err {
+            ConnectionError::CompilationError(err) => match err {
+                CompilationError::Unsupported(msg, meta)
+                | CompilationError::User(msg, meta)
+                | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
+            },
+            _ => (
+                format!("Error during processing PostgreSQL message: {}", err),
+                None,
+            ),
+        };
+
+        self.logger.error(message.as_str(), props);
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -561,12 +579,8 @@ impl AsyncPostgresShim {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_statement_to_cube_query(
-                &prepared_statement,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan =
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             Some(Portal::new(plan, format, true))
@@ -622,12 +636,7 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query);
 
-            let plan = convert_statement_to_cube_query(
-                &hacked_query,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
 
             let description = if let Some(description) = plan.to_row_description(Format::Text)? {
                 if description.len() > 0 {
@@ -825,12 +834,8 @@ impl AsyncPostgresShim {
                     )
                 })?;
 
-                let plan = convert_statement_to_cube_query(
-                    &cursor.query,
-                    meta,
-                    self.session.clone(),
-                    self.logger.clone(),
-                )?;
+                let plan =
+                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())?;
 
                 let mut portal = Portal::new(plan, cursor.format, false);
 
@@ -884,7 +889,6 @@ impl AsyncPostgresShim {
                     &select_stmt,
                     meta.clone(),
                     self.session.clone(),
-                    self.logger.clone(),
                 )?;
 
                 let cursor = Cursor {
@@ -971,12 +975,8 @@ impl AsyncPostgresShim {
                     .await?;
             }
             other => {
-                let plan = convert_statement_to_cube_query(
-                    &other,
-                    meta.clone(),
-                    self.session.clone(),
-                    self.logger.clone(),
-                )?;
+                let plan =
+                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())?;
 
                 self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;

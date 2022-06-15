@@ -214,11 +214,17 @@ export class CubejsServerCore {
           msg === 'User Error' ||
           msg === 'Compiling schema' ||
           msg === 'Recompiling schema' ||
-          msg === 'Slow Query Warning'
+          msg === 'Slow Query Warning' ||
+          msg === 'Cube SQL Error'
         ) {
-          this.event(msg, { error: params.error });
-        } else if (params.apiType === 'sql') {
-          this.event(msg, params);
+          const props = {
+            error: params.error,
+            ...(params.apiType ? { apiType: params.apiType } : {}),
+            ...(params.protocol ? { protocol: params.protocol } : {}),
+            ...(params.appName ? { appName: params.appName } : {}),
+          };
+
+          this.event(msg, props);
         }
         oldLogger(msg, params);
       });
@@ -229,20 +235,31 @@ export class CubejsServerCore {
     } else {
       const oldLogger = this.logger;
       let loadRequestCount = 0;
+      let loadSqlRequestCount = 0;
 
       this.logger = ((msg, params) => {
         if (msg === 'Load Request Success') {
-          loadRequestCount++;
-        }
-        if (params.apiType === 'sql') {
-          this.event(msg, params);
+          if (params.apiType === 'sql') {
+            loadSqlRequestCount++;
+          } else {
+            loadRequestCount++;
+          }
+        } else if (msg === 'Cube SQL Error') {
+          const props = {
+            error: params.error,
+            apiType: params.apiType,
+            protocol: params.protocol,
+            ...(params.appName ? { appName: params.appName } : {}),
+          };
+          this.event(msg, props);
         }
         oldLogger(msg, params);
       });
 
       setInterval(() => {
-        this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount });
+        this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount, loadSqlRequestSuccessCount: loadSqlRequestCount });
         loadRequestCount = 0;
+        loadSqlRequestCount = 0;
       }, 60000);
 
       this.event('Server Start');

@@ -131,7 +131,7 @@ pub fn parse_sql_to_statements(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    parse_result.map_err(|err| CompilationError::User(format!("Unable to parse: {:?}", err)))
+    parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
 }
 
 pub fn parse_sql_to_statement(
@@ -142,16 +142,20 @@ pub fn parse_sql_to_statement(
         stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
-            } else if stmts.is_empty() {
-                Err(CompilationError::User(format!(
-                    "Invalid query, no statements was specified: {}",
-                    &query
-                )))
             } else {
-                Err(CompilationError::Unsupported(format!(
-                    "Multiple statements was specified in one query: {}",
-                    &query
-                )))
+                let err = if stmts.is_empty() {
+                    CompilationError::user(format!(
+                        "Invalid query, no statements was specified: {}",
+                        &query
+                    ))
+                } else {
+                    CompilationError::unsupported(format!(
+                        "Multiple statements was specified in one query: {}",
+                        &query
+                    ))
+                };
+
+                Err(err)
             }
         }
     }

@@ -69,11 +69,12 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
         session::DatabaseProtocol,
-        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
+        statement::{
+            CastReplacer, SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
+        },
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    telemetry::ContextLogger,
     transport::{
         df_data_type_by_column_type, TransportServiceMetaFields, V1CubeMetaDimensionExt,
         V1CubeMetaExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt,
@@ -91,26 +92,26 @@ pub mod service;
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
     #[error("SQLCompilationError: Internal: {0}")]
-    Internal(String, Backtrace),
+    Internal(String, Backtrace, Option<HashMap<String, String>>),
     #[error("SQLCompilationError: User: {0}")]
-    User(String),
+    User(String, Option<HashMap<String, String>>),
     #[error("SQLCompilationError: Unsupported: {0}")]
-    Unsupported(String),
+    Unsupported(String, Option<HashMap<String, String>>),
 }
 
 impl PartialEq for CompilationError {
     fn eq(&self, other: &Self) -> bool {
         match &self {
-            CompilationError::Internal(left, _) => match other {
-                CompilationError::Internal(right, _) => left == right,
+            CompilationError::Internal(left, _, _) => match other {
+                CompilationError::Internal(right, _, _) => left == right,
                 _ => false,
             },
-            CompilationError::User(left) => match other {
-                CompilationError::User(right) => left == right,
+            CompilationError::User(left, _) => match other {
+                CompilationError::User(right, _) => left == right,
                 _ => false,
             },
-            CompilationError::Unsupported(left) => match other {
-                CompilationError::Unsupported(right) => left == right,
+            CompilationError::Unsupported(left, _) => match other {
+                CompilationError::Unsupported(right, _) => left == right,
                 _ => false,
             },
         }
@@ -124,28 +125,64 @@ impl PartialEq for CompilationError {
 impl CompilationError {
     pub fn backtrace(&self) -> Option<&Backtrace> {
         match self {
-            CompilationError::Internal(_, bt) => Some(bt),
-            CompilationError::User(_) => None,
-            CompilationError::Unsupported(_) => None,
+            CompilationError::Internal(_, bt, _) => Some(bt),
+            CompilationError::User(_, _) => None,
+            CompilationError::Unsupported(_, _) => None,
         }
     }
 
     pub fn to_backtrace(self) -> Option<Backtrace> {
         match self {
-            CompilationError::Internal(_, bt) => Some(bt),
-            CompilationError::User(_) => None,
-            CompilationError::Unsupported(_) => None,
+            CompilationError::Internal(_, bt, _) => Some(bt),
+            CompilationError::User(_, _) => None,
+            CompilationError::Unsupported(_, _) => None,
         }
     }
 }
 
 impl CompilationError {
     pub fn internal(message: String) -> Self {
-        Self::Internal(message, Backtrace::capture())
+        Self::Internal(message, Backtrace::capture(), None)
     }
 
     pub fn internal_with_bt(message: String, bt: Backtrace) -> Self {
-        Self::Internal(message, bt)
+        Self::Internal(message, bt, None)
+    }
+
+    pub fn user(message: String) -> Self {
+        Self::User(message, None)
+    }
+
+    pub fn unsupported(message: String) -> Self {
+        Self::Unsupported(message, None)
+    }
+}
+
+impl CompilationError {
+    pub fn message(&self) -> String {
+        match self {
+            CompilationError::Internal(msg, _, _)
+            | CompilationError::User(msg, _)
+            | CompilationError::Unsupported(msg, _) => msg.clone(),
+        }
+    }
+
+    pub fn with_message(self, msg: String) -> Self {
+        match self {
+            CompilationError::Internal(_, bts, meta) => CompilationError::Internal(msg, bts, meta),
+            CompilationError::User(_, meta) => CompilationError::User(msg, meta),
+            CompilationError::Unsupported(_, meta) => CompilationError::Unsupported(msg, meta),
+        }
+    }
+}
+
+impl CompilationError {
+    pub fn with_meta(self, meta: Option<HashMap<String, String>>) -> Self {
+        match self {
+            CompilationError::Internal(msg, bts, _) => CompilationError::Internal(msg, bts, meta),
+            CompilationError::User(msg, _) => CompilationError::User(msg, meta),
+            CompilationError::Unsupported(msg, _) => CompilationError::Unsupported(msg, meta),
+        }
     }
 }
 
@@ -171,7 +208,7 @@ fn compile_select_expr(
 ) -> CompilationResult<()> {
     let selection =
         ctx.compile_selection_from_projection(expr)?
-            .ok_or(CompilationError::Unsupported(format!(
+            .ok_or(CompilationError::unsupported(format!(
                 "Unknown expression in SELECT statement: {}",
                 expr.to_string()
             )))?;
@@ -230,7 +267,7 @@ fn compile_select_expr(
             );
         }
         Selection::Segment(s) => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Unable to use segment '{}' as column in SELECT statement",
                 s.get_real_name()
             )))
@@ -320,12 +357,12 @@ fn compile_argument(argument: &ast::Expr) -> CompilationResult<CompiledExpressio
             ast::Value::SingleQuotedString(format) => {
                 Ok(CompiledExpression::StringLiteral(format.clone()))
             }
-            _ => Err(CompilationError::Unsupported(format!(
+            _ => Err(CompilationError::unsupported(format!(
                 "Unable to compile argument: {:?}",
                 argument
             ))),
         },
-        _ => Err(CompilationError::Unsupported(format!(
+        _ => Err(CompilationError::unsupported(format!(
             "Unable to compile argument: {:?}",
             argument
         ))),
@@ -340,7 +377,7 @@ fn function_arguments_unpack2<'a>(
         [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg1)), ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg2))] => {
             Ok((&arg1, &arg2))
         }
-        _ => Err(CompilationError::User(format!(
+        _ => Err(CompilationError::user(format!(
             "Unsupported signature for {} function: {:?}",
             fn_name, f
         ))),
@@ -353,7 +390,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
     let date = match compile_argument(date_expr)? {
         CompiledExpression::StringLiteral(str) => str,
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Wrong type of argument (date), must be StringLiteral: {:?}",
                 f
             )))
@@ -362,7 +399,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
     let format = match compile_argument(format_expr)? {
         CompiledExpression::StringLiteral(str) => str,
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Wrong type of argument (format), must be StringLiteral: {:?}",
                 f
             )))
@@ -370,7 +407,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
     };
 
     if !format.eq("%Y-%m-%d %H:%i:%s.%f") {
-        return Err(CompilationError::User(format!(
+        return Err(CompilationError::user(format!(
             "Wrong type of argument: {:?}",
             f
         )));
@@ -379,7 +416,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
     let parsed_date = Utc
         .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
         .map_err(|e| {
-            CompilationError::User(format!("Unable to parse {}, err: {}", date, e.to_string(),))
+            CompilationError::user(format!("Unable to parse {}, err: {}", date, e.to_string(),))
         })?;
 
     Ok(CompiledExpression::DateLiteral(parsed_date))
@@ -391,7 +428,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
     let date_expr = match f.args.as_slice() {
         [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(date_expr))] => date_expr,
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Unsupported signature for DATE function: {:?}",
                 f
             )));
@@ -405,7 +442,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
             let parsed_date = Utc
                 .datetime_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
                 .map_err(|e| {
-                    CompilationError::User(format!(
+                    CompilationError::user(format!(
                         "Unable to parse {}, err: {}",
                         input,
                         e.to_string(),
@@ -415,7 +452,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
             Ok(CompiledExpression::DateLiteral(parsed_date))
         }
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Wrong type of argument (date), must be DateLiteral, actual: {:?}",
                 f
             )))
@@ -425,7 +462,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
 
 fn now_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
     if f.args.len() > 1 {
-        return Err(CompilationError::User(format!(
+        return Err(CompilationError::user(format!(
             "Unsupported signature for NOW function: {:?}",
             f
         )));
@@ -443,7 +480,7 @@ fn date_add_function(
     let date = match compile_expression(&left_expr, &ctx)? {
         CompiledExpression::DateLiteral(str) => str,
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Wrong type of argument (date), must be DateLiteral: {:?}",
                 f
             )))
@@ -453,7 +490,7 @@ fn date_add_function(
     let interval = match compile_expression(&right_expr, &ctx)? {
         CompiledExpression::IntervalLiteral(str) => str,
         _ => {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Wrong type of argument (interval), must be IntervalLiteral: {:?}",
                 f
             )))
@@ -475,7 +512,7 @@ fn date_add_function(
         // @todo use real years
         Duration::days((interval.years * 365) as i64)
     } else {
-        return Err(CompilationError::Unsupported(format!(
+        return Err(CompilationError::unsupported(format!(
             "Unsupported manipulation with interval",
         )));
     };
@@ -496,7 +533,7 @@ fn compile_expression(
             if let Some(selection) = ctx.find_selection_for_identifier(&ident.value, true) {
                 Ok(CompiledExpression::Selection(selection))
             } else {
-                Err(CompilationError::User(format!(
+                Err(CompilationError::user(format!(
                     "Unable to find selection for: {:?}",
                     ident
                 )))
@@ -507,7 +544,7 @@ fn compile_expression(
             let identifier = if i.len() == 2 {
                 i[1].value.to_string()
             } else {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "Unsupported compound identifier in argument: {}",
                     expr.to_string()
                 )));
@@ -516,7 +553,7 @@ fn compile_expression(
             if let Some(selection) = ctx.find_selection_for_identifier(&identifier, true) {
                 Ok(CompiledExpression::Selection(selection))
             } else {
-                Err(CompilationError::User(format!(
+                Err(CompilationError::user(format!(
                     "Unable to find selection for: {:?}",
                     identifier
                 )))
@@ -526,17 +563,17 @@ fn compile_expression(
             ast::UnaryOperator::Minus => match *expr.clone() {
                 ast::Expr::Value(value) => match value {
                     ast::Value::Number(v, _) => Ok(CompiledExpression::NumberLiteral(v, true)),
-                    _ => Err(CompilationError::User(format!(
+                    _ => Err(CompilationError::user(format!(
                         "Unsupported value: {:?}",
                         value
                     ))),
                 },
-                _ => Err(CompilationError::Unsupported(format!(
+                _ => Err(CompilationError::unsupported(format!(
                     "Unable to compile Unary Op: {:?}",
                     expr
                 ))),
             },
-            _ => Err(CompilationError::Unsupported(format!(
+            _ => Err(CompilationError::unsupported(format!(
                 "Unable to compile Unary Op: {:?}",
                 expr
             ))),
@@ -553,7 +590,7 @@ fn compile_expression(
                 let (interval_value, interval_negative) = match compile_expression(&value, &ctx)? {
                     CompiledExpression::NumberLiteral(n, is_negative) => {
                         let n = n.to_string().parse::<u32>().map_err(|e| {
-                            CompilationError::Unsupported(format!(
+                            CompilationError::unsupported(format!(
                                 "Unable to parse interval value: {}",
                                 e.to_string()
                             ))
@@ -562,7 +599,7 @@ fn compile_expression(
                         (n, is_negative)
                     }
                     _ => {
-                        return Err(CompilationError::User(format!(
+                        return Err(CompilationError::user(format!(
                             "Unsupported type of Interval value, must be NumberLiteral: {:?}",
                             value
                         )))
@@ -601,7 +638,7 @@ fn compile_expression(
                         interval.years = interval_value;
                     }
                     _ => {
-                        return Err(CompilationError::User(format!(
+                        return Err(CompilationError::user(format!(
                             "Unsupported type of Interval, actual: {:?}",
                             leading_field
                         )))
@@ -610,7 +647,7 @@ fn compile_expression(
 
                 Ok(CompiledExpression::IntervalLiteral(interval))
             }
-            _ => Err(CompilationError::User(format!(
+            _ => Err(CompilationError::user(format!(
                 "Unsupported value: {:?}",
                 val
             ))),
@@ -620,12 +657,12 @@ fn compile_expression(
             "date" => date_function(&f, &ctx),
             "date_add" => date_add_function(&f, &ctx),
             "now" => now_function(&f),
-            _ => Err(CompilationError::User(format!(
+            _ => Err(CompilationError::user(format!(
                 "Unsupported function: {:?}",
                 f
             ))),
         },
-        _ => Err(CompilationError::Unsupported(format!(
+        _ => Err(CompilationError::unsupported(format!(
             "Unable to compile expression: {:?}",
             expr
         ))),
@@ -647,7 +684,7 @@ fn compiled_binary_op_expr(
         (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
         // CubeSQL doesnt support BinaryExpression with literals in both sides
         (l, r) => {
-            return Err(CompilationError::Unsupported(format!(
+            return Err(CompilationError::unsupported(format!(
                 "Unable to compile binary expression (unbound expr): ({:?}, {:?})",
                 l, r
             )))
@@ -674,7 +711,7 @@ fn compiled_binary_op_expr(
                 ast::BinaryOperator::Lt => (filter_expr, "lt".to_string()),
                 ast::BinaryOperator::LtEq => (filter_expr, "lte".to_string()),
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "Operator in binary expression for measure: {} {} {}",
                         left, op, right
                     )))
@@ -694,7 +731,7 @@ fn compiled_binary_op_expr(
                 if let Some(dt) = date {
                     CompiledExpression::DateLiteral(dt)
                 } else {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to compare time dimension \"{}\" with not a date value: {}",
                         dim.get_real_name(),
                         filter_expr.to_value_as_str()?
@@ -732,7 +769,7 @@ fn compiled_binary_op_expr(
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "Operator in binary expression for dimension: {} {} {}",
                         left, op, right
                     )))
@@ -752,27 +789,27 @@ fn compiled_binary_op_expr(
                     if v {
                         CompiledFilter::SegmentFilter { member }
                     } else {
-                        return Err(CompilationError::Unsupported(
+                        return Err(CompilationError::unsupported(
                             "Unable to use false as value for filtering segment".to_string(),
                         ));
                     }
                 }
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "Unable to use value {:?} as value for filtering segment",
                         filter_expr
                     )));
                 }
             },
             _ => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to use operator {} with segment: {} {} {}",
                     op, left, op, right
                 )));
             }
         },
         _ => {
-            return Err(CompilationError::Unsupported(format!(
+            return Err(CompilationError::unsupported(format!(
                 "Binary expression: {} {} {}",
                 left, op, right
             )))
@@ -835,7 +872,7 @@ fn compiled_binary_op_logical(
     match op {
         ast::BinaryOperator::And => Ok(binary_op_create_node_and(left, right)?),
         ast::BinaryOperator::Or => Ok(CompiledFilterTree::Or(Box::new(left), Box::new(right))),
-        _ => Err(CompilationError::Unsupported(format!(
+        _ => Err(CompilationError::unsupported(format!(
             "Unable to compiled_binary_op_logical: BinaryOp({:?}, {:?}, {:?})",
             left, op, right
         ))),
@@ -862,13 +899,13 @@ fn compile_where_expression(
                     Selection::TimeDimension(t, _) => Ok(t),
                     Selection::Dimension(d) => Ok(d),
                     Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
                             compiled_expr
                         )))
                     }
                 },
-                _ => Err(CompilationError::User(format!(
+                _ => Err(CompilationError::user(format!(
                     "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
                     compiled_expr
                 ))),
@@ -893,13 +930,13 @@ fn compile_where_expression(
                     if d.is_time() {
                         Ok(d)
                     } else {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Column for Between must be a time dimension, actual: {:?}",
                             compiled_expr
                         )))
                     }
                 }
-                _ => Err(CompilationError::User(format!(
+                _ => Err(CompilationError::user(format!(
                     "Column for Between must be a time dimension, actual: {:?}",
                     compiled_expr
                 ))),
@@ -909,7 +946,7 @@ fn compile_where_expression(
             let low_compiled_date =
                 low_compiled
                     .to_date_literal()
-                    .ok_or(CompilationError::User(format!(
+                    .ok_or(CompilationError::user(format!(
                         "Unable to compare time dimension \"{}\" with not a date value: {}",
                         column_for_filter.get_real_name(),
                         low_compiled.to_value_as_str()?
@@ -919,7 +956,7 @@ fn compile_where_expression(
             let high_compiled_date =
                 high_compiled
                     .to_date_literal()
-                    .ok_or(CompilationError::User(format!(
+                    .ok_or(CompilationError::user(format!(
                         "Unable to compare time dimension \"{}\" with not a date value: {}",
                         column_for_filter.get_real_name(),
                         high_compiled.to_value_as_str()?
@@ -945,13 +982,13 @@ fn compile_where_expression(
                     Selection::TimeDimension(t, _) => Ok(t),
                     Selection::Dimension(d) => Ok(d),
                     Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
                             compiled_expr
                         )))
                     }
                 },
-                _ => Err(CompilationError::User(format!(
+                _ => Err(CompilationError::user(format!(
                     "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
                     compiled_expr
                 ))),
@@ -974,13 +1011,13 @@ fn compile_where_expression(
                     Selection::TimeDimension(t, _) => Ok(t),
                     Selection::Dimension(d) => Ok(d),
                     Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Column for InExpr must be a Dimension or TimeDimension, actual: {:?}",
                             compiled_expr
                         )))
                     }
                 },
-                _ => Err(CompilationError::User(format!(
+                _ => Err(CompilationError::user(format!(
                     "Column for InExpr must be a Dimension or TimeDimension, actual: {:?}",
                     compiled_expr
                 ))),
@@ -1007,7 +1044,7 @@ fn compile_where_expression(
                 values: Some(values),
             }))
         }
-        _ => Err(CompilationError::Unsupported(format!(
+        _ => Err(CompilationError::unsupported(format!(
             "Unable to compile expression: {:?}",
             expr
         ))),
@@ -1240,7 +1277,7 @@ fn compile_group(
                 if let Some(selection) = ctx.find_selection_for_identifier(&i.to_string(), true) {
                     match selection {
                         Selection::Segment(s) => {
-                            return Err(CompilationError::User(format!(
+                            return Err(CompilationError::user(format!(
                                 "Unable to use segment '{}' in GROUP BY",
                                 s.get_real_name()
                             )));
@@ -1284,7 +1321,7 @@ fn compile_where(
                 CompiledFilterTree::Or(Box::new(left_compiled), Box::new(right_compiled))
             }
             _ => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "Operator for binary expression in WHERE clause: {:?}",
                     selection
                 )));
@@ -1296,7 +1333,7 @@ fn compile_where(
         isnotnull @ ast::Expr::IsNotNull { .. } => compile_where_expression(isnotnull, ctx)?,
         between @ ast::Expr::Between { .. } => compile_where_expression(between, ctx)?,
         _ => {
-            return Err(CompilationError::Unsupported(format!(
+            return Err(CompilationError::unsupported(format!(
                 "Expression in WHERE clause: {:?}",
                 selection
             )));
@@ -1328,7 +1365,7 @@ fn compile_order(
         let order_selection = ctx
             .compile_selection(&order_expr.expr.clone())?
             .ok_or_else(|| {
-                CompilationError::Unsupported(format!(
+                CompilationError::unsupported(format!(
                     "Unsupported expression in order: {:?}",
                     order_expr.expr
                 ))
@@ -1351,7 +1388,7 @@ fn compile_order(
                 builder.with_order(vec![t.name.clone(), direction_as_str])
             }
             Selection::Segment(s) => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to use segment '{}' in ORDER BY",
                     s.get_real_name()
                 )));
@@ -1390,7 +1427,7 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
                     compile_select_expr(expr, ctx, &mut builder, Some(alias.value.to_string()))?
                 }
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "Unsupported expression in projection: {:?}",
                         projection
                     )));
@@ -1406,7 +1443,6 @@ struct QueryPlanner {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
-    logger: Arc<dyn ContextLogger>,
 }
 
 impl QueryPlanner {
@@ -1414,20 +1450,18 @@ impl QueryPlanner {
         state: Arc<SessionState>,
         meta: Arc<MetaContext>,
         session_manager: Arc<SessionManager>,
-        logger: Arc<dyn ContextLogger>,
     ) -> Self {
         Self {
             state,
             meta,
             session_manager,
-            logger,
         }
     }
 
     /// Common case for both planners: meta & olap
     /// This method tries to detect what planner to use as earlier as possible
     /// and forward context to correct planner
-    pub fn select_to_plan(
+    fn select_to_plan(
         &self,
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
@@ -1444,14 +1478,14 @@ impl QueryPlanner {
         let select = match &q.body {
             sqlparser::ast::SetExpr::Select(select) => select,
             _ => {
-                return Err(CompilationError::Unsupported(
+                return Err(CompilationError::unsupported(
                     "Unsupported Query".to_string(),
                 ));
             }
         };
 
         if select.into.is_some() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Unsupported query type: SELECT INTO".to_string(),
             ));
         }
@@ -1493,7 +1527,7 @@ impl QueryPlanner {
                             ),
                         },
                         _ => {
-                            return Err(CompilationError::Unsupported(format!(
+                            return Err(CompilationError::unsupported(format!(
                                 "Table identifier: {:?}",
                                 identifiers
                             )));
@@ -1502,7 +1536,7 @@ impl QueryPlanner {
                 }
             },
             factor => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "table factor: {:?}",
                     factor
                 )));
@@ -1528,38 +1562,38 @@ impl QueryPlanner {
         };
 
         if db_name.to_lowercase() != "db" {
-            return Err(CompilationError::Unsupported(format!(
+            return Err(CompilationError::unsupported(format!(
                 "Unable to access database {}",
                 db_name
             )));
         }
 
         if !select.from[0].joins.is_empty() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Query with JOIN instruction(s)".to_string(),
             ));
         }
 
         if q.with.is_some() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Query with CTE instruction(s)".to_string(),
             ));
         }
 
         if !select.cluster_by.is_empty() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Query with CLUSTER BY instruction(s)".to_string(),
             ));
         }
 
         if !select.distribute_by.is_empty() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Query with DISTRIBUTE BY instruction(s)".to_string(),
             ));
         }
 
         if select.having.is_some() {
-            return Err(CompilationError::Unsupported(
+            return Err(CompilationError::unsupported(
                 "Query with HAVING instruction(s)".to_string(),
             ));
         }
@@ -1591,7 +1625,7 @@ impl QueryPlanner {
 
             if let Some(limit_expr) = &q.limit {
                 let limit = limit_expr.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::Unsupported(format!(
+                    CompilationError::unsupported(format!(
                         "Unable to parse limit: {}",
                         e.to_string()
                     ))
@@ -1602,7 +1636,7 @@ impl QueryPlanner {
 
             if let Some(offset_expr) = &q.offset {
                 let offset = offset_expr.value.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::Unsupported(format!(
+                    CompilationError::unsupported(format!(
                         "Unable to parse offset: {}",
                         e.to_string()
                     ))
@@ -1651,7 +1685,7 @@ impl QueryPlanner {
                 ctx,
             ))
         } else {
-            Err(CompilationError::User(format!(
+            Err(CompilationError::user(format!(
                 "Unknown cube '{}'. Please ensure your schema files are valid.",
                 table_name,
             )))
@@ -1757,13 +1791,26 @@ impl QueryPlanner {
                     CommandCompletion::Discard(object_type.to_string()),
                 ))
             }
-            _ => Err(CompilationError::Unsupported(format!(
+            _ => Err(CompilationError::unsupported(format!(
                 "Unsupported query type: {}",
                 stmt.to_string()
             ))),
         };
 
-        plan
+        match plan {
+            Err(err) => {
+                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
+                let msg = err.message();
+                Err(err
+                    .with_message(format!(
+                        "{} QUERY: {}",
+                        msg,
+                        SensitiveDataSanitizer::new().replace(stmt).to_string()
+                    ))
+                    .with_meta(meta))
+            }
+            _ => plan,
+        }
     }
 
     fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
@@ -1863,13 +1910,13 @@ impl QueryPlanner {
                 format!("WHERE VARIABLE_NAME {}", stmt.to_string())
             }
             Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "Show variable doesnt support WHERE statement: {}",
                     stmt
                 )))
             }
             Some(stmt @ ast::ShowStatementFilter::ILike(_)) => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Show variable doesnt define ILIKE statement: {}",
                     stmt
                 )))
@@ -1893,7 +1940,7 @@ impl QueryPlanner {
         match obj_type {
             ast::ShowCreateObject::Table => {}
             _ => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "SHOW CREATE doesn't support type: {}",
                     obj_type
                 )))
@@ -1939,7 +1986,7 @@ impl QueryPlanner {
                 ])]
             )))
         }).ok_or(
-            CompilationError::User(format!(
+            CompilationError::user(format!(
                 "Unknown table: {}",
                 table_name_filter
             ))
@@ -1962,7 +2009,7 @@ impl QueryPlanner {
                 format!("UNION ALL SELECT 'DB_TRX_ID' AS `Field`, 2 AS `Order`, {} UNION ALL SELECT 'DB_ROLL_PTR' AS `Field`, 3 AS `Order`, {}", extended_columns, extended_columns)
             }*/
             true => {
-                return Err(CompilationError::Unsupported(
+                return Err(CompilationError::unsupported(
                     "SHOW COLUMNS: EXTENDED is not implemented".to_string(),
                 ))
             }
@@ -1995,7 +2042,7 @@ impl QueryPlanner {
                 format!("{}", stmt.to_string())
             }
             Some(stmt) => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "SHOW COLUMNS doesn't support requested filter: {}",
                     stmt
                 )))
@@ -2047,7 +2094,7 @@ impl QueryPlanner {
                 format!("{}", stmt)
             }
             Some(stmt) => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "SHOW TABLES doesn't support requested filter: {}",
                     stmt
                 )))
@@ -2084,7 +2131,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 format!("{}", stmt)
             }
             Some(stmt) => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "SHOW COLLATION doesn't support requested filter: {}",
                     stmt
                 )))
@@ -2199,14 +2246,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
                             }
                             ast::Value::Number(number, _) => number.to_string(),
                             _ => {
-                                return Err(CompilationError::User(format!(
+                                return Err(CompilationError::user(format!(
                                     "invalid {} variable format",
                                     key_value.key.value
                                 )))
                             }
                         },
                         _ => {
-                            return Err(CompilationError::User(format!(
+                            return Err(CompilationError::user(format!(
                                 "invalid {} variable format",
                                 key_value.key.value
                             )))
@@ -2251,14 +2298,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
                             }
                             ast::Value::Number(number, _) => number.to_string(),
                             _ => {
-                                return Err(CompilationError::User(format!(
+                                return Err(CompilationError::user(format!(
                                     "invalid {} variable format",
                                     key_value.key.value
                                 )))
                             }
                         },
                         _ => {
-                            return Err(CompilationError::User(format!(
+                            return Err(CompilationError::user(format!(
                                 "invalid {} variable format",
                                 key_value.key.value
                             )))
@@ -2317,7 +2364,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
             self.planner_meta_fields(),
-            self.logger.clone(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
@@ -2424,7 +2470,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         match &stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
-                    return Err(CompilationError::Unsupported(
+                    return Err(CompilationError::unsupported(
                         "Unsupported query type: SELECT INTO".to_string(),
                     ))
                 }
@@ -2447,7 +2493,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
-                CompilationError::internal(format!("Initial planning error: {}", err))
+                let message = format!("Initial planning error: {}", err,);
+                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
+
+                CompilationError::internal(message).with_meta(meta)
             })?;
 
         let optimized_plan = plan;
@@ -2462,21 +2511,28 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let result = converter
             .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
-            .map_err(|e| match &e.cause {
-                CubeErrorCauseType::Internal => CompilationError::internal_with_bt(
+            .map_err(|e| match e.cause {
+                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
                     format!(
                         "Error during rewrite: {}. Please check logs for additional information.",
                         e.message
                     ),
                     e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
+                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
                 ),
-                CubeErrorCauseType::User => CompilationError::User(e.message.to_string()),
+                CubeErrorCauseType::User(_) => CompilationError::User(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
+                ),
             });
+
         if let Err(_) = &result {
-            self.logger
-                .error(format!("Can't rewrite plan: {:#?}", optimized_plan).as_str());
-            self.logger.error(format!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.").as_str());
+            log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.");
         }
+
         let rewrite_plan = result?;
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
@@ -2498,6 +2554,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let protocol = self.state.protocol.to_string();
         meta_fields.insert("protocol".to_string(), protocol);
         meta_fields.insert("apiType".to_string(), "sql".to_string());
+
         Some(meta_fields)
     }
 }
@@ -2506,18 +2563,12 @@ pub fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
-    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
 
-    let planner = QueryPlanner::new(
-        session.state.clone(),
-        meta,
-        session.session_manager.clone(),
-        logger.clone(),
-    );
+    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(&stmt)
 }
 
@@ -2650,10 +2701,9 @@ pub fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
-    logger: Arc<dyn ContextLogger>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone())?;
-    convert_statement_to_cube_query(&stmt, meta, session, logger)
+    convert_statement_to_cube_query(&stmt, meta, session)
 }
 
 #[cfg(test)]
@@ -2858,27 +2908,8 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
-        #[derive(Debug)]
-        struct TestContextLogger {}
-
-        #[async_trait]
-        impl ContextLogger for TestContextLogger {
-            fn error(&self, message: &str) {
-                log::error!("{}", message);
-            }
-        }
-
-        Arc::new(TestContextLogger {})
-    }
-
     fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_session(db),
-            get_test_context_logger(),
-        );
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
 
         query.unwrap()
     }
@@ -4377,71 +4408,87 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[test]
     fn test_select_error() {
-        let variants = vec![
-            // Count agg fn
-            (
-                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
-            ),
-            (
-                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::User("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
-            ),
-            // (
-            //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to use number '2' as argument to aggregation function".to_string()),
-            // ),
-            // (
-            //     "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
-            // ),
-            // Another aggregation functions
-            // (
-            //     "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-            // ),
-            // (
-            //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
-            // ),
-            // (
-            //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
-            // ),
-            // (
-            //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
-            // ),
-            // (
-            //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
-            // ),
-            // Check restrictions for segments usage
-            // (
-            //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
-            //     CompilationError::User("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
-            // ),
-            // (
-            //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-            //     CompilationError::User("Unable to use segment 'is_male' in GROUP BY".to_string()),
-            // ),
-            // (
-            //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
-            //     CompilationError::User("Unable to use segment 'is_male' in ORDER BY".to_string()),
-            // ),
-        ];
+        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
+            .ok()
+            .map(|v| v.parse::<bool>().unwrap())
+            .unwrap_or(false);
+        let variants = if rewrite_engine {
+            vec![
+                (
+                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information. QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                ),
+                (
+                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                ),
+            ]
+        } else {
+            vec![
+                // Count agg fn
+                (
+                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                ),
+                (
+                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                ),
+                // (
+                //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to use number '2' as argument to aggregation function".to_string()),
+                // ),
+                // (
+                //     "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
+                // ),
+                // Another aggregation functions
+                // (
+                //     "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
+                // ),
+                // (
+                //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
+                // ),
+                // (
+                //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
+                // ),
+                // (
+                //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
+                // ),
+                // (
+                //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
+                // ),
+                // Check restrictions for segments usage
+                // (
+                //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
+                //     CompilationError::user("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
+                // ),
+                // (
+                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
+                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY QUERY: SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string()),
+                // ),
+                // (
+                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
+                //     CompilationError::user("Unable to use segment 'is_male' in ORDER BY".to_string()),
+                // ),
+            ]
+        };
 
         for (input_query, expected_error) in variants.iter() {
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
-                get_test_context_logger(),
             );
 
-            match &query {
+            match query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
-                Err(e) => assert_eq!(e, expected_error, "for {}", input_query),
+                Err(e) => assert_eq!(&e.with_meta(None), expected_error, "for {}", input_query),
             }
         }
     }
@@ -5089,36 +5136,36 @@ ORDER BY \"COUNT(count)\" DESC"
             // Binary expr
             (
                 "order_date >= 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date <= 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date < 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date <= 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date = 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date <> 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             // Between
             (
                 "order_date BETWEEN 'WRONG_DATE' AND '2021-01-01'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
             (
                 "order_date BETWEEN '2021-01-01' AND 'WRONG_DATE'".to_string(),
-                CompilationError::User("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
+                CompilationError::user("Unable to compare time dimension \"order_date\" with not a date value: WRONG_DATE".to_string()),
             ),
         ];
 
@@ -5134,7 +5181,6 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
-                get_test_context_logger(),
             );
 
             match &query {
@@ -5515,12 +5561,7 @@ ORDER BY \"COUNT(count)\" DESC"
         query: String,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
-        let query = convert_sql_to_cube_query(
-            &query,
-            get_test_tenant_ctx(),
-            get_test_session(db),
-            get_test_context_logger(),
-        );
+        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
@@ -8511,10 +8552,9 @@ ORDER BY \"COUNT(count)\" DESC"
             ".to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
-            get_test_context_logger(),
         );
         match create_query {
-            Err(CompilationError::Unsupported(msg)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS QUERY: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
             _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
         };
 
@@ -8528,13 +8568,12 @@ ORDER BY \"COUNT(count)\" DESC"
             .to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
-            get_test_context_logger(),
         );
         match select_into_query {
-            Err(CompilationError::Unsupported(msg)) => {
-                assert_eq!(msg, "Unsupported query type: SELECT INTO")
+            Err(CompilationError::Unsupported(msg, _)) => {
+                assert_eq!(msg, "Unsupported query type: SELECT INTO QUERY: SELECT * INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\" FROM (SELECT 1 AS COL) AS CHECKTEMP LIMIT 1")
             }
-            _ => panic!("SELECT INTO should throw CompilationError::Unsupported"),
+            _ => panic!("SELECT INTO should throw CompilationError::unsupported"),
         }
     }
 
