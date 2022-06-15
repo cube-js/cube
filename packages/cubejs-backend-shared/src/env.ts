@@ -171,6 +171,10 @@ const variables: Record<string, (...args: any) => any> = {
     return undefined;
   },
   // Export bucket options for Azure
+  dbExportBucketAzureAccount:
+    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_ACCOUNT').asString(),
+  dbExportBucketAzureContainer:
+    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_CONTAINER').asString(),
   dbExportBucketAzureKey:
     () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
   // Redshift Driver

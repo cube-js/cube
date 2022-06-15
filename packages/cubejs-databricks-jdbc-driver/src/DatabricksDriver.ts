@@ -11,6 +11,13 @@ import {
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
 import {
+  DataLakeServiceClient,
+  StorageSharedKeyCredential as DlsStorageSharedKeyCredential,
+  DataLakeSASPermissions,
+  SASProtocol as DlsSASProtocol,
+  generateDataLakeSASQueryParameters,
+} from '@azure/storage-file-datalake';
+import {
   DownloadTableCSVData,
 } from '@cubejs-backend/query-orchestrator';
 import {
@@ -33,6 +40,8 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     awsSecret?: string,
     awsRegion?: string,
     // Azure export bucket
+    azureAccount?: string,
+    azureContainer?: string,
     azureKey?: string,
   };
 
@@ -118,6 +127,8 @@ export class DatabricksDriver extends JDBCDriver {
       awsSecret: conf?.awsSecret || getEnv('dbExportBucketAwsSecret'),
       awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
       // Azure export bucket
+      azureAccount: conf?.azureAccount || getEnv('dbExportBucketAzureAccount'),
+      azureContainer: conf?.azureContainer || getEnv('dbExportBucketAzureContainer'),
       azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
     };
     super(config);
@@ -278,13 +289,73 @@ export class DatabricksDriver extends JDBCDriver {
   private async getSignedAzureUrls(
     pathname: string,
   ): Promise<string[]> {
-    const csvFile: string[] = [];
-    const [container, account] =
-      pathname.split('wasbs://')[1].split('.blob')[0].split('@');
-    const foldername =
-      pathname.split(`${this.config.exportBucket}/`)[1];
-    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
+    if (this.isAzureMounted()) {
+      return this.getSignedAzureFiles(pathname);
+    } else {
+      return this.getSignedAzureBlobs(pathname);
+    }
+  }
 
+  /**
+   * Generate and returns signed URLs of unloaded scv files for Azure
+   * Data Lake Storage Gen2.
+   */
+  private async getSignedAzureFiles(
+    pathname: string,
+  ): Promise<string[]> {
+    const csvFile: string[] = [];
+    const account = this.config.azureAccount as string;
+    const container = this.config.azureContainer as string;
+    const foldername = pathname.split(`${this.config.exportBucket}/`)[1];
+    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
+    const credential = new DlsStorageSharedKeyCredential(
+      account,
+      this.config.azureKey as string,
+    );
+    const dlsClient = new DataLakeServiceClient(
+      `https://${account}.dfs.core.windows.net`,
+      credential,
+    );
+    const fileSystemClient = dlsClient.getFileSystemClient(container);
+    const filesList = fileSystemClient.listPaths({ path: foldername });
+    for await (const file of filesList) {
+      if (!file.isDirectory && file.name && expr.test(file.name)) {
+        const sas = generateDataLakeSASQueryParameters(
+          {
+            fileSystemName: container,
+            // @ts-ignore
+            fileName: file.name,
+            permissions: DataLakeSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: DlsSASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFile.push(`https://${
+          account
+        }.dfs.core.windows.net/${
+          container
+        }/${file.name}?${sas}`);
+      }
+    }
+    return csvFile;
+  }
+
+  /**
+   * Generate and returns signed URLs of unloaded scv files for Azure
+   * Blob Storage.
+   */
+  private async getSignedAzureBlobs(
+    pathname: string,
+  ): Promise<string[]> {
+    const csvFile: string[] = [];
+    const account = this.config.azureAccount as string;
+    const container = this.config.azureContainer as string;
+    const foldername = pathname.split(`${this.config.exportBucket}/`)[1];
+    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
     const credential = new StorageSharedKeyCredential(
       account,
       this.config.azureKey as string,
@@ -318,6 +389,13 @@ export class DatabricksDriver extends JDBCDriver {
       }
     }
     return csvFile;
+  }
+
+  /**
+   * Determine whether Azure storage is mounted or not.
+   */
+  private isAzureMounted(): boolean {
+    return (this.config.exportBucket as string).indexOf('/') === 0;
   }
 
   /**
