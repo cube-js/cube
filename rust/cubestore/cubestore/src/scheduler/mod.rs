@@ -4,8 +4,7 @@ use crate::metastore::job::{Job, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
-    TableId,
+    deactivate_table_on_corrupt_data, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
 };
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
@@ -616,8 +615,7 @@ impl SchedulerImpl {
             })
             .collect::<Vec<_>>();
 
-        if chunks.len() > compaction_in_memory_chunks_count_threshold
-        {
+        if chunks.len() > compaction_in_memory_chunks_count_threshold {
             let node = self.cluster.node_name_by_partition(partition);
             let job = self
                 .meta_store
