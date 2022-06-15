@@ -23,7 +23,7 @@ use egg::{
     rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
     Symbol, Var,
 };
-use std::{collections::HashMap, fmt::Display, slice::Iter, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Index, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -224,6 +224,10 @@ crate::plan_to_language! {
             name: String,
             expr: Arc<Expr>,
         },
+        Segment {
+            name: String,
+            expr: Arc<Expr>,
+        },
         Order {
             member: String,
             asc: bool,
@@ -257,6 +261,18 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             cube: Arc<LogicalPlan>,
         },
+        MemberPushdownReplacer {
+            members: Vec<LogicalPlan>,
+            old_members: Arc<LogicalPlan>,
+            table_name: String,
+            target_table_name: String,
+        },
+        ListConcatPushdownReplacer {
+            members: Arc<LogicalPlan>,
+        },
+        ListConcatPushupReplacer {
+            members: Arc<LogicalPlan>,
+        },
         TimeDimensionDateRangeReplacer {
             members: Vec<LogicalPlan>,
             member: String,
@@ -265,23 +281,16 @@ crate::plan_to_language! {
         FilterReplacer {
             filters: Vec<LogicalPlan>,
             cube: Option<String>,
+            members: Vec<LogicalPlan>,
+            table_name: String,
         },
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
-        },
-        SaveDateRangeReplacer {
-            members: Vec<LogicalPlan>,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
             cube: Option<String>,
-        },
-        ColumnAliasReplacer {
-            members: Vec<LogicalPlan>,
-            aliases: Vec<(String, String)>,
-            table_name: Option<String>,
-            target_table_name: Option<String>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -305,6 +314,16 @@ macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
             LogicalPlanLanguage::$field_variant($field_variant(v)) => Some(v),
+            _ => None,
+        })
+    }};
+}
+
+#[macro_export]
+macro_rules! var_list_iter {
+    ($eclass:expr, $field_variant:ident) => {{
+        $eclass.nodes.iter().filter_map(|node| match node {
+            LogicalPlanLanguage::$field_variant(v) => Some(v),
             _ => None,
         })
     }};
@@ -335,11 +354,35 @@ fn column_name_to_member_name(
     member_name_to_expr: Vec<(String, Expr)>,
     table_name: String,
 ) -> HashMap<String, String> {
+    column_name_to_member_vec(member_name_to_expr, table_name)
+        .into_iter()
+        .collect::<HashMap<_, _>>()
+}
+
+fn column_name_to_member_vec(
+    member_name_to_expr: Vec<(String, Expr)>,
+    table_name: String,
+) -> Vec<(String, String)> {
     let mut relation = WithColumnRelation(table_name);
     member_name_to_expr
         .into_iter()
         .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
-        .collect::<HashMap<_, _>>()
+        .collect::<Vec<_>>()
+}
+
+fn member_name_by_alias(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+    alias: &str,
+    table_name: String,
+) -> Option<String> {
+    if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
+        let column_name_to_member =
+            column_name_to_member_name(member_name_to_expr.clone(), table_name);
+        column_name_to_member.get(alias).cloned()
+    } else {
+        None
+    }
 }
 
 fn referenced_columns(referenced_expr: Vec<Expr>, table_name: String) -> Vec<String> {
@@ -634,20 +677,28 @@ fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
 }
 
-fn column_alias_replacer(
+fn member_replacer(members: impl Display, aliases: impl Display) -> String {
+    format!("(MemberReplacer {} {})", members, aliases)
+}
+
+fn member_pushdown_replacer(
     members: impl Display,
-    aliases: impl Display,
+    old_members: impl Display,
     table_name: impl Display,
     target_table_name: impl Display,
 ) -> String {
     format!(
-        "(ColumnAliasReplacer {} {} {} {})",
-        members, aliases, table_name, target_table_name
+        "(MemberPushdownReplacer {} {} {} {})",
+        members, old_members, table_name, target_table_name
     )
 }
 
-fn member_replacer(members: impl Display, aliases: impl Display) -> String {
-    format!("(MemberReplacer {} {})", members, aliases)
+fn list_concat_pushdown_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushdownReplacer {})", members)
+}
+
+fn list_concat_pushup_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushupReplacer {})", members)
 }
 
 fn time_dimension_date_range_replacer(
@@ -665,12 +716,16 @@ fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Displ
     format!("(OrderReplacer {} {} {})", members, aliases, cube)
 }
 
-fn filter_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(FilterReplacer {} {})", members, cube)
-}
-
-fn save_date_range_replacer(members: impl Display) -> String {
-    format!("(SaveDateRangeReplacer {})", members)
+fn filter_replacer(
+    members: impl Display,
+    cube: impl Display,
+    cube_members: impl Display,
+    table_name: impl Display,
+) -> String {
+    format!(
+        "(FilterReplacer {} {} {} {})",
+        members, cube, cube_members, table_name
+    )
 }
 
 fn filter_cast_unwrap_replacer(members: impl Display) -> String {
@@ -739,6 +794,10 @@ fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
 
 fn dimension_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Dimension {} {})", name, expr)
+}
+
+fn segment_expr(name: impl Display, expr: impl Display) -> String {
+    format!("(Segment {} {})", name, expr)
 }
 
 fn time_dimension_expr(

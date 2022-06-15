@@ -143,7 +143,11 @@ pub trait V1CubeMetaExt {
 
     fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension>;
 
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+
     fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure>;
+
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure>;
 
     fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment>;
 
@@ -228,6 +232,10 @@ impl V1CubeMetaExt for V1CubeMeta {
 
     fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure> {
         let member_name = self.member_name(column_name);
+        self.lookup_measure_by_member_name(&member_name)
+    }
+
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure> {
         self.measures
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(&member_name))
@@ -235,6 +243,10 @@ impl V1CubeMetaExt for V1CubeMeta {
 
     fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension> {
         let member_name = self.member_name(column_name);
+        self.lookup_dimension_by_member_name(&member_name)
+    }
+
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
         self.dimensions
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(&member_name))

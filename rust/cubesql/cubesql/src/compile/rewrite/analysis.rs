@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ColumnExprColumn, DimensionName, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, TableScanSourceTableName, TimeDimensionName,
+            MeasureName, SegmentName, TableScanSourceTableName, TimeDimensionName,
         },
     },
     var_iter, CubeError,
@@ -119,6 +119,16 @@ impl LogicalPlanAnalysis {
                     let dimension_name =
                         var_iter!(egraph[params[0]], DimensionName).next().unwrap();
                     map.push((dimension_name.to_string(), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::Segment(params) => {
+                if let Some(_) = column_name(params[1]) {
+                    let expr = original_expr(params[1])?;
+                    let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
+                    map.push((segment_name.to_string(), expr));
                     Some(map)
                 } else {
                     None

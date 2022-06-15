@@ -1,7 +1,7 @@
 use datafusion::arrow::datatypes::DataType;
 use std::ops::RangeFrom;
 
-use cubeclient::models::V1CubeMeta;
+use cubeclient::models::{V1CubeMeta, V1CubeMetaMeasure};
 
 use crate::sql::ColumnType;
 
@@ -65,6 +65,15 @@ impl MetaContext {
         }
 
         None
+    }
+
+    pub fn find_measure_with_name(&self, name: String) -> Option<V1CubeMetaMeasure> {
+        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
+        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0].to_string()) {
+            cube.lookup_measure(cube_and_member_name[1]).cloned()
+        } else {
+            None
+        }
     }
 
     pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
