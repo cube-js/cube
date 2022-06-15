@@ -540,7 +540,6 @@ impl SchedulerImpl {
         &self,
         partition: &IdRow<Partition>,
     ) -> Result<(), CubeError> {
-        println!("####");
         let partition_id = partition.get_id();
         let all_chunks = self
             .meta_store
