@@ -3,26 +3,30 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
-            aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_expr, column_name_to_member_name, cube_scan,
-            cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-            cube_scan_order_empty_tail, dimension_expr, expr_column_name,
-            expr_column_name_with_relation, fun_expr, limit, literal_expr, measure_expr,
+            aggr_group_expr_empty_tail, aggregate, alias_expr,
+            analysis::LogicalPlanAnalysis,
+            binary_expr, cast_expr, column_expr, column_name_to_member_name,
+            column_name_to_member_vec, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
+            cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
+            expr_column_name, expr_column_name_with_relation, fun_expr, limit,
+            list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr, measure_expr,
             member_pushdown_replacer, member_replacer, original_expr_name, projection,
             projection_expr, projection_expr_empty_tail, referenced_columns, rewrite,
-            rewriter::RewriteRules, rules::replacer_push_down_node_substitute_rules, segment_expr,
-            table_scan, time_dimension_expr, transforming_chain_rewrite, transforming_rewrite,
-            udaf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName,
-            LimitN, LiteralExprValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
-            MemberErrorPriority, MemberPushdownReplacerTableName,
-            MemberPushdownReplacerTargetTableName, ProjectionAlias, SegmentName,
-            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+            rewriter::RewriteRules,
+            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
+            segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
+            transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanAliases,
+            CubeScanLimit, CubeScanTableName, DimensionName, LimitN, LiteralExprValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, MemberErrorPriority,
+            MemberPushdownReplacerTableName, MemberPushdownReplacerTargetTableName,
+            ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt},
-    var, var_iter, CubeError,
+    var, var_iter, var_list_iter, CubeError,
 };
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
@@ -31,6 +35,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst, Var};
+use itertools::Itertools;
 use std::{collections::HashSet, ops::Index, sync::Arc};
 
 pub struct MemberRules {
@@ -291,13 +296,13 @@ impl RewriteRules for MemberRules {
                     cube_scan_members(
                         member_pushdown_replacer(
                             "?group_expr",
-                            "?old_members",
+                            list_concat_pushdown_replacer("?old_members"),
                             "?member_pushdown_replacer_table_name",
                             "?member_pushdown_replacer_target_table_name",
                         ),
                         member_pushdown_replacer(
                             "?aggr_expr",
-                            "?old_members",
+                            list_concat_pushdown_replacer("?old_members"),
                             "?member_pushdown_replacer_table_name",
                             "?member_pushdown_replacer_target_table_name",
                         ),
@@ -370,7 +375,7 @@ impl RewriteRules for MemberRules {
                     "?source_table_name",
                     member_pushdown_replacer(
                         "?expr",
-                        "?members",
+                        list_concat_pushdown_replacer("?members"),
                         "?member_pushdown_table_name",
                         "?target_table_name",
                     ),
@@ -460,6 +465,18 @@ impl RewriteRules for MemberRules {
             ),
         ];
 
+        rules.extend(self.member_pushdown_rules());
+        rules
+    }
+}
+
+impl MemberRules {
+    pub fn new(cube_context: Arc<CubeContext>) -> Self {
+        Self { cube_context }
+    }
+
+    fn member_pushdown_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        let mut rules = Vec::new();
         let member_replacer_fn = |members| {
             member_pushdown_replacer(members, "?old_members", "?table_name", "?target_table_name")
         };
@@ -502,22 +519,21 @@ impl RewriteRules for MemberRules {
                 ),
                 member_pushdown_replacer(
                     column_expr.clone(),
-                    cube_scan_members("?left_old_members", "?right_old_members"),
+                    list_concat_pushup_replacer("?old_members"),
                     "?table_name",
                     "?target_table_name",
                 ),
                 member_pushdown_replacer(
                     column_expr,
-                    "?old_members",
+                    "?terminal_member",
                     "?table_name",
                     "?target_table_name",
                 ),
                 self.find_matching_old_member(
                     "?column",
-                    "?left_old_members",
-                    "?right_old_members",
-                    "?table_name",
                     "?old_members",
+                    "?table_name",
+                    "?terminal_member",
                 ),
             )
         };
@@ -582,13 +598,97 @@ impl RewriteRules for MemberRules {
         rules.extend(member_column_pushdown("time-dimension", |column| {
             time_dimension_expr("?name", "?granularity", "?date_range", column)
         }));
+
+        fn list_concat_terminal(
+            name: &str,
+            member_fn: String,
+        ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+            rewrite(
+                &format!("list-concat-terminal-{}", name),
+                list_concat_pushdown_replacer(member_fn.to_string()),
+                list_concat_pushup_replacer(member_fn),
+            )
+        }
+
+        // List concat replacer -- concats CubeScanMembers into big single node to provide
+        // O(n*2) CubeScanMembers complexity instead of O(n^2) for old member search
+        // TODO check why overall graph size is increased most of the times
+        rules.extend(replacer_push_down_node(
+            "list-concat-replacer",
+            "CubeScanMembers",
+            list_concat_pushdown_replacer,
+            false,
+        ));
+        rules.push(list_concat_terminal(
+            "measure",
+            measure_expr("?name", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "dimension",
+            dimension_expr("?name", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "segment",
+            segment_expr("?name", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "time-dimension",
+            time_dimension_expr("?name", "?granularity", "?date_range", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "empty-tail",
+            cube_scan_members_empty_tail(),
+        ));
+        rules.push(transforming_rewrite(
+            "list-concat-replacer-merge",
+            cube_scan_members(
+                list_concat_pushup_replacer("?left"),
+                list_concat_pushup_replacer("?right"),
+            ),
+            list_concat_pushup_replacer("?concat_output"),
+            self.concat_cube_scan_members("?left", "?right", "?concat_output"),
+        ));
+
         rules
     }
-}
 
-impl MemberRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
-        Self { cube_context }
+    fn concat_cube_scan_members(
+        &self,
+        left_var: &'static str,
+        right_var: &'static str,
+        concat_output_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let left_var = var!(left_var);
+        let right_var = var!(right_var);
+        let concat_output_var = var!(concat_output_var);
+        move |egraph, subst| {
+            let left_list = var_list_iter!(egraph[subst[left_var]], CubeScanMembers)
+                .cloned()
+                .collect::<Vec<_>>();
+            let left_list = if left_list.is_empty() {
+                vec![vec![subst[left_var]]]
+            } else {
+                left_list
+            };
+            for left in left_list {
+                let right_list = var_list_iter!(egraph[subst[right_var]], CubeScanMembers)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let right_list = if right_list.is_empty() {
+                    vec![vec![subst[right_var]]]
+                } else {
+                    right_list
+                };
+                for right in right_list {
+                    let output = egraph.add(LogicalPlanLanguage::CubeScanMembers(
+                        left.into_iter().chain(right.into_iter()).collect(),
+                    ));
+                    subst.insert(concat_output_var, output);
+                    return true;
+                }
+            }
+            false
+        }
     }
 
     fn transform_table_scan(
@@ -1204,16 +1304,14 @@ impl MemberRules {
     fn find_matching_old_member(
         &self,
         column_var: &'static str,
-        left_old_members_var: &'static str,
-        right_old_members_var: &'static str,
-        table_name_var: &'static str,
         old_members_var: &'static str,
+        table_name_var: &'static str,
+        terminal_member: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let column_var = var!(column_var);
-        let left_old_members_var = var!(left_old_members_var);
-        let right_old_members_var = var!(right_old_members_var);
-        let table_name_var = var!(table_name_var);
         let old_members_var = var!(old_members_var);
+        let table_name_var = var!(table_name_var);
+        let terminal_member = var!(terminal_member);
         move |egraph, subst| {
             for table_name in var_iter!(
                 egraph[subst[table_name_var]],
@@ -1227,33 +1325,26 @@ impl MemberRules {
                         expr_column_name(Expr::Column(alias_column), &Some(table_name.to_string()));
 
                     if let Some(left_member_name_to_expr) = egraph
-                        .index(subst[left_old_members_var])
+                        .index(subst[old_members_var])
                         .data
                         .member_name_to_expr
                         .clone()
                     {
-                        let column_name_to_member = column_name_to_member_name(
+                        let column_name_to_member = column_name_to_member_vec(
                             left_member_name_to_expr,
                             table_name.to_string(),
                         );
-                        if let Some(_) = column_name_to_member.get(&alias_name) {
-                            subst.insert(old_members_var, subst[left_old_members_var]);
-                            return true;
-                        }
-                    }
+                        if let Some((index, _)) = column_name_to_member
+                            .iter()
+                            .find_position(|(member_alias, _)| member_alias == &alias_name)
+                        {
+                            for old_members in
+                                var_list_iter!(egraph[subst[old_members_var]], CubeScanMembers)
+                                    .cloned()
+                            {
+                                subst.insert(terminal_member, old_members[index]);
+                            }
 
-                    if let Some(right_member_name_to_expr) = egraph
-                        .index(subst[right_old_members_var])
-                        .data
-                        .member_name_to_expr
-                        .clone()
-                    {
-                        let column_name_to_member = column_name_to_member_name(
-                            right_member_name_to_expr,
-                            table_name.to_string(),
-                        );
-                        if let Some(_) = column_name_to_member.get(&alias_name) {
-                            subst.insert(old_members_var, subst[right_old_members_var]);
                             return true;
                         }
                     }

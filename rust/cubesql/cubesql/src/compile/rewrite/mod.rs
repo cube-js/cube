@@ -267,6 +267,12 @@ crate::plan_to_language! {
             table_name: String,
             target_table_name: String,
         },
+        ListConcatPushdownReplacer {
+            members: Arc<LogicalPlan>,
+        },
+        ListConcatPushupReplacer {
+            members: Arc<LogicalPlan>,
+        },
         TimeDimensionDateRangeReplacer {
             members: Vec<LogicalPlan>,
             member: String,
@@ -314,6 +320,16 @@ macro_rules! var_iter {
 }
 
 #[macro_export]
+macro_rules! var_list_iter {
+    ($eclass:expr, $field_variant:ident) => {{
+        $eclass.nodes.iter().filter_map(|node| match node {
+            LogicalPlanLanguage::$field_variant(v) => Some(v),
+            _ => None,
+        })
+    }};
+}
+
+#[macro_export]
 macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
@@ -338,11 +354,20 @@ fn column_name_to_member_name(
     member_name_to_expr: Vec<(String, Expr)>,
     table_name: String,
 ) -> HashMap<String, String> {
+    column_name_to_member_vec(member_name_to_expr, table_name)
+        .into_iter()
+        .collect::<HashMap<_, _>>()
+}
+
+fn column_name_to_member_vec(
+    member_name_to_expr: Vec<(String, Expr)>,
+    table_name: String,
+) -> Vec<(String, String)> {
     let mut relation = WithColumnRelation(table_name);
     member_name_to_expr
         .into_iter()
         .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
-        .collect::<HashMap<_, _>>()
+        .collect::<Vec<_>>()
 }
 
 fn member_name_by_alias(
@@ -666,6 +691,14 @@ fn member_pushdown_replacer(
         "(MemberPushdownReplacer {} {} {} {})",
         members, old_members, table_name, target_table_name
     )
+}
+
+fn list_concat_pushdown_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushdownReplacer {})", members)
+}
+
+fn list_concat_pushup_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushupReplacer {})", members)
 }
 
 fn time_dimension_date_range_replacer(

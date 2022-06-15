@@ -16,9 +16,9 @@ use crate::{
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
-use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner};
+use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use itertools::Itertools;
-use std::{env, ffi::OsStr, fs, io::Write, sync::Arc};
+use std::{env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
 
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -252,8 +252,22 @@ impl Rewriter {
             self.cube_context.clone(),
             Arc::new(DefaultPhysicalPlanner::default()),
         ))
-        .with_iter_limit(300)
-        .with_node_limit(10000)
+        // TODO move config to injector
+        .with_iter_limit(
+            env::var("CUBESQL_REWRITE_MAX_ITERATIONS")
+                .map(|v| v.parse::<usize>().unwrap())
+                .unwrap_or(300),
+        )
+        .with_node_limit(
+            env::var("CUBESQL_REWRITE_MAX_NODES")
+                .map(|v| v.parse::<usize>().unwrap())
+                .unwrap_or(10000),
+        )
+        .with_time_limit(Duration::from_secs(
+            env::var("CUBESQL_REWRITE_TIMEOUT")
+                .map(|v| v.parse::<u64>().unwrap())
+                .unwrap_or(15),
+        ))
         .with_egraph(self.graph.clone())
     }
 
@@ -266,6 +280,25 @@ impl Rewriter {
         let rules = self.rewrite_rules();
         let runner = runner.run(rules.iter());
         log::debug!("Iterations: {:?}", runner.iterations);
+        let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
+        let stop_reason = match stop_reason {
+            None => Some("timeout reached".to_string()),
+            Some(StopReason::Saturated) => None,
+            Some(StopReason::NodeLimit(limit)) => Some(format!("{} AST node limit reached", limit)),
+            Some(StopReason::IterationLimit(limit)) => {
+                Some(format!("{} iteration limit reached", limit))
+            }
+            Some(StopReason::Other(other)) => Some(other.to_string()),
+            Some(StopReason::TimeLimit(seconds)) => {
+                Some(format!("{} seconds timeout reached", seconds))
+            }
+        };
+        if let Some(stop_reason) = stop_reason {
+            return Err(CubeError::user(format!(
+                "Can't find rewrite due to {}",
+                stop_reason
+            )));
+        }
         if IterInfo::egraph_debug_enabled() {
             let _ = fs::remove_dir_all("egraph-debug");
             let _ = fs::create_dir_all("egraph-debug");
