@@ -17,6 +17,7 @@ use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use chrono::Utc;
 use datafusion::cube_ext;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -115,6 +116,21 @@ impl CompactionService for CompactionServiceImpl {
         let mut size = 0;
         let chunks = all_pending_chunks
             .iter()
+            .filter(|c| {
+                !c.get_row().in_memory()
+                    || c.get_row().get_row_count()
+                        > self.config.compaction_in_memory_chunks_size_limit()
+                    || c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                > self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(false)
+            })
             .take_while(|c| {
                 if size == 0 {
                     size += c.get_row().get_row_count();
@@ -126,6 +142,11 @@ impl CompactionService for CompactionServiceImpl {
             })
             .map(|c| c.clone())
             .collect::<Vec<_>>();
+
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
         let partition_id = partition.get_id();
         let chunks_row_count = chunks
             .iter()
@@ -416,6 +437,8 @@ impl CompactionService for CompactionServiceImpl {
         let compaction_in_memory_chunks_size_limit =
             self.config.compaction_in_memory_chunks_size_limit();
 
+        let mut size = 0;
+        let mut count = 0;
         // Get all in_memory and active chunks
         let chunks = self
             .meta_store
@@ -425,10 +448,33 @@ impl CompactionService for CompactionServiceImpl {
             .filter(|c| {
                 c.get_row().in_memory()
                     && c.get_row().active()
-                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
+                    && c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
+                    && c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                <= self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(true)
+            })
+            .take_while(|c| {
+                if count < 2 {
+                    size += c.get_row().get_row_count();
+                    count += 1;
+                    true
+                } else {
+                    size += c.get_row().get_row_count();
+                    count += 1;
+                    size <= self.config.compaction_in_memory_chunks_total_size_limit()
+                }
             })
             .collect::<Vec<_>>();
-
+        if count < 2 {
+            return Ok(()); //We don't need to compact single chunk
+        }
         // Prepare merge params
         let unique_key = table.get_row().unique_key_columns();
         let num_columns = index.get_row().columns().len();

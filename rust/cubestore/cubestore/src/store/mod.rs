@@ -805,10 +805,6 @@ impl ChunkStore {
                     .add_memory_chunk(&node_name, chunk.get_id(), batch)
                     .await?;
 
-                cluster
-                    .schedule_compaction_in_memory_chunks_if_needed(&node_name, partition.get_id())
-                    .await?;
-
                 Ok((chunk, None))
             }))
         } else {

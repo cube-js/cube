@@ -148,12 +148,6 @@ pub trait Cluster: DIService + Send + Sync {
     async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage;
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError>;
-
-    async fn schedule_compaction_in_memory_chunks_if_needed(
-        &self,
-        node_name: &str,
-        partition_id: u64,
-    ) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockCluster, [Cluster]);
@@ -596,55 +590,6 @@ impl Cluster for ClusterImpl {
                 self.notify_job_runner(node).await?;
             }
         }
-        Ok(())
-    }
-
-    async fn schedule_compaction_in_memory_chunks_if_needed(
-        &self,
-        node_name: &str,
-        partition_id: u64,
-    ) -> Result<(), CubeError> {
-        let compaction_in_memory_chunks_count_threshold =
-            self.config().compaction_in_memory_chunks_count_threshold();
-        let compaction_in_memory_chunks_size_limit =
-            self.config().compaction_in_memory_chunks_size_limit();
-        // Use total size limit to prevent heavy in-memory operation (out of memory)
-        let compaction_in_memory_chunks_total_size_limit =
-            self.config().compaction_in_memory_chunks_total_size_limit();
-
-        let chunks = self
-            .meta_store
-            .get_chunks_by_partition(partition_id, false)
-            .await?
-            .into_iter()
-            .filter(|c| {
-                c.get_row().in_memory()
-                    && c.get_row().active()
-                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
-            })
-            .collect::<Vec<_>>();
-
-        let chunks_total_size = chunks
-            .iter()
-            .map(|c| c.get_row().get_row_count())
-            .sum::<u64>();
-
-        if chunks.len() > compaction_in_memory_chunks_count_threshold
-            && chunks_total_size < compaction_in_memory_chunks_total_size_limit
-        {
-            let job = self
-                .meta_store
-                .add_job(Job::new(
-                    RowKey::Table(TableId::Partitions, partition_id),
-                    JobType::InMemoryChunksCompaction,
-                    node_name.to_string(),
-                ))
-                .await?;
-            if job.is_some() {
-                self.notify_job_runner(node_name.to_string()).await?;
-            }
-        }
-
         Ok(())
     }
 }
