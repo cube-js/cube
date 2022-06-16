@@ -135,26 +135,16 @@ export class JDBCDriver extends BaseDriver {
    */
   async testConnection() {
     let err;
-    let isValid;
     let connection;
-    let valid = false;
     try {
       connection = await this.pool._factory.create();
     } catch (e) {
       err = e.message;
     }
-    if (!err) {
-      try {
-        isValid = promisify(connection.isValid.bind(connection));
-        valid = await isValid(this.testConnectionTimeout() / 1000);
-      } catch (e) {
-        err = e.message;
-      } finally {
-        await this.pool._factory.destroy(connection);
-      }
-    }
-    if (!valid) {
-      throw new Error(`Invalid connection${err ? `:\n${err}` : ''}`);
+    if (err) {
+      throw new Error(err);
+    } else {
+      await this.pool._factory.destroy(connection);
     }
   }
 
