@@ -150,6 +150,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asEnum(supported),
   dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
     .asString(),
+  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
+    .asString(),
   // Export bucket options for AWS S3
   dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
     .asString(),

@@ -133,8 +133,13 @@ export class JDBCDriver extends BaseDriver {
    * @public
    * @return {Promise<*>}
    */
-  testConnection() {
-    return this.withConnection((conn) => conn);
+  async testConnection() {
+    this.withConnection(async (connection) => {
+      const createStatement = promisify(connection.createStatement.bind(connection));
+      const statement = await createStatement();
+      const cancel = promisify(statement.cancel.bind(statement));
+      await cancel();
+    });
   }
 
   /**
