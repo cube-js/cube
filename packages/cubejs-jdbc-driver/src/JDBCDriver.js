@@ -134,12 +134,8 @@ export class JDBCDriver extends BaseDriver {
    * @return {Promise<*>}
    */
   async testConnection() {
-    this.withConnection(async (connection) => {
-      const createStatement = promisify(connection.createStatement.bind(connection));
-      const statement = await createStatement();
-      const cancel = promisify(statement.cancel.bind(statement));
-      await cancel();
-    });
+    const connection = await this.pool._factory.create();
+    await this.pool._factory.destroy(connection);
   }
 
   /**
