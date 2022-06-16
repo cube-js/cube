@@ -5652,7 +5652,7 @@ mod tests {
             meta_store
                 .swap_chunks(source_ids.clone(), vec![(dest_chunk2.get_id(), Some(26))])
                 .await
-                .expect_err("Source chunk 1 is not active then swapping of (1, 2) to (3) chunks");
+                .expect_err("Source chunk 1 is not active when swapping of (1, 2) to (3) chunks");
 
             //============= trying to use already active chunk as destination of swap ==============
             let mut source_ids: Vec<u64> = Vec::new();
@@ -5674,7 +5674,7 @@ mod tests {
                 .swap_chunks(source_ids.clone(), vec![(dest_chunk.get_id(), Some(26))])
                 .await
                 .expect_err(
-                    "Destination chunk 3 is already active then swapping of (5, 6) to (3) chunks",
+                    "Destination chunk 3 is already active when swapping of (5, 6) to (3) chunks",
                 );
 
             for id in source_ids.iter() {
@@ -5932,7 +5932,7 @@ impl RocksMetaStore {
             let chunk = chunks.get_row_or_not_found(*id)?;
             if !chunk.get_row().active() {
                 return Err(CubeError::internal(format!(
-                    "Source chunk {} is not active then swapping of ({}) to ({}) chunks",
+                    "Source chunk {} is not active when swapping of ({}) to ({}) chunks",
                     id,
                     deactivate_ids.iter().join(", "),
                     uploaded_ids_and_sizes.iter().map(|(id, _)| id).join(", ")
@@ -5948,7 +5948,7 @@ impl RocksMetaStore {
             let chunk = chunks.get_row_or_not_found(*id)?;
             if chunk.get_row().active() {
                 return Err(CubeError::internal(format!(
-                    "Destination chunk {} is already active then swapiping of ({}) to ({}) chunks",
+                    "Destination chunk {} is already active when swapiping of ({}) to ({}) chunks",
                     id,
                     deactivate_ids.iter().join(", "),
                     uploaded_ids_and_sizes.iter().map(|(id, _)| id).join(", ")
