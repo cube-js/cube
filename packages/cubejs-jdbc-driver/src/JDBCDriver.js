@@ -133,8 +133,19 @@ export class JDBCDriver extends BaseDriver {
    * @public
    * @return {Promise<*>}
    */
-  testConnection() {
-    return this.withConnection((conn) => conn);
+  async testConnection() {
+    let err;
+    let connection;
+    try {
+      connection = await this.pool._factory.create();
+    } catch (e) {
+      err = e.message;
+    }
+    if (err) {
+      throw new Error(err);
+    } else {
+      await this.pool._factory.destroy(connection);
+    }
   }
 
   /**

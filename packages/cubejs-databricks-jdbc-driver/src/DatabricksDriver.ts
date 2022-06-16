@@ -111,7 +111,7 @@ export class DatabricksDriver extends JDBCDriver {
         conf?.bucketType ||
         getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
       exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
-      exportBucketMountDir: conf?.exportBucketMountDir || process.env.CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR,
+      exportBucketMountDir: conf?.exportBucketMountDir || getEnv('dbExportBucketMountDir'),
       pollInterval: (
         conf?.pollInterval || getEnv('dbPollMaxInterval')
       ) * 1000,
@@ -319,6 +319,10 @@ export class DatabricksDriver extends JDBCDriver {
         }/${blob.name}?${sas}`);
       }
     }
+    if (csvFile.length === 0) {
+      throw new Error('No CSV files were exported to the specified bucket. ' +
+        'Please check your export bucket configuration.');
+    }
     return csvFile;
   }
 
@@ -367,6 +371,10 @@ export class DatabricksDriver extends JDBCDriver {
           return getSignedUrl(client, command, { expiresIn: 3600 });
         })
     );
+    if (csvFile.length === 0) {
+      throw new Error('No CSV files were exported to the specified bucket. ' +
+        'Please check your export bucket configuration.');
+    }
     return csvFile;
   }
 
