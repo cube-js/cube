@@ -2874,7 +2874,6 @@ impl RocksMetaStore {
 
         let aggregate_columns = table_id.get_row().aggregate_columns();
         if aggregate_columns.is_empty() {
-            //TODO check that index column is not in aggregate columns
             return Err(CubeError::user(format!(
                     "Can't create aggregate index for table '{}' because aggregate columns (`AGGREGATIONS`) not specified for the table",
                     table_id.get_row().get_table_name()
@@ -2893,23 +2892,10 @@ impl RocksMetaStore {
                 )));
         }
         let unique_key_columns = table_id.get_row().unique_key_columns();
-        if let Some(unique_key) = &unique_key_columns {
-            if let Some(not_found) = index_def
-                .columns
-                .iter()
-                .find(|dc| unique_key.iter().all(|c| c.name.as_str() != dc.as_str()))
-            {
-                return Err(CubeError::user(format!(
-                    "Column '{}' in aggregate index '{}' is out of unique key {:?} for table '{}'. Index columns outside of unique key are not supported.",
-                    not_found,
-                    index_def.name,
-                    unique_key
-                        .iter()
-                        .map(|c| c.name.to_string())
-                        .collect::<Vec<String>>(),
-                    table_id.get_row().get_table_name()
-                )));
-            }
+        if unique_key_columns.is_some() {
+            return Err(CubeError::user(format!(
+                    "Can't create aggregate index for table '{}' because aggregate index for the table with unique key is not supported yet",
+                    table_id.get_row().get_table_name())));
         }
 
         // First put the columns from the sort key.
@@ -5664,7 +5650,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
-                    Some(vec!["col2".to_string(), "col1".to_string()]),
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
