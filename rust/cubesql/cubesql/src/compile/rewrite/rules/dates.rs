@@ -259,6 +259,21 @@ impl RewriteRules for DateRules {
                     vec![literal_string("week"), column_expr("?column")],
                 ),
             ),
+            rewrite(
+                "metabase-interval-date-range",
+                binary_expr(
+                    cast_expr(fun_expr("Now", Vec::<String>::new()), "?data_type"),
+                    "+",
+                    literal_expr("?interval"),
+                ),
+                udf_expr(
+                    "date_add",
+                    vec![
+                        udf_expr("now_evaluated", Vec::<String>::new()),
+                        literal_expr("?interval"),
+                    ],
+                ),
+            ),
         ]
     }
 }

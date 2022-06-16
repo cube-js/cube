@@ -1043,6 +1043,21 @@ pub fn create_current_timestamp_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_now_evaluated_udf() -> ScalarUDF {
+    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
+        Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "now_evaluated",
+        &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 macro_rules! parse_timestamp_arr {
     ($ARR:expr, $ARR_TYPE: ident, $FN_NAME: ident) => {{
         let arr = $ARR.as_any().downcast_ref::<$ARR_TYPE>();
