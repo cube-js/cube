@@ -573,6 +573,8 @@ pub struct Chunk {
     #[serde(default)]
     created_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    oldest_insert_at: Option<DateTime<Utc>>,
+    #[serde(default)]
     suffix: Option<String>,
     #[serde(default)]
     file_size: Option<u64>
@@ -4864,11 +4866,19 @@ fn swap_active_partitions_impl(
         deactivated_row_count += current_partition.get_row().main_table_row_count();
 
         for chunk in chunks.iter() {
-            deactivated_row_count += chunk_table
-                .get_row_or_not_found(chunk.id)?
-                .get_row()
-                .get_row_count();
-            chunk_table.update_with_fn(chunk.id, |row| row.deactivate(), batch_pipe)?;
+            let current_chunk = chunk_table.get_row_or_not_found(chunk.get_id())?;
+            if !current_chunk.get_row().active() {
+                return Err(CubeError::internal(format!(
+                    "Current chunk is not active: {:?}",
+                    chunk.get_row()
+                )));
+            }
+            deactivated_row_count += current_chunk.get_row().get_row_count();
+            chunk_table.update_with_fn(
+                current_chunk.get_id(),
+                |row| row.deactivate(),
+                batch_pipe,
+            )?;
         }
     }
 
@@ -5561,6 +5571,345 @@ mod tests {
             fs::remove_dir_all(config.remote_dir()).unwrap();
         }
     }
+
+    #[tokio::test]
+    async fn swap_chunks() {
+        let config = Config::test("swap_chunks");
+        let store_path = env::current_dir().unwrap().join("swap_chunks_test-local");
+        let remote_store_path = env::current_dir().unwrap().join("swap_chunks_test-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+            meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+            let partition = meta_store.get_partition(1).await.unwrap();
+
+            //============= trying to swap same source chunks twice ==============
+
+            let mut source_ids: Vec<u64> = Vec::new();
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 10, true)
+                .await
+                .unwrap();
+            source_ids.push(ch.get_id());
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            source_ids.push(ch.get_id());
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+
+            let dest_chunk = meta_store
+                .create_chunk(partition.get_id(), 26, true)
+                .await
+                .unwrap();
+            assert_eq!(dest_chunk.get_row().active(), false);
+
+            let dest_chunk2 = meta_store
+                .create_chunk(partition.get_id(), 26, true)
+                .await
+                .unwrap();
+            assert_eq!(dest_chunk2.get_row().active(), false);
+
+            meta_store
+                .swap_chunks(source_ids.clone(), vec![(dest_chunk.get_id(), Some(26))])
+                .await
+                .unwrap();
+
+            for id in source_ids.iter() {
+                let ch = meta_store.get_chunk(id.to_owned()).await.unwrap();
+                assert_eq!(ch.get_row().active(), false);
+            }
+
+            let ch = meta_store.get_chunk(dest_chunk.get_id()).await.unwrap();
+            assert_eq!(ch.get_row().active(), true);
+
+            meta_store
+                .swap_chunks(source_ids.clone(), vec![(dest_chunk2.get_id(), Some(26))])
+                .await
+                .expect_err("Source chunk 1 is not active when swapping of (1, 2) to (3) chunks");
+
+            //============= trying to use already active chunk as destination of swap ==============
+            let mut source_ids: Vec<u64> = Vec::new();
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 10, true)
+                .await
+                .unwrap();
+            source_ids.push(ch.get_id());
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            source_ids.push(ch.get_id());
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+
+            meta_store
+                .swap_chunks(source_ids.clone(), vec![(dest_chunk.get_id(), Some(26))])
+                .await
+                .expect_err(
+                    "Destination chunk 3 is already active when swapping of (5, 6) to (3) chunks",
+                );
+
+            for id in source_ids.iter() {
+                let ch = meta_store.get_chunk(id.to_owned()).await.unwrap();
+                assert_eq!(ch.get_row().active(), true);
+            }
+        }
+
+        assert!(true);
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn swap_active_partitions() {
+        let config = Config::test("swap_active_partitions");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("swap_active_partitions_test-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("swap_active_partitions_test-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+            meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+            let partition = meta_store.get_partition(1).await.unwrap();
+
+            let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 10, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let dest_partition = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+
+            meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), source_chunks.clone())],
+                    vec![(dest_partition.clone(), 10)],
+                    vec![(26, (None, None))],
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                meta_store
+                    .get_partition(1)
+                    .await
+                    .unwrap()
+                    .get_row()
+                    .is_active(),
+                false
+            );
+            assert_eq!(
+                meta_store
+                    .get_partition(dest_partition.get_id())
+                    .await
+                    .unwrap()
+                    .get_row()
+                    .is_active(),
+                true
+            );
+            for c in source_chunks.iter() {
+                assert_eq!(
+                    meta_store
+                        .get_chunk(c.get_id())
+                        .await
+                        .unwrap()
+                        .get_row()
+                        .active(),
+                    false
+                );
+            }
+
+            //==================  Source partition is not active ===============
+
+            let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
+            let ch = meta_store
+                .create_chunk(partition.clone().get_id(), 10, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let dest_partition = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+
+            match meta_store
+                .swap_active_partitions(
+                    vec![(partition, source_chunks.clone())],
+                    vec![(dest_partition.clone(), 10)],
+                    vec![(26, (None, None))],
+                )
+                .await
+            {
+                Ok(_) => assert!(false),
+                Err(CubeError { message, .. }) => {
+                    assert!(message.starts_with("Current partition is not active"))
+                }
+            };
+
+            //==================  Source chunks is not active ===============
+
+            let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
+
+            let partition = meta_store
+                .get_active_partitions_by_index_id(1)
+                .await
+                .unwrap()
+                .first()
+                .unwrap()
+                .to_owned();
+            let ch = meta_store
+                .create_chunk(partition.clone().get_id(), 10, true)
+                .await
+                .unwrap();
+            source_chunks.push(ch);
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            source_chunks.push(ch);
+
+            let dest_partition = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+
+            let dest_row_count = partition.get_row().main_table_row_count() + 26;
+
+            match meta_store
+                .swap_active_partitions(
+                    vec![(partition, source_chunks.clone())],
+                    vec![(dest_partition.clone(), 10)],
+                    vec![(dest_row_count, (None, None))],
+                )
+                .await
+            {
+                Ok(_) => assert!(false),
+                Err(CubeError { message, .. }) => {
+                    assert!(message.starts_with("Current chunk is not active"))
+                }
+            };
+
+            //===================== Destination partition is active ================
+            let mut source_chunks: Vec<IdRow<Chunk>> = Vec::new();
+
+            let partition = meta_store
+                .get_active_partitions_by_index_id(1)
+                .await
+                .unwrap()
+                .first()
+                .unwrap()
+                .to_owned();
+            let ch = meta_store
+                .create_chunk(partition.clone().get_id(), 10, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let ch = meta_store
+                .create_chunk(partition.get_id(), 16, true)
+                .await
+                .unwrap();
+            meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
+            source_chunks.push(ch);
+
+            let dest_row_count = partition.get_row().main_table_row_count() + 26;
+
+            match meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), source_chunks.clone())],
+                    vec![(partition.clone(), 10)],
+                    vec![(dest_row_count, (None, None))],
+                )
+                .await
+            {
+                Ok(_) => assert!(false),
+                Err(CubeError { message, .. }) => {
+                    assert!(message.starts_with("New partition is already active"))
+                }
+            };
+        }
+
+        assert!(true);
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
 }
 
 impl RocksMetaStore {
@@ -5581,6 +5930,14 @@ impl RocksMetaStore {
         let mut activated_row_count = 0;
         for id in deactivate_ids.iter() {
             let chunk = chunks.get_row_or_not_found(*id)?;
+            if !chunk.get_row().active() {
+                return Err(CubeError::internal(format!(
+                    "Source chunk {} is not active when swapping of ({}) to ({}) chunks",
+                    id,
+                    deactivate_ids.iter().join(", "),
+                    uploaded_ids_and_sizes.iter().map(|(id, _)| id).join(", ")
+                )));
+            }
             deactivated_row_count += chunk.row.row_count;
             *partition_to_row_diffs
                 .entry(chunk.row.partition_id)
@@ -5589,6 +5946,14 @@ impl RocksMetaStore {
         }
         for (id, file_size) in uploaded_ids_and_sizes.iter() {
             let chunk = chunks.get_row_or_not_found(*id)?;
+            if chunk.get_row().active() {
+                return Err(CubeError::internal(format!(
+                    "Destination chunk {} is already active when swapiping of ({}) to ({}) chunks",
+                    id,
+                    deactivate_ids.iter().join(", "),
+                    uploaded_ids_and_sizes.iter().map(|(id, _)| id).join(", ")
+                )));
+            }
             activated_row_count += chunk.row.row_count;
             *partition_to_row_diffs
                 .entry(chunk.row.partition_id)
