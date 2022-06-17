@@ -33,6 +33,10 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
+lazy_static! {
+    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s'(?P<nspname>[^']+)'.*\),\s+tbl\sas\s\(.*relname\s=\s'(?P<relname>[^']+)'.*\).*$"#).unwrap();
+}
+
 pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
@@ -125,6 +129,36 @@ pub fn parse_sql_to_statements(
 
     let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
     let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
+
+    // Sigma Computing WITH query workaround
+    let query = match SIGMA_WORKAROUND.captures(&query) {
+        Some(c) => {
+            let nspname = c.name("nspname").unwrap().as_str();
+            let relname = c.name("relname").unwrap().as_str();
+            format!(
+                "
+                select
+                    attname,
+                    typname,
+                    description
+                from pg_attribute a
+                join pg_type on atttypid = pg_type.oid
+                left join pg_description on
+                    attrelid = objoid and
+                    attnum = objsubid
+                join pg_catalog.pg_namespace nsp ON nspname = '{}'
+                join pg_catalog.pg_class tbl ON relname = '{}' and relnamespace = nsp.oid
+                where
+                    attnum > 0 and
+                    attrelid = tbl.oid
+                order by attnum
+                ;
+                ",
+                nspname, relname
+            )
+        }
+        None => query,
+    };
 
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
