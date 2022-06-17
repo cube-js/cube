@@ -24,9 +24,9 @@ function EventBanner () {
             className={styles.banner__link}
             href={setUTM(
               link,
-              'cube.dev',
-              campaign === null ? undefined : campaign)
-            }
+              'docs',
+              campaign === null ? undefined : campaign
+            )}
             target="_blank"
             rel="noreferrer"
           >{message}</a>
