@@ -13,9 +13,9 @@ import {
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
-import type { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 import type { Constructor, Required } from '@cubejs-backend/shared';
 
+import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -418,18 +418,23 @@ export class CubejsServerCore {
       dbType: <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE,
       externalDbType,
       devServer,
-      driverFactory: (ctx: DriverContext, opt: DriverOptions) => {
-        const dbType = this.contextToDbType(ctx);
-        if (typeof dbType === 'string') {
-          return CubejsServerCore.createDriver(dbType, opt);
+      driverFactory: (ctx: DriverContext) => {
+        const type = this.contextToDbType(ctx);
+        if (typeof type === 'string') {
+          return {
+            type: this.contextToDbType(ctx),
+            options: {},
+          };
         }
-
         throw new Error(
-          `Unexpected return type, dbType must return string (dataSource: "${ctx.dataSource}"), actual: ${getRealType(dbType)}`
+          `Unexpected return type, dbType must return string (dataSource: "${
+            ctx.dataSource}"), actual: ${getRealType(type)}`
         );
       },
-      dialectFactory: (ctx) => CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
-        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass(),
+      dialectFactory: (ctx) => (
+        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass &&
+        CubejsServerCore.lookupDriverClass(ctx.dbType).dialectClass()
+      ),
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
@@ -734,6 +739,63 @@ export class CubejsServerCore {
     );
   }
 
+  /**
+   * Calculate and returns driver's max pool number.
+   */
+  private getDriverMaxPool(
+    context: DriverContext,
+    options?: OrchestratorOptions,
+  ): undefined | number {
+    if (!options) {
+      return undefined;
+    } else {
+      const queryQueueOptions = (
+        options.queryCacheOptions.queueOptions as ((dataSource: String) => {
+          concurrency: number,
+        })
+      )(context.dataSource);
+  
+      const preAggregationsQueueOptions = (
+        options.preAggregationsOptions.queueOptions as ((dataSource: String) => {
+          concurrency: number,
+        })
+      )(context.dataSource);
+  
+      return 2 * (
+        queryQueueOptions.concurrency +
+        preAggregationsQueueOptions.concurrency
+      );
+    }
+  }
+
+  /**
+   * Resolve driver to the data source.
+   */
+  private async resolveDriver(
+    context: DriverContext,
+    options?: OrchestratorOptions,
+  ): Promise<BaseDriver> {
+    const val = await this.options.driverFactory(context);
+    if (val instanceof BaseDriver) {
+      return val;
+    } else {
+      const type = this.contextToDbType(context);
+      // TODO (buntarb): Disintegrity point - there is no way to determine
+      // overriden type from the default.
+      if (type === process.env.CUBEJS_DB_TYPE) {
+        return CubejsServerCore.createDriver(val.type, {
+          poolSize: this.getDriverMaxPool(context, options),
+          ...val.options
+        });
+      } else {
+        return CubejsServerCore.createDriver(type, {
+          poolSize: this.getDriverMaxPool(context, options),
+          ...val.options
+        });
+      }
+    }
+  }
+
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {
     const orchestratorId = this.contextToOrchestratorId(context);
 
@@ -741,10 +803,17 @@ export class CubejsServerCore {
       return this.orchestratorStorage.get(orchestratorId);
     }
 
+    /**
+     * Hash table to store promises which will be resolved with the
+     * datasource drivers. DriverFactoryByDataSource function is closure
+     * this constant.
+     */
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
+
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const externalDbType = this.contextToExternalDbType(context);
+
     // orchestrator options can be empty, if user didnt define it
     const orchestratorOptions = this.orchestratorOptions(context) || {};
 
@@ -760,10 +829,10 @@ export class CubejsServerCore {
     const externalRefresh: boolean = rollupOnlyMode && !this.options.scheduledRefreshTimer;
 
     const orchestratorApi = this.createOrchestratorApi(
-      async (
-        dataSource = 'default',
-        options: DriverOptions,
-      ) => {
+      /**
+       * Driver factory function `DriverFactoryByDataSource`.
+       */
+      async (dataSource = 'default') => {
         if (driverPromise[dataSource]) {
           return driverPromise[dataSource];
         }
@@ -773,7 +842,13 @@ export class CubejsServerCore {
           let driver: BaseDriver | null = null;
 
           try {
-            driver = await this.options.driverFactory({ ...context, dataSource }, options);
+            driver = await this.resolveDriver(
+              {
+                ...context,
+                dataSource,
+              },
+              orchestratorOptions,
+            );
 
             if (typeof driver === 'object' && driver != null) {
               if (driver.setLogger) {
@@ -957,17 +1032,28 @@ export class CubejsServerCore {
     return result;
   }
 
-  public async getDriver(ctx: DriverContext, opt: DriverOptions): Promise<BaseDriver> {
+  /**
+   * Returns driver instance by a given context
+   */
+  public async getDriver(
+    context: DriverContext,
+    options?: OrchestratorOptions,
+  ): Promise<BaseDriver> {
     if (!this.driver) {
-      const driver = await this.options.driverFactory(ctx, opt);
+      const driver = await this.resolveDriver(context, options);
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
-
     return this.driver;
   }
 
-  public static createDriver(type: DatabaseType, options: DriverOptions): BaseDriver {
+  /**
+   * Create new driver instance by specified database type.
+   */
+  public static createDriver(
+    type: DatabaseType,
+    options?: DriverOptions,
+  ): BaseDriver {
     return new (CubejsServerCore.lookupDriverClass(type))(options);
   }
 

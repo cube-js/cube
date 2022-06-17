@@ -166,7 +166,7 @@ export class OrchestratorApi {
 
   public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource, { poolSize: 1 }); // TODO (buntarb): check this point!
+      const driver = await driverFn(dataSource);
       await driver.testConnection();
     }
   }
@@ -181,7 +181,7 @@ export class OrchestratorApi {
 
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
-      const driver = await driverFn(dataSource, { poolSize: 1 }); // TODO (buntarb): check this point!
+      const driver = await driverFn(dataSource);
       if (driver.release) {
         await driver.release();
       }

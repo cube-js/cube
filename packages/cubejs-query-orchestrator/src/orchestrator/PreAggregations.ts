@@ -1453,10 +1453,7 @@ export class PreAggregations {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
             this.redisPrefix,
-            () => this.driverFactory(
-              dataSource,
-              this.getDriverConfig(dataSource),
-            ),
+            () => this.driverFactory(dataSource),
             this.queryCache,
             this,
             {
@@ -1480,10 +1477,7 @@ export class PreAggregations {
     const preAggregationsTablesToTempTablesPromise = preAggregations.map((p: PreAggregationDescription, i) => (preAggregationsTablesToTempTables) => {
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
-        () => this.driverFactory(
-          p.dataSource || 'default',
-          this.getDriverConfig(p.dataSource || 'default'),
-        ),
+        () => this.driverFactory(p.dataSource || 'default'),
         this.logger,
         this.queryCache,
         this,
@@ -1554,10 +1548,7 @@ export class PreAggregations {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
             this.redisPrefix,
-            () => this.driverFactory(
-              dataSource,
-              this.getDriverConfig(dataSource),
-            ),
+            () => this.driverFactory(dataSource),
             this.queryCache,
             this,
             {
@@ -1573,10 +1564,7 @@ export class PreAggregations {
     const expandedPreAggregations: PreAggregationDescription[][] = await Promise.all(preAggregations.map(p => {
       const loader = new PreAggregationPartitionRangeLoader(
         this.redisPrefix,
-        () => this.driverFactory(
-          p.dataSource || 'default',
-          this.getDriverConfig(p.dataSource || 'default'),
-        ),
+        () => this.driverFactory(p.dataSource || 'default'),
         this.logger,
         this.queryCache,
         this,
@@ -1604,29 +1592,6 @@ export class PreAggregations {
     };
   }
 
-  /**
-   * Calculate driver config object.
-   */
-  private getDriverConfig(dataSource: string = 'default') {
-    const queryQueueOptions = (
-      this.queryCache.options.queueOptions as ((dataSource: String) => {
-        concurrency: number,
-      })
-    )(dataSource);
-
-    const preAggregationsQueueOptions = (
-      this.options.queueOptions as ((dataSource: String) => {
-        concurrency: number,
-      })
-    )(dataSource);
-
-    const poolSize = 2 * (
-      queryQueueOptions.concurrency +
-      preAggregationsQueueOptions.concurrency
-    );
-    return { poolSize };
-  }
-
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       const queueOptions = (
@@ -1634,18 +1599,17 @@ export class PreAggregations {
           concurrency: number,
         })
       )(dataSource);
-      const driverConfig = this.getDriverConfig(dataSource);
 
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource, driverConfig),
+        () => this.driverFactory(dataSource),
         (client, q) => {
           const {
             preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
           } = q;
           const loader = new PreAggregationLoader(
             this.redisPrefix,
-            () => this.driverFactory(dataSource, driverConfig),
+            () => this.driverFactory(dataSource),
             this.logger,
             this.queryCache,
             this,
@@ -1653,7 +1617,7 @@ export class PreAggregations {
             preAggregationsTablesToTempTables,
             new PreAggregationLoadCache(
               this.redisPrefix,
-              () => this.driverFactory(dataSource, driverConfig),
+              () => this.driverFactory(dataSource),
               this.queryCache,
               this,
               { requestId, dataSource }
@@ -1690,10 +1654,7 @@ export class PreAggregations {
           } = q;
           const loadCache = new PreAggregationLoadCache(
             this.redisPrefix,
-            () => this.driverFactory(
-              dataSource,
-              this.getDriverConfig(dataSource),
-            ),
+            () => this.driverFactory(dataSource),
             this.queryCache,
             this,
             { requestId, dataSource }
@@ -1737,10 +1698,7 @@ export class PreAggregations {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
             this.redisPrefix,
-            () => this.driverFactory(
-              dataSource,
-              this.getDriverConfig(dataSource),
-            ),
+            () => this.driverFactory(dataSource),
             this.queryCache,
             this,
             {
