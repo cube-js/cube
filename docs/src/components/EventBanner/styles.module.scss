@@ -5,15 +5,14 @@
     z-index: 99;
     overflow: hidden;
     height: 0;
-    transition: height 0.3s linear;
-
+    
     &.visible {
         height: 40px;
     }
-
+    
     &__link {
-        position: fixed;
         display: flex;
+        position: fixed;
         align-items: center;
         justify-content: center;
         width: 100%;
