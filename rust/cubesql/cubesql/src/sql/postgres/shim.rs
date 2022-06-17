@@ -623,7 +623,7 @@ impl AsyncPostgresShim {
             let parameters: Vec<PgTypeId> = stmt_finder
                 .find(&query)
                 .into_iter()
-                .map(|_p| PgTypeId::TEXT)
+                .map(|param| param.coltype.to_pg_tid())
                 .collect();
 
             let meta = self
