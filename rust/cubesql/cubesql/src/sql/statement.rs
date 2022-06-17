@@ -280,6 +280,15 @@ trait Visitor<'ast> {
 
     fn visit_query(&mut self, query: &mut Box<ast::Query>) {
         self.visit_set_expr(&mut query.body);
+        if let Some(with) = query.with.as_mut() {
+            self.visit_with(with);
+        }
+    }
+
+    fn visit_with(&mut self, with: &mut ast::With) {
+        for cte in &mut with.cte_tables {
+            self.visit_query(&mut cte.query);
+        }
     }
 
     fn visit_statement(&mut self, statement: &mut ast::Statement) {
@@ -855,6 +864,10 @@ mod tests {
     fn test_placeholder_find() -> Result<(), CubeError> {
         assert_params_finder("SELECT $1", vec![FoundParameter {}])?;
         assert_params_finder("SELECT true as true_bool, false as false_bool", vec![])?;
+        assert_params_finder(
+            "WITH t AS (SELECT $1 AS x) SELECT x FROM t",
+            vec![FoundParameter {}],
+        )?;
 
         Ok(())
     }
