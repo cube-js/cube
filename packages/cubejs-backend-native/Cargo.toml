@@ -26,6 +26,6 @@ uuid = { version = "0.8", features = ["v4"] }
 once_cell = "1.10"
 
 [dependencies.neon]
-version = "=0.10.0"
+version = "=0.10.1"
 default-features = false
 features = ["napi-1", "napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]
