@@ -1,23 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { loadEvents, Event } from "./lib/api";
 import { setUTM } from "./lib/link";
+import { checkEvents, readEvents, writeEvents } from "./lib/browser";
+
 import * as styles from './styles.module.scss';
 
 function EventBanner () {
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
-    loadEvents()
-      .then((events) => {
-        setEvents(events);
-        setLoading(false);
-      });
+    if (checkEvents()) {
+      const events = readEvents();
+      setEvents(events);
+      setLoading(false);
+    } else {
+      loadEvents()
+        .then((events) => {
+          writeEvents(events);
+          setEvents(events);
+          setLoading(false);
+        });
+    }
   }, []);
 
   return (
-    <div className={`${styles.banner} ${!loading ? styles.visible : ''}`}>
-      {!loading
+    <div className={`${styles.banner} ${!isLoading ? styles.visible : ''}`}>
+      {!isLoading
         && events.map(({id, link, message, campaign}) => (
           <a
             key={id}
