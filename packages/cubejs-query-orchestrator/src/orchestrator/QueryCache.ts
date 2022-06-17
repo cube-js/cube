@@ -59,9 +59,6 @@ export class QueryCache {
       cacheAndQueueDriver?: 'redis' | 'memory';
       maxInMemoryCacheEntries?: number;
       skipExternalCacheAndQueue?: boolean;
-      preAggregationsQueueOptions?: ((dataSource: String) => {
-        concurrency: number,
-      });
     } = {}
   ) {
     this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
