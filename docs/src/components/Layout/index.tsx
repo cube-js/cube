@@ -197,8 +197,8 @@ class AppLayout extends React.Component<
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <>
-              <EventBanner />
               <Row>
+                <EventBanner />
                 <Header
                   className={cx(styles.header, {
                     [styles.fixed]: this.state.mobileMode === MobileModes.MENU,

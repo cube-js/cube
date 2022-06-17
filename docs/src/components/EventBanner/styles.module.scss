@@ -1,0 +1,51 @@
+@import "../../../static/styles/variables.scss";
+
+.banner {
+    position: relative;
+    z-index: 99;
+    overflow: hidden;
+    height: 0;
+    transition: height 0.3s linear;
+
+    &.visible {
+        height: 40px;
+    }
+
+    &__link {
+        position: fixed;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 40px;
+        padding: 7px;
+        border: none;
+    
+        text-decoration: none;
+        font-family: $header-font;
+        font-style: normal;
+        font-weight: 500;
+        font-size: 16px;
+        line-height: 26px;
+        letter-spacing: 0.005em;
+    
+        color: #FFFFFF;
+        background: radial-gradient(218.73% 98564.22% at 87.78% 50%, #FF76A0 0%, #9592FF 51.56%, #CAC9FF 100%);
+        
+        @media screen and (max-width: 640px) {
+            padding: 4px 16px;
+            text-align: left;
+        }
+
+        @media screen and (max-width: 768px) {
+            font-size: 12px;
+            line-height: 16px;
+        }
+    }
+    
+    &__link:hover,
+    &__link:focus {
+        color: #FFFFFF;
+        text-decoration: underline;
+    }
+}
