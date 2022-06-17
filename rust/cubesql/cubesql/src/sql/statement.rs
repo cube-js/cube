@@ -1,18 +1,39 @@
-use msql_srv::{Column, ColumnFlags, ColumnType};
+use msql_srv::Column as MysqlColumn;
 use pg_srv::{BindValue, PgType};
-use sqlparser::{
-    ast,
-    ast::{Expr, Ident, Value},
-};
+use sqlparser::ast::{self, Expr, Ident, Value};
+
+use super::types::{ColumnFlags, ColumnType};
+
+enum PlaceholderType {
+    String,
+    Number,
+}
+
+impl PlaceholderType {
+    pub fn to_coltype(self) -> ColumnType {
+        match self {
+            Self::String => ColumnType::String,
+            Self::Number => ColumnType::Int64,
+        }
+    }
+}
 
 trait Visitor<'ast> {
-    fn visit_value(&mut self, _val: &mut ast::Value) {}
+    fn visit_value(&mut self, _val: &mut ast::Value, _placeholder_type: PlaceholderType) {}
 
     fn visit_identifier(&mut self, _identifier: &mut ast::Ident) {}
 
     fn visit_expr(&mut self, expr: &mut Expr) {
+        self.visit_expr_with_placeholder_type(expr, PlaceholderType::String)
+    }
+
+    fn visit_expr_with_placeholder_type(
+        &mut self,
+        expr: &mut Expr,
+        placeholder_type: PlaceholderType,
+    ) {
         match expr {
-            Expr::Value(value) => self.visit_value(value),
+            Expr::Value(value) => self.visit_value(value, placeholder_type),
             Expr::Identifier(identifier) => self.visit_identifier(identifier),
             Expr::CompoundIdentifier(identifiers) => {
                 for ident in identifiers.iter_mut() {
@@ -280,6 +301,18 @@ trait Visitor<'ast> {
 
     fn visit_query(&mut self, query: &mut Box<ast::Query>) {
         self.visit_set_expr(&mut query.body);
+        if let Some(with) = query.with.as_mut() {
+            self.visit_with(with);
+        }
+        if let Some(limit) = query.limit.as_mut() {
+            self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number);
+        }
+    }
+
+    fn visit_with(&mut self, with: &mut ast::With) {
+        for cte in &mut with.cte_tables {
+            self.visit_query(&mut cte.query);
+        }
     }
 
     fn visit_statement(&mut self, statement: &mut ast::Statement) {
@@ -353,15 +386,23 @@ trait Visitor<'ast> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FoundParameter {}
+pub struct FoundParameter {
+    pub coltype: ColumnType,
+}
 
-impl Into<Column> for FoundParameter {
-    fn into(self) -> Column {
-        Column {
+impl FoundParameter {
+    fn new(coltype: ColumnType) -> Self {
+        Self { coltype }
+    }
+}
+
+impl Into<MysqlColumn> for FoundParameter {
+    fn into(self) -> MysqlColumn {
+        MysqlColumn {
             table: String::new(),
             column: "not implemented".to_owned(),
-            coltype: ColumnType::MYSQL_TYPE_VAR_STRING,
-            colflags: ColumnFlags::empty(),
+            coltype: self.coltype.to_mysql(),
+            colflags: ColumnFlags::empty().to_mysql(),
         }
     }
 }
@@ -384,9 +425,9 @@ impl StatementParamsFinder {
 }
 
 impl<'ast> Visitor<'ast> for StatementParamsFinder {
-    fn visit_value(&mut self, v: &mut ast::Value) {
+    fn visit_value(&mut self, v: &mut ast::Value, pt: PlaceholderType) {
         match v {
-            Value::Placeholder(_) => self.parameters.push(FoundParameter {}),
+            Value::Placeholder(_) => self.parameters.push(FoundParameter::new(pt.to_coltype())),
             _ => {}
         }
     }
@@ -412,7 +453,7 @@ impl StatementParamsBinder {
 }
 
 impl<'ast> Visitor<'ast> for StatementParamsBinder {
-    fn visit_value(&mut self, value: &mut ast::Value) {
+    fn visit_value(&mut self, value: &mut ast::Value, placeholder_type: PlaceholderType) {
         match &value {
             ast::Value::Placeholder(_) => {
                 let to_replace = self.values.get(self.position).expect(
@@ -426,7 +467,11 @@ impl<'ast> Visitor<'ast> for StatementParamsBinder {
 
                 match to_replace {
                     BindValue::String(v) => {
-                        *value = ast::Value::SingleQuotedString(v.clone());
+                        // FIXME: this workaround is needed as we don't know types on Bind
+                        *value = match placeholder_type {
+                            PlaceholderType::String => ast::Value::SingleQuotedString(v.clone()),
+                            PlaceholderType::Number => ast::Value::Number(v.clone(), false),
+                        };
                     }
                     BindValue::Bool(v) => {
                         *value = ast::Value::Boolean(*v);
@@ -468,10 +513,15 @@ impl StatementPlaceholderReplacer {
 }
 
 impl<'ast> Visitor<'ast> for StatementPlaceholderReplacer {
-    fn visit_value(&mut self, value: &mut ast::Value) {
+    fn visit_value(&mut self, value: &mut ast::Value, placeholder_type: PlaceholderType) {
         match &value {
             ast::Value::Placeholder(_) => {
-                *value = ast::Value::SingleQuotedString("replaced_placeholder".to_string());
+                *value = match placeholder_type {
+                    PlaceholderType::String => {
+                        ast::Value::SingleQuotedString("replaced_placeholder".to_string())
+                    }
+                    PlaceholderType::Number => ast::Value::Number("1".to_string(), false),
+                };
             }
             _ => {}
         }
@@ -690,7 +740,7 @@ impl SensitiveDataSanitizer {
 }
 
 impl<'ast> Visitor<'ast> for SensitiveDataSanitizer {
-    fn visit_value(&mut self, val: &mut ast::Value) {
+    fn visit_value(&mut self, val: &mut ast::Value, _pt: PlaceholderType) {
         match val {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
@@ -853,8 +903,16 @@ mod tests {
 
     #[test]
     fn test_placeholder_find() -> Result<(), CubeError> {
-        assert_params_finder("SELECT $1", vec![FoundParameter {}])?;
+        assert_params_finder("SELECT $1", vec![FoundParameter::new(ColumnType::String)])?;
         assert_params_finder("SELECT true as true_bool, false as false_bool", vec![])?;
+        assert_params_finder(
+            "WITH t AS (SELECT $1 AS x) SELECT x FROM t",
+            vec![FoundParameter::new(ColumnType::String)],
+        )?;
+        assert_params_finder(
+            "SELECT 1 LIMIT $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
         Ok(())
     }
@@ -873,6 +931,7 @@ mod tests {
     #[test]
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
+        assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
 
         Ok(())
     }
