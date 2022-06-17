@@ -68,7 +68,6 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
-        preAggregationsQueueOptions: options.preAggregationsOptions.queueOptions,
       }
     );
     this.preAggregations = new PreAggregations(
