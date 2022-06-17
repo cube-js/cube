@@ -909,13 +909,20 @@ async fn merge_chunks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::MockCluster;
+    use crate::config::Config;
     use crate::config::MockConfigObj;
-    use crate::metastore::{Column, ColumnType, RocksMetaStore};
+    use crate::metastore::{Column, ColumnType, IndexDef, IndexType, RocksMetaStore};
+    use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::{cmp_same_types, Row, TableValue};
-    use arrow::array::StringArray;
+    use arrow::array::{Int64Array, StringArray};
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
+    use datafusion::physical_plan::collect;
+    use rocksdb::{Options, DB};
+    use std::fs;
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn compaction() {
@@ -1104,6 +1111,172 @@ mod tests {
         assert_eq!(result, expected);
 
         RocksMetaStore::cleanup_test_metastore("compaction");
+    }
+
+    #[tokio::test]
+    async fn aggr_index_compaction() {
+        let config = Config::test("create_aggr_chunk_test").update_config(|mut c| {
+            c.compaction_chunks_total_size_threshold = 50;
+            c
+        });
+        let path = "/tmp/test_create_aggr_chunk";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+
+        let remote_fs = LocalDirRemoteFs::new(
+            Some(PathBuf::from(chunk_remote_store_path.clone())),
+            PathBuf::from(chunk_store_path.clone()),
+        );
+        let metastore = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs.clone(),
+            Arc::new(MockCluster::new()),
+            config.config_obj(),
+            50,
+        );
+
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+
+        let ind = IndexDef {
+            name: "aggr".to_string(),
+            columns: vec!["foo".to_string(), "boo".to_string()],
+            multi_index: None,
+            index_type: IndexType::Aggregate,
+        };
+        let cols = vec![
+            Column::new("foo".to_string(), ColumnType::String, 0),
+            Column::new("boo".to_string(), ColumnType::Int, 1),
+            Column::new("sum_int".to_string(), ColumnType::Int, 2),
+        ];
+        let table = metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols.clone(),
+                None,
+                None,
+                vec![ind],
+                true,
+                None,
+                Some(vec![("sum".to_string(), "sum_int".to_string())]),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let indices = metastore.get_table_indexes(table.get_id()).await.unwrap();
+
+        let aggr_index = indices
+            .iter()
+            .find(|i| i.get_row().get_name() == "aggr")
+            .unwrap();
+
+        let partition = &metastore
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await
+            .unwrap()[0];
+
+        let data1: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec![
+                "a".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+            ])),
+            Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10])),
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+        ];
+        let data2: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec![
+                "a".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "c".to_string(),
+            ])),
+            Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30])),
+            Arc::new(Int64Array::from(vec![10, 20, 30, 40, 50, 60])),
+        ];
+
+        let (chunk, _) = chunk_store
+            .add_chunk_columns(aggr_index.clone(), partition.clone(), data1.clone(), false)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
+
+        let (chunk, _) = chunk_store
+            .add_chunk_columns(aggr_index.clone(), partition.clone(), data2.clone(), false)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
+
+        let compaction_service = CompactionServiceImpl::new(
+            metastore.clone(),
+            chunk_store.clone(),
+            remote_fs.clone(),
+            config.config_obj(),
+        );
+        compaction_service
+            .compact(partition.get_id())
+            .await
+            .unwrap();
+
+        let partitions = metastore
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await
+            .unwrap();
+        assert_eq!(partitions.len(), 1);
+        let partition = &partitions[0];
+        assert_eq!(partition.get_row().main_table_row_count(), 6);
+
+        let remote = partition
+            .get_row()
+            .get_full_name(partition.get_id())
+            .unwrap();
+        let local = remote_fs
+            .download_file(&remote, partition.get_row().file_size())
+            .await
+            .unwrap();
+        let reader = Arc::new(
+            ParquetExec::try_from_path(local.as_str(), None, None, ROW_GROUP_SIZE, 1, None)
+                .unwrap(),
+        );
+        let res_data = &collect(reader).await.unwrap()[0];
+
+        let foos = Arc::new(StringArray::from(vec![
+            "a".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "c".to_string(),
+        ]));
+        let boos = Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30]));
+
+        let sums = Arc::new(Int64Array::from(vec![11, 22, 33, 44, 55, 60]));
+        let expected: Vec<ArrayRef> = vec![foos, boos, sums];
+
+        assert_eq!(res_data.columns(), &expected);
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
     }
 }
 

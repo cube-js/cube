@@ -554,6 +554,8 @@ pub struct Index {
 pub enum AggregateFunction {
     SUM = 1,
     MAX = 2,
+    MIN = 3,
+    MERGE = 4,
 }
 
 impl FromStr for AggregateFunction {
@@ -563,6 +565,8 @@ impl FromStr for AggregateFunction {
         match s.to_uppercase().as_ref() {
             "SUM" => Ok(AggregateFunction::SUM),
             "MAX" => Ok(AggregateFunction::MAX),
+            "MIN" => Ok(AggregateFunction::MIN),
+            "MERGE" => Ok(AggregateFunction::MERGE),
             _ => Err(CubeError::user(format!(
                 "Function {} can't be used in aggregate index",
                 s
@@ -576,9 +580,30 @@ impl fmt::Display for AggregateFunction {
         let res = match self {
             Self::SUM => "SUM",
             Self::MAX => "MAX",
+            Self::MIN => "MIN",
+            Self::MERGE => "MERGE",
         };
 
         f.write_fmt(format_args!("{}", res))
+    }
+}
+
+impl AggregateFunction {
+    pub fn allowed_for_type(&self, col_type: &ColumnType) -> bool {
+        match self {
+            Self::MAX | Self::MIN => match col_type {
+                ColumnType::HyperLogLog(_) => false,
+                _ => true,
+            },
+            Self::SUM => match col_type {
+                ColumnType::Int | ColumnType::Decimal { .. } | ColumnType::Float => true,
+                _ => false,
+            },
+            Self::MERGE => match col_type {
+                ColumnType::HyperLogLog(_) => true,
+                _ => false,
+            },
+        }
     }
 }
 
@@ -2849,30 +2874,28 @@ impl RocksMetaStore {
 
         let aggregate_columns = table_id.get_row().aggregate_columns();
         if aggregate_columns.is_empty() {
-            //TODO check that index column is not in aggregate columns
             return Err(CubeError::user(format!(
-                    "Can't create aggregate index for table '{}' because aggregate columns not specified for the table",
+                    "Can't create aggregate index for table '{}' because aggregate columns (`AGGREGATIONS`) not specified for the table",
+                    table_id.get_row().get_table_name()
+                )));
+        }
+        if let Some(col_in_aggreations) = index_def.columns.iter().find(|dc| {
+            aggregate_columns
+                .iter()
+                .any(|c| c.column().name == dc.as_str())
+        }) {
+            return Err(CubeError::user(format!(
+                    "Column '{}' in aggregate index '{}' is in aggregations list for table '{}'. Aggregate index columns must be outside of aggregations list.",
+                    col_in_aggreations,
+                    index_def.name,
                     table_id.get_row().get_table_name()
                 )));
         }
         let unique_key_columns = table_id.get_row().unique_key_columns();
-        if let Some(unique_key) = &unique_key_columns {
-            if let Some(not_found) = index_def
-                .columns
-                .iter()
-                .find(|dc| unique_key.iter().all(|c| c.name.as_str() != dc.as_str()))
-            {
-                return Err(CubeError::user(format!(
-                    "Column '{}' in aggregate index '{}' is out of unique key {:?} for table '{}'. Index columns outside of unique key are not supported.",
-                    not_found,
-                    index_def.name,
-                    unique_key
-                        .iter()
-                        .map(|c| c.name.to_string())
-                        .collect::<Vec<String>>(),
-                    table_id.get_row().get_table_name()
-                )));
-            }
+        if unique_key_columns.is_some() {
+            return Err(CubeError::user(format!(
+                    "Can't create aggregate index for table '{}' because aggregate index for the table with unique key is not supported yet",
+                    table_id.get_row().get_table_name())));
         }
 
         // First put the columns from the sort key.
@@ -3215,6 +3238,15 @@ impl MetaStore for RocksMetaStore {
                             }
                         }
                         let function = aggr.0.parse::<AggregateFunction>()?;
+
+                        if !function.allowed_for_type(&column.column_type) {
+                            return Err(CubeError::user(
+                                    format!(
+                                        "Aggregate function {} not allowed for column type {}",
+                                        function, &column.column_type
+                                        )
+))
+                        }
                         Ok(AggregateColumnIndex::new(index, function))
                     })
                 .collect::<Result<Vec<_>,_>>()?;
@@ -5027,7 +5059,7 @@ fn swap_active_partitions_impl(
     let table = PartitionRocksTable::new(db_ref.clone());
     let chunk_table = ChunkRocksTable::new(db_ref.clone());
 
-    // Rows are compacted using unique key columns and totals don't match
+    // Rows are compacted using unique key columns or aggregating index and totals don't match
     let skip_row_count_sanity_check = if let Some(current) = current_active.first() {
         let current_partition =
             table
@@ -5038,7 +5070,8 @@ fn swap_active_partitions_impl(
                 )))?;
         let index = index_table.get_row_or_not_found(current_partition.get_row().get_index_id())?;
         let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
-        table.get_row().unique_key_columns().is_some()
+        index.get_row().get_type() == IndexType::Aggregate
+            || table.get_row().unique_key_columns().is_some()
     } else {
         false
     };
@@ -5617,7 +5650,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
-                    Some(vec!["col2".to_string(), "col1".to_string()]),
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),

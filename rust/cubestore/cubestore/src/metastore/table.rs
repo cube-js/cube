@@ -4,14 +4,16 @@ use super::{
 };
 use crate::data_frame_from;
 use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
+use crate::queryplanner::udfs::aggregate_udf_by_kind;
+use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use arrow::datatypes::Schema as ArrowSchema;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
-use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Sum};
-use datafusion::physical_plan::{AggregateExpr, PhysicalExpr};
+use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Min, Sum};
+use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -79,6 +81,13 @@ impl AggregateColumn {
             }
             AggregateFunction::MAX => {
                 Arc::new(Max::new(col.clone(), col.name(), col.data_type(schema)?))
+            }
+            AggregateFunction::MIN => {
+                Arc::new(Min::new(col.clone(), col.name(), col.data_type(schema)?))
+            }
+            AggregateFunction::MERGE => {
+                let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll).descriptor();
+                udaf::create_aggregate_expr(&fun, &[col.clone()], schema, col.name())?
             }
         };
         Ok(res)
