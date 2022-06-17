@@ -65,8 +65,6 @@ const generate = async (options) => {
     authInfo: null,
     securityContext: null,
     requestId: 'CLI REQUEST'
-  }, {
-    poolSize: 1, // TODO (buntarb): check this point!
   });
 
   const dbSchema = await driver.tablesSchema();

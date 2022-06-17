@@ -89,10 +89,14 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
 export type DriverOptions = {
-  poolSize: number
+  poolSize?: number
 };
-export type DriverFactoryFn =
-  (context: DriverContext, options: DriverOptions) => Promise<BaseDriver> | BaseDriver;
+export type DriverConfig = {
+  type: DatabaseType,
+  options: DriverOptions
+};
+export type DriverFactoryFn = (context: DriverContext) =>
+  Promise<BaseDriver> | BaseDriver | Promise<DriverConfig> | DriverConfig;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external

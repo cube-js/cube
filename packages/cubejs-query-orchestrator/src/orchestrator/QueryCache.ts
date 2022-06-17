@@ -224,26 +224,6 @@ export class QueryCache {
     });
   }
 
-  /**
-   * Calculate driver config object.
-   */
-  private getDriverConfig(dataSource: string = 'default') {
-    const queryQueueOptions = (
-      this.options.queueOptions as ((dataSource: String) => {
-        concurrency: number,
-      })
-    )(dataSource);
-
-    const preAggregationsQueueOptions =
-      this.options.preAggregationsQueueOptions(dataSource);
-
-    const poolSize = 2 * (
-      queryQueueOptions.concurrency +
-      preAggregationsQueueOptions.concurrency
-    );
-    return { poolSize };
-  }
-
   public getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       const queueOptions = (
@@ -251,11 +231,10 @@ export class QueryCache {
           concurrency: number,
         })
       )(dataSource);
-      const driverConfig = this.getDriverConfig(dataSource);
       
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource, driverConfig),
+        () => this.driverFactory(dataSource),
         (client, q) => {
           this.logger('Executing SQL', {
             ...q
