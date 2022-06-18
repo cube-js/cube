@@ -269,7 +269,7 @@ impl RewriteRules for DateRules {
                 udf_expr(
                     "date_add",
                     vec![
-                        udf_expr("now_evaluated", Vec::<String>::new()),
+                        fun_expr("Now", Vec::<String>::new()),
                         literal_expr("?interval"),
                     ],
                 ),

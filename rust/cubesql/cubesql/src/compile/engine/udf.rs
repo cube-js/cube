@@ -948,10 +948,16 @@ pub fn create_date_add_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "date_add",
-        &Signature::exact(
+        &Signature::one_of(
             vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
             ],
             Volatility::Immutable,
         ),
@@ -1037,21 +1043,6 @@ pub fn create_current_timestamp_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "current_timestamp",
-        &Signature::exact(vec![], Volatility::Immutable),
-        &return_type,
-        &fun,
-    )
-}
-
-pub fn create_now_evaluated_udf() -> ScalarUDF {
-    let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
-        Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
-
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
-
-    ScalarUDF::new(
-        "now_evaluated",
         &Signature::exact(vec![], Volatility::Immutable),
         &return_type,
         &fun,

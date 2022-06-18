@@ -332,12 +332,6 @@ impl LogicalPlanAnalysis {
                     if &fun.name == "str_to_date" || &fun.name == "date_add" || &fun.name == "date"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
-                    } else if &fun.name == "now_evaluated" {
-                        let expr = Expr::ScalarFunction {
-                            fun: BuiltinScalarFunction::UtcTimestamp,
-                            args: Vec::new(),
-                        };
-                        Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
                     }
@@ -355,7 +349,9 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if fun.volatility() == Volatility::Immutable {
+                    if fun.volatility() == Volatility::Immutable
+                        || fun == &BuiltinScalarFunction::Now
+                    {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None

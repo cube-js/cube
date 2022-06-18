@@ -47,7 +47,7 @@ use self::{
             create_generate_series_udtf, create_generate_subscripts_udtf, create_hour_udf,
             create_if_udf, create_instr_udf, create_isnull_udf, create_least_udf,
             create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
-            create_now_evaluated_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
             create_pg_numeric_scale_udf, create_pg_table_is_visible_udf, create_pg_truetypid_udf,
@@ -2435,7 +2435,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date_udf());
         ctx.register_udf(create_current_timestamp_udf());
-        ctx.register_udf(create_now_evaluated_udf());
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
         ctx.register_udf(create_format_type_udf());
