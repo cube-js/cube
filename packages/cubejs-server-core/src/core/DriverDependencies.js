@@ -23,6 +23,7 @@ module.exports = {
   ksql: '@cubejs-backend/ksql-driver',
   questdb: '@cubejs-backend/questdb-driver',
   materialize: '@cubejs-backend/materialize-driver',
+  cockroach: '@cubejs-backend/cockroach-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
 };

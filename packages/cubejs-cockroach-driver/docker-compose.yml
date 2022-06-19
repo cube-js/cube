@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+
+ crdb:
+   container_name: ${CONTAINER_NAME}
+   image: cockroachdb/cockroach:v22.1.1
+   ports:
+     - "${HOST_PORT}:26257"
+   command: start-single-node --insecure
+   healthcheck:
+      interval: 3s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      timeout: 50s
+      retries: 5
+   volumes:
+     - "./data/crdb:/cockroach/cockroach-data"
