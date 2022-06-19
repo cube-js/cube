@@ -60,30 +60,6 @@ export class BaseDbRunner {
     return this.connection.testQueries(queries, fixture);
   }
 
-  public replaceTableName(query: any, preAggregation: any, suffix: any) {
-    const [toReplace, params] = query;
-    preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
-    return [
-      preAggregation.reduce(
-        (replacedQuery: any, desc: any) => {
-          const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
-            desc.partitionGranularity,
-            PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange)
-          ).map(
-            range => `SELECT * FROM ${PreAggregationPartitionRangeLoader.partitionTableName(desc.tableName, desc.partitionGranularity, range)}_${suffix}`
-          ).join(' UNION ALL ');
-          const targetTableName = desc.dateRange ? `(${partitionUnion})` : `${desc.tableName}_${suffix}`;
-          return replacedQuery.replace(
-            new RegExp(`${desc.tableName}\\s+`, 'g'),
-            `${targetTableName} `
-          );
-        },
-        toReplace
-      ),
-      params
-    ];
-  }
-
   public async tearDown() {
     console.log('[TearDown] Starting');
 
