@@ -353,7 +353,7 @@ it.
 
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source
-database to persist data directly into cloud storage, which is then loaded into
+database to temporarily materialize the data locally, which is then loaded into
 Cube Store in parallel:
 
 <div style="text-align: center">
