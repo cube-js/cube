@@ -305,6 +305,22 @@ impl RewriteRules for DateRules {
                     vec!["?left".to_string(), literal_expr("?interval")],
                 ),
                 self.transform_interval_binary_expr("?interval"),
+            rewrite(
+                "datastudio-dates",
+                fun_expr(
+                    "DateTrunc",
+                    vec![
+                        "?granularity".to_string(),
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("SECOND"), column_expr("?column")],
+                        ),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec!["?granularity".to_string(), column_expr("?column")],
+                ),
             ),
         ]
     }
