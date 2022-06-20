@@ -3,6 +3,10 @@ title: Druid
 permalink: /config/databases/druid
 ---
 
+<WarningBox>
+  The driver for Druid is <b>community supported</b>. 
+</WarningBox>
+
 ## Prerequisites
 
 - The URL for the [Druid][druid] database
