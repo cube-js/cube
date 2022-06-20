@@ -2511,6 +2511,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "byteorder",
  "bytes 0.5.6",
  "hex",
  "log",

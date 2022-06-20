@@ -321,14 +321,16 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_prepare(&self) -> RunResult<()> {
+        // Unknown variables will be detected as TEXT
+        // LIMIT has a typehint for i64
         let stmt = self
             .client
-            .prepare("SELECT $1 as t1, $2 as t2")
+            .prepare("SELECT $1 as t1, $2 as t2 LIMIT $3")
             .await
             .unwrap();
 
         self.client
-            .query(&stmt, &[&"test1", &"test2"])
+            .query(&stmt, &[&"test1", &"test2", &0_i64])
             .await
             .unwrap();
 

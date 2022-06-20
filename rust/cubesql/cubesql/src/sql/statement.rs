@@ -476,9 +476,6 @@ impl<'ast> Visitor<'ast> for StatementParamsBinder {
                     BindValue::Bool(v) => {
                         *value = ast::Value::Boolean(*v);
                     }
-                    BindValue::UInt64(v) => {
-                        *value = ast::Value::Number(v.to_string(), false);
-                    }
                     BindValue::Int64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_i64);
                     }
@@ -820,7 +817,7 @@ mod tests {
             vec![
                 BindValue::String("test".to_string()),
                 BindValue::Int64(1),
-                BindValue::UInt64(2),
+                BindValue::Int64(2),
                 BindValue::Float64(2.0),
                 BindValue::Bool(true),
             ],
