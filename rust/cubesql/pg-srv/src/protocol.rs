@@ -820,6 +820,7 @@ pub enum ErrorCode {
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
     DuplicateCursor,
+    SyntaxError,
     // Class 53 — Insufficient Resources
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
@@ -841,6 +842,7 @@ impl Display for ErrorCode {
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
+            Self::SyntaxError => "42601",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::InternalError => "XX000",

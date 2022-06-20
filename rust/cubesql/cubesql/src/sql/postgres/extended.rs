@@ -2,7 +2,7 @@ use crate::{
     compile::QueryPlan,
     sql::{
         dataframe::{batch_to_dataframe, DataFrame, TableValue},
-        statement::StatementParamsBinder,
+        statement::PostgresStatementParamsBinder,
         writer::BatchWriter,
     },
     CubeError,
@@ -36,12 +36,12 @@ pub struct PreparedStatement {
 }
 
 impl PreparedStatement {
-    pub fn bind(&self, values: Vec<BindValue>) -> ast::Statement {
-        let binder = StatementParamsBinder::new(values);
+    pub fn bind(&self, values: Vec<BindValue>) -> Result<ast::Statement, ConnectionError> {
+        let binder = PostgresStatementParamsBinder::new(values);
         let mut statement = self.query.clone();
-        binder.bind(&mut statement);
+        binder.bind(&mut statement)?;
 
-        statement
+        Ok(statement)
     }
 }
 
