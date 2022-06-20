@@ -6,6 +6,7 @@ import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
 import { RequestContext } from './types';
+import { getSchedulerConcurrency } from './concurrencyService';
 
 export interface ScheduledRefreshOptions {
   timezone?: string,
@@ -134,30 +135,6 @@ export class RefreshScheduler {
     }
   }
 
-  /**
-   * Evaluate and returns minimal QueryQueue concurrency value.
-   */
-  protected evalConcurrency(context: RequestContext): null | number {
-    const queues = this.serverCore
-      .getOrchestratorApi(context)
-      .getQueryOrchestrator()
-      .getQueryCache()
-      .getQueues();
-
-    let concurrency: null | number;
-
-    if (!queues) { // first execution - no queues
-      concurrency = null;
-    } else { // further executions - queues ready
-      const concurrencies: number[] = [];
-      Object.keys(queues).forEach((name) => {
-        concurrencies.push(queues[name].concurrency);
-      });
-      concurrency = Math.min(...concurrencies);
-    }
-    return concurrency;
-  }
-
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
     const context: RequestContext = {
       authInfo: null,
@@ -166,7 +143,10 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
-    const concurrency = options.concurrency || this.evalConcurrency(context) || 1;
+    const concurrency =
+      options.concurrency ||
+      getSchedulerConcurrency(this.serverCore, context) ||
+      1;
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
