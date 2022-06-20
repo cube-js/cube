@@ -96,7 +96,7 @@ export type DriverConfig = {
   options: DriverOptions
 };
 export type DriverFactoryFn = (context: DriverContext) =>
-  Promise<BaseDriver> | BaseDriver | Promise<DriverConfig> | DriverConfig;
+  Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
