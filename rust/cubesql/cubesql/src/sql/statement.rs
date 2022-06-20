@@ -784,6 +784,11 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
 
                         *data_type = ast::DataType::BigInt(None)
                     }
+                    "timestamptz" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Timestamp
+                    }
                     // TODO:
                     _ => (),
                 },
@@ -990,10 +995,12 @@ mod tests {
     #[test]
     fn test_cast_replacer() -> Result<(), CubeError> {
         run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
-
         run_cast_replacer("SELECT 'pg_class'::regclass::oid", "SELECT 1259")?;
-
         run_cast_replacer("SELECT 64::information_schema.cardinal_number", "SELECT 64")?;
+        run_cast_replacer(
+            "SELECT NOW()::timestamptz",
+            "SELECT CAST(NOW() AS TIMESTAMP)",
+        )?;
 
         Ok(())
     }
