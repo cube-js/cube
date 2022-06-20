@@ -162,6 +162,14 @@ Cube is capable of performing joins between pre-aggregations from different
 [data sources][ref-schema-ref-cube-datasource] to avoid making excessive queries
 to them.
 
+<WarningBox>
+
+Currently pre-aggregations of type `rollupJoin` do not support background
+refreshing. Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to
+`true` will result in an error.
+
+</WarningBox>
+
 In the following example, we have a `Users` cube with a `usersRollup`
 pre-aggregation, and an `Orders` cube with an `ordersRollup` pre-aggregation,
 and an `ordersWithUsersRollup` pre-aggregation. Note the following:
