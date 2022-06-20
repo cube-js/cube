@@ -570,7 +570,7 @@ impl AsyncPostgresShim {
         }
 
         let portal = if let Some(statement) = source_statement {
-            let prepared_statement = statement.bind(body.to_bind_values());
+            let prepared_statement = statement.bind(body.to_bind_values(&statement.parameters)?);
 
             let meta = self
                 .session
