@@ -28,6 +28,8 @@ rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
 log = "=0.4.11"
+rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
+postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
 # which panic with Could not determine the UTC offset on this system.
 # It's a problem with determing local_offset_at for local-offset feature

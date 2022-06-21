@@ -10,16 +10,17 @@ use chrono_tz::Tz;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
-        Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalMonthDayNanoArray,
-        IntervalYearMonthArray, LargeStringArray, ListArray, StringArray,
-        TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
-        UInt8Array,
+        Array, ArrayRef, BooleanArray, DecimalArray, Float16Array, Float32Array, Float64Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray,
+        IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray, ListArray,
+        StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array,
+        UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
     temporal_conversions,
 };
+use rust_decimal::prelude::*;
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -92,9 +93,10 @@ pub enum TableValue {
     Int32(i32),
     Int64(i64),
     Boolean(bool),
-    List(ArrayRef),
     Float32(f32),
     Float64(f64),
+    List(ArrayRef),
+    Decimal128(Decimal128Value),
     Timestamp(TimestampValue),
 }
 
@@ -110,6 +112,7 @@ impl ToString for TableValue {
             TableValue::Float32(v) => v.to_string(),
             TableValue::Float64(v) => v.to_string(),
             TableValue::Timestamp(v) => v.to_string(),
+            TableValue::Decimal128(v) => v.to_string(),
             TableValue::List(v) => {
                 let mut values: Vec<String> = Vec::with_capacity(v.len());
 
@@ -283,6 +286,46 @@ impl ToString for TimestampValue {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Decimal128Value {
+    n: i128,
+    // number of digits after .
+    scale: usize,
+}
+
+impl Decimal128Value {
+    pub fn new(n: i128, scale: usize) -> Self {
+        Self { n, scale }
+    }
+
+    pub fn as_decimal(&self) -> Result<Decimal, CubeError> {
+        Ok(Decimal::try_from_i128_with_scale(
+            self.n,
+            self.scale as u32,
+        )?)
+    }
+}
+
+impl ToString for Decimal128Value {
+    fn to_string(&self) -> String {
+        let as_str = self.n.to_string();
+
+        if self.scale == 0 {
+            as_str
+        } else {
+            let (sign, rest) = as_str.split_at(if self.n >= 0 { 0 } else { 1 });
+
+            if rest.len() > self.scale {
+                let (whole, decimal) = as_str.split_at(as_str.len() - self.scale);
+                format!("{}.{}", whole, decimal)
+            } else {
+                // String has to be padded
+                format!("{}0.{:0>w$}", sign, rest, w = self.scale)
+            }
+        }
+    }
+}
+
 macro_rules! convert_array_cast_native {
     ($V: expr, (Vec<u8>)) => {{
         $V.to_vec()
@@ -315,6 +358,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::List(field) => Ok(ColumnType::List(field)),
         DataType::Int32 | DataType::UInt32 => Ok(ColumnType::Int32),
+        DataType::Decimal(_, _) => Ok(ColumnType::Int32),
         DataType::Int8
         | DataType::Int16
         | DataType::Int64
@@ -359,6 +403,9 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int32, i32),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int64, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int64, i64),
+                DataType::Boolean => {
+                    convert_array!(array, num_rows, rows, BooleanArray, Boolean, bool)
+                }
                 DataType::Float32 => {
                     convert_array!(array, num_rows, rows, Float32Array, Float32, f32)
                 }
@@ -443,13 +490,13 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         }
                     }
                 }
-                DataType::Boolean => {
-                    let a = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+                DataType::Decimal(_, s) => {
+                    let a = array.as_any().downcast_ref::<DecimalArray>().unwrap();
                     for i in 0..num_rows {
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Boolean(a.value(i))
+                            TableValue::Decimal128(Decimal128Value::new(a.value(i), *s))
                         });
                     }
                 }

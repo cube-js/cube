@@ -1,4 +1,7 @@
-use crate::sql::{dataframe::TimestampValue, df_type_to_pg_tid};
+use crate::sql::{
+    dataframe::{Decimal128Value, TimestampValue},
+    df_type_to_pg_tid,
+};
 use bytes::{BufMut, BytesMut};
 use chrono::{
     format::{
@@ -17,9 +20,10 @@ use datafusion::arrow::{
 };
 use pg_srv::{
     protocol,
-    protocol::{Format, Serialize},
-    ProtocolError,
+    protocol::{ErrorCode, ErrorResponse, Format, Serialize},
+    PgTypeId, ProtocolError,
 };
+use postgres_types::{ToSql, Type};
 use std::{convert::TryFrom, io, io::Error, mem};
 
 pub trait ToPostgresValue {
@@ -155,6 +159,26 @@ impl<T: ToPostgresValue> ToPostgresValue for Option<T> {
             None => buf.extend_from_slice(&(-1_i32).to_be_bytes()),
             Some(v) => v.to_binary(buf)?,
         };
+
+        Ok(())
+    }
+}
+
+/// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/numeric.c#L1022
+impl ToPostgresValue for Decimal128Value {
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
+        self.to_string().to_text(buf)
+    }
+
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
+        let mut tmp = postgres_types::private::BytesMut::new();
+        self.as_decimal()
+            .map_err(|err| ErrorResponse::error(ErrorCode::InternalError, err.to_string()))?
+            .to_sql(&Type::from_oid(PgTypeId::NUMERIC as u32).unwrap(), &mut tmp)
+            .map_err(|err| ErrorResponse::error(ErrorCode::InternalError, err.to_string()))?;
+
+        buf.put_i32(tmp.len() as i32);
+        buf.extend_from_slice(&tmp[..]);
 
         Ok(())
     }
@@ -381,7 +405,7 @@ impl<'a> Serialize for BatchWriter {
 #[cfg(test)]
 mod tests {
     use crate::sql::{
-        dataframe::TimestampValue,
+        dataframe::{Decimal128Value, TimestampValue},
         shim::ConnectionError,
         writer::{BatchWriter, ToPostgresValue},
     };
@@ -493,6 +517,34 @@ mod tests {
                 68, 0, 0, 0, 20, 0, 2, 0, 0, 0, 5, 116, 101, 115, 116, 49, 0, 0, 0, 1, 1,
                 // row
                 68, 0, 0, 0, 20, 0, 2, 0, 0, 0, 5, 116, 101, 115, 116, 50, 0, 0, 0, 1, 1
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_backend_writer_binary_numeric() -> Result<(), ConnectionError> {
+        // DECLARE test BINARY CURSOR FOR SELECT CAST(1 as decimal(10, 5)) UNION ALL SELECT CAST(2 as decimal(25, 15));
+        // fetch 2 in test;
+        let mut cursor = Cursor::new(vec![]);
+
+        let mut writer = BatchWriter::new(Format::Binary);
+        writer.write_value(Decimal128Value::new(1, 5))?;
+        writer.end_row()?;
+
+        writer.write_value(Decimal128Value::new(2, 15))?;
+        writer.end_row()?;
+
+        buffer::write_direct(&mut cursor, writer).await?;
+
+        assert_eq!(
+            cursor.get_ref()[0..],
+            vec![
+                // row
+                68, 0, 0, 0, 20, 0, 1, 0, 0, 0, 10, 0, 1, 255, 254, 0, 0, 0, 5, 3, 232,
+                // row
+                68, 0, 0, 0, 20, 0, 1, 0, 0, 0, 10, 0, 1, 255, 252, 0, 0, 0, 15, 0, 20
             ]
         );
 
