@@ -17,9 +17,7 @@ use datafusion::{
     },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
-        functions::{BuiltinScalarFunction, Volatility},
-        planner::DefaultPhysicalPlanner,
-        ColumnarValue, PhysicalPlanner,
+        functions::Volatility, planner::DefaultPhysicalPlanner, ColumnarValue, PhysicalPlanner,
     },
     scalar::ScalarValue,
 };
@@ -350,7 +348,7 @@ impl LogicalPlanAnalysis {
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
                     if fun.volatility() == Volatility::Immutable
-                        || fun == &BuiltinScalarFunction::Now
+                        || fun.volatility() == Volatility::Stable
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
@@ -379,6 +377,21 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
+
+                match &expr {
+                    Expr::BinaryExpr { left, right, .. } => match (&**left, &**right) {
+                        (Expr::Literal(ScalarValue::IntervalYearMonth(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalDayTime(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalMonthDayNano(_)), Expr::Literal(_))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalYearMonth(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalDayTime(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalMonthDayNano(_))) => {
+                            return None
+                        }
+                        _ => (),
+                    },
+                    _ => (),
+                }
 
                 Self::eval_constant_expr(&egraph, &expr)
             }

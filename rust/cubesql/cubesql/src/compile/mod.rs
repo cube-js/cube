@@ -2935,10 +2935,54 @@ mod tests {
         visitor.0.expect("No CubeScanNode was found in plan")
     }
 
+    fn find_timestamps(parent: Arc<LogicalPlan>) -> Vec<ScalarValue> {
+        pub struct FindTimestampVisitor(Vec<ScalarValue>);
+
+        fn extract_timestamps(exprs: Vec<Expr>) -> Vec<ScalarValue> {
+            let mut result = vec![];
+            for e in exprs.iter() {
+                let timestamps = match e {
+                    Expr::Literal(val) => match val {
+                        ScalarValue::TimestampSecond(_, _)
+                        | ScalarValue::TimestampMillisecond(_, _)
+                        | ScalarValue::TimestampMicrosecond(_, _)
+                        | ScalarValue::TimestampNanosecond(_, _) => vec![val.clone()],
+                        _ => vec![],
+                    },
+                    // TODO: support other cases if needed
+                    Expr::Alias(expr, _) => extract_timestamps(vec![*expr.clone()]),
+                    Expr::Cast { expr, .. } => extract_timestamps(vec![*expr.clone()]),
+                    _ => vec![],
+                };
+
+                result.extend(timestamps.into_iter());
+            }
+
+            result
+        }
+
+        impl PlanVisitor for FindTimestampVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                self.0.extend(extract_timestamps(plan.expressions()));
+
+                Ok(true)
+            }
+        }
+
+        let mut visitor = FindTimestampVisitor(Vec::new());
+        parent.accept(&mut visitor).unwrap();
+
+        visitor.0
+    }
+
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
         fn find_cube_scan(&self) -> CubeScanNode;
+
+        fn find_timestamps(&self) -> Vec<ScalarValue>;
     }
 
     impl LogicalPlanTestUtils for LogicalPlan {
@@ -2951,6 +2995,10 @@ mod tests {
 
         fn find_cube_scan(&self) -> CubeScanNode {
             find_cube_scan_deep_search(Arc::new(self.clone()))
+        }
+
+        fn find_timestamps(&self) -> Vec<ScalarValue> {
+            find_timestamps(Arc::new(self.clone()))
         }
     }
 
@@ -3717,10 +3765,11 @@ mod tests {
         );
 
         let logical_plan = query_plan.print(true).unwrap();
+        let timestamps = query_plan.as_logical_plan().find_timestamps();
         assert_eq!(
             logical_plan,
-            "Projection: CAST(utctimestamp() AS Timestamp(Nanosecond, None)) AS COL\
-            \n  EmptyRelation"
+            format!("Projection: CAST(TimestampNanosecond({}, None) AS Timestamp(Nanosecond, None)) AS COL\
+            \n  EmptyRelation", timestamps[0]),
         );
     }
 
@@ -9278,10 +9327,21 @@ ORDER BY \"COUNT(count)\" DESC"
             "
             SELECT COUNT(*) 
             FROM KibanaSampleDataEcommerce 
-            WHERE KibanaSampleDataEcommerce.order_date >= cast(date_add(STR_TO_DATE('2021-09-30 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f'), INTERVAL -30 day) as date);
+            WHERE KibanaSampleDataEcommerce.order_date >= CAST((CAST(now() AS timestamp) + (INTERVAL '-30 day')) AS date);
             ".to_string(), 
             DatabaseProtocol::PostgreSQL
         ).as_logical_plan();
+
+        let filters = logical_plan
+            .find_cube_scan()
+            .request
+            .filters
+            .unwrap_or_default();
+        let filter_vals = if filters.len() > 0 {
+            filters[0].values.clone()
+        } else {
+            None
+        };
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -9296,7 +9356,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterDate".to_string()),
-                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+                    values: filter_vals,
                     or: None,
                     and: None,
                 },])
