@@ -25,13 +25,6 @@ let coreOptions: CreateOptions & {
 };
 
 /**
- * Service logger setter.
- */
-export const setLogger = (loggerFn: LoggerFn) => {
-  logger = loggerFn;
-};
-
-/**
  * Asserts incoming options combined with environment.
  */
 const assertOptions = (opts: CreateOptions) => {
@@ -126,6 +119,13 @@ const getDbType = (opts: CreateOptions) => {
       throw new Error('Unexpected dbType type');
     }
   };
+};
+
+/**
+ * Service logger setter.
+ */
+export const setLogger = (loggerFn: LoggerFn) => {
+  logger = loggerFn;
 };
 
 /**
