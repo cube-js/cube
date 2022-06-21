@@ -89,7 +89,7 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 // internal
 export type DbTypeFn = (context: DriverContext) => DatabaseType;
 export type DriverOptions = {
-  poolSize?: number
+  maxPoolSize?: number
 };
 export type DriverConfig = {
   type: DatabaseType,

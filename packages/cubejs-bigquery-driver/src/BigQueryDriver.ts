@@ -19,11 +19,19 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   location?: string,
   pollTimeout?: number,
   pollMaxInterval?: number,
+  maxPoolSize?: number,
 }
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
 export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 1;
+  }
+
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly bigquery: BigQuery;

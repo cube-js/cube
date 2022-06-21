@@ -142,6 +142,13 @@ interface SnowflakeDriverOptions {
  * Similar to data in response, column_name will be COLUMN_NAME
  */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 1;
+  }
+
   protected connection: Promise<Connection> | null = null;
 
   protected readonly config: SnowflakeDriverOptions;

@@ -21,6 +21,7 @@ const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5
 
 export type QuestDriverConfiguration = Partial<PoolConfig> & {
   readOnly?: boolean,
+  maxPoolSize?: number,
 };
 
 export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverConfiguration>
@@ -33,13 +34,22 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     return QuestQuery;
   }
 
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 1;
+  }
+
   public constructor(
     config: Partial<Config> = {}
   ) {
     super();
 
     this.pool = new Pool({
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 4,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.maxPoolSize || 4,
       idleTimeoutMillis: 30_000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,

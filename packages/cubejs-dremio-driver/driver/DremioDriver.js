@@ -16,6 +16,13 @@ class DremioDriver extends BaseDriver {
     return DremioQuery;
   }
 
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 1;
+  }
+
   constructor(config = {}) {
     super();
 

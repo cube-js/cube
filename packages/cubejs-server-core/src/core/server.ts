@@ -518,8 +518,9 @@ export class CubejsServerCore {
     this.options.externalDbType = this.options.externalDbType
       || <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
 
+    driverService.decorateOpts(this.options);
     this.driver = null;
-    this.contextToDbType = wrapToFnIfNeeded(this.options.dbType);
+    this.contextToDbType = <DbTypeFn> this.options.dbType;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
