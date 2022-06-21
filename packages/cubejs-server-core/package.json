@@ -27,7 +27,8 @@
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
-    "unit": "jest --runInBand --coverage dist/test"
+    "unit": "jest --runInBand --coverage dist/test",
+    "tst": "jest --runInBand --coverage dist/test/unit/driverService.test.js"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.30.28",

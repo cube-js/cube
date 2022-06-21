@@ -357,9 +357,10 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
     },
     continueWaitTimeout: 0.1,
     preAggregationsOptions: {
-      queueOptions: {
+      queueOptions: () => ({
         executionTimeout: 2,
-      },
+        concurrency: 2,
+      }),
     },
     redisPrefix: `TEST_${testCounter++}`,
   });
