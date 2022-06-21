@@ -1,4 +1,5 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
+
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -155,10 +156,16 @@ describe('QueryOrchestrator', () => {
         }
       },
       (msg, params) => console.log(new Date().toJSON(), msg, params), {
+        queryCacheOptions: {
+          queueOptions: () => ({
+            concurrency: 2,
+          }),
+        },
         preAggregationsOptions: {
-          queueOptions: {
-            executionTimeout: 2
-          },
+          queueOptions: () => ({
+            executionTimeout: 2,
+            concurrency: 2,
+          }),
           usedTablePersistTime: 1
         },
         externalDriverFactory: () => externalMockDriverLocal,
