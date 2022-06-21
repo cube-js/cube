@@ -23,6 +23,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   exportBucket?: string
   pollTimeout?: number
   pollMaxInterval?: number
+  maxPoolSize?: number
 }
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
@@ -36,6 +37,13 @@ function applyParams(query: string, params: any[]): string {
 }
 
 export class AthenaDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 1;
+  }
+
   private config: AthenaDriverOptionsInitialized;
 
   private athena: Athena;

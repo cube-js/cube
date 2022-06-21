@@ -37,6 +37,13 @@ IDLFactory.extractConfig = (config) => {
 const TSaslTransport = require('./TSaslTransport');
 
 class HiveDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
     this.config = {
@@ -95,7 +102,7 @@ class HiveDriver extends BaseDriver {
       destroy: (connection) => connection.close()
     }, {
       min: 0,
-      max: 8,
+      max: this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

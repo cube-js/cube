@@ -52,7 +52,7 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   executionTimeout?: number,
   readOnly?: boolean,
 } & {
-  poolSize: number
+  maxPoolSize?: number
 };
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
@@ -61,7 +61,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 40;
+    return 2;
   }
 
   protected readonly pool: Pool;
@@ -76,8 +76,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.pool = new Pool({
       max:
         process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
-        config.poolSize ||
-        8,
+        config.maxPoolSize || 8,
       idleTimeoutMillis: 30000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,

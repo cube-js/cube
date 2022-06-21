@@ -199,7 +199,7 @@ export const resolveDriver = async (
   } else {
     const type = coreOptions.dbType(context);
     return CubejsServerCore.createDriver(type, {
-      poolSize: getDriverMaxPool(context, options),
+      maxPoolSize: getDriverMaxPool(context, options),
       ...val.options
     });
   }
