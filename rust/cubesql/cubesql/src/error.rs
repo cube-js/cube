@@ -139,6 +139,12 @@ impl From<ParserError> for CubeError {
     }
 }
 
+impl From<rust_decimal::Error> for CubeError {
+    fn from(v: rust_decimal::Error) -> Self {
+        CubeError::internal(format!("{:?}", v))
+    }
+}
+
 impl From<tokio::task::JoinError> for CubeError {
     fn from(v: tokio::task::JoinError) -> Self {
         CubeError::internal(v.to_string())

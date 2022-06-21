@@ -205,6 +205,7 @@ impl Portal {
                     TableValue::Float64(v) => writer.write_value(*v)?,
                     TableValue::List(v) => writer.write_value(v.clone())?,
                     TableValue::Timestamp(v) => writer.write_value(v.clone())?,
+                    TableValue::Decimal128(v) => writer.write_value(v.clone())?,
                 };
             }
 
