@@ -107,6 +107,13 @@ export class QueryOrchestrator {
   }
 
   /**
+   * Returns PreAggregations instance.
+   */
+  public getPreAggregations(): PreAggregations {
+    return this.preAggregations;
+  }
+
+  /**
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {

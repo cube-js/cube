@@ -79,22 +79,31 @@ export const getSchedulerConcurrency = (
   core: CubejsServerCore,
   context: RequestContext,
 ): null | number => {
-  const queues = core
+  const queryQueues = core
     .getOrchestratorApi(context)
     .getQueryOrchestrator()
     .getQueryCache()
     .getQueues();
 
+  const preaggsQueues = core
+    .getOrchestratorApi(context)
+    .getQueryOrchestrator()
+    .getPreAggregations()
+    .getQueues();
+
   let concurrency: null | number;
 
-  if (!queues) {
+  if (!queryQueues && !preaggsQueues) {
     // first execution - no queues
     concurrency = null;
   } else {
     // further executions - queues ready
     const concurrencies: number[] = [];
-    Object.keys(queues).forEach((name) => {
-      concurrencies.push(queues[name].concurrency);
+    Object.keys(queryQueues).forEach((name) => {
+      concurrencies.push(queryQueues[name].concurrency);
+    });
+    Object.keys(preaggsQueues).forEach((name) => {
+      concurrencies.push(preaggsQueues[name].concurrency);
     });
     concurrency = Math.min(...concurrencies);
   }

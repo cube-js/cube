@@ -1641,6 +1641,17 @@ export class PreAggregations {
     return this.queue[dataSource];
   }
 
+  /**
+   * Returns registered queries queues hash table if any, false otherwise.
+   */
+  public getQueues(): false | {[dataSource: string]: QueryQueue} {
+    if (Object.keys(this.queue).length > 0) {
+      return this.queue;
+    } else {
+      return false;
+    }
+  }
+
   public getLoadCacheQueue(dataSource: string = 'default') {
     if (!this.loadCacheQueue[dataSource]) {
       this.loadCacheQueue[dataSource] = QueryCache.createQueue(
