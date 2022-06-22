@@ -356,6 +356,11 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
       return 'cubestore';
     },
     continueWaitTimeout: 0.1,
+    queryCacheOptions: {
+      queueOptions: () => ({
+        concurrency: 2,
+      }),
+    },
     preAggregationsOptions: {
       queueOptions: () => ({
         executionTimeout: 2,
@@ -471,7 +476,7 @@ describe('Refresh Scheduler', () => {
           throwErrors: true,
         });
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue
@@ -542,7 +547,7 @@ describe('Refresh Scheduler', () => {
           }],
         );
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue
@@ -779,7 +784,7 @@ describe('Refresh Scheduler', () => {
         });
         break;
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue
