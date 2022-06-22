@@ -155,6 +155,8 @@ export class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
+      lambdaRangeSql: this.query.lambdaRangeSql(cube, preAggregation),
+      lambdaTimeDimensionColumn: this.query.lambdaTimeDimensionColumn(cube, preAggregation),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       partitionGranularity: preAggregation.partitionGranularity,
@@ -837,6 +839,20 @@ export class PreAggregations {
           this.mergePartitionTimeDimensions(aggregation, aggregation.partitionTimeDimensions),
         preAggregationQuery: true,
         useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+      }
+    );
+  }
+
+  buildRangeQuery(cube, aggregation) {
+    const references = this.evaluateAllReferences(cube, aggregation);
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        measures: [],
+        dimensions: [],
+        timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
+        preAggregationQuery: true,
       }
     );
   }

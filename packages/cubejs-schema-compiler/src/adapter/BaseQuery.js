@@ -11,7 +11,13 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import {
+  LAMBDA_RANGE_END,
+  LAMBDA_RANGE_START,
+  LAMBDA_TABLE_NAME,
+  inDbTimeZone,
+  QueryAlias
+} from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -2184,6 +2190,33 @@ class BaseQuery {
         throw new UserError(`Unknown pre-aggregation type '${preAggregation.type}' in '${cube}'`);
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
+    );
+  }
+
+  lambdaRangeSql(cube, preAggregation) {
+    return this.cacheValue(
+      ['lambdaRangeSql', cube, JSON.stringify(preAggregation)],
+      () => {
+        const start = this.timeGroupedColumn(
+          preAggregation.granularity,
+          this.convertTz(this.paramAllocator.allocateParam(LAMBDA_RANGE_START))
+        );
+        const startAlias = this.escapeColumnName(QueryAlias.LAMBDA_RANGE_START);
+        const end = this.timeGroupedColumn(
+          preAggregation.granularity,
+          this.convertTz(this.paramAllocator.allocateParam(LAMBDA_RANGE_END))
+        );
+        const endAlias = this.escapeColumnName(QueryAlias.LAMBDA_RANGE_END);
+        const sql = `SELECT ${start} ${startAlias}, ${end} ${endAlias}`;
+        return this.paramAllocator.buildSqlAndParams(sql);
+      }
+    );
+  }
+
+  lambdaTimeDimensionColumn(cube, preAggregation) {
+    return this.cacheValue(
+      ['lambdaTimeDimensionColumn', cube, JSON.stringify(preAggregation)],
+      () => this.externalQuery().timeDimensions[0].aliasName(),
     );
   }
 

@@ -46,6 +46,12 @@ export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
 
 export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
+export const LAMBDA_RANGE_START = '__LAMBDA_RANGE_START';
+
+export const LAMBDA_RANGE_END = '__LAMBDA_RANGE_END';
+
+export const LAMBDA_TABLE_NAME = '__LAMBDA_TABLE_NAME';
+
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
   if (timestamp.length === 23) {
     const zone = moment.tz.zone(timezone);
