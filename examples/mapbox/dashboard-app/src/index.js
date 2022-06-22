@@ -14,7 +14,7 @@ const exampleDescritpion = {
       Follow 
       the <a href="https://mapbox-guide.cube.dev/">tutorial</a> 
       or explore 
-      the <a href="https://github.com/cube-js/cube.js/tree/master/guides/mapbox">source code</a> 
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/mapbox">source code</a> 
       to learn more.
     </p>
   `

@@ -9,8 +9,8 @@ const exampleDescription = {
   title: "Angular Dashboard with Material",
   text: `
   <p>This live demo shows a Material dashboard created with Angular and Cube.</p>
-  <p>Follow the <a href="https://angular-dashboard.cube.dev/">tutorial</a> or explore the 
-    <a href="https://github.com/cube-js/cube.js/commit/e018eb3fd11a72b04e861b08bf12dd712b46ca43">source code</a> 
+  <p>Follow the <a href="https://angular-dashboard.cube.dev/">tutorial</a> or explore the
+    <a href="https://github.com/cube-js/cube.js/tree/master/examples/angular-dashboard-with-material-ui">source code</a>
     to learn more.
   </p>`
 }
