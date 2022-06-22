@@ -1495,7 +1495,7 @@ impl MemberRules {
                                         add_member_error(egraph, format!(
                                             "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                                             dimension.get_real_name(),
-                                            call_agg_type.unwrap().to_uppercase(),
+                                            call_agg_type.unwrap_or("MEASURE".to_string()).to_uppercase(),
                                         ), 1),
                                     );
 

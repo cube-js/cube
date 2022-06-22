@@ -4179,6 +4179,22 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
+    fn measure_used_on_dimension() {
+        init_logger();
+
+        let create_query = convert_sql_to_cube_query(
+            &"SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL),
+        );
+
+        assert_eq!(
+            create_query.err().unwrap().message(),
+            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"KibanaSampleDataEcommerce\"",
+        );
+    }
+
+    #[test]
     fn powerbi_contains_filter() {
         init_logger();
 
