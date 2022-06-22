@@ -3,12 +3,6 @@ title: Connecting to Streamlit
 permalink: /config/downstream/streamlit
 ---
 
-<InfoBox>
-  <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
-  You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
-  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
-</InfoBox>
-
 You can query Cube from Streamlit notebooks via [SQL API][ref-sql-api].
 
 ```python

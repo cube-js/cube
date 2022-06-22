@@ -3,12 +3,6 @@ title: Connecting from Power BI
 permalink: /config/downstream/powerbi
 ---
 
-<InfoBox>
-  <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
-  You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
-  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
-</InfoBox>
-
 <WarningBox heading={`Power BI support is in preview`}>
 
 Power BI support is in preview, not all features and requests may work at this
