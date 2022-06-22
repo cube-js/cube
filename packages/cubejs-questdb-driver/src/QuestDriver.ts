@@ -145,6 +145,10 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
       if (tableName === undefined) {
         return;
       }
+      // Skip system tables.
+      if (tableName.startsWith('sys.')) {
+        return;
+      }
       const columns = await this.tableColumnTypes(tableName);
       metadata[''][tableName] = columns;
     }));
@@ -162,7 +166,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
   }
 
   public async tableColumnTypes(table: string) {
-    const response: any[] = await this.query(`SHOW COLUMNS FROM ${table}`, []);
+    const response: any[] = await this.query(`SHOW COLUMNS FROM '${table}'`, []);
 
     return response.map((row) => ({ name: row.column, type: this.toGenericType(row.type) }));
   }
@@ -182,7 +186,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     try {
       for (let i = 0; i < tableData.rows.length; i++) {
         await this.query(
-          `INSERT INTO ${table}
+          `INSERT INTO '${table}'
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
           columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
