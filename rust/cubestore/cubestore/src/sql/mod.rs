@@ -45,7 +45,7 @@ use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
-    MetaStoreTable, RowKey, Schema, TableId,
+    IndexType, MetaStoreTable, RowKey, Schema, TableId,
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
@@ -185,6 +185,7 @@ impl SqlServiceImpl {
         import_format: Option<ImportFormat>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
+        aggregates: Option<Vec<(Ident, Ident)>>,
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
@@ -216,10 +217,18 @@ impl SqlServiceImpl {
                 name: "#mi0".to_string(),
                 columns,
                 multi_index: Some(part_index_name),
+                index_type: IndexType::Regular,
             });
         }
+
         for index in indexes.iter() {
-            if let Statement::CreateIndex { name, columns, .. } = index {
+            if let Statement::CreateIndex {
+                name,
+                columns,
+                unique,
+                ..
+            } = index
+            {
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
                     multi_index: None,
@@ -236,6 +245,11 @@ impl SqlServiceImpl {
                             }
                         })
                         .collect::<Result<Vec<_>, _>>()?,
+                    index_type: if *unique {
+                        IndexType::Aggregate
+                    } else {
+                        IndexType::Regular
+                    },
                 });
             }
         }
@@ -252,6 +266,11 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                    aggregates.map(|keys| {
+                        keys.iter()
+                            .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                            .collect()
+                    }),
                     None,
                 )
                 .await;
@@ -302,6 +321,11 @@ impl SqlServiceImpl {
                 indexes_to_create,
                 false,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                aggregates.map(|keys| {
+                    keys.iter()
+                        .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                        .collect()
+                }),
                 partition_split_threshold,
             )
             .await?;
@@ -413,6 +437,7 @@ impl SqlServiceImpl {
                     name,
                     multi_index: None,
                     columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                    index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
             .await?)
@@ -745,6 +770,7 @@ impl SqlService for SqlServiceImpl {
                         ..
                     },
                 indexes,
+                aggregates,
                 locations,
                 unique_key,
                 partitioned_index,
@@ -790,6 +816,7 @@ impl SqlService for SqlServiceImpl {
                         Some(import_format),
                         indexes,
                         unique_key,
+                        aggregates,
                         partitioned_index,
                         &context.trace_obj,
                     )
@@ -1685,6 +1712,7 @@ mod tests {
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2983,6 +3011,115 @@ mod tests {
 
             }).await;
         }).await;
+    }
+    #[tokio::test]
+    async fn create_aggr_index() {
+        assert!(true);
+        Config::test("aggregate_index")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 10;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                let paths = {
+                    let dir = env::temp_dir();
+
+                    let path_2 = dir.clone().join("orders.csv.gz");
+
+                    let mut file = GzipEncoder::new(BufWriter::new(
+                        tokio::fs::File::create(path_2.clone()).await.unwrap(),
+                    ));
+
+                    file.write_all("platform,age,gender,cnt,max_id\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"ios\",20,\"M\",10,100\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"android\",20,\"M\",2,10\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",20,\"M\",20,111\n".as_bytes())
+                        .await
+                        .unwrap();
+
+                    file.write_all("\"ios\",20,\"F\",10,100\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"android\",20,\"F\",2,10\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",22,\"F\",20,115\n".as_bytes())
+                        .await
+                        .unwrap();
+                    file.write_all("\"web\",22,\"F\",20,222\n".as_bytes())
+                        .await
+                        .unwrap();
+
+                    file.shutdown().await.unwrap();
+
+                    services
+                        .injector
+                        .get_service_typed::<dyn RemoteFs>()
+                        .await
+                        .upload_file(path_2.to_str().unwrap(), "temp-uploads/orders.csv.gz")
+                        .await
+                        .unwrap();
+
+                    vec!["temp://orders.csv.gz".to_string()]
+                };
+                let query = format!(
+                    "CREATE TABLE foo.Orders (
+                                    platform varchar(255),
+                                    age int,
+                                    gender varchar(2),
+                                    cnt int,
+                                    max_id int
+                                  )
+                    AGGREGATIONS (sum(cnt), max(max_id))
+                    INDEX index1 (platform, age)
+                    AGGREGATE INDEX aggr_index (platform, age)
+                    LOCATION {}",
+                    paths.into_iter().map(|p| format!("'{}'", p)).join(",")
+                );
+                service.exec_query(&query).await.unwrap();
+
+                let indices = services.meta_store.get_table_indexes(1).await.unwrap();
+
+                let aggr_index = indices
+                    .iter()
+                    .find(|i| i.get_row().get_name() == "aggr_index")
+                    .unwrap();
+
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(aggr_index.get_id())
+                    .await
+                    .unwrap();
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(partitions[0].get_id(), false)
+                    .await
+                    .unwrap();
+
+                assert_eq!(chunks.len(), 1);
+                assert_eq!(chunks[0].get_row().get_row_count(), 4);
+
+                let p = service
+                    .plan_query(
+                        "SELECT platform, age, sum(cnt) FROM foo.Orders GROUP BY platform, age",
+                    )
+                    .await
+                    .unwrap();
+
+                let worker_plan = pp_phys_plan(p.worker.as_ref());
+                assert!(worker_plan.find("aggr_index").is_some());
+            })
+            .await;
     }
 }
 
