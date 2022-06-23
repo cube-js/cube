@@ -51,14 +51,16 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Export Bucket |             ❌             |     ✅      |
+| Simple        |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-By default, Databricks uses the [export bucket
-strategy][self-preaggs-export-bucket] to build pre-aggregations.
+By default, Databricks JDBC uses a [simple][self-preaggs-simple] strategy to
+build pre-aggregations.
 
-### Batching
+### Simple
 
-Databricks does not support batching.
+No extra configuration is required to configure simple pre-aggregation builds
+for Databricks.
 
 ### Export Bucket
 
@@ -121,4 +123,4 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
-[self-preaggs-export-bucket]: #export-bucket
+[self-preaggs-simple]: #simple
