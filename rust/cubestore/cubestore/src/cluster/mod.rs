@@ -832,6 +832,19 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::InMemoryChunksCompaction => {
+                if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let partition_id = *partition_id;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service
+                            .compact_in_memory_chunks(partition_id)
+                            .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
             JobType::MultiPartitionSplit => {
                 if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();

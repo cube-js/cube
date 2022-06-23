@@ -984,10 +984,12 @@ impl ChunkStore {
             let batch = RecordBatch::try_new(Arc::new(arrow_schema(&index.get_row())), data)?;
             let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
+
             Ok(cube_ext::spawn(async move {
                 cluster
                     .add_memory_chunk(&node_name, chunk.get_id(), batch)
                     .await?;
+
                 Ok((chunk, None))
             }))
         } else {

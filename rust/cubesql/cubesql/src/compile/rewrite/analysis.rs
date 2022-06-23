@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ColumnExprColumn, DimensionName, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, TableScanSourceTableName, TimeDimensionName,
+            MeasureName, SegmentName, TableScanSourceTableName, TimeDimensionName,
         },
     },
     var_iter, CubeError,
@@ -124,6 +124,16 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
+            LogicalPlanLanguage::Segment(params) => {
+                if let Some(_) = column_name(params[1]) {
+                    let expr = original_expr(params[1])?;
+                    let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
+                    map.push((segment_name.to_string(), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
             LogicalPlanLanguage::TimeDimension(params) => {
                 if let Some(_) = column_name(params[3]) {
                     let expr = original_expr(params[3])?;
@@ -205,6 +215,11 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AnyExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::BinaryExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
@@ -234,15 +249,18 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::CaseExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[1], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
-            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
+            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
@@ -255,21 +273,14 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
-            LogicalPlanLanguage::SortExp(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
-                Some(vec)
-            }
-            LogicalPlanLanguage::AggregateGroupExpr(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
-                Some(vec)
-            }
-            LogicalPlanLanguage::AggregateAggrExpr(params) => {
+            LogicalPlanLanguage::SortExp(params)
+            | LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::CaseExprWhenThenExpr(params)
+            | LogicalPlanLanguage::CaseExprElseExpr(params)
+            | LogicalPlanLanguage::CaseExprExpr(params)
+            | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }
@@ -344,6 +355,17 @@ impl LogicalPlanAnalysis {
                 } else {
                     panic!("Expected ScalarFunctionExpr but got: {:?}", expr);
                 }
+            }
+            LogicalPlanLanguage::AnyExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+
+                Self::eval_constant_expr(&egraph, &expr)
             }
             LogicalPlanLanguage::BinaryExpr(_) => {
                 let expr = node_to_expr(

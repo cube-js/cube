@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
-use crate::{buffer, BindValue, PgType, PgTypeId, ProtocolError};
+use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
 
@@ -61,6 +61,45 @@ impl Serialize for StartupMessage {
             buffer::write_string(&mut buffer, &value);
         }
 
+        buffer.push(0);
+
+        Some(buffer)
+    }
+}
+
+#[derive(Debug)]
+pub struct NoticeResponse {
+    // https://www.postgresql.org/docs/14/protocol-error-fields.html
+    pub severity: NoticeSeverity,
+    pub code: ErrorCode,
+    pub message: String,
+}
+
+impl NoticeResponse {
+    pub fn warning(code: ErrorCode, message: String) -> Self {
+        Self {
+            severity: NoticeSeverity::Warning,
+            code,
+            message,
+        }
+    }
+}
+
+impl Serialize for NoticeResponse {
+    const CODE: u8 = b'N';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
+
+        let severity = self.severity.to_string();
+        buffer.push(b'S');
+        buffer::write_string(&mut buffer, &severity);
+
+        buffer.push(b'C');
+        buffer::write_string(&mut buffer, &self.code.to_string());
+
+        buffer.push(b'M');
+        buffer::write_string(&mut buffer, &self.message);
         buffer.push(0);
 
         Some(buffer)
@@ -180,6 +219,22 @@ impl Serialize for ReadyForQuery {
     }
 }
 
+pub struct EmptyQuery {}
+
+impl EmptyQuery {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for EmptyQuery {
+    const CODE: u8 = b'I';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 pub struct ParameterStatus {
     name: String,
     value: String,
@@ -256,7 +311,17 @@ impl Serialize for ParseComplete {
 #[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
+    Fetch(u32),
     Plain(String),
+}
+
+impl CommandComplete {
+    pub fn new_selection(is_select: bool, rows: u32) -> Self {
+        match is_select {
+            true => CommandComplete::Select(rows),
+            false => CommandComplete::Fetch(rows),
+        }
+    }
 }
 
 impl Serialize for CommandComplete {
@@ -267,6 +332,9 @@ impl Serialize for CommandComplete {
         match self {
             CommandComplete::Select(rows) => {
                 buffer::write_string(&mut buffer, &format!("SELECT {}", rows))
+            }
+            CommandComplete::Fetch(rows) => {
+                buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
             CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
         }
@@ -316,13 +384,17 @@ impl ParameterDescription {
     pub fn new(parameters: Vec<PgTypeId>) -> Self {
         Self { parameters }
     }
+
+    pub fn get(&self, i: usize) -> Option<&PgTypeId> {
+        self.parameters.get(i)
+    }
 }
 
 impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![];
+        let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
         // FIXME!
         let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
@@ -343,6 +415,9 @@ pub struct RowDescription {
 impl RowDescription {
     pub fn new(fields: Vec<RowDescriptionField>) -> Self {
         Self { fields }
+    }
+    pub fn len(&self) -> usize {
+        self.fields.len()
     }
 }
 
@@ -372,12 +447,18 @@ impl Serialize for RowDescription {
 #[derive(Debug, Clone)]
 pub struct RowDescriptionField {
     name: String,
-    // TODO: REWORK!
+    /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
     table_oid: i32,
+    /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
     attribute_number: i16,
+    // The object ID of the field's data type. PgTypeId
     data_type_oid: i32,
+    /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
     data_type_size: i16,
+    /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
+    /// select attrelid, attname, atttypmod from pg_attribute;
     type_modifier: i32,
+    /// The format code being used for the field. It depends on the client request and binary ecconding for specific type
     format: Format,
 }
 
@@ -385,26 +466,15 @@ impl RowDescriptionField {
     pub fn new(name: String, typ: &PgType, format: Format) -> Self {
         Self {
             name,
+            // TODO: REWORK!
             table_oid: 0,
+            // TODO: REWORK!
             attribute_number: 0,
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
-            format: if format == Format::Binary {
-                // TODO: Introduce new function for PgType that checks for binary support
-                if typ.oid == PgTypeId::INT4 as u32
-                    || typ.oid == PgTypeId::INT2 as u32
-                    || typ.oid == PgTypeId::INT8 as u32
-                    || typ.oid == PgTypeId::BOOL as u32
-                    || typ.oid == PgTypeId::FLOAT4 as u32
-                    || typ.oid == PgTypeId::FLOAT8 as u32
-                    || typ.oid == PgTypeId::TIMESTAMP as u32
-                    || typ.oid == PgTypeId::TIMESTAMPTZ as u32
-                {
-                    Format::Binary
-                } else {
-                    Format::Text
-                }
+            format: if format == Format::Binary && typ.is_binary_supported() {
+                Format::Binary
             } else {
                 Format::Text
             },
@@ -538,22 +608,51 @@ pub struct Bind {
 }
 
 impl Bind {
-    pub fn to_bind_values(&self) -> Vec<BindValue> {
-        let mut values = vec![];
+    pub fn to_bind_values(
+        &self,
+        description: &ParameterDescription,
+    ) -> Result<Vec<BindValue>, ProtocolError> {
+        let mut values = Vec::with_capacity(self.parameter_values.len());
 
-        for param_value in &self.parameter_values {
-            values.push(match param_value {
+        for (idx, raw_value) in self.parameter_values.iter().enumerate() {
+            let param_tid = description.get(idx).ok_or::<ProtocolError>({
+                ErrorResponse::error(
+                    ErrorCode::InternalError,
+                    format!("Unknown type for parameter: {}", idx),
+                )
+                .into()
+            })?;
+
+            let param_format = match self.parameter_formats.len() {
+                0 => Format::Text,
+                1 => self.parameter_formats[0],
+                _ => self.parameter_formats[idx],
+            };
+
+            values.push(match raw_value {
                 None => BindValue::Null,
-                Some(raw_value) => {
-                    let decoded = String::from_utf8(raw_value.clone())
-                        .expect("Unable to unpack raw parameter to string");
-
-                    BindValue::String(decoded)
-                }
+                Some(raw_value) => match param_tid {
+                    PgTypeId::TEXT => {
+                        BindValue::String(String::from_protocol(raw_value, param_format)?)
+                    }
+                    PgTypeId::INT8 => {
+                        BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
+                    }
+                    _ => {
+                        return Err(ErrorResponse::error(
+                            ErrorCode::FeatureNotSupported,
+                            format!(
+                                r#"Type "{:?}" is not supported for parameters decoding"#,
+                                param_tid
+                            ),
+                        )
+                        .into())
+                    }
+                },
             })
         }
 
-        values
+        Ok(values)
     }
 }
 
@@ -691,6 +790,8 @@ pub enum FrontendMessage {
     Describe(Describe),
     Execute(Execute),
     Close(Close),
+    /// Flush network buffer
+    Flush,
     /// Close connection
     Terminate,
     /// Finish
@@ -710,10 +811,20 @@ pub enum ErrorCode {
     InvalidPassword,
     // 22
     DataException,
+    // Class 25 — Invalid Transaction State
+    ActiveSqlTransaction,
+    NoActiveSqlTransaction,
     // 26
     InvalidSqlStatement,
     // 34
     InvalidCursorName,
+    // Class 42 — Syntax Error or Access Rule Violation
+    DuplicateCursor,
+    SyntaxError,
+    // Class 53 — Insufficient Resources
+    ConfigurationLimitExceeded,
+    // Class 55 — Object Not In Prerequisite State
+    ObjectNotInPrerequisiteState,
     // XX - Internal Error
     InternalError,
 }
@@ -726,9 +837,38 @@ impl Display for ErrorCode {
             Self::InvalidAuthorizationSpecification => "28000",
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
+            Self::ActiveSqlTransaction => "25001",
+            Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::DuplicateCursor => "42P03",
+            Self::SyntaxError => "42601",
+            Self::ConfigurationLimitExceeded => "53400",
+            Self::ObjectNotInPrerequisiteState => "55000",
             Self::InternalError => "XX000",
+        };
+        write!(f, "{}", string)
+    }
+}
+
+#[derive(Debug)]
+pub enum NoticeSeverity {
+    // https://www.postgresql.org/docs/14/protocol-error-fields.html
+    Warning,
+    Notice,
+    Debug,
+    Info,
+    Log,
+}
+
+impl Display for NoticeSeverity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Self::Warning => "WARNING",
+            Self::Notice => "NOTICE",
+            Self::Debug => "DEBUG",
+            Self::Info => "INFO",
+            Self::Log => "LOG",
         };
         write!(f, "{}", string)
     }
@@ -739,7 +879,7 @@ pub enum ErrorSeverity {
     // https://www.postgresql.org/docs/14/protocol-error-fields.html
     Error,
     Fatal,
-    // Panic,
+    Panic,
 }
 
 impl Display for ErrorSeverity {
@@ -747,7 +887,7 @@ impl Display for ErrorSeverity {
         let string = match self {
             Self::Error => "ERROR",
             Self::Fatal => "FATAL",
-            // Self::Panic => "PANIC",
+            Self::Panic => "PANIC",
         };
         write!(f, "{}", string)
     }
@@ -755,7 +895,7 @@ impl Display for ErrorSeverity {
 
 pub enum TransactionStatus {
     Idle,
-    // InTransactionBlock,
+    InTransactionBlock,
     // InFailedTransactionBlock,
 }
 
@@ -763,7 +903,7 @@ impl TransactionStatus {
     pub fn to_byte(&self) -> u8 {
         match self {
             Self::Idle => b'I',
-            // Self::InTransactionBlock => b'T',
+            Self::InTransactionBlock => b'T',
             // Self::InFailedTransactionBlock => b'E',
         }
     }
@@ -868,10 +1008,10 @@ mod tests {
             r#"
             50 00 00 00 77 6e 61 6d 65 64 2d 73 74 6d 74 00   P...wnamed-stmt.
             0a 20 20 20 20 20 20 53 45 4c 45 43 54 20 6e 75   .      SELECT nu
-            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.   
+            6d 2c 20 73 74 72 2c 20 62 6f 6f 6c 0a 20 20 20   m, str, bool.
             20 20 20 46 52 4f 4d 20 74 65 73 74 64 61 74 61      FROM testdata
             0a 20 20 20 20 20 20 57 48 45 52 45 20 6e 75 6d   .      WHERE num
-            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str = 
+            20 3d 20 24 31 20 41 4e 44 20 73 74 72 20 3d 20    = $1 AND str =
             24 32 20 41 4e 44 20 62 6f 6f 6c 20 3d 20 24 33   $2 AND bool = $3
             0a 20 20 20 20 00 00 00                           .    ...
             "#
@@ -903,7 +1043,7 @@ mod tests {
             r#"
             42 00 00 00 2d 00 6e 61 6d 65 64 2d 73 74 6d 74   B...-.named-stmt
             00 00 00 00 03 00 00 00 01 35 00 00 00 04 74 65   .........5....te
-            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....            
+            73 74 00 00 00 04 74 72 75 65 00 01 00 00         st....true....
             "#
             .to_string(),
         );
@@ -925,7 +1065,7 @@ mod tests {
                         ],
                         result_formats: vec![Format::Text]
                     },
-                )
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
@@ -956,7 +1096,13 @@ mod tests {
                         parameter_values: vec![Some(vec![116, 101, 115, 116])],
                         result_formats: vec![Format::Binary]
                     },
-                )
+                );
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::TEXT]))
+                        .unwrap(),
+                    vec![BindValue::String("test".to_string())]
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
@@ -968,7 +1114,7 @@ mod tests {
     async fn test_frontend_message_parse_describe() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            44 00 00 00 08 53 73 30 00                        D....Ss0.          
+            44 00 00 00 08 53 73 30 00                        D....Ss0.
             "#
             .to_string(),
         );
@@ -1021,7 +1167,7 @@ mod tests {
     async fn test_frontend_message_execute() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
-            45 00 00 00 09 00 00 00 00 00                     E.........      
+            45 00 00 00 09 00 00 00 00 00                     E.........
             "#
             .to_string(),
         );

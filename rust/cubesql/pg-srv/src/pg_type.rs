@@ -21,6 +21,43 @@ pub struct PgType<'a> {
     pub typreceive_oid: u32,
 }
 
+impl<'a> PgType<'a> {
+    pub fn get_typinput(&self) -> String {
+        if let Some(ty_id) = PgTypeId::from_oid(self.oid) {
+            // TODO: It requires additional verification
+            match ty_id {
+                PgTypeId::ARRAYTEXT
+                | PgTypeId::ARRAYINT2
+                | PgTypeId::ARRAYINT4
+                | PgTypeId::ARRAYINT8
+                | PgTypeId::ARRAYFLOAT4
+                | PgTypeId::ARRAYFLOAT8
+                | PgTypeId::ARRAYBOOL
+                | PgTypeId::ARRAYBYTEA => "array_in".to_string(),
+                PgTypeId::TIMESTAMP
+                | PgTypeId::TIMESTAMPTZ
+                | PgTypeId::DATE
+                | PgTypeId::TIME
+                | PgTypeId::TIMETZ => self.typname.to_owned() + "_in",
+                PgTypeId::TSMULTIRANGE
+                | PgTypeId::NUMMULTIRANGE
+                | PgTypeId::DATEMULTIRANGE
+                | PgTypeId::INT4MULTIRANGE
+                | PgTypeId::INT8MULTIRANGE => "multirange_in".to_string(),
+                PgTypeId::MONEY => "cash_in".to_string(),
+                _ => self.typname.to_owned() + "in",
+            }
+        } else {
+            "record_in".to_string()
+        }
+    }
+
+    pub fn is_binary_supported(&self) -> bool {
+        // Right now, We assume that all types have binary encoding support
+        true
+    }
+}
+
 macro_rules! define_pg_types {
     ($($NAME:ident ($OID:expr) { $($KEY:ident: $VALUE:expr,)* },)*) => {
         #[derive(Debug, Clone, Copy)]

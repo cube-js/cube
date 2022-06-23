@@ -5,16 +5,16 @@ use crate::{
     compile::{
         convert_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
-        CompilationError, QueryPlan,
+        CompilationError, MetaContext, QueryPlan,
     },
     sql::{
         df_type_to_pg_tid,
-        extended::Portal,
+        extended::{Cursor, Portal},
         session::DatabaseProtocol,
-        statement::{StatementParamsFinder, StatementPlaceholderReplacer},
+        statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
         writer::BatchWriter,
-        AuthContext, Session,
+        AuthContext, Session, StatusFlags,
     },
     telemetry::ContextLogger,
     CubeError,
@@ -22,8 +22,12 @@ use crate::{
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
-    protocol::{CommandComplete, ErrorCode, ErrorResponse, Format},
+    protocol::{ErrorCode, ErrorResponse, Format},
     PgType, PgTypeId, ProtocolError,
+};
+use sqlparser::{
+    ast,
+    ast::{CloseCursor, FetchDirection, Statement, Value},
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -31,6 +35,7 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     // Extended query
     statements: HashMap<String, Option<PreparedStatement>>,
+    cursors: HashMap<String, Cursor>,
     portals: HashMap<String, Option<Portal>>,
     // Shared
     session: Arc<Session>,
@@ -43,6 +48,52 @@ pub enum StartupState {
     Success(HashMap<String, String>),
     SslRequested,
     Denied,
+}
+
+pub trait QueryPlanExt {
+    fn to_row_description(
+        &self,
+        required_format: protocol::Format,
+    ) -> Result<Option<protocol::RowDescription>, ConnectionError>;
+}
+
+impl QueryPlanExt for QueryPlan {
+    /// This method returns schema for response
+    /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
+    fn to_row_description(
+        &self,
+        required_format: protocol::Format,
+    ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
+        match &self {
+            QueryPlan::MetaOk(_, _) => Ok(None),
+            QueryPlan::MetaTabular(_, frame) => {
+                let mut result = vec![];
+
+                for field in frame.get_columns() {
+                    result.push(protocol::RowDescriptionField::new(
+                        field.get_name(),
+                        PgType::get_by_tid(PgTypeId::TEXT),
+                        required_format,
+                    ));
+                }
+
+                Ok(Some(protocol::RowDescription::new(result)))
+            }
+            QueryPlan::DataFusionSelect(_, logical_plan, _) => {
+                let mut result = vec![];
+
+                for field in logical_plan.schema().fields() {
+                    result.push(protocol::RowDescriptionField::new(
+                        field.name().clone(),
+                        df_type_to_pg_tid(field.data_type())?.to_type(),
+                        required_format,
+                    ));
+                }
+
+                Ok(Some(protocol::RowDescription::new(result)))
+            }
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -71,20 +122,26 @@ impl ConnectionError {
             ConnectionError::Cube(e) => {
                 protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
             }
-            ConnectionError::CompilationError(e) => match e {
-                CompilationError::Internal(_, _) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InternalError,
-                    e.to_string(),
-                ),
-                CompilationError::User(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::InvalidSqlStatement,
-                    e.to_string(),
-                ),
-                CompilationError::Unsupported(_) => protocol::ErrorResponse::error(
-                    protocol::ErrorCode::FeatureNotSupported,
-                    e.to_string(),
-                ),
-            },
+            ConnectionError::CompilationError(e) => {
+                fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
+                    match e {
+                        CompilationError::Internal(_, _, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InternalError,
+                            e.to_string(),
+                        ),
+                        CompilationError::User(_, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::InvalidSqlStatement,
+                            e.to_string(),
+                        ),
+                        CompilationError::Unsupported(_, _) => protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            e.to_string(),
+                        ),
+                    }
+                }
+
+                to_error_response(e)
+            }
             ConnectionError::Protocol(e) => e.to_error_response(),
         }
     }
@@ -124,6 +181,7 @@ impl AsyncPostgresShim {
     ) -> Result<(), std::io::Error> {
         let mut shim = Self {
             socket,
+            cursors: HashMap::new(),
             portals: HashMap::new(),
             statements: HashMap::new(),
             session,
@@ -134,6 +192,7 @@ impl AsyncPostgresShim {
             Err(e) => {
                 shim.logger.error(
                     format!("Error during processing PostgreSQL connection: {}", e).as_str(),
+                    None,
                 );
 
                 if let Some(bt) = e.backtrace() {
@@ -184,6 +243,7 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Close(body) => self.close(body).await,
                 protocol::FrontendMessage::Describe(body) => self.describe(body).await,
                 protocol::FrontendMessage::Sync => self.sync().await,
+                protocol::FrontendMessage::Flush => self.flush().await,
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 command_id => {
                     return Err(ConnectionError::Protocol(
@@ -205,8 +265,19 @@ impl AsyncPostgresShim {
         &mut self,
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
-        self.logger
-            .error(format!("Error during processing PostgreSQL message: {}", err).as_str());
+        let (message, props) = match &err {
+            ConnectionError::CompilationError(err) => match err {
+                CompilationError::Unsupported(msg, meta)
+                | CompilationError::User(msg, meta)
+                | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
+            },
+            _ => (
+                format!("Error during processing PostgreSQL message: {}", err),
+                None,
+            ),
+        };
+
+        self.logger.error(message.as_str(), props);
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -328,6 +399,11 @@ impl AsyncPostgresShim {
             ("server_encoding".to_string(), "UTF8".to_string()),
             ("client_encoding".to_string(), "UTF8".to_string()),
             ("DateStyle".to_string(), "ISO".to_string()),
+            // Reports whether PostgreSQL was built with support for 64-bit-integer dates and times.
+            ("integer_datetimes".to_string(), "on".to_string()),
+            ("TimeZone".to_string(), "Etc/UTC".to_string()),
+            // TODO: Right now we dont support intervals, but it's an important thing
+            // ("IntervalStyle".to_string(), "postgres".to_string()),
         ];
 
         for (key, value) in params {
@@ -352,6 +428,11 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    pub async fn flush(&mut self) -> Result<(), ConnectionError> {
+        // TODO: flush network buffers here once buffering has been implemented
+        Ok(())
+    }
+
     pub async fn describe_portal(&mut self, name: String) -> Result<(), ConnectionError> {
         match self.portals.get(&name) {
             None => {
@@ -367,7 +448,7 @@ impl AsyncPostgresShim {
             Some(portal) => match portal {
                 // We use None for Portal on empty query
                 None => self.write(protocol::NoData::new()).await,
-                Some(named) => match named.get_description().clone() {
+                Some(named) => match named.get_description()? {
                     // If Query doesnt return data, no fields in response.
                     None => self.write(protocol::NoData::new()).await,
                     Some(packet) => self.write(packet).await,
@@ -475,8 +556,21 @@ impl AsyncPostgresShim {
             )
         })?;
 
+        if self.portals.len() >= self.session.server.configuration.connection_max_portals {
+            return Err(ConnectionError::Protocol(
+                protocol::ErrorResponse::error(
+                    protocol::ErrorCode::ConfigurationLimitExceeded,
+                    format!(
+                        "Unable to allocate a new portal: max allocation reached, actual: {}, max: {}",
+                        self.portals.len(),
+                        self.session.server.configuration.connection_max_portals),
+                )
+                    .into(),
+            ));
+        }
+
         let portal = if let Some(statement) = source_statement {
-            let prepared_statement = statement.bind(body.to_bind_values());
+            let prepared_statement = statement.bind(body.to_bind_values(&statement.parameters)?)?;
 
             let meta = self
                 .session
@@ -485,25 +579,11 @@ impl AsyncPostgresShim {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_statement_to_cube_query(
-                &prepared_statement,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan =
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-            let fields = self
-                .query_plan_to_row_description(&plan, format)
-                .await?
-                .unwrap_or(vec![]);
-            let description = if fields.len() > 0 {
-                Some(protocol::RowDescription::new(fields))
-            } else {
-                None
-            };
-
-            Some(Portal::new(plan, format, description))
+            Some(Portal::new(plan, format, true))
         } else {
             None
         };
@@ -514,55 +594,36 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    /// This method returns schema for response
-    /// None is used for special queries, which doesnt have any data, for example: DISCARD ALL
-    async fn query_plan_to_row_description(
-        &mut self,
-        plan: &QueryPlan,
-        required_format: protocol::Format,
-    ) -> Result<Option<Vec<protocol::RowDescriptionField>>, ConnectionError> {
-        match plan {
-            QueryPlan::MetaOk(_, _) => Ok(None),
-            QueryPlan::MetaTabular(_, frame) => {
-                let mut result = vec![];
-
-                for field in frame.get_columns() {
-                    result.push(protocol::RowDescriptionField::new(
-                        field.get_name(),
-                        PgType::get_by_tid(PgTypeId::TEXT),
-                        required_format,
-                    ));
-                }
-
-                Ok(Some(result))
-            }
-            QueryPlan::DataFusionSelect(_, logical_plan, _) => {
-                let mut result = vec![];
-
-                for field in logical_plan.schema().fields() {
-                    result.push(protocol::RowDescriptionField::new(
-                        field.name().clone(),
-                        df_type_to_pg_tid(field.data_type())?.to_type(),
-                        required_format,
-                    ));
-                }
-
-                Ok(Some(result))
-            }
-        }
-    }
-
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), ConnectionError> {
         let prepared = if parse.query.trim() == "" {
             None
         } else {
             let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
 
-            let stmt_finder = StatementParamsFinder::new();
+            if self.statements.len()
+                >= self
+                    .session
+                    .server
+                    .configuration
+                    .connection_max_prepared_statements
+            {
+                return Err(ConnectionError::Protocol(
+                    protocol::ErrorResponse::error(
+                        protocol::ErrorCode::ConfigurationLimitExceeded,
+                        format!(
+                            "Unable to allocate a new prepared statement: max allocation reached, actual: {}, max: {}",
+                            self.statements.len(),
+                            self.session.server.configuration.connection_max_prepared_statements),
+                    )
+                        .into(),
+                ));
+            }
+
+            let stmt_finder = PostgresStatementParamsFinder::new();
             let parameters: Vec<PgTypeId> = stmt_finder
-                .find(&query)
+                .find(&query)?
                 .into_iter()
-                .map(|_p| PgTypeId::TEXT)
+                .map(|param| param.coltype.to_pg_tid())
                 .collect();
 
             let meta = self
@@ -573,21 +634,13 @@ impl AsyncPostgresShim {
                 .await?;
 
             let stmt_replacer = StatementPlaceholderReplacer::new();
-            let hacked_query = stmt_replacer.replace(&query);
+            let hacked_query = stmt_replacer.replace(&query)?;
 
-            let plan = convert_statement_to_cube_query(
-                &hacked_query,
-                meta,
-                self.session.clone(),
-                self.logger.clone(),
-            )?;
+            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
 
-            let description = if let Some(fields) = self
-                .query_plan_to_row_description(&plan, Format::Text)
-                .await?
-            {
-                if fields.len() > 0 {
-                    Some(protocol::RowDescription::new(fields))
+            let description = if let Some(description) = plan.to_row_description(Format::Text)? {
+                if description.len() > 0 {
+                    Some(description)
                 } else {
                     None
                 }
@@ -609,6 +662,358 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    pub fn end_transaction(&mut self) -> Result<bool, ConnectionError> {
+        if let Some(_) = self.session.state.end_transaction() {
+            // Portals + Cursors which we want to remove
+            let mut to_remove = Vec::new();
+
+            for (key, cursor) in &self.cursors {
+                if !cursor.hold {
+                    to_remove.push(key.clone());
+                }
+            }
+
+            for key in &to_remove {
+                self.cursors.remove(key);
+                self.portals.remove(key);
+
+                trace!("Closing cursor/portal {}", key);
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub async fn process_simple_query(
+        &mut self,
+        stmt: ast::Statement,
+        meta: Arc<MetaContext>,
+    ) -> Result<(), ConnectionError> {
+        match stmt {
+            Statement::StartTransaction { .. } => {
+                if !self.session.state.begin_transaction() {
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::ActiveSqlTransaction,
+                        "there is already a transaction in progress".to_string(),
+                    ))
+                    .await?
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            Statement::Rollback { .. } => {
+                if self.end_transaction()? == false {
+                    // PostgreSQL returns command completion anyway
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::NoActiveSqlTransaction,
+                        "there is no transaction in progress".to_string(),
+                    ))
+                    .await?
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            Statement::Commit { .. } => {
+                if self.end_transaction()? == false {
+                    // PostgreSQL returns command completion anyway
+                    self.write(protocol::NoticeResponse::warning(
+                        ErrorCode::NoActiveSqlTransaction,
+                        "there is no transaction in progress".to_string(),
+                    ))
+                    .await?
+                };
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            Statement::Fetch {
+                name,
+                direction,
+                into,
+            } => {
+                if into.is_some() {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "INTO is not supported for FETCH statement".to_string(),
+                        )
+                        .into(),
+                    ));
+                };
+
+                let limit: usize = match direction {
+                    FetchDirection::Count { limit } => {
+                        match limit {
+                            Value::Number(v, negative) => {
+                                if negative {
+                                    // HINT:  Declare it with SCROLL option to enable backward scan.
+                                    // But it's not supported right now!
+                                    return Err(ConnectionError::Protocol(
+                                        protocol::ErrorResponse::error(
+                                            protocol::ErrorCode::ObjectNotInPrerequisiteState,
+                                            "cursor can only scan forward".to_string(),
+                                        )
+                                        .into(),
+                                    ));
+                                }
+
+                                v.parse::<usize>().map_err(|err| ConnectionError::Protocol(
+                                protocol::ErrorResponse::error(
+                                    protocol::ErrorCode::ProtocolViolation,
+                                    format!(r#""Unable to parse number "{}" for fetch limit: {}"#, v, err),
+                                )
+                                    .into(),
+                            ))?
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    other => {
+                        return Err(ConnectionError::Protocol(
+                            protocol::ErrorResponse::error(
+                                protocol::ErrorCode::ProtocolViolation,
+                                format!("Limit {} is not supported for FETCH statement", other),
+                            )
+                            .into(),
+                        ));
+                    }
+                };
+
+                if let Some(portal) = self.portals.remove(&name.value) {
+                    if let Some(mut portal) = portal {
+                        self.write_portal(&mut portal, limit).await?;
+                        self.portals.insert(name.value.clone(), Some(portal));
+
+                        return Ok(());
+                    } else {
+                        return Err(ConnectionError::Protocol(
+                            protocol::ErrorResponse::error(
+                                protocol::ErrorCode::InternalError,
+                                "Unable to unwrap Plan without plan, unexpected error".to_string(),
+                            )
+                            .into(),
+                        ));
+                    }
+                } else {
+                    trace!(
+                        r#"Unable to find portal for cursor: "{}". Maybe it was not created. Opening..."#,
+                        &name.value
+                    );
+                }
+
+                if self.portals.len() >= self.session.server.configuration.connection_max_portals {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::ConfigurationLimitExceeded,
+                            format!(
+                                "Unable to allocate a new portal to open cursor: max allocation reached, actual: {}, max: {}",
+                                self.portals.len(),
+                                self.session.server.configuration.connection_max_portals),
+                        )
+                            .into(),
+                    ));
+                }
+
+                let cursor = self.cursors.get(&name.value).ok_or_else(|| {
+                    ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::ProtocolViolation,
+                            format!(r#"cursor "{}" does not exist"#, name.value),
+                        )
+                        .into(),
+                    )
+                })?;
+
+                let plan =
+                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())?;
+
+                let mut portal = Portal::new(plan, cursor.format, false);
+
+                self.write_portal(&mut portal, limit).await?;
+                self.portals.insert(name.value, Some(portal));
+            }
+            Statement::Declare {
+                name,
+                binary,
+                query,
+                scroll,
+                sensitive,
+                hold,
+            } => {
+                // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
+                if scroll.is_some() {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "SCROLL|NO SCROLL is not supported for DECLARE statement".to_string(),
+                        )
+                        .into(),
+                    ));
+                };
+
+                // In PostgreSQL, all cursors are insensitive
+                if Some(true) == sensitive {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "INSENSITIVE|ASENSITIVE is not supported for DECLARE statement"
+                                .to_string(),
+                        )
+                        .into(),
+                    ));
+                };
+
+                if self.statements.contains_key(&name.value) {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::DuplicateCursor,
+                            format!(r#"cursor "{}" already exists"#, name.value),
+                        )
+                        .into(),
+                    ));
+                }
+
+                let select_stmt = Statement::Query(query);
+                // It's just a verification that we can compile that query.
+                let _ = convert_statement_to_cube_query(
+                    &select_stmt,
+                    meta.clone(),
+                    self.session.clone(),
+                )?;
+
+                let cursor = Cursor {
+                    query: select_stmt,
+                    hold: hold.unwrap_or(false),
+                    format: if binary { Format::Binary } else { Format::Text },
+                };
+
+                if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::ConfigurationLimitExceeded,
+                            format!(
+                                "Unable to allocate a new cursor: max allocation reached, actual: {}, max: {}",
+                                self.cursors.len(),
+                                self.session.server.configuration.connection_max_cursors),
+                        )
+                            .into(),
+                    ));
+                }
+
+                self.cursors.insert(name.value, cursor);
+
+                let plan =
+                    QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            Statement::Discard { object_type } => {
+                self.statements = HashMap::new();
+                self.portals = HashMap::new();
+                self.cursors = HashMap::new();
+
+                let plan = QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Discard(object_type.to_string()),
+                );
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            Statement::Close { cursor } => {
+                let plan = match cursor {
+                    CloseCursor::All => {
+                        let mut portals_to_remove = Vec::new();
+
+                        for (key, _) in &self.cursors {
+                            portals_to_remove.push(key.clone());
+                        }
+
+                        self.cursors = HashMap::new();
+
+                        for key in portals_to_remove {
+                            self.portals.remove(&key);
+                        }
+
+                        Ok(QueryPlan::MetaOk(
+                            StatusFlags::empty(),
+                            CommandCompletion::CloseCursorAll,
+                        ))
+                    }
+                    CloseCursor::Specific { name } => {
+                        if self.cursors.remove(&name.value).is_some() {
+                            self.portals.remove(&name.value);
+
+                            Ok(QueryPlan::MetaOk(
+                                StatusFlags::empty(),
+                                CommandCompletion::CloseCursor,
+                            ))
+                        } else {
+                            Err(ConnectionError::Protocol(
+                                protocol::ErrorResponse::error(
+                                    protocol::ErrorCode::ProtocolViolation,
+                                    format!(r#"cursor "{}" does not exist"#, name.value),
+                                )
+                                .into(),
+                            ))
+                        }
+                    }
+                }?;
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+            other => {
+                let plan =
+                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())?;
+
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
+                    .await?;
+            }
+        };
+
+        Ok(())
+    }
+
+    pub async fn write_portal(
+        &mut self,
+        portal: &mut Portal,
+        max_rows: usize,
+    ) -> Result<(), ConnectionError> {
+        // Special handling for special queries, such as DISCARD ALL.
+        if let Some(description) = portal.get_description()? {
+            match description.len() {
+                0 => self.write(protocol::NoData::new()).await?,
+                _ => self.write(description).await?,
+            };
+        }
+
+        let mut writer = BatchWriter::new(portal.get_format());
+        let completion = portal.execute(&mut writer, max_rows).await?;
+
+        if writer.has_data() {
+            buffer::write_direct(&mut self.socket, writer).await?;
+        };
+
+        self.write(completion).await
+    }
+
+    /// Pipeline of Execution
+    /// process_query -> (&str)
+    ///     execute_query -> (&str)
+    ///         process_simple_query -> (portal)
+    ///             write_portal
     pub async fn execute_query(&mut self, query: &str) -> Result<(), ConnectionError> {
         let meta = self
             .session
@@ -619,46 +1024,12 @@ impl AsyncPostgresShim {
 
         let statements = parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL)?;
 
-        let mut plans = Vec::with_capacity(statements.len());
-
-        // TODO: PostgreSQL execute it dependently.
-        for stmt in statements {
-            plans.push(convert_statement_to_cube_query(
-                &stmt,
-                meta.clone(),
-                self.session.clone(),
-                self.logger.clone(),
-            )?);
-        }
-
-        for plan in plans {
-            // Special handling for special queries, such as DISCARD ALL.
-            if let Some(description) = self
-                .query_plan_to_row_description(&plan, Format::Text)
-                .await?
-            {
-                match description.len() {
-                    0 => self.write(protocol::NoData::new()).await?,
-                    _ => {
-                        self.write(protocol::RowDescription::new(description))
-                            .await?
-                    }
-                };
+        if statements.len() == 0 {
+            self.write(protocol::EmptyQuery::new()).await?;
+        } else {
+            for statement in statements {
+                self.process_simple_query(statement, meta.clone()).await?;
             }
-
-            // Re-usage of Portal functionality
-            let mut portal = Portal::new(plan, Format::Text, None);
-
-            let mut writer = BatchWriter::new(portal.get_format());
-            let completion = portal.execute(&mut writer, 0).await?;
-
-            self.handle_command_complete(&completion);
-
-            if writer.has_data() {
-                buffer::write_direct(&mut self.socket, writer).await?;
-            };
-
-            self.write(completion).await?;
         }
 
         Ok(())
@@ -672,7 +1043,11 @@ impl AsyncPostgresShim {
         };
 
         self.write(protocol::ReadyForQuery::new(
-            protocol::TransactionStatus::Idle,
+            if self.session.state.is_in_transaction() {
+                protocol::TransactionStatus::InTransactionBlock
+            } else {
+                protocol::TransactionStatus::Idle
+            },
         ))
         .await?;
 
@@ -684,15 +1059,6 @@ impl AsyncPostgresShim {
             Ok(Arc::new(ctx))
         } else {
             Err(CubeError::internal("must be auth".to_string()))
-        }
-    }
-
-    fn handle_command_complete(&mut self, completion: &CommandComplete) {
-        if completion == &CommandCompletion::Discard("ALL".to_string()).to_pg_command()
-            || completion == &CommandCompletion::Discard("PLANS".to_string()).to_pg_command()
-        {
-            self.statements = HashMap::new();
-            self.portals = HashMap::new();
         }
     }
 }

@@ -150,6 +150,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asEnum(supported),
   dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
     .asString(),
+  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
+    .asString(),
   // Export bucket options for AWS S3
   dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
     .asString(),
@@ -303,6 +305,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
+    .asInt(),
+  agentMaxSockets: () => get('CUBEJS_AGENT_MAX_SOCKETS')
+    .default(100)
     .asInt(),
   instanceId: () => get('CUBEJS_INSTANCE_ID')
     .asString(),

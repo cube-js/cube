@@ -2481,6 +2481,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn in_memory_compaction() {
+        Config::test("inmemory_compaction")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 10;
+                c.not_used_timeout = 0;
+                c.compaction_in_memory_chunks_count_threshold = 5;
+                c.compaction_in_memory_chunks_max_lifetime_threshold = 1;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (a int, num int) UNIQUE KEY (a)")
+                    .await
+                    .unwrap();
+
+                for i in 0..6 {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
+                            i, i, i
+                        ))
+                        .await
+                        .unwrap();
+                }
+
+                Delay::new(Duration::from_millis(500)).await;
+
+                let active_partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(active_partitions.len(), 1);
+                let partition = active_partitions.first().unwrap();
+                assert_eq!(partition.get_row().main_table_row_count(), 0);
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(partition.get_id(), false)
+                    .await
+                    .unwrap();
+                assert_eq!(chunks.len(), 1);
+                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
+                //waiting for more then compaction_chunks_count_threshold
+                Delay::new(Duration::from_millis(2000)).await;
+                service
+                    .exec_query(&format!(
+                        "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
+                        7, 7, 7
+                    ))
+                    .await
+                    .unwrap();
+                Delay::new(Duration::from_millis(1000)).await;
+                let active_partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(active_partitions.len(), 1);
+                let partition = active_partitions.first().unwrap();
+                assert_eq!(partition.get_row().main_table_row_count(), 6);
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(partition.get_id(), false)
+                    .await
+                    .unwrap();
+                assert_eq!(chunks.len(), 1);
+                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 1);
+            })
+            .await
+    }
+
+    #[tokio::test]
     async fn cluster() {
         Config::test("cluster_router").update_config(|mut config| {
             config.select_workers = vec!["127.0.0.1:14306".to_string(), "127.0.0.1:14307".to_string()];

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Input } from 'antd';
-import { useMutation } from '@apollo/react-hooks';
+import { useMutation } from '@apollo/client';
 import { GET_DASHBOARD_ITEMS } from '../graphql/queries';
 import { CREATE_DASHBOARD_ITEM, UPDATE_DASHBOARD_ITEM } from '../graphql/mutations';
 

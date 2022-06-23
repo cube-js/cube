@@ -28,7 +28,6 @@ use log::warn;
 
 use crate::{
     sql::AuthContext,
-    telemetry::ContextLogger,
     transport::{TransportService, TransportServiceMetaFields},
 };
 use chrono::{TimeZone, Utc};
@@ -40,7 +39,7 @@ use datafusion::{
 #[derive(Debug, Clone)]
 pub struct CubeScanNode {
     pub schema: DFSchemaRef,
-    pub member_fields: Vec<String>,
+    pub member_fields: Vec<Option<String>>,
     pub request: V1LoadRequestQuery,
     pub auth_context: Arc<AuthContext>,
 }
@@ -48,7 +47,7 @@ pub struct CubeScanNode {
 impl CubeScanNode {
     pub fn new(
         schema: DFSchemaRef,
-        member_fields: Vec<String>,
+        member_fields: Vec<Option<String>>,
         request: V1LoadRequestQuery,
         auth_context: Arc<AuthContext>,
     ) -> Self {
@@ -108,7 +107,6 @@ impl UserDefinedLogicalNode for CubeScanNode {
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
     pub meta_fields: Option<HashMap<String, String>>,
-    pub logger: Arc<dyn ContextLogger>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -134,7 +132,6 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
                     meta_fields: self.meta_fields.clone(),
-                    logger: self.logger.clone(),
                 }))
             } else {
                 None
@@ -147,14 +144,13 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
 struct CubeScanExecutionPlan {
     // Options from logical node
     schema: SchemaRef,
-    member_fields: Vec<String>,
+    member_fields: Vec<Option<String>>,
     request: V1LoadRequestQuery,
     auth_context: Arc<AuthContext>,
     // Shared references which will be injected by extension planner
     transport: Arc<dyn TransportService>,
     // Fields passing to cube (for now using to pass app_name and protocol for telemetry)
     meta_fields: TransportServiceMetaFields,
-    logger: Arc<dyn ContextLogger>,
 }
 
 impl CubeScanExecutionPlan {
@@ -169,26 +165,35 @@ impl CubeScanExecutionPlan {
                 DataType::Utf8 => {
                     let mut builder = StringBuilder::new(100);
 
-                    for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(field_name).ok_or(
-                            DataFusionError::Internal(
-                                "Unexpected response from Cube.js, rows are not objects"
-                                    .to_string(),
-                            ),
-                        )?;
-                        match &value {
-                            serde_json::Value::Null => builder.append_null()?,
-                            serde_json::Value::String(v) => builder.append_value(v)?,
-                            serde_json::Value::Bool(v) => {
-                                builder.append_value(if *v { "true" } else { "false" })?
-                            }
-                            serde_json::Value::Number(v) => builder.append_value(v.to_string())?,
-                            v => {
-                                self.logger.error(format!("Unable to map value {:?} to DataType::Utf8 (returning null)", v).as_str());
+                    if let Some(field_name) = field_name {
+                        for row in response.data.iter() {
+                            let value = row.as_object().unwrap().get(field_name).ok_or(
+                                DataFusionError::Internal(
+                                    "Unexpected response from Cube.js, rows are not objects"
+                                        .to_string(),
+                                ),
+                            )?;
+                            match &value {
+                                serde_json::Value::Null => builder.append_null()?,
+                                serde_json::Value::String(v) => builder.append_value(v)?,
+                                serde_json::Value::Bool(v) => {
+                                    builder.append_value(if *v { "true" } else { "false" })?
+                                }
+                                serde_json::Value::Number(v) => {
+                                    builder.append_value(v.to_string())?
+                                }
+                                v => {
+                                    log::error!(
+                                        "Unable to map value {:?} to DataType::Utf8 (returning null)",
+                                        v
+                                    );
 
-                                builder.append_null()?
-                            }
-                        };
+                                    builder.append_null()?
+                                }
+                            };
+                        }
+                    } else {
+                        builder.append_null()?;
                     }
 
                     Arc::new(builder.finish()) as ArrayRef
@@ -197,32 +202,42 @@ impl CubeScanExecutionPlan {
                     let mut builder = Int64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(field_name).ok_or(
-                            DataFusionError::Internal(
-                                "Unexpected response from Cube.js, rows are not objects"
-                                    .to_string(),
-                            ),
-                        )?;
-                        match &value {
-                            serde_json::Value::Null => builder.append_null()?,
-                            serde_json::Value::Number(number) => match number.as_i64() {
-                                Some(v) => builder.append_value(v)?,
-                                None => builder.append_null()?,
-                            },
-                            serde_json::Value::String(s) => match s.parse::<i64>() {
-                                Ok(v) => builder.append_value(v)?,
-                                Err(error) => {
-                                    warn!("Unable to parse value as i64: {}", error.to_string());
+                        if let Some(field_name) = field_name {
+                            let value = row.as_object().unwrap().get(field_name).ok_or(
+                                DataFusionError::Internal(
+                                    "Unexpected response from Cube.js, rows are not objects"
+                                        .to_string(),
+                                ),
+                            )?;
+                            match &value {
+                                serde_json::Value::Null => builder.append_null()?,
+                                serde_json::Value::Number(number) => match number.as_i64() {
+                                    Some(v) => builder.append_value(v)?,
+                                    None => builder.append_null()?,
+                                },
+                                serde_json::Value::String(s) => match s.parse::<i64>() {
+                                    Ok(v) => builder.append_value(v)?,
+                                    Err(error) => {
+                                        warn!(
+                                            "Unable to parse value as i64: {}",
+                                            error.to_string()
+                                        );
+
+                                        builder.append_null()?
+                                    }
+                                },
+                                v => {
+                                    log::error!(
+                                        "Unable to map value {:?} to DataType::Int64 (returning null)",
+                                        v
+                                    );
 
                                     builder.append_null()?
                                 }
-                            },
-                            v => {
-                                self.logger.error(format!("Unable to map value {:?} to DataType::Int64 (returning null)", v).as_str());
-
-                                builder.append_null()?
-                            }
-                        };
+                            };
+                        } else {
+                            builder.append_null()?;
+                        }
                     }
 
                     Arc::new(builder.finish()) as ArrayRef
@@ -231,32 +246,39 @@ impl CubeScanExecutionPlan {
                     let mut builder = Float64Builder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(field_name).ok_or(
-                            DataFusionError::Internal(
-                                "Unexpected response from Cube.js, rows are not objects"
-                                    .to_string(),
-                            ),
-                        )?;
-                        match &value {
-                            serde_json::Value::Null => builder.append_null()?,
-                            serde_json::Value::Number(number) => match number.as_f64() {
-                                Some(v) => builder.append_value(v)?,
-                                None => builder.append_null()?,
-                            },
-                            serde_json::Value::String(s) => match s.parse::<f64>() {
-                                Ok(v) => builder.append_value(v)?,
-                                Err(error) => {
-                                    warn!("Unable to parse value as f64: {}", error.to_string());
+                        if let Some(field_name) = field_name {
+                            let value = row.as_object().unwrap().get(field_name).ok_or(
+                                DataFusionError::Internal(
+                                    "Unexpected response from Cube.js, rows are not objects"
+                                        .to_string(),
+                                ),
+                            )?;
+                            match &value {
+                                serde_json::Value::Null => builder.append_null()?,
+                                serde_json::Value::Number(number) => match number.as_f64() {
+                                    Some(v) => builder.append_value(v)?,
+                                    None => builder.append_null()?,
+                                },
+                                serde_json::Value::String(s) => match s.parse::<f64>() {
+                                    Ok(v) => builder.append_value(v)?,
+                                    Err(error) => {
+                                        warn!(
+                                            "Unable to parse value as f64: {}",
+                                            error.to_string()
+                                        );
+
+                                        builder.append_null()?
+                                    }
+                                },
+                                v => {
+                                    log::error!("Unable to map value {:?} to DataType::Float64 (returning null)", v);
 
                                     builder.append_null()?
                                 }
-                            },
-                            v => {
-                                self.logger.error(format!("Unable to map value {:?} to DataType::Float64 (returning null)", v).as_str());
-
-                                builder.append_null()?
-                            }
-                        };
+                            };
+                        } else {
+                            builder.append_null()?;
+                        }
                     }
 
                     Arc::new(builder.finish()) as ArrayRef
@@ -265,31 +287,35 @@ impl CubeScanExecutionPlan {
                     let mut builder = BooleanBuilder::new(100);
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(field_name).ok_or(
-                            DataFusionError::Internal(
-                                "Unexpected response from Cube.js, rows are not objects"
-                                    .to_string(),
-                            ),
-                        )?;
-                        match &value {
-                            serde_json::Value::Null => builder.append_null()?,
-                            serde_json::Value::Bool(v) => builder.append_value(*v)?,
-                            // Cube allows to mark a type as boolean, but it doesn't guarantee that the user will return a boolean type
-                            serde_json::Value::String(v) => match v.as_str() {
-                                "true" | "1" => builder.append_value(true)?,
-                                "false" | "0" => builder.append_value(false)?,
-                                _ => {
-                                    self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
+                        if let Some(field_name) = field_name {
+                            let value = row.as_object().unwrap().get(field_name).ok_or(
+                                DataFusionError::Internal(
+                                    "Unexpected response from Cube.js, rows are not objects"
+                                        .to_string(),
+                                ),
+                            )?;
+                            match &value {
+                                serde_json::Value::Null => builder.append_null()?,
+                                serde_json::Value::Bool(v) => builder.append_value(*v)?,
+                                // Cube allows to mark a type as boolean, but it doesn't guarantee that the user will return a boolean type
+                                serde_json::Value::String(v) => match v.as_str() {
+                                    "true" | "1" => builder.append_value(true)?,
+                                    "false" | "0" => builder.append_value(false)?,
+                                    _ => {
+                                        log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
+
+                                        builder.append_null()?
+                                    }
+                                },
+                                v => {
+                                    log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
 
                                     builder.append_null()?
                                 }
-                            },
-                            v => {
-                                self.logger.error(format!("Unable to map value {:?} to DataType::Boolean (returning null)", v).as_str());
-
-                                builder.append_null()?
-                            }
-                        };
+                            };
+                        } else {
+                            builder.append_null()?;
+                        }
                     }
 
                     Arc::new(builder.finish()) as ArrayRef
@@ -298,31 +324,35 @@ impl CubeScanExecutionPlan {
                     let mut builder = TimestampNanosecondBuilder::new(response.data.len());
 
                     for row in response.data.iter() {
-                        let value = row.as_object().unwrap().get(field_name).ok_or(
-                            DataFusionError::Internal(
-                                "Unexpected response from Cube.js, rows are not objects"
-                                    .to_string(),
-                            ),
-                        )?;
-                        match &value {
-                            serde_json::Value::Null => builder.append_null()?,
-                            serde_json::Value::String(s) => {
-                                let timestamp = Utc
-                                    .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                    .map_err(|e| {
-                                        DataFusionError::Execution(format!(
-                                            "Can't parse timestamp: '{}': {}",
-                                            s, e
-                                        ))
-                                    })?;
-                                builder.append_value(timestamp.timestamp_nanos())?;
-                            }
-                            v => {
-                                self.logger.error(format!("Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)", v).as_str());
+                        if let Some(field_name) = field_name {
+                            let value = row.as_object().unwrap().get(field_name).ok_or(
+                                DataFusionError::Internal(
+                                    "Unexpected response from Cube.js, rows are not objects"
+                                        .to_string(),
+                                ),
+                            )?;
+                            match &value {
+                                serde_json::Value::Null => builder.append_null()?,
+                                serde_json::Value::String(s) => {
+                                    let timestamp = Utc
+                                        .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                                        .map_err(|e| {
+                                            DataFusionError::Execution(format!(
+                                                "Can't parse timestamp: '{}': {}",
+                                                s, e
+                                            ))
+                                        })?;
+                                    builder.append_value(timestamp.timestamp_nanos())?;
+                                }
+                                v => {
+                                    log::error!("Unable to map value {:?} to DataType::Timestamp(TimeUnit::Nanosecond, None) (returning null)", v);
 
-                                builder.append_null()?
-                            }
-                        };
+                                    builder.append_null()?
+                                }
+                            };
+                        } else {
+                            builder.append_null()?;
+                        }
                     }
 
                     Arc::new(builder.finish()) as ArrayRef
@@ -540,20 +570,6 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    fn get_test_context_logger() -> Arc<dyn ContextLogger> {
-        #[derive(Debug)]
-        struct TestContextLogger {}
-
-        #[async_trait]
-        impl ContextLogger for TestContextLogger {
-            fn error(&self, message: &str) {
-                log::error!("{}", message);
-            }
-        }
-
-        Arc::new(TestContextLogger {})
-    }
-
     #[tokio::test]
     async fn test_df_cube_scan_execute() {
         let schema = Arc::new(Schema::new(vec![
@@ -571,7 +587,7 @@ mod tests {
             member_fields: schema
                 .fields()
                 .iter()
-                .map(|f| f.name().to_string())
+                .map(|f| Some(f.name().to_string()))
                 .collect(),
             request: V1LoadRequestQuery {
                 measures: None,
@@ -589,7 +605,6 @@ mod tests {
             }),
             transport: get_test_transport(),
             meta_fields: None,
-            logger: get_test_context_logger(),
         };
 
         let runtime = Arc::new(

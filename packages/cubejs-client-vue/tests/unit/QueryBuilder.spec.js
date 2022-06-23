@@ -502,6 +502,63 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.validatedQuery.filters[0].or[2].and[1].values).toContain('that');
     });
 
+    it('filters with boolean logical operators without explicit set', async () => {
+      const cube = createCubejsApi();
+      jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+      const filter = {
+        or: [
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['this'],
+          },
+          {
+            dimension: 'Orders.status',
+            operator: 'equals',
+            values: ['that'],
+          },
+          {
+            and: [
+              {
+                dimension: 'Orders.status',
+                operator: 'equals',
+                values: ['this'],
+              },
+              {
+                dimension: 'Orders.status',
+                operator: 'equals',
+                values: ['that'],
+              },
+            ],
+          },
+        ],
+      };
+
+      const wrapper = mount(QueryBuilder, {
+        propsData: {
+          cubejsApi: cube,
+          query: {
+            filters: [filter],
+          },
+        },
+      });
+
+      await flushPromises();
+
+      expect(wrapper.vm.filters[0].or.length).toBe(3);
+      expect(wrapper.vm.validatedQuery.filters.length).toBe(1);
+      expect(wrapper.vm.validatedQuery.filters[0].or[0].member).toBe('Orders.status');
+      expect(wrapper.vm.validatedQuery.filters[0].or[0].values).toContain('this');
+      expect(wrapper.vm.validatedQuery.filters[0].or[1].values).toContain('that');
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[0].member).toBe('Orders.status');
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[0].values).toContain('this');
+      expect(wrapper.vm.validatedQuery.filters[0].or[2].and[1].values).toContain('that');
+    });
+
     it.each([
       [
         {

@@ -302,13 +302,17 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_simple_query<AssertFn>(&self, query: String, f: AssertFn) -> RunResult<()>
+    async fn test_simple_query<AssertFn>(
+        &self,
+        query: String,
+        f: AssertFn,
+    ) -> Result<(), tokio_postgres::Error>
     where
         AssertFn: FnOnce(Vec<SimpleQueryMessage>) -> (),
     {
         print!("test {} .. ", query);
 
-        let res = self.client.simple_query(&query).await.unwrap();
+        let res = self.client.simple_query(&query).await?;
         f(res);
 
         println!("ok");
@@ -317,14 +321,16 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_prepare(&self) -> RunResult<()> {
+        // Unknown variables will be detected as TEXT
+        // LIMIT has a typehint for i64
         let stmt = self
             .client
-            .prepare("SELECT $1 as t1, $2 as t2")
+            .prepare("SELECT $1 as t1, $2 as t2 LIMIT $3")
             .await
             .unwrap();
 
         self.client
-            .query(&stmt, &[&"test1", &"test2"])
+            .query(&stmt, &[&"test1", &"test2", &0_i64])
             .await
             .unwrap();
 
@@ -379,12 +385,193 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    async fn test_simple_cursors(&self) -> RunResult<()> {
+        self.test_simple_query(
+            r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 1 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                // Row | Selection - 2
+                // Row 1 | .. | Row 10 | Selection - 11
+                assert_eq!(messages.len(), 13);
+
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("1"));
+                } else {
+                    panic!("Must be Row command, 0")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[1] {
+                    assert_eq!(rows, 1_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 1")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[2] {
+                    assert_eq!(row.get(0), Some("2"));
+                } else {
+                    panic!("Must be Row command, 2")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[11] {
+                    assert_eq!(row.get(0), Some("11"));
+                } else {
+                    panic!("Must be Row command, 11")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[12] {
+                    assert_eq!(rows, 10_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 12")
+                }
+            },
+        )
+        .await?;
+
+        // Read till finish
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series;"#.to_string(),
+            |messages| {
+                // fetch 1
+                // fetch 10
+                // 100 - 11 = 89
+                assert_eq!(messages.len(), 89 + 1);
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[89] {
+                    assert_eq!(rows, 89_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 89")
+                }
+            },
+        )
+        .await?;
+
+        // Portal for Cursor was finished.
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 2);
+            }
+        ).await?;
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_without_hold(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"begin; declare test_without_hold cursor for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"fetch 5 in test_without_hold; commit;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_without_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_without_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_specific(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE test_with_hold CURSOR WITH HOLD FOR SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"FETCH 5 IN test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(r#"CLOSE test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_with_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_with_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_all(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE cursor_1 CURSOR WITH HOLD for SELECT generate_series(1, 100); DECLARE cursor_2 CURSOR WITH HOLD for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+            .await?;
+
+        self.test_simple_query(
+            r#"FETCH 5 IN cursor_1; FETCH 5 IN cursor_2;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"CLOSE ALL;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor1 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_1;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_1\" does not exist"
+        );
+
+        // Assert that cursor2 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_2;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_2\" does not exist"
+        );
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl AsyncTestSuite for PostgresIntegrationTestSuite {
     async fn after_all(&mut self) -> RunResult<()> {
-        todo!()
+        // TODO: Close SQL API?
+        Ok(())
     }
 
     async fn run(&mut self) -> RunResult<()> {
@@ -392,6 +579,10 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
+        self.test_simple_cursors().await?;
+        self.test_simple_cursors_without_hold().await?;
+        self.test_simple_cursors_close_specific().await?;
+        self.test_simple_cursors_close_all().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
@@ -414,6 +605,10 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 true as bool_true,
                 false as bool_false,
                 'test' as str,
+                CAST(1.25 as DECIMAL(15, 0)) as d0,
+                CAST(1.25 as DECIMAL(15, 2)) as d2,
+                CAST(1.25 as DECIMAL(15, 5)) as d5,
+                CAST(1.25 as DECIMAL(15, 10)) as d10,
                 ARRAY['test1', 'test2'] as str_arr,
                 ARRAY[1,2,3] as i64_arr,
                 ARRAY[1.2,2.3,3.4] as f64_arr,

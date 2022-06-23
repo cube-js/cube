@@ -49,7 +49,7 @@ const staticOptions = {
   },
 };
 
-export default ({ title, data }) => {
+const Stack = ({ title, data }) => {
   const [options, setOptions] = useState({});
   useEffect(() => {
     console.log(data);
@@ -65,3 +65,5 @@ export default ({ title, data }) => {
 
   return <HighchartsReact highcharts={Highcharts} options={options} />;
 };
+
+export default Stack;

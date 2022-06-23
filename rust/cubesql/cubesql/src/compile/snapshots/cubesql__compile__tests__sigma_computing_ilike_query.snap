@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                select distinct table_schema\n                from information_schema.tables\n                where\n                    table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and\n                    table_schema NOT IN ('pg_catalog', 'information_schema') and\n                    table_schema ilike '%'\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------+
+| table_schema |
++--------------+
+| public       |
++--------------+

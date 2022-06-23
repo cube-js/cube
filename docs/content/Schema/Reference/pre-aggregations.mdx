@@ -23,6 +23,8 @@ multi-stage process:
    raw data.
 
 Pre-aggregations can be defined in the `preAggregations` available on each cube.
+A more in-depth diagram detailing how pre-aggregations are selected can be
+[found here][ref-caching-preaggs-selecting-preaggs].
 
 ## Naming
 
@@ -156,18 +158,22 @@ version.
 
 </WarningBox>
 
-Cube.js is capable of performing joins between separate pre-aggregations,
-thereby avoiding excessive queries to the source database.
+Cube is capable of performing joins between pre-aggregations from different
+[data sources][ref-schema-ref-cube-datasource] to avoid making excessive queries
+to them.
 
 In the following example, we have a `Users` cube with a `usersRollup`
 pre-aggregation, and an `Orders` cube with an `ordersRollup` pre-aggregation,
-and an `ordersWithUsersRollup` pre-aggregation. Note the type of
-`ordersWithUsersRollup` is `rollupJoin`, and that this pre-aggregation has a
-special property `rollups` which is an array containing references to both
-"source" rollups.
+and an `ordersWithUsersRollup` pre-aggregation. Note the following:
+
+- Both cubes have different values for `dataSource`.
+- The type of `ordersWithUsersRollup` is `rollupJoin`.
+- This pre-aggregation has a special property `rollups` which is an array
+  containing references to both "source" rollups.
 
 ```javascript
 cube(`Users`, {
+  dataSource: 'postgres',
   sql: `SELECT * FROM public.users`,
 
   preAggregations: {
@@ -197,6 +203,7 @@ cube(`Users`, {
 });
 
 cube('Orders', {
+  dataSource: 'mssql',
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -251,6 +258,29 @@ cube('Orders', {
   },
 });
 ```
+
+<InfoBox>
+
+`rollupJoin` is not required to join cubes from the same data source; instead
+include the foreign cube's dimensions/measures in the rollup definition
+directly:
+
+```javascript
+cube('Orders', {
+  sql: `SELECT * FROM orders`,
+
+  preAggregations: {
+    ordersRollup: {
+      measures: [CUBE.count],
+      dimensions: [Users.name, CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+    },
+  },
+});
+```
+
+</InfoBox>
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -554,10 +584,18 @@ partition as determined by the pre-aggregation's `partitionGranularity`.
 
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
-`updateWindow` from the current time. In the example below, it will refresh
-today's and the last 7 days of partitions once a day. Partitions before the
-`7 day` interval **will not** be refreshed once they are built unless the rollup
-SQL is changed.
+`updateWindow` from the current time.
+
+<WarningBox>
+
+Because incremental refreshes generate their own SQL, you **must not** use the
+[`sql`](#parameters-refresh-key-sql) property here.
+
+</WarningBox>
+
+In the example below, it will refresh today's and the last 7 days of partitions
+once a day. Partitions before the `7 day` interval **will not** be refreshed
+once they are built unless the rollup SQL is changed.
 
 ```javascript
 cube(`Orders`, {
@@ -799,6 +837,8 @@ cube(`Orders`, {
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-preaggs-selecting-preaggs]:
+  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-driverfactory]: /config/#driver-factory
@@ -808,6 +848,7 @@ cube(`Orders`, {
 [ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#sql-alias
 [ref-schema-cube-naming]: /schema/reference/cube#naming
+[ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments

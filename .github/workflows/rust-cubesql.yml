@@ -44,7 +44,7 @@ jobs:
   unit:
     runs-on: ubuntu-20.04
     timeout-minutes: 40
-    name: Unit
+    name: Unit (Rewrite Engine)
 
     steps:
       - name: Checkout
@@ -64,16 +64,11 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Install tarpaulin@0.19.1
+      - name: Install tarpaulin@0.20.0
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-tarpaulin --version 0.19.1
-      - name: Unit tests
-        env:
-          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
-          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
-        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+          args: cargo-tarpaulin --version 0.20.0
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -88,8 +83,37 @@ jobs:
           flags: cubesql
           fail_ci_if_error: true
 
+  unit_legacy:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 40
+    name: Unit (Legacy)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-08
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+      - name: Unit tests (Legacy Engine)
+        env:
+          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
+          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+        run: cd rust/cubesql && cargo test
+
   native_linux:
-    needs: [lint,unit]
+    needs: [lint,unit,unit_legacy]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
@@ -151,7 +175,7 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run test:unit
 
   native:
-    needs: [lint,unit]
+    needs: [lint,unit,unit_legacy]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}

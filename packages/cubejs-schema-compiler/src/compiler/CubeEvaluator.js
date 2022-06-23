@@ -277,6 +277,7 @@ export class CubeEvaluator extends CubeSymbols {
       granularity: aggregation.granularity
     }] : [];
     return {
+      allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
         (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
           .concat(

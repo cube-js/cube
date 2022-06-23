@@ -5,13 +5,13 @@ permalink: /config/databases/firebolt
 
 ## Prerequisites
 
-- The username/password for the [Firebolt][firebolt] account
+- The username/password for your [Firebolt][firebolt] account
 
 ## Setup
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_NAME=firebolt_database
@@ -29,3 +29,6 @@ CUBEJS_FIREBOLT_ENGINE_ENDPOINT=engine-endpoint.cube.us-east-1.app.firebolt.io
 | `CUBEJS_DB_PASS`                                | The password used to connect to the database                                                                                       | A valid database password                                                   |    ✅    |
 | `CUBEJS_FIREBOLT_ENGINE_ENDPOINT`               | Engine endpoint to connect to                                                                                                      | A valid engine endpoint                                                     |    ✅    |
 | `CUBEJS_FIREBOLT_API_ENDPOINT`                  | Firebolt api endpoint (used for authentication)                                                                                    | `api.dev.firebolt.io`, `api.staging.firebolt.io`, `api.app.firebolt.io`     |    -     |
+
+
+[firebolt]: https://www.firebolt.io/

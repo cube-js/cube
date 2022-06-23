@@ -44,6 +44,13 @@ lazy_static! {
 }
 
 #[derive(Debug)]
+pub enum TransactionState {
+    None,
+    // Right now, it's 1 for all the time.
+    Active(u64),
+}
+
+#[derive(Debug)]
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
@@ -60,6 +67,8 @@ pub struct SessionState {
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
     auth_context: RwLockSync<Option<AuthContext>>,
+
+    transaction: RwLockSync<TransactionState>,
 }
 
 impl SessionState {
@@ -76,6 +85,50 @@ impl SessionState {
             variables: RwLockSync::new(None),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new(auth_context),
+            transaction: RwLockSync::new(TransactionState::None),
+        }
+    }
+
+    pub fn is_in_transaction(&self) -> bool {
+        let guard = self
+            .transaction
+            .read()
+            .expect("failed to unlock transaction for is_in_transaction");
+
+        match *guard {
+            TransactionState::None => false,
+            TransactionState::Active(_) => true,
+        }
+    }
+
+    pub fn begin_transaction(&self) -> bool {
+        let mut guard = self
+            .transaction
+            .write()
+            .expect("failed to unlock transaction for begin_transaction");
+
+        match *guard {
+            TransactionState::None => {
+                *guard = TransactionState::Active(1);
+
+                true
+            }
+            TransactionState::Active(_) => false,
+        }
+    }
+
+    pub fn end_transaction(&self) -> Option<u64> {
+        let mut guard = self
+            .transaction
+            .write()
+            .expect("failed to unlock transaction for checking end_transaction");
+
+        if let TransactionState::Active(n) = *guard {
+            *guard = TransactionState::None;
+
+            Some(n)
+        } else {
+            None
         }
     }
 

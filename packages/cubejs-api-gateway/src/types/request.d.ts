@@ -21,6 +21,7 @@ interface RequestContext {
   signedWithPlaygroundAuthSecret?: boolean;
   appName?: string,
   protocol?: string,
+  apiType?: string,
 }
 
 /**

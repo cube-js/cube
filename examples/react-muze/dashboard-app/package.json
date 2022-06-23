@@ -13,6 +13,7 @@
     "@testing-library/react": "^11.2.2",
     "@testing-library/user-event": "^12.3.0",
     "antd": "^4.9.1",
+    "cube-example-wrapper": "^1.0.26",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-responsive": "^8.2.0",

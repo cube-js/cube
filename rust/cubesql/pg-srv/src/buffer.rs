@@ -31,6 +31,7 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
             FrontendMessage::PasswordMessage(protocol::PasswordMessage::deserialize(cursor).await?)
         }
         b'X' => FrontendMessage::Terminate,
+        b'H' => FrontendMessage::Flush,
         b'S' => FrontendMessage::Sync,
         identifier => {
             return Err(ErrorResponse::error(

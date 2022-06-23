@@ -1,7 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import fs from 'fs';
 import path from 'path';
-import fetch, { Headers, Request } from 'node-fetch';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -18,7 +17,7 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv, pausePromise } from '@cubejs-backend/shared';
+import { getEnv } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -28,6 +27,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
+    exportBucketMountDir?: string,
     pollInterval?: number,
     // AWS bucket config
     awsKey?: string,
@@ -85,6 +85,9 @@ async function resolveJDBCDriver(): Promise<string> {
   );
 }
 
+/**
+ * Databricks driver class.
+ */
 export class DatabricksDriver extends JDBCDriver {
   protected readonly config: DatabricksDriverConfiguration;
 
@@ -108,6 +111,7 @@ export class DatabricksDriver extends JDBCDriver {
         conf?.bucketType ||
         getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
       exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
+      exportBucketMountDir: conf?.exportBucketMountDir || getEnv('dbExportBucketMountDir'),
       pollInterval: (
         conf?.pollInterval || getEnv('dbPollMaxInterval')
       ) * 1000,
@@ -211,233 +215,132 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns databricks API base URL.
+   * Saves pre-aggs table to the bucket and returns links to download
+   * results.
    */
-  private getApiUrl(): string {
-    let res: string;
-    try {
-      // eslint-disable-next-line prefer-destructuring
-      res = this.config.url
-        .split(';')
-        .filter(node => /^jdbc/i.test(node))[0]
-        .split('/')[2]
-        .split(':')[0];
-    } catch (e) {
-      res = '';
-    }
-    if (!res.length) {
-      throw new Error(
-        `Error parsing API URL from the CUBEJS_DB_DATABRICKS_URL = ${
-          this.config.url
-        }`
-      );
+  public async unload(
+    tableName: string,
+  ): Promise<DownloadTableCSVData> {
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
+    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    const csvFile = await this.getCsvFiles(
+      tableName,
+      columns,
+      pathname,
+    );
+    return {
+      csvFile,
+      types,
+      csvNoHeader: true,
+    };
+  }
+
+  /**
+   * Unload table to bucket using Databricks JDBC query and returns (async)
+   * csv files signed URLs array.
+   */
+  private async getCsvFiles(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    let res;
+    switch (this.config.bucketType) {
+      case 'azure':
+        res = await this.getAzureCsvFiles(table, columns, pathname);
+        break;
+      case 's3':
+        res = await this.getS3CsvFiles(table, columns, pathname);
+        break;
+      default:
+        throw new Error(`Unsupported export bucket type: ${
+          this.config.bucketType
+        }`);
     }
     return res;
   }
 
   /**
-   * Returns databricks API token.
+   * Saves specified table to the Azure blob storage and returns (async)
+   * csv files signed URLs array.
    */
-  private getApiToken(): string {
-    let res: string;
-    try {
-      // eslint-disable-next-line prefer-destructuring
-      res = this.config.url
-        .split(';')
-        .filter(node => /^PWD/i.test(node))[0]
-        .split('=')[1];
-    } catch (e) {
-      res = '';
-    }
-    if (!res.length) {
-      throw new Error(
-        'Error parsing API token from the CUBEJS_DB_DATABRICKS_URL' +
-        ` = ${this.config.url}`
-      );
-    }
-    return res;
+  private async getAzureCsvFiles(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    await this.createExternalTable(table, columns);
+    return this.getSignedAzureUrls(pathname);
   }
 
   /**
-   * Returns IDs of databricks runned clusters.
+   * Returns Azure signed URLs of unloaded scv files.
    */
-  private async getClustersIds(): Promise<string[]> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/clusters/list`;
+  private async getSignedAzureUrls(
+    pathname: string,
+  ): Promise<string[]> {
+    const csvFile: string[] = [];
+    const [container, account] =
+      pathname.split('wasbs://')[1].split('.blob')[0].split('@');
+    const foldername =
+      pathname.split(`${this.config.exportBucket}/`)[1];
+    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
 
-    const request = new Request(url, {
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-    });
-
-    const response = await fetch(request);
-
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
+    const credential = new StorageSharedKeyCredential(
+      account,
+      this.config.azureKey as string,
+    );
+    const blobClient = new BlobServiceClient(
+      `https://${account}.blob.core.windows.net`,
+      credential,
+    );
+    const containerClient = blobClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat({ prefix: foldername });
+    for await (const blob of blobsList) {
+      if (blob.name && expr.test(blob.name)) {
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: blob.name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFile.push(`https://${
+          account
+        }.blob.core.windows.net/${
+          container
+        }/${blob.name}?${sas}`);
+      }
     }
-
-    const body: {
-      id: string,
-      status: string,
-    }[] = (await response.json()) as {
-      id: string,
-      status: string,
-    }[];
-    
-    return body
-      .filter(item => item.status === 'Running')
-      .map(item => item.id);
-  }
-
-  /**
-   * Returns execution context ("scala" by default) for spesified
-   * cluster.
-   */
-  private async getContextId(
-    clusterId: string,
-    language = 'scala',
-  ): Promise<string> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/contexts/create`;
-
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-      }),
-      body: JSON.stringify({
-        clusterId,
-        language,
-      }),
-    });
-    const response = await fetch(request);
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
+    if (csvFile.length === 0) {
+      throw new Error('No CSV files were exported to the specified bucket. ' +
+        'Please check your export bucket configuration.');
     }
-    const body = (await response.json()) as { id: string };
-    return body.id;
+    return csvFile;
   }
 
   /**
-   * Running specified command.
+   * Saves specified table to the S3 bucket and returns (async) csv files
+   * signed URLs array.
    */
-  private async runCommand(
-    clusterId: string,
-    contextId: string,
-    language: string,
-    command: string,
-  ): Promise<string> {
-    const url = `https://${
-      this.getApiUrl()
-    }/api/1.2/commands/execute`;
-    const request = new Request(url, {
-      method: 'POST',
-      headers: new Headers({
-        Accept: '*/*',
-        Authorization: `Bearer ${this.getApiToken()}`,
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({
-        clusterId,
-        contextId,
-        language,
-        command,
-      }),
-    });
-    const response = await fetch(request);
-    if (!response.ok) {
-      throw new Error(`Databricks API call error: ${
-        response.status
-      } - ${
-        response.statusText
-      }`);
-    }
-    const body = (await response.json()) as { id: string };
-    return body.id;
+  private async getS3CsvFiles(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    await this.createExternalTable(table, columns);
+    return this.getSignedS3Urls(pathname);
   }
 
   /**
-   * Resolves command result.
-   * TODO: timeout to cancel job?
-   */
-  private async commandResult(
-    clusterId: string,
-    contextId: string,
-    commandId: string,
-  ): Promise<{resultType: string, data: string}> {
-    return new Promise((resolve, reject) => {
-      const url = `https://${
-        this.getApiUrl()
-      }/api/1.2/commands/status?clusterId=${
-        clusterId
-      }&contextId=${
-        contextId
-      }&commandId=${
-        commandId
-      }`;
-      const request = new Request(url, {
-        headers: new Headers({
-          Accept: '*/*',
-          Authorization: `Bearer ${this.getApiToken()}`,
-        }),
-      });
-      fetch(request).then((response) => {
-        if (!response.ok) {
-          reject();
-          throw new Error(`Databricks API call error: ${
-            response.status
-          } - ${
-            response.statusText
-          }`);
-        }
-        response.json().then((body) => {
-          const b = body as {
-            status: string,
-            results: {
-              resultType: string,
-              data: string,
-            }
-          };
-          if (b.status === 'Finished') {
-            resolve(b.results);
-          } else if (b.status === 'Error') {
-            reject(b.results);
-          } else if (b.status === 'Cancelled') {
-            reject(b.results);
-          } else {
-            pausePromise(this.config.pollInterval as number)
-              .then(() => {
-                this.commandResult(
-                  clusterId,
-                  contextId,
-                  commandId,
-                ).then((res) => {
-                  resolve(res);
-                }).catch((err) => {
-                  reject(err);
-                });
-              });
-          }
-        });
-      });
-    });
-  }
-
-  /**
-   * Returns signed temporary URLs for AWS S3 objects.
+   * Returns S3 signed URLs of unloaded scv files.
    */
   private async getSignedS3Urls(
     pathname: string,
@@ -468,178 +371,38 @@ export class DatabricksDriver extends JDBCDriver {
           return getSignedUrl(client, command, { expiresIn: 3600 });
         })
     );
-    return csvFile;
-  }
-
-  /**
-   * Unload to AWS S3 bucket.
-   */
-  private async unloadS3Command(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    const clusterId = (await this.getClustersIds())[0];
-    const contextId = await this.getContextId(clusterId);
-    const commandId = await this.runCommand(
-      clusterId,
-      contextId,
-      'scala',
-      `
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsAccessKeyId", "${this.config.awsKey}"
-        )
-        sc.hadoopConfiguration.set(
-          "fs.s3n.awsSecretAccessKey","${this.config.awsSecret}"
-        )
-        sqlContext
-          .sql("SELECT ${columns} FROM ${table}")
-          .write
-          .format("com.databricks.spark.csv")
-          .option("header", "false")
-          .save("${pathname}")
-      `,
-    );
-    await this.commandResult(
-      clusterId,
-      contextId,
-      commandId,
-    );
-    const result = await this.getSignedS3Urls(pathname);
-    return result;
-  }
-
-  /**
-   * Returns signed temporary URLs for Azure container objects.
-   */
-  private async getSignedWasbsUrls(
-    pathname: string,
-  ): Promise<string[]> {
-    // const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    // wasbs://cubejs-bucket@cubecloud.blob.core.windows.net/test/orderspa.csv
-    const csvFile: string[] = [];
-
-    const [container, account] =
-      pathname.split('wasbs://')[1].split('.blob')[0].split('@');
-    const foldername =
-      pathname.split(`${this.config.exportBucket}/`)[1];
-    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
-
-    const credential = new StorageSharedKeyCredential(
-      account,
-      this.config.azureKey as string,
-    );
-    const blobClient = new BlobServiceClient(
-      `https://${account}.blob.core.windows.net`,
-      credential,
-    );
-    const containerClient = blobClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat();
-    for await (const blob of blobsList) {
-      if (blob.name && expr.test(blob.name)) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
-          },
-          credential,
-        ).toString();
-        csvFile.push(`https://${
-          account
-        }.blob.core.windows.net/${
-          container
-        }/${blob.name}?${sas}`);
-      }
+    if (csvFile.length === 0) {
+      throw new Error('No CSV files were exported to the specified bucket. ' +
+        'Please check your export bucket configuration.');
     }
     return csvFile;
   }
 
   /**
-   * Unload to Azure Blob Container bucket.
+   * Saves specified table to the configured bucket. This requires Databricks
+   * cluster to be configured.
+   *
+   * For Azure blob storage you need to configure account access key in
+   * Cluster -> Configuration -> Advanced options
+   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   *
+   * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
+   *
+   * For S3 bucket storage you need to configure AWS access key and secret in
+   * Cluster -> Configuration -> Advanced options
+   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   *
+   * `fs.s3a.access.key <aws-access-key>`
+   * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async unloadWasbsCommand(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    const storage = pathname.split('@')[1].split('.')[0];
-    const clusterId = (await this.getClustersIds())[0];
-    const contextId = await this.getContextId(clusterId);
-    const commandId = await this.runCommand(
-      clusterId,
-      contextId,
-      'scala',
+  private async createExternalTable(table: string, columns: string,) {
+    await this.query(
       `
-      spark.conf.set(
-        "fs.azure.account.key.${storage}.blob.core.windows.net",
-        "${this.config.azureKey}"
-      )
-      sqlContext
-        .sql("SELECT ${columns} FROM ${table}")
-        .write
-        .format("com.databricks.spark.csv")
-        .option("header", "false")
-        .save("${pathname}")
+      CREATE TABLE ${table}_csv_export
+      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      AS SELECT ${columns} FROM ${table}
       `,
+      [],
     );
-    await this.commandResult(
-      clusterId,
-      contextId,
-      commandId,
-    );
-    const result = await this.getSignedWasbsUrls(pathname);
-    return result;
-  }
-
-  /**
-   * Unload table to bucket.
-   */
-  private async unloadCommand(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    let res;
-    switch (this.config.bucketType) {
-      case 's3':
-        res = await this.unloadS3Command(table, columns, pathname);
-        break;
-      case 'azure':
-        res = await this.unloadWasbsCommand(table, columns, pathname);
-        break;
-      default:
-        throw new Error(`Unsupported export bucket type: ${
-          this.config.bucketType
-        }`);
-    }
-    return res;
-  }
-
-  /**
-   * Saves pre-aggs table to the bucket and returns links to download
-   * results.
-   */
-  public async unload(
-    tableName: string,
-  ): Promise<DownloadTableCSVData> {
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
-    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
-    const csvFile = await this.unloadCommand(
-      tableName,
-      columns,
-      pathname,
-    );
-    return {
-      csvFile,
-      types,
-      csvNoHeader: true,
-    };
   }
 }

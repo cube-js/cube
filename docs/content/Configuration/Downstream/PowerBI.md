@@ -22,7 +22,7 @@ here][ref-getting-started].
 
 </InfoBox>
 
-### Cube Cloud
+### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
 
 Click **How to connect your BI tool** link on the Overview page, navigate to the SQL API tab
 and enable it. Once enabled, you should see the screen like the one below with
@@ -36,7 +36,7 @@ your connection credentials:
   />
 </div>
 
-### Self-hosted Cube
+### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
 These credentials will be required to connect to Cube from Apache Superset

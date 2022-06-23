@@ -1,5 +1,5 @@
 import React from 'react'
-import { Button, Space, Layout, Row } from 'antd'
+import { Layout, Row } from 'antd'
 import Header from "../Header"
 import Indicator from "../Indicator"
 import styles from "./App.module.css"
@@ -103,23 +103,6 @@ export default class App extends React.Component {
     renderReports() {
         return (
           <Layout>
-              <Layout.Header style={{ backgroundColor: '#43436B' }}>
-                  <Row justify='center'>
-                      <Space size='large'>
-                          <a href='https://cube.dev' rel='noopener noreferrer' target='_blank'
-                             style={{ border: 'none' }}>
-                              <img src='https://cubejs.s3-us-west-2.amazonaws.com/downloads/logo-full.svg'
-                                   alt='Cube.js' />
-                          </a>
-                          <Space>
-                              <Button href='https://github.com/cube-js/cube.js' target='_blank'
-                                      rel='noopener noreferrer' ghost>GitHub</Button>
-                              <Button href='https://slack.cube.dev' target='_blank' rel='noopener noreferrer'
-                                      ghost>Slack</Button>
-                          </Space>
-                      </Space>
-                  </Row>
-              </Layout.Header>
               <Layout.Content style={{ padding: '7.5vh 7.5vw' }}>
                   <Header
                     country={this.state.country}
@@ -128,11 +111,6 @@ export default class App extends React.Component {
                   />
 
                   <div className={styles.footnotes}>
-                      <div>These reports are based on <a
-                        href='https://console.cloud.google.com/marketplace/browse?filter=category:covid19'
-                        target='_blank' rel='noopener noreferrer'>public datasets for COVID-19 research</a> hosted on Google
-                          Cloud Platform and queried with <a href='https://cube.dev' target='_blank' rel='noopener noreferrer'>Cube.js</a>.
-                      </div>
                       <div>Charts in color provide insights into changes in community mobility due to measures implemented
                           to mitigate COVID-19.</div>
                       <div>Gray rectangles show the time frames of relevant measures.</div>

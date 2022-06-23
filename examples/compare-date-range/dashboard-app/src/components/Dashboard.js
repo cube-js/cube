@@ -3,7 +3,7 @@ import { Row, Col } from 'antd';
 import SingleQuery from './SingleQuery';
 import MultipleQueries from './MultipleQueries';
 
-export default () => {
+const Dashboard = () => {
   return (
     <React.Fragment>
       <Row gutter={20} className='dashboard__row'>
@@ -21,3 +21,5 @@ export default () => {
     </React.Fragment>
   );
 };
+
+export default Dashboard;

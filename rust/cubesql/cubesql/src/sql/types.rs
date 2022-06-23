@@ -16,6 +16,7 @@ pub enum ColumnType {
     Int64,
     Blob,
     Timestamp,
+    Decimal(usize, usize),
     List(Box<Field>),
 }
 
@@ -42,6 +43,7 @@ impl ColumnType {
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
             ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::Decimal(_, _) => PgTypeId::NUMERIC,
             ColumnType::List(field) => match field.data_type() {
                 DataType::Binary => PgTypeId::ARRAYBYTEA,
                 DataType::Boolean => PgTypeId::ARRAYBOOL,
@@ -92,19 +94,31 @@ pub enum CommandCompletion {
     Rollback,
     Set,
     Select(u32),
+    DeclareCursor,
+    CloseCursor,
+    CloseCursorAll,
     Discard(String),
 }
 
 impl CommandCompletion {
     pub fn to_pg_command(self) -> CommandComplete {
         match self {
+            // IDENTIFIER ONLY
             CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
-            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+            CommandCompletion::DeclareCursor => {
+                CommandComplete::Plain("DECLARE CURSOR".to_string())
+            }
+            CommandCompletion::CloseCursor => CommandComplete::Plain("CLOSE CURSOR".to_string()),
+            CommandCompletion::CloseCursorAll => {
+                CommandComplete::Plain("CLOSE CURSOR ALL".to_string())
+            }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
+            // ROWS COUNT
+            CommandCompletion::Select(rows) => CommandComplete::Select(rows),
         }
     }
 }

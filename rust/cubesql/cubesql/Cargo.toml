@@ -9,12 +9,12 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "ce9c81c8c7557d9a7023aa15ea26a5e9fa423197", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "24265c4602640fb03536b472a29e3e7ff8cd937f", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "92ac0de2634cac686d29035593eb57df36606396" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "9cd679244cadad4a6b9032a1ddb4f03c7a87c410" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt"] }
@@ -28,6 +28,8 @@ rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
 log = "=0.4.11"
+rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
+postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
 # which panic with Could not determine the UTC offset on this system.
 # It's a problem with determing local_offset_at for local-offset feature
