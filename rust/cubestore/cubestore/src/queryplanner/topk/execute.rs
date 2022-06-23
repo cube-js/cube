@@ -310,7 +310,7 @@ impl Hash for GroupKey<'_> {
 }
 
 impl TopKState<'_> {
-    pub fn new(
+    pub fn new<'a>(
         limit: usize,
         num_nodes: usize,
         key_len: usize,

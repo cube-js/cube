@@ -1278,7 +1278,7 @@ pub struct RocksMetaStore {
     rw_loop_tx: std::sync::mpsc::SyncSender<
         Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
     >,
-    rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
+    _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 trait BaseRocksSecondaryIndex<T>: Debug {
@@ -2103,7 +2103,7 @@ impl RocksMetaStore {
             config,
             cached_tables: Arc::new(Mutex::new(None)),
             rw_loop_tx,
-            rw_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
+            _rw_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
         };
         meta_store
     }

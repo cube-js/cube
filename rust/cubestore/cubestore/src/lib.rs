@@ -1,16 +1,12 @@
-#![feature(in_band_lifetimes)]
 #![feature(test)]
 #![feature(backtrace)]
 #![feature(async_closure)]
 #![feature(drain_filter)]
 #![feature(box_patterns)]
 #![feature(slice_internals)]
-#![feature(raw)]
-#![feature(total_cmp)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
 #![feature(map_first_last)]
-#![feature(arc_new_cyclic)]
 #![feature(is_sorted)]
 #![feature(result_flattening)]
 // #![feature(trace_macros)]
@@ -81,7 +77,7 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
-    pub fn display_with_backtrace(&'a self) -> impl Display + 'a {
+    pub fn display_with_backtrace<'a>(&'a self) -> impl Display + 'a {
         struct WithBt<'a>(&'a CubeError);
         impl Display for WithBt<'_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
