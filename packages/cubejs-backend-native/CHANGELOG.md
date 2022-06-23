@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.26](https://github.com/cube-js/cube.js/compare/v0.30.25...v0.30.26) (2022-06-20)
+
+
+### Features
+
+* **cubesql:** Support Int8 for Bind + binary in pg-wire ([f28fbd5](https://github.com/cube-js/cube.js/commit/f28fbd5049e0a72adbb0f078e45728d60b481ca2))
+
+
+
+
+
 ## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
 
 

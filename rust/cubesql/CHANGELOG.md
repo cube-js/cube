@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.26](https://github.com/cube-js/cube.js/compare/v0.30.25...v0.30.26) (2022-06-20)
+
+
+### Features
+
+* **cubesql:** Correct implementation for placeholder binder/finder in pg-wire ([fa018bd](https://github.com/cube-js/cube.js/commit/fa018bd62fd0d7f66c8aa0b68b43cc37d73d65ac))
+* **cubesql:** Replace timestamptz CAST with timestamp ([9e7c1bd](https://github.com/cube-js/cube.js/commit/9e7c1bd69adae367a65f77339087194e7e1bc5fe))
+* **cubesql:** Support Int8 for Bind + binary in pg-wire ([f28fbd5](https://github.com/cube-js/cube.js/commit/f28fbd5049e0a72adbb0f078e45728d60b481ca2))
+* **cubesql:** Support placeholders in `WITH` and `LIMIT` ([#4768](https://github.com/cube-js/cube.js/issues/4768)) ([d444c0f](https://github.com/cube-js/cube.js/commit/d444c0fda31b3cdf824e85c3f03d76d8a3f47211))
+* **cubesql:** Workaround CTEs with subqueries (Sigma) ([#4767](https://github.com/cube-js/cube.js/issues/4767)) ([d99a02f](https://github.com/cube-js/cube.js/commit/d99a02f508418c9a054977572da0985f627acfc3))
+
+
+
+
+
 ## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
 
 

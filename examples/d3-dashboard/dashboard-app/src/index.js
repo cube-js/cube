@@ -15,7 +15,7 @@ const exampleDescription = {
       Follow 
       the <a href="https://d3-dashboard.cube.dev/">tutorial</a>
       or explore 
-      the <a href="https://github.com/cube-js/cube.js/tree/master/guides/d3-dashboard">source code</a>
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard">source code</a>
       to learn more.
     </p>
   `

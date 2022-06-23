@@ -25,7 +25,7 @@ function EventBanner () {
   }, []);
 
   return (
-    <div className={`${styles.banner} ${!isLoading ? styles.visible : ''}`}>
+    <div className={`${styles.banner} ${(!isLoading && events.length) > 0 ? styles.visible : ''}`}>
       {!isLoading
         && events.map(({id, link, message, campaign}) => (
           <a

@@ -34,7 +34,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 }
 
 lazy_static! {
-    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s'(?P<nspname>[^']+)'.*\),\s+tbl\sas\s\(.*relname\s=\s'(?P<relname>[^']+)'.*\).*$"#).unwrap();
+    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s(?P<nspname>'[^']+'|\$\d+).*\),\s+tbl\sas\s\(.*relname\s=\s(?P<relname>'[^']+'|\$\d+).*\).*$"#).unwrap();
 }
 
 pub fn parse_sql_to_statements(
@@ -146,8 +146,8 @@ pub fn parse_sql_to_statements(
                 left join pg_description on
                     attrelid = objoid and
                     attnum = objsubid
-                join pg_catalog.pg_namespace nsp ON nspname = '{}'
-                join pg_catalog.pg_class tbl ON relname = '{}' and relnamespace = nsp.oid
+                join pg_catalog.pg_namespace nsp ON nspname = {}
+                join pg_catalog.pg_class tbl ON relname = {} and relnamespace = nsp.oid
                 where
                     attnum > 0 and
                     attrelid = tbl.oid

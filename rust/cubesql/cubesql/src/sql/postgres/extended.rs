@@ -2,7 +2,7 @@ use crate::{
     compile::QueryPlan,
     sql::{
         dataframe::{batch_to_dataframe, DataFrame, TableValue},
-        statement::StatementParamsBinder,
+        statement::PostgresStatementParamsBinder,
         writer::BatchWriter,
     },
     CubeError,
@@ -36,12 +36,12 @@ pub struct PreparedStatement {
 }
 
 impl PreparedStatement {
-    pub fn bind(&self, values: Vec<BindValue>) -> ast::Statement {
-        let binder = StatementParamsBinder::new(values);
+    pub fn bind(&self, values: Vec<BindValue>) -> Result<ast::Statement, ConnectionError> {
+        let binder = PostgresStatementParamsBinder::new(values);
         let mut statement = self.query.clone();
-        binder.bind(&mut statement);
+        binder.bind(&mut statement)?;
 
-        statement
+        Ok(statement)
     }
 }
 
@@ -205,6 +205,7 @@ impl Portal {
                     TableValue::Float64(v) => writer.write_value(*v)?,
                     TableValue::List(v) => writer.write_value(v.clone())?,
                     TableValue::Timestamp(v) => writer.write_value(v.clone())?,
+                    TableValue::Decimal128(v) => writer.write_value(v.clone())?,
                 };
             }
 

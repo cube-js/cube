@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
-use crate::{buffer, BindValue, PgType, PgTypeId, ProtocolError};
+use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
 
@@ -384,13 +384,17 @@ impl ParameterDescription {
     pub fn new(parameters: Vec<PgTypeId>) -> Self {
         Self { parameters }
     }
+
+    pub fn get(&self, i: usize) -> Option<&PgTypeId> {
+        self.parameters.get(i)
+    }
 }
 
 impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![];
+        let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
         // FIXME!
         let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
@@ -604,22 +608,51 @@ pub struct Bind {
 }
 
 impl Bind {
-    pub fn to_bind_values(&self) -> Vec<BindValue> {
-        let mut values = vec![];
+    pub fn to_bind_values(
+        &self,
+        description: &ParameterDescription,
+    ) -> Result<Vec<BindValue>, ProtocolError> {
+        let mut values = Vec::with_capacity(self.parameter_values.len());
 
-        for param_value in &self.parameter_values {
-            values.push(match param_value {
+        for (idx, raw_value) in self.parameter_values.iter().enumerate() {
+            let param_tid = description.get(idx).ok_or::<ProtocolError>({
+                ErrorResponse::error(
+                    ErrorCode::InternalError,
+                    format!("Unknown type for parameter: {}", idx),
+                )
+                .into()
+            })?;
+
+            let param_format = match self.parameter_formats.len() {
+                0 => Format::Text,
+                1 => self.parameter_formats[0],
+                _ => self.parameter_formats[idx],
+            };
+
+            values.push(match raw_value {
                 None => BindValue::Null,
-                Some(raw_value) => {
-                    let decoded = String::from_utf8(raw_value.clone())
-                        .expect("Unable to unpack raw parameter to string");
-
-                    BindValue::String(decoded)
-                }
+                Some(raw_value) => match param_tid {
+                    PgTypeId::TEXT => {
+                        BindValue::String(String::from_protocol(raw_value, param_format)?)
+                    }
+                    PgTypeId::INT8 => {
+                        BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
+                    }
+                    _ => {
+                        return Err(ErrorResponse::error(
+                            ErrorCode::FeatureNotSupported,
+                            format!(
+                                r#"Type "{:?}" is not supported for parameters decoding"#,
+                                param_tid
+                            ),
+                        )
+                        .into())
+                    }
+                },
             })
         }
 
-        values
+        Ok(values)
     }
 }
 
@@ -787,6 +820,7 @@ pub enum ErrorCode {
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
     DuplicateCursor,
+    SyntaxError,
     // Class 53 — Insufficient Resources
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
@@ -808,6 +842,7 @@ impl Display for ErrorCode {
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
+            Self::SyntaxError => "42601",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::InternalError => "XX000",
@@ -1030,7 +1065,7 @@ mod tests {
                         ],
                         result_formats: vec![Format::Text]
                     },
-                )
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
@@ -1061,7 +1096,13 @@ mod tests {
                         parameter_values: vec![Some(vec![116, 101, 115, 116])],
                         result_formats: vec![Format::Binary]
                     },
-                )
+                );
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::TEXT]))
+                        .unwrap(),
+                    vec![BindValue::String("test".to_string())]
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }

@@ -11,7 +11,7 @@ use crate::{
         df_type_to_pg_tid,
         extended::{Cursor, Portal},
         session::DatabaseProtocol,
-        statement::{StatementParamsFinder, StatementPlaceholderReplacer},
+        statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
         writer::BatchWriter,
         AuthContext, Session, StatusFlags,
@@ -570,7 +570,7 @@ impl AsyncPostgresShim {
         }
 
         let portal = if let Some(statement) = source_statement {
-            let prepared_statement = statement.bind(body.to_bind_values());
+            let prepared_statement = statement.bind(body.to_bind_values(&statement.parameters)?)?;
 
             let meta = self
                 .session
@@ -619,9 +619,9 @@ impl AsyncPostgresShim {
                 ));
             }
 
-            let stmt_finder = StatementParamsFinder::new();
+            let stmt_finder = PostgresStatementParamsFinder::new();
             let parameters: Vec<PgTypeId> = stmt_finder
-                .find(&query)
+                .find(&query)?
                 .into_iter()
                 .map(|param| param.coltype.to_pg_tid())
                 .collect();
@@ -634,7 +634,7 @@ impl AsyncPostgresShim {
                 .await?;
 
             let stmt_replacer = StatementPlaceholderReplacer::new();
-            let hacked_query = stmt_replacer.replace(&query);
+            let hacked_query = stmt_replacer.replace(&query)?;
 
             let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
 

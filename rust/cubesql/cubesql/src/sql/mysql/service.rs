@@ -30,7 +30,7 @@ use crate::{
     sql::{
         dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
-        statement::{StatementParamsBinder, StatementParamsFinder},
+        statement::{MySQLStatementParamsFinder, MysqlStatementParamsBinder},
         AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
     },
     CubeError,
@@ -285,9 +285,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
                 }
             };
 
-        let stmt_prepare = StatementParamsFinder::new();
+        let stmt_prepare = MySQLStatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
             .find(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?
             .into_iter()
             .map(|p| p.into())
             .collect();
@@ -369,8 +370,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             values_to_bind.push(bind_value);
         }
 
-        let binder = StatementParamsBinder::new(values_to_bind);
-        binder.bind(&mut statement);
+        let binder = MysqlStatementParamsBinder::new(values_to_bind);
+        binder
+            .bind(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
 
         self.handle_query(statement.to_string().as_str(), results)
             .await

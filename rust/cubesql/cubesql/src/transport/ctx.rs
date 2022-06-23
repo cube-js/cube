@@ -57,7 +57,7 @@ impl MetaContext {
         Self { cubes, tables }
     }
 
-    pub fn find_cube_with_name(&self, name: String) -> Option<V1CubeMeta> {
+    pub fn find_cube_with_name(&self, name: &str) -> Option<V1CubeMeta> {
         for cube in self.cubes.iter() {
             if cube.name.eq(&name) {
                 return Some(cube.clone());
@@ -69,7 +69,7 @@ impl MetaContext {
 
     pub fn find_measure_with_name(&self, name: String) -> Option<V1CubeMetaMeasure> {
         let cube_and_member_name = name.split(".").collect::<Vec<_>>();
-        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0].to_string()) {
+        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
             cube.lookup_measure(cube_and_member_name[1]).cloned()
         } else {
             None
@@ -77,7 +77,7 @@ impl MetaContext {
     }
 
     pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
-        self.find_cube_with_name(member_name.split(".").next()?.to_string())?
+        self.find_cube_with_name(member_name.split(".").next()?)?
             .df_data_type(member_name.as_str())
     }
 

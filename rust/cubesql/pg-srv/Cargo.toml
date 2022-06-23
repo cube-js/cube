@@ -13,6 +13,7 @@ tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1.36"
 log = "=0.4.11"
 bytes = "0.5.4"
+byteorder = "1.4.3"
 thiserror = "1.0"
 anyhow = "1.0"
 

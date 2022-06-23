@@ -321,14 +321,16 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_prepare(&self) -> RunResult<()> {
+        // Unknown variables will be detected as TEXT
+        // LIMIT has a typehint for i64
         let stmt = self
             .client
-            .prepare("SELECT $1 as t1, $2 as t2")
+            .prepare("SELECT $1 as t1, $2 as t2 LIMIT $3")
             .await
             .unwrap();
 
         self.client
-            .query(&stmt, &[&"test1", &"test2"])
+            .query(&stmt, &[&"test1", &"test2", &0_i64])
             .await
             .unwrap();
 
@@ -603,6 +605,10 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 true as bool_true,
                 false as bool_false,
                 'test' as str,
+                CAST(1.25 as DECIMAL(15, 0)) as d0,
+                CAST(1.25 as DECIMAL(15, 2)) as d2,
+                CAST(1.25 as DECIMAL(15, 5)) as d5,
+                CAST(1.25 as DECIMAL(15, 10)) as d10,
                 ARRAY['test1', 'test2'] as str_arr,
                 ARRAY[1,2,3] as i64_arr,
                 ARRAY[1.2,2.3,3.4] as f64_arr,

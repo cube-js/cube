@@ -1,13 +1,17 @@
 #![feature(backtrace)]
+#![feature(type_ascription)]
 
 pub mod buffer;
+mod decoding;
 pub mod extended;
 pub mod pg_type;
 pub mod protocol;
 
 pub use buffer::*;
+pub use decoding::*;
 pub use extended::*;
 pub use pg_type::*;
+
 use std::backtrace::Backtrace;
 
 /// Protocol error abstract of handled/unhandled errors, it should not handle any kind of business logic errors

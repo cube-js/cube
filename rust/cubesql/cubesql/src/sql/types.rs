@@ -16,6 +16,7 @@ pub enum ColumnType {
     Int64,
     Blob,
     Timestamp,
+    Decimal(usize, usize),
     List(Box<Field>),
 }
 
@@ -42,6 +43,7 @@ impl ColumnType {
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
             ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::Decimal(_, _) => PgTypeId::NUMERIC,
             ColumnType::List(field) => match field.data_type() {
                 DataType::Binary => PgTypeId::ARRAYBYTEA,
                 DataType::Boolean => PgTypeId::ARRAYBOOL,
