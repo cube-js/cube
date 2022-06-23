@@ -355,6 +355,15 @@ class CubejsApi {
     );
   }
 
+  runScheduledRefresh(options, callback) {
+    return this.loadMethod(
+      () => this.request('run-scheduled-refresh'),
+      (response) => response,
+      options,
+      callback
+    );
+  }
+
   dryRun(query, options, callback) {
     return this.loadMethod(
       () => this.request('dry-run', { query }),

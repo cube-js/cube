@@ -7,3 +7,11 @@ Array [
   },
 ]
 `;
+
+exports[`athena rollup measure: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;

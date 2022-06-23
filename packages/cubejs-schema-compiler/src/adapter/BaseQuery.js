@@ -2194,6 +2194,9 @@ class BaseQuery {
   }
 
   lambdaRangeSql(cube, preAggregation) {
+    if (!preAggregation.lambdaView) {
+      return undefined;
+    }
     return this.cacheValue(
       ['lambdaRangeSql', cube, JSON.stringify(preAggregation)],
       () => {
@@ -2214,6 +2217,9 @@ class BaseQuery {
   }
 
   lambdaTimeDimensionColumn(cube, preAggregation) {
+    if (!preAggregation.lambdaView) {
+      return undefined;
+    }
     return this.cacheValue(
       ['lambdaTimeDimensionColumn', cube, JSON.stringify(preAggregation)],
       () => this.externalQuery().timeDimensions[0].aliasName(),

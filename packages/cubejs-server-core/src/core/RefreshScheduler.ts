@@ -135,10 +135,6 @@ export class RefreshScheduler {
   }
 
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
-    return {
-      finished: true
-    };
-
     const context: RequestContext = {
       authInfo: null,
       ...ctx,

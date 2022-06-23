@@ -13,7 +13,7 @@ import {
   utcToLocalTimeZone,
   pausePromise,
   LAMBDA_RANGE_START,
-  LAMBDA_RANGE_END
+  LAMBDA_RANGE_END, QueryAlias
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -427,6 +427,8 @@ export class PreAggregationLoader {
 
   private externalRefresh: boolean;
 
+  private buildRangeEnd: string;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
@@ -451,6 +453,7 @@ export class PreAggregationLoader {
     this.metadata = options.metadata;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
+    this.buildRangeEnd = options.buildRangeEnd;
 
     if (this.externalRefresh && this.waitForRenew) {
       const message = 'Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.';
@@ -751,7 +754,8 @@ export class PreAggregationLoader {
         invalidationKeys,
         forceBuild: this.forceBuild,
         metadata: this.metadata,
-        orphanedTimeout: this.orphanedTimeout
+        orphanedTimeout: this.orphanedTimeout,
+        buildRangeEnd: this.buildRangeEnd,
       },
       priority,
       // eslint-disable-next-line no-use-before-define
@@ -810,6 +814,7 @@ export class PreAggregationLoader {
       targetTableName,
       requestId: this.requestId,
       newVersionEntry,
+      buildRangeEnd: this.buildRangeEnd,
     };
   }
 
@@ -1284,23 +1289,6 @@ export class PreAggregationPartitionRangeLoader {
     ];
   }
 
-  private replaceLambdaExternalSqlAndParams(
-    query: QueryWithParams,
-    dateRange: QueryDateRange
-  ): QueryWithParams {
-    const [sql, params, options] = query;
-    return [
-      sql,
-      params.map(param => {
-        switch (param) {
-          case LAMBDA_RANGE_START: return dateRange[0];
-          case LAMBDA_RANGE_END: return dateRange[1];
-          default: return param;
-        }
-      })
-    ];
-  }
-
   private partitionPreAggregationDescription(range: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
@@ -1325,17 +1313,22 @@ export class PreAggregationPartitionRangeLoader {
   public async loadPreAggregations(): Promise<LoadPreAggregationResult> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const { buildRange, partitionRanges } = await this.partitionRanges();
-      const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
-        this.redisPrefix,
-        this.driverFactory,
-        this.logger,
-        this.queryCache,
-        this.preAggregations,
-        this.partitionPreAggregationDescription(range),
-        this.preAggregationsTablesToTempTables,
-        this.loadCache,
-        this.options
-      ));
+      const partitionLoaders = partitionRanges.map(range => {
+        const [_, buildRangeEnd] = buildRange;
+        return new PreAggregationLoader(
+          this.redisPrefix,
+          this.driverFactory,
+          this.logger,
+          this.queryCache,
+          this.preAggregations,
+          this.partitionPreAggregationDescription(range),
+          this.preAggregationsTablesToTempTables,
+          this.loadCache,
+          PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)
+            ? { ...this.options, buildRangeEnd }
+            : this.options,
+        );
+      });
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
 
@@ -1343,21 +1336,19 @@ export class PreAggregationPartitionRangeLoader {
       console.log('RRR', loadResults);
 
       if (this.preAggregation.lambdaView) {
-      // if (false) {
-        // Necessary to align buildRange on preAggregation.granularity
-        // TODO. Persist at partition table creation time instead of query time.
+        // Align buildRange on preAggregation.granularity
         const lambdaRangeSql = this.replaceLambdaRangeSqlAndParams(this.preAggregation.lambdaRangeSql, buildRange);
         const client = await this.driverFactory();
         const rows = await client.query(lambdaRangeSql[0], lambdaRangeSql[1], {});
+        const lambdaRange: QueryDateRange = [rows[0][QueryAlias.LAMBDA_RANGE_END], partitionRanges[partitionRanges.length - 1][1]];
 
-        const range: QueryDateRange = [rows[0].end, partitionRanges[partitionRanges.length - 1][1]];
         const lambdaLoader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
           this.logger,
           this.queryCache,
           this.preAggregations,
-          this.partitionPreAggregationDescription(range),
+          this.partitionPreAggregationDescription(lambdaRange),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
           this.options
@@ -1367,10 +1358,9 @@ export class PreAggregationPartitionRangeLoader {
         const firstTableTargetNames = allTableTargetNames.slice(0, allTableTargetNames.length - 1);
         const lastTableTargetName = allTableTargetNames[allTableTargetNames.length - 1];
 
-
         const unionTargetTableName = [
           ...firstTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${lastTableTargetName} WHERE ${this.preAggregation.lambdaTimeDimensionColumn} < to_timestamp('${range[0]}')`,
+          `SELECT * FROM ${lastTableTargetName} WHERE ${this.preAggregation.lambdaTimeDimensionColumn} < to_timestamp('${lambdaRange[0]}')`,
           `SELECT * FROM ${lambdaResult.targetTableName}`,
         ].join(' UNION ALL ');
         return {
@@ -1486,6 +1476,10 @@ export class PreAggregationPartitionRangeLoader {
     if (range[0].length !== 23 || range[1].length !== 23) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }
+  }
+
+  public static dateRangeIncludesTimestamp(range: QueryDateRange, timestamp: string) {
+    return range[0] <= timestamp && timestamp <= range[1];
   }
 
   public static intersectDateRanges(rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange {
@@ -1737,8 +1731,9 @@ export class PreAggregations {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource), (client, q) => {
         const {
-          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
+          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
         } = q;
+        // TODO(cristipp) align buildRangeEnd
         const loader = new PreAggregationLoader(
           this.redisPrefix,
           () => this.driverFactory(dataSource),
@@ -1754,7 +1749,7 @@ export class PreAggregations {
             this,
             { requestId, dataSource }
           ),
-          { requestId, externalRefresh: this.externalRefresh }
+          { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
         );
         return loader.refresh(newVersionEntry, invalidationKeys, client);
       }, {
