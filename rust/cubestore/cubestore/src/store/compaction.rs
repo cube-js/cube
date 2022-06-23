@@ -491,9 +491,20 @@ impl CompactionService for CompactionServiceImpl {
         let in_memory_columns =
             prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
 
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+
         // Get merged RecordBatch
-        let batches_stream =
-            merge_chunks(key_size, main_table, in_memory_columns, unique_key).await?;
+        let batches_stream = merge_chunks(
+            key_size,
+            main_table,
+            in_memory_columns,
+            unique_key,
+            aggregate_columns,
+        )
+        .await?;
         let batches = collect(batches_stream).await?;
         let batch = RecordBatch::concat(&schema, &batches).unwrap();
 
@@ -1340,6 +1351,7 @@ mod tests {
                 true,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1438,7 +1450,6 @@ mod tests {
 
         RocksMetaStore::cleanup_test_metastore("compact_in_memory_chunks");
     }
-
 
     #[tokio::test]
     async fn aggr_index_compaction() {
@@ -1605,7 +1616,6 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_store_path.clone());
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
     }
-
 }
 
 struct MultiSplit {
