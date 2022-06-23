@@ -53,7 +53,17 @@ syntax on the [reference page][ref-sql-api].
 
 <div style="text-align: center">
   <img
-    src="https://descriptive-reply-0b7.notion.site/image/https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fsecure.notion-static.com%2F225f79fc-5150-47ce-9398-c54c97e7e143%2FUntitled.png?table=block&id=5a4515cf-8aa9-4885-88b5-42e0c54358b4&spaceId=73430d0e-c482-40f7-946b-8a7851a88586&width=2000&userId=&cache=v2"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/hex-1.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/hex-2.png"
     style="border: none"
     width="80%"
   />
