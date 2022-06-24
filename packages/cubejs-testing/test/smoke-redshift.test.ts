@@ -23,7 +23,7 @@ const reusableSuite = (env: { [key: string]: string} = {}) => () => {
         ...DEFAULT_CONFIG,
       },
       {
-        schemaDir: 'postgresql/schema',
+        schemaDir: 'smoke/schema',
       }
     );
     client = cubejs(async () => 'test', {

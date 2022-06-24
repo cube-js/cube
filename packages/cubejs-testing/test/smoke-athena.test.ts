@@ -1,22 +1,12 @@
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, expect, jest } from '@jest/globals';
+import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
-
-async function setupBirdbox(extraEnv: Record<string, string> = {}) {
-  return getBirdbox(
-    'athena',
-    {
-      CUBEJS_DB_TYPE: 'athena',
-      ...DEFAULT_CONFIG,
-      ...extraEnv,
-    },
-    {
-      schemaDir: 'postgresql/schema',
-    }
-  );
-}
+import {
+  DEFAULT_CONFIG,
+  testPreAggregation,
+  testQueryMeasure
+} from './smoke-tests';
 
 async function setupClient(birdbox: BirdBox) {
   return cubejs(async () => 'test', {
@@ -24,38 +14,63 @@ async function setupClient(birdbox: BirdBox) {
   });
 }
 
-async function runScheduledRefresh(client: any) {
-  return client.loadMethod(
-    () => client.request('run-scheduled-refresh'),
-    (response: any) => response,
-  );
-}
-
 describe('athena', () => {
   jest.setTimeout(60 * 5 * 1000);
+  let birdbox: BirdBox;
+  let client: CubejsApi;
 
-  // test('query measure', async () => {
-  //   const birdbox = await setupBirdbox();
-  //   try {
-  //     const client = await setupClient(birdbox);
-  //     await testQueryMeasure(client);
-  //   } finally {
-  //     await birdbox.stop();
-  //   }
-  // });
-
-  test('rollup measure', async () => {
-    const birdbox = await setupBirdbox({
-      CUBEJS_REFRESH_WORKER: 'true',
-      CUBEJS_ROLLUP_ONLY: 'true',
+  beforeAll(async () => {
+    birdbox = await getBirdbox(
+      'athena',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DB_TYPE: 'athena',
+      },
+      {
+        schemaDir: 'smoke/schema',
+      }
+    );
+    client = cubejs(async () => 'test', {
+      apiUrl: birdbox.configuration.apiUrl,
     });
-    try {
-      const client = await setupClient(birdbox);
-      // await client.runScheduledRefresh();
-      await runScheduledRefresh(client);
-      await testQueryMeasure(client);
-    } finally {
-      await birdbox.stop();
-    }
+  });
+
+  afterAll(async () => {
+    await birdbox.stop();
+  });
+
+  test('query measure', async () => {
+    await testQueryMeasure(client);
+  });
+});
+
+describe('athena pa', () => {
+  let birdbox: BirdBox;
+  let client: CubejsApi;
+
+  beforeAll(async () => {
+    birdbox = await getBirdbox(
+      'athena',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DB_TYPE: 'athena',
+        CUBEJS_REFRESH_WORKER: 'true',
+        CUBEJS_ROLLUP_ONLY: 'true',
+      },
+      {
+        schemaDir: 'smoke/schema',
+      }
+    );
+    client = cubejs(async () => 'test', {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+  });
+
+  afterAll(async () => {
+    await birdbox.stop();
+  });
+
+  test('query measure', async () => {
+    await testPreAggregation(client);
   });
 });

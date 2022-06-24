@@ -11,6 +11,13 @@ export const DEFAULT_CONFIG = {
   CUBEJS_ROLLUP_ONLY: 'false',
 };
 
+export async function runScheduledRefresh(client: any) {
+  return client.loadMethod(
+    () => client.request('run-scheduled-refresh'),
+    (response: any) => response,
+  );
+}
+
 export async function testQueryMeasure(client: CubejsApi) {
   const response = await client.load({
     measures: [
@@ -18,4 +25,15 @@ export async function testQueryMeasure(client: CubejsApi) {
     ],
   });
   expect(response.rawData()).toMatchSnapshot('query');
+}
+
+export async function testPreAggregation(client: CubejsApi) {
+  // await client.runScheduledRefresh();
+  await runScheduledRefresh(client);
+  const response = await client.load({
+    measures: [
+      'OrdersPA.totalAmount',
+    ],
+  });
+  expect(response.rawData()).toMatchSnapshot('preaggregation');
 }
