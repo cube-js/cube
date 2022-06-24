@@ -53,7 +53,8 @@
     "serve-static": "^1.13.2",
     "sqlstring": "^2.3.1",
     "uuid": "^8.3.2",
-    "ws": "^7.5.3"
+    "ws": "^7.5.3",
+    "lodash.clonedeep": "^4.5.0"
   },
   "devDependencies": {
     "@cubejs-backend/cubestore-driver": "^0.30.28",

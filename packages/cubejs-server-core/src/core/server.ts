@@ -32,8 +32,10 @@ import * as concurrencyService from './concurrencyService';
 import type {
   ContextToAppIdFn,
   CreateOptions,
+  InitializedOptions,
   DatabaseType,
   DbTypeFn,
+  DbTypeAsyncFn,
   DriverFactoryFn,
   ExternalDbTypeFn,
   OrchestratorOptions,
