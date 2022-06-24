@@ -87,16 +87,24 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
-export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverOptions = {
-  maxPoolSize?: number
+export type DriverOptions = {// TODO: merge to config
+  maxPoolSize?: number,
 };
 export type DriverConfig = {
   type: DatabaseType,
-  options: DriverOptions
+  options: DriverOptions,
 };
+
+export type DbTypeFn = (context: DriverContext) =>
+  DatabaseType | Promise<DatabaseType>;
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
+
+export type DbTypeAsyncFn = (context: DriverContext) =>
+  Promise<DatabaseType>;
+export type DriverFactoryAsyncFn = (context: DriverContext) =>
+  Promise<BaseDriver | DriverConfig>;
+
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
@@ -152,6 +160,11 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
   allowNodeRequire?: boolean;
+}
+
+export interface InitializedOptions extends CreateOptions {
+  dbType: DbTypeAsyncFn;
+  driverFactory: DriverFactoryAsyncFn;
 }
 
 export type SystemOptions = {

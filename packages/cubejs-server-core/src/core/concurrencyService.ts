@@ -54,7 +54,7 @@ const queueOptionsWrapper = (
  */
 export const decorateOpts = (
   context: RequestContext,
-  orchestratorOptions: OrchestratorOptions,
+  orchestratorOptions: OrchestratorOptions | (() => OrchestratorOptions),
 ) => {
   // query queue
   orchestratorOptions.queryCacheOptions =
