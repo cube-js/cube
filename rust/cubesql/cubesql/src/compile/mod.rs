@@ -2714,6 +2714,7 @@ mod tests {
     };
     use datafusion::dataframe::DataFrame as DFDataFrame;
     use pretty_assertions::assert_eq;
+    use regex::Regex;
 
     use super::*;
     use crate::{
@@ -2934,55 +2935,10 @@ mod tests {
         parent.accept(&mut visitor).unwrap();
         visitor.0.expect("No CubeScanNode was found in plan")
     }
-
-    fn find_timestamps(parent: Arc<LogicalPlan>) -> Vec<ScalarValue> {
-        pub struct FindTimestampVisitor(Vec<ScalarValue>);
-
-        fn extract_timestamps(exprs: Vec<Expr>) -> Vec<ScalarValue> {
-            let mut result = vec![];
-            for e in exprs.iter() {
-                let timestamps = match e {
-                    Expr::Literal(val) => match val {
-                        ScalarValue::TimestampSecond(_, _)
-                        | ScalarValue::TimestampMillisecond(_, _)
-                        | ScalarValue::TimestampMicrosecond(_, _)
-                        | ScalarValue::TimestampNanosecond(_, _) => vec![val.clone()],
-                        _ => vec![],
-                    },
-                    // TODO: support other cases if needed
-                    Expr::Alias(expr, _) => extract_timestamps(vec![*expr.clone()]),
-                    Expr::Cast { expr, .. } => extract_timestamps(vec![*expr.clone()]),
-                    _ => vec![],
-                };
-
-                result.extend(timestamps.into_iter());
-            }
-
-            result
-        }
-
-        impl PlanVisitor for FindTimestampVisitor {
-            type Error = CubeError;
-
-            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                self.0.extend(extract_timestamps(plan.expressions()));
-
-                Ok(true)
-            }
-        }
-
-        let mut visitor = FindTimestampVisitor(Vec::new());
-        parent.accept(&mut visitor).unwrap();
-
-        visitor.0
-    }
-
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
         fn find_cube_scan(&self) -> CubeScanNode;
-
-        fn find_timestamps(&self) -> Vec<ScalarValue>;
     }
 
     impl LogicalPlanTestUtils for LogicalPlan {
@@ -2995,10 +2951,6 @@ mod tests {
 
         fn find_cube_scan(&self) -> CubeScanNode {
             find_cube_scan_deep_search(Arc::new(self.clone()))
-        }
-
-        fn find_timestamps(&self) -> Vec<ScalarValue> {
-            find_timestamps(Arc::new(self.clone()))
         }
     }
 
@@ -3764,12 +3716,18 @@ mod tests {
             DatabaseProtocol::PostgreSQL,
         );
 
-        let logical_plan = query_plan.print(true).unwrap();
-        let timestamps = query_plan.as_logical_plan().find_timestamps();
+        let logical_plan = &query_plan.print(true).unwrap();
+
+        let re = Regex::new(r"TimestampNanosecond\(\d+, None\)").unwrap();
+        let logical_plan = re
+            .replace_all(logical_plan, "TimestampNanosecond(0, None)")
+            .as_ref()
+            .to_string();
+
         assert_eq!(
             logical_plan,
-            format!("Projection: CAST(TimestampNanosecond({}, None) AS Timestamp(Nanosecond, None)) AS COL\
-            \n  EmptyRelation", timestamps[0]),
+            "Projection: CAST(TimestampNanosecond(0, None) AS Timestamp(Nanosecond, None)) AS COL\
+            \n  EmptyRelation",
         );
     }
 
