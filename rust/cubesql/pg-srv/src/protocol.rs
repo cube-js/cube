@@ -308,6 +308,7 @@ impl Serialize for ParseComplete {
     }
 }
 
+/// https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27
 #[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
