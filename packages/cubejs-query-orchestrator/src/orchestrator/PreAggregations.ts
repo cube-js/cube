@@ -362,13 +362,13 @@ class PreAggregationLoadCache {
   }
 
   protected async getQueryStage(stageQueryKey) {
-    const queue = this.preAggregations.getQueue(this.dataSource);
+    const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
   }
 
   protected async fetchQueryStageState(queue?) {
-    queue = queue || this.preAggregations.getQueue(this.dataSource);
+    queue = queue || await this.preAggregations.getQueue(this.dataSource);
     if (!this.queryStageState) {
       this.queryStageState = await queue.fetchQueryStageState();
     }
@@ -676,7 +676,8 @@ export class PreAggregationLoader {
   }
 
   protected async executeInQueue(invalidationKeys, priority, newVersionEntry) {
-    return this.preAggregations.getQueue(this.preAggregation.dataSource).executeInQueue(
+    const query = await this.preAggregations.getQueue(this.preAggregation.dataSource);
+    return query.executeInQueue(
       'query',
       this.preAggregationQueryKey(invalidationKeys),
       {
@@ -1592,14 +1593,8 @@ export class PreAggregations {
     };
   }
 
-  public getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
-      const queueOptions = (
-        this.options.queueOptions as ((dataSource: String) => {
-          concurrency: number,
-        })
-      )(dataSource);
-
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
@@ -1633,8 +1628,11 @@ export class PreAggregations {
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...queueOptions,
-          getQueueEventsBus: this.getQueueEventsBus,
+          ...(typeof this.options.queueOptions === 'function' ?
+            this.options.queueOptions(dataSource) :
+            this.options.queueOptions
+          ),
+          getQueueEventsBus: this.getQueueEventsBus
         }
       );
     }
@@ -1742,12 +1740,13 @@ export class PreAggregations {
   }
 
   public async getQueueState(dataSource: string) {
-    const queries = await this.getQueue(dataSource).getQueries();
+    const query = await this.getQueue(dataSource);
+    const queries = await query.getQueries();
     return queries;
   }
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
-    const queue = this.getQueue(dataSource);
+    const queue = await this.getQueue(dataSource);
     return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey)));
   }
 }
