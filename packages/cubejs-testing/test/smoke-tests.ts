@@ -12,6 +12,7 @@ export const DEFAULT_CONFIG = {
 };
 
 export async function runScheduledRefresh(client: any) {
+  // return client.runScheduledRefresh();
   return client.loadMethod(
     () => client.request('run-scheduled-refresh'),
     (response: any) => response,
@@ -28,7 +29,6 @@ export async function testQueryMeasure(client: CubejsApi) {
 }
 
 export async function testPreAggregation(client: CubejsApi) {
-  // await client.runScheduledRefresh();
   await runScheduledRefresh(client);
   const response = await client.load({
     measures: [
