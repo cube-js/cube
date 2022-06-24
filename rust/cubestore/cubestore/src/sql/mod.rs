@@ -12,7 +12,7 @@ use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
-use chrono::{ParseResult, Utc};
+use chrono::{DateTime, ParseResult, TimeZone, Utc};
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -183,6 +183,7 @@ impl SqlServiceImpl {
         external: bool,
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
+        build_range_end: Option<DateTime<Utc>>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         partitioned_index: Option<PartitionedIndexRef>,
@@ -251,7 +252,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
-                    None,
+                    build_range_end,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     None,
                 )
@@ -302,7 +303,7 @@ impl SqlServiceImpl {
                 import_format,
                 indexes_to_create,
                 false,
-                None,
+                build_range_end,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 partition_split_threshold,
             )
@@ -769,14 +770,30 @@ impl SqlService for SqlServiceImpl {
                                 match input_format.as_str() {
                                     "csv" => Result::Ok(ImportFormat::CSV),
                                     "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                    _ => Err(CubeError::user(format!(
-                                        "Bad input format {}",
+                                    _ => Result::Err(CubeError::user(format!(
+                                        "Bad input_format {}",
                                         option.value
                                     ))),
                                 }
                             }
-                            _ => Err(CubeError::user(format!(
+                            _ => Result::Err(CubeError::user(format!(
                                 "Bad input format {}",
+                                option.value
+                            ))),
+                        }
+                    })?;
+                let build_range_end = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "build_range_end")
+                    .map_or(Result::Ok(None), |option| {
+                        match &option.value {
+                            Value::SingleQuotedString(build_range_end) => {
+                                let ts = timestamp_from_string(build_range_end)?;
+                                let utc = Utc.timestamp_nanos(ts.get_time_stamp());
+                                Result::Ok(Some(utc))
+                            }
+                            _ => Result::Err(CubeError::user(format!(
+                                "Bad build_range_end {}",
                                 option.value
                             ))),
                         }
@@ -790,6 +807,7 @@ impl SqlService for SqlServiceImpl {
                         external,
                         locations,
                         Some(import_format),
+                        build_range_end,
                         indexes,
                         unique_key,
                         partitioned_index,

@@ -4755,8 +4755,14 @@ async fn panic_worker(service: Box<dyn SqlClient>) {
 
 async fn build_range_end(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
+
     service
-        .exec_query("CREATE TABLE s.t(x string)")
+        .exec_query("CREATE TABLE s.t0(x string)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t1(x string) WITH(build_range_end = '2020-01-01T00:00:00.000')")
         .await
         .unwrap();
 
@@ -4769,10 +4775,14 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
         r.get_rows(),
         &vec![
             Row::new(vec![
-                // TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
                 TableValue::String("s".to_string()),
-                TableValue::String("t".to_string()),
+                TableValue::String("t0".to_string()),
                 TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
             ]),
         ]
     );
