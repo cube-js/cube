@@ -5,18 +5,18 @@
   "dependencies": {
     "@apollo/client": "^3.5.6",
     "@testing-library/jest-dom": "^5.11.4",
-    "@testing-library/react": "^11.1.0",
-    "@testing-library/user-event": "^12.1.10",
+    "@testing-library/react": "^13.3.0",
+    "@testing-library/user-event": "^14.2.1",
     "apollo-link-http": "^1.5.17",
     "chart.js": "^3.6.2",
     "cube-example-wrapper": "^1.0.26",
     "graphql": "^16.1.0",
     "graphql-tag": "^2.12.6",
-    "react": "^17.0.2",
+    "react": "^18.2.0",
     "react-chartjs-2": "^4.0.0",
-    "react-dom": "^17.0.2",
-    "react-scripts": "^4.0.3",
-    "web-vitals": "^1.0.1"
+    "react-dom": "^18.2.0",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
