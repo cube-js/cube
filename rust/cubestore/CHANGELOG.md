@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Features
+
+* **cubestore:** Aggregating index ([#4379](https://github.com/cube-js/cube.js/issues/4379)) ([a0bd36c](https://github.com/cube-js/cube.js/commit/a0bd36c0898f66da907f3c04c439fc31826777a0)), closes [#4599](https://github.com/cube-js/cube.js/issues/4599) [#4728](https://github.com/cube-js/cube.js/issues/4728)
+
+
+
+
+
 ## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
 
 

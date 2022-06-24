@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Bug Fixes
+
+* **questdb-driver:** schema query error due to system tables ([#4762](https://github.com/cube-js/cube.js/issues/4762)) ([5571a70](https://github.com/cube-js/cube.js/commit/5571a70a987b18e6d28b3200a482b76054f2639b))
+
+
+
+
+
 ## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
 
 

@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct TransactionStatus for Sync in pg-wire ([90c6265](https://github.com/cube-js/cube.js/commit/90c62658fe076060161e6384e0b3dcc8e7e94dd4))
+* **cubesql:** Return error on execute for unknown portal in pg-wire ([0b87261](https://github.com/cube-js/cube.js/commit/0b872614f30f5fd9b22c88916ad4edba604f8d02))
+* **cubesql:** thread 'tokio-runtime-worker' panicked at 'called `Option::unwrap()` on a `None` value' in case of MEASURE() called on a dimension ([5d62c5a](https://github.com/cube-js/cube.js/commit/5d62c5af1562696ccb192c800ed2047b8345f8f8))
+
+
+### Features
+
+* **cubesql:** Metabase interval date range filter support ([#4763](https://github.com/cube-js/cube.js/issues/4763)) ([221715a](https://github.com/cube-js/cube.js/commit/221715adee2876585c639e8918dc0f171ad91a86))
+* **cubesql:** Support Numeric type (text + binary) in pg-wire ([db7ec5c](https://github.com/cube-js/cube.js/commit/db7ec5c2d0a726b99daf014a70cdee8c15d3721b))
+* **cubesql:** Workaround for Metabase introspection query ([ee7b3cf](https://github.com/cube-js/cube.js/commit/ee7b3cfd7401882bf802d668e5709e4f02c64be3))
+
+
+
+
+
 ## [0.30.26](https://github.com/cube-js/cube.js/compare/v0.30.25...v0.30.26) (2022-06-20)
 
 
