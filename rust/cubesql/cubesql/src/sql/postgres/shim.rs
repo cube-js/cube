@@ -419,11 +419,19 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn sync(&mut self) -> Result<(), ConnectionError> {
+    pub async fn write_ready(&mut self) -> Result<(), ConnectionError> {
         self.write(protocol::ReadyForQuery::new(
-            protocol::TransactionStatus::Idle,
+            if self.session.state.is_in_transaction() {
+                protocol::TransactionStatus::InTransactionBlock
+            } else {
+                protocol::TransactionStatus::Idle
+            },
         ))
-        .await?;
+        .await
+    }
+
+    pub async fn sync(&mut self) -> Result<(), ConnectionError> {
+        self.write_ready().await?;
 
         Ok(())
     }
@@ -1043,16 +1051,7 @@ impl AsyncPostgresShim {
             self.handle_connection_error(err).await?;
         };
 
-        self.write(protocol::ReadyForQuery::new(
-            if self.session.state.is_in_transaction() {
-                protocol::TransactionStatus::InTransactionBlock
-            } else {
-                protocol::TransactionStatus::Idle
-            },
-        ))
-        .await?;
-
-        Ok(())
+        self.write_ready().await
     }
 
     pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
