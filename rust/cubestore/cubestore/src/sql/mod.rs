@@ -251,6 +251,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
+                    None,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     None,
                 )
@@ -301,6 +302,7 @@ impl SqlServiceImpl {
                 import_format,
                 indexes_to_create,
                 false,
+                None,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 partition_split_threshold,
             )

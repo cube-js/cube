@@ -759,6 +759,7 @@ pub trait MetaStore: DIService + Send + Sync {
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
         is_ready: bool,
+        build_range_end: Option<DateTime<Utc>>,
         unique_key_column_names: Option<Vec<String>>,
         partition_split_threshold: Option<u64>,
     ) -> Result<IdRow<Table>, CubeError>;
@@ -2977,6 +2978,7 @@ impl MetaStore for RocksMetaStore {
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
         is_ready: bool,
+        build_range_end: Option<DateTime<Utc>>,
         unique_key_column_names: Option<Vec<String>>,
         partition_split_threshold: Option<u64>,
     ) -> Result<IdRow<Table>, CubeError> {
@@ -3025,6 +3027,7 @@ impl MetaStore for RocksMetaStore {
                 locations,
                 import_format,
                 is_ready,
+                build_range_end,
                 unique_key_column_indices,
                 seq_column_index,
                 partition_split_threshold,
@@ -5193,6 +5196,7 @@ mod tests {
                 true,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -5206,6 +5210,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
             )
@@ -5313,6 +5318,7 @@ mod tests {
                     true,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5328,6 +5334,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                 )

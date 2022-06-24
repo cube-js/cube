@@ -179,6 +179,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("panic_worker", panic_worker),
         t("planning_filter_index_selection", planning_filter_index_selection),
+        t("system_tables", system_tables),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4750,6 +4751,39 @@ async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
 async fn panic_worker(service: Box<dyn SqlClient>) {
     let r = service.exec_query("SYS PANIC WORKER").await;
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+}
+
+async fn system_tables(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(x string)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(x) VALUES ('a'), ('b'), ('c')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(3)]));
+
+    let r = service
+        .exec_query("SELECT build_range_end FROM system.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                // TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+                TableValue::Null
+            ]),
+        ]
+    );
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
