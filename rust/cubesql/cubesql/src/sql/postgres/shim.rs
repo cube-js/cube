@@ -517,9 +517,10 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/commands/portalcmds.c#L167
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), ConnectionError> {
-        match self.portals.get_mut(&execute.portal) {
-            Some(portal) => match portal {
+        if let Some(portal) = self.portals.get_mut(&execute.portal) {
+            match portal {
                 // We use None for Statement on empty query
                 None => {
                     self.write(protocol::EmptyQueryResponse::new()).await?;
@@ -536,23 +537,23 @@ impl AsyncPostgresShim {
 
                     self.write(completion).await?;
                 }
-            },
-            None => {
-                self.write(protocol::ReadyForQuery::new(
-                    protocol::TransactionStatus::Idle,
-                ))
-                .await?;
             }
-        }
 
-        Ok(())
+            Ok(())
+        } else {
+            Err(ErrorResponse::error(
+                ErrorCode::InvalidCursorName,
+                format!(r#"Unknown portal: {}"#, execute.portal),
+            )
+            .into())
+        }
     }
 
     pub async fn bind(&mut self, body: protocol::Bind) -> Result<(), ConnectionError> {
         let source_statement = self.statements.get(&body.statement).ok_or_else(|| {
             ErrorResponse::error(
                 ErrorCode::InvalidSqlStatement,
-                "Unknown statement".to_string(),
+                format!(r#"Unknown statement: {}"#, body.statement),
             )
         })?;
 
