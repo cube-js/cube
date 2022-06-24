@@ -78,8 +78,9 @@ export class QueryCache {
       // uses its internal queue which managed separately.
       return;
     }
-    if (this.getQueue(datasource)) {
-      await this.getQueue(datasource).reconcileQueue();
+    const queue = await this.getQueue(datasource);
+    if (queue) {
+      await queue.reconcileQueue();
     }
   }
 
@@ -111,7 +112,7 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource
-        })
+        }),
       };
     }
 
@@ -203,7 +204,7 @@ export class QueryCache {
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
   }
 
-  public queryWithRetryAndRelease(query, values, {
+  public async queryWithRetryAndRelease(query, values, {
     priority, cacheKey, external, requestId, dataSource
   }: {
     priority?: number,
@@ -212,7 +213,9 @@ export class QueryCache {
     requestId?: string,
     dataSource: string
   }) {
-    const queue = external ? this.getExternalQueue() : this.getQueue(dataSource);
+    const queue = external
+      ? this.getExternalQueue()
+      : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
       queryKey: cacheKey, query, values, requestId
     }, priority, {
@@ -221,7 +224,7 @@ export class QueryCache {
     });
   }
 
-  public getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,

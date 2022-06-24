@@ -362,13 +362,13 @@ class PreAggregationLoadCache {
   }
 
   protected async getQueryStage(stageQueryKey) {
-    const queue = this.preAggregations.getQueue(this.dataSource);
+    const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
   }
 
   protected async fetchQueryStageState(queue?) {
-    queue = queue || this.preAggregations.getQueue(this.dataSource);
+    queue = queue || await this.preAggregations.getQueue(this.dataSource);
     if (!this.queryStageState) {
       this.queryStageState = await queue.fetchQueryStageState();
     }
@@ -676,7 +676,8 @@ export class PreAggregationLoader {
   }
 
   protected async executeInQueue(invalidationKeys, priority, newVersionEntry) {
-    return this.preAggregations.getQueue(this.preAggregation.dataSource).executeInQueue(
+    const query = await this.preAggregations.getQueue(this.preAggregation.dataSource);
+    return query.executeInQueue(
       'query',
       this.preAggregationQueryKey(invalidationKeys),
       {
@@ -1580,43 +1581,48 @@ export class PreAggregations {
     };
   }
 
-  public getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
-      this.queue[dataSource] = QueryCache.createQueue(`SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`, () => this.driverFactory(dataSource), (client, q) => {
-        const {
-          preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
-        } = q;
-        const loader = new PreAggregationLoader(
-          this.redisPrefix,
-          () => this.driverFactory(dataSource),
-          this.logger,
-          this.queryCache,
-          this,
-          preAggregation,
-          preAggregationsTablesToTempTables,
-          new PreAggregationLoadCache(
+      this.queue[dataSource] = QueryCache.createQueue(
+        `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
+        () => this.driverFactory(dataSource),
+        (client, q) => {
+          const {
+            preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys
+          } = q;
+          const loader = new PreAggregationLoader(
             this.redisPrefix,
             () => this.driverFactory(dataSource),
+            this.logger,
             this.queryCache,
             this,
-            { requestId, dataSource }
+            preAggregation,
+            preAggregationsTablesToTempTables,
+            new PreAggregationLoadCache(
+              this.redisPrefix,
+              () => this.driverFactory(dataSource),
+              this.queryCache,
+              this,
+              { requestId, dataSource }
+            ),
+            { requestId, externalRefresh: this.externalRefresh }
+          );
+          return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
+        },
+        {
+          concurrency: 1,
+          logger: this.logger,
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          redisPool: this.options.redisPool,
+          // Centralized continueWaitTimeout that can be overridden in queueOptions
+          continueWaitTimeout: this.options.continueWaitTimeout,
+          ...(typeof this.options.queueOptions === 'function' ?
+            this.options.queueOptions(dataSource) :
+            this.options.queueOptions
           ),
-          { requestId, externalRefresh: this.externalRefresh }
-        );
-        return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
-      }, {
-        concurrency: 1,
-        logger: this.logger,
-        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        redisPool: this.options.redisPool,
-        // Centralized continueWaitTimeout that can be overridden in queueOptions
-        continueWaitTimeout: this.options.continueWaitTimeout,
-        ...(typeof this.options.queueOptions === 'function' ?
-          this.options.queueOptions(dataSource) :
-          this.options.queueOptions
-        ),
-        getQueueEventsBus: this.getQueueEventsBus
-      });
+          getQueueEventsBus: this.getQueueEventsBus
+        }
+      );
     }
     return this.queue[dataSource];
   }
@@ -1707,12 +1713,13 @@ export class PreAggregations {
   }
 
   public async getQueueState(dataSource: string) {
-    const queries = await this.getQueue(dataSource).getQueries();
+    const query = await this.getQueue(dataSource);
+    const queries = await query.getQueries();
     return queries;
   }
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
-    const queue = this.getQueue(dataSource);
+    const queue = await this.getQueue(dataSource);
     return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey)));
   }
 }

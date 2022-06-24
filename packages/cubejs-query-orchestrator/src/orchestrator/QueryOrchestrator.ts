@@ -149,7 +149,7 @@ export class QueryOrchestrator {
 
     const preAggregationsQueryStageState = async (dataSource) => {
       if (!preAggregationsQueryStageStateByDataSource[dataSource]) {
-        const queue = this.preAggregations.getQueue(dataSource);
+        const queue = await this.preAggregations.getQueue(dataSource);
         preAggregationsQueryStageStateByDataSource[dataSource] = queue.fetchQueryStageState();
       }
       return preAggregationsQueryStageStateByDataSource[dataSource];
@@ -158,17 +158,24 @@ export class QueryOrchestrator {
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(async p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
-            PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
-          ))
+          .map(async p => {
+            const queue = await this.preAggregations.getQueue(p.dataSource);
+            return queue.getQueryStage(
+              PreAggregations.preAggregationQueryCacheKey(p),
+              10,
+              await preAggregationsQueryStageState(p.dataSource),
+            );
+          })
       )).findIndex(p => !!p);
 
     if (pendingPreAggregationIndex === -1) {
-      return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
+      const qcQueue = await this.queryCache.getQueue(queryBody.dataSource);
+      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
 
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
-    const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
+    const paQueue = await this.preAggregations.getQueue(preAggregation.dataSource);
+    const preAggregationStage = await paQueue.getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),
       undefined,
       await preAggregationsQueryStageState(preAggregation.dataSource)
