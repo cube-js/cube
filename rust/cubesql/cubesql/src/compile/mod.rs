@@ -2739,6 +2739,7 @@ mod tests {
     };
     use datafusion::dataframe::DataFrame as DFDataFrame;
     use pretty_assertions::assert_eq;
+    use regex::Regex;
 
     use super::*;
     use crate::{
@@ -2959,7 +2960,6 @@ mod tests {
         parent.accept(&mut visitor).unwrap();
         visitor.0.expect("No CubeScanNode was found in plan")
     }
-
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
@@ -3741,11 +3741,18 @@ mod tests {
             DatabaseProtocol::PostgreSQL,
         );
 
-        let logical_plan = query_plan.print(true).unwrap();
+        let logical_plan = &query_plan.print(true).unwrap();
+
+        let re = Regex::new(r"TimestampNanosecond\(\d+, None\)").unwrap();
+        let logical_plan = re
+            .replace_all(logical_plan, "TimestampNanosecond(0, None)")
+            .as_ref()
+            .to_string();
+
         assert_eq!(
             logical_plan,
-            "Projection: CAST(utctimestamp() AS Timestamp(Nanosecond, None)) AS COL\
-            \n  EmptyRelation"
+            "Projection: CAST(TimestampNanosecond(0, None) AS Timestamp(Nanosecond, None)) AS COL\
+            \n  EmptyRelation",
         );
     }
 
@@ -9369,5 +9376,48 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn metabase_interval_date_range_filter() {
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT COUNT(*) 
+            FROM KibanaSampleDataEcommerce 
+            WHERE KibanaSampleDataEcommerce.order_date >= CAST((CAST(now() AS timestamp) + (INTERVAL '-30 day')) AS date);
+            ".to_string(), 
+            DatabaseProtocol::PostgreSQL
+        ).as_logical_plan();
+
+        let filters = logical_plan
+            .find_cube_scan()
+            .request
+            .filters
+            .unwrap_or_default();
+        let filter_vals = if filters.len() > 0 {
+            filters[0].values.clone()
+        } else {
+            None
+        };
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("afterDate".to_string()),
+                    values: filter_vals,
+                    or: None,
+                    and: None,
+                },])
+            }
+        )
     }
 }

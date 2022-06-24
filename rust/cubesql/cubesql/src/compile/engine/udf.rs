@@ -948,10 +948,16 @@ pub fn create_date_add_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "date_add",
-        &Signature::exact(
+        &Signature::one_of(
             vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
             ],
             Volatility::Immutable,
         ),
