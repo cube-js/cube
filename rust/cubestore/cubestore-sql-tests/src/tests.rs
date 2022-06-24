@@ -179,7 +179,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("panic_worker", panic_worker),
         t("planning_filter_index_selection", planning_filter_index_selection),
-        t("system_tables", system_tables),
+        t("build_range_end", build_range_end),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4753,25 +4753,15 @@ async fn panic_worker(service: Box<dyn SqlClient>) {
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
-async fn system_tables(service: Box<dyn SqlClient>) {
+async fn build_range_end(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.t(x string)")
         .await
         .unwrap();
-    service
-        .exec_query("INSERT INTO s.t(x) VALUES ('a'), ('b'), ('c')")
-        .await
-        .unwrap();
 
     let r = service
-        .exec_query("SELECT count(*) FROM s.t")
-        .await
-        .unwrap();
-    assert_eq!(to_rows(&r), rows(&[(3)]));
-
-    let r = service
-        .exec_query("SELECT build_range_end FROM system.tables")
+        .exec_query("SELECT table_schema, table_name, build_range_end FROM system.tables")
         .await
         .unwrap();
 
@@ -4780,7 +4770,9 @@ async fn system_tables(service: Box<dyn SqlClient>) {
         &vec![
             Row::new(vec![
                 // TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
-                TableValue::Null
+                TableValue::String("s".to_string()),
+                TableValue::String("t".to_string()),
+                TableValue::Null,
             ]),
         ]
     );

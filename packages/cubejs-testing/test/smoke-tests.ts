@@ -37,3 +37,5 @@ export async function testPreAggregation(client: CubejsApi) {
   });
   expect(response.rawData()).toMatchSnapshot('preaggregation');
 }
+
+// TODO(cristipp) Add a lambda-view test.

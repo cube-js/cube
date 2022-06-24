@@ -1324,6 +1324,7 @@ export class PreAggregationPartitionRangeLoader {
           this.partitionPreAggregationDescription(range),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
+          // TODO(cristipp) RefreshScheduler may have a different PreAggregationLoader codepath. Update it with proper buildRangeEnd handling.
           PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)
             ? { ...this.options, buildRangeEnd }
             : this.options,
@@ -1335,7 +1336,11 @@ export class PreAggregationPartitionRangeLoader {
       console.log('PPP', '\nbuildRange: ', buildRange, '\npartitionRanges', partitionRanges);
       console.log('RRR', loadResults);
 
+      // TODO(cristipp) Load buildRange from CubeStore system.tables.build_range_end
+
       if (this.preAggregation.lambdaView) {
+        // TODO(cristipp) Move to partition creation time.
+        // TODO(cristipp) Perhaps make it js only? See this.inDbTimeZone and this.timeSeries.
         // Align buildRange on preAggregation.granularity
         const lambdaRangeSql = this.replaceLambdaRangeSqlAndParams(this.preAggregation.lambdaRangeSql, buildRange);
         const client = await this.driverFactory();
