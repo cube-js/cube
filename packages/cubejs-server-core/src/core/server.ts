@@ -257,7 +257,9 @@ export class CubejsServerCore {
       });
 
       setInterval(() => {
-        this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount, loadSqlRequestSuccessCount: loadSqlRequestCount });
+        if (loadRequestCount > 0 || loadSqlRequestCount > 0) {
+          this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount, loadSqlRequestSuccessCount: loadSqlRequestCount });
+        }
         loadRequestCount = 0;
         loadSqlRequestCount = 0;
       }, 60000);
