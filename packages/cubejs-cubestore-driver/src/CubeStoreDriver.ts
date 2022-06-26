@@ -109,12 +109,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  public getPrefixTablesQuery(schemaName, tablePrefixes) {
+  public async getPrefixTablesQuery(schemaName, tablePrefixes) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
-    return this.query(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
+    const result = await this.query(
+      `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
+    console.log('TTT', result);
+    return result;
   }
 
   public quoteIdentifier(identifier: string): string {

@@ -98,6 +98,8 @@ type VersionEntry = {
   // eslint-disable-next-line camelcase
   last_updated_at: number,
   // eslint-disable-next-line camelcase
+  build_range_end?: string,
+  // eslint-disable-next-line camelcase
   naming_version?: number
 };
 
@@ -105,6 +107,8 @@ type TableCacheEntry = {
   // eslint-disable-next-line camelcase
   table_name?: string;
   TABLE_NAME?: string;
+  // eslint-disable-next-line camelcase
+  build_range_end?: string;
 };
 
 type QueryDateRange = [string, string];
@@ -156,7 +160,8 @@ const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry
     const entity: any = {
       table_name: `${schema}.${match[1]}`,
       content_version: match[2],
-      structure_version: match[3]
+      structure_version: match[3],
+      build_range_end: table.build_range_end,
     };
 
     if (match[4].length < 13) {
@@ -399,6 +404,7 @@ type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
   lastUpdatedAt: number;
+  buildRangeEnd?: string;
 };
 
 export class PreAggregationLoader {
@@ -494,7 +500,8 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
+          buildRangeEnd: versionEntryByStructureVersion.build_range_end,
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
         };
       }
 
@@ -513,7 +520,8 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+          buildRangeEnd: versionEntryByStructureVersion.build_range_end,
         };
       } else {
         // no rollup has been built yet - build it synchronously as part of responding to this request
@@ -578,7 +586,8 @@ export class PreAggregationLoader {
     return {
       targetTableName,
       refreshKeyValues: [],
-      lastUpdatedAt: newVersionEntry.last_updated_at
+      lastUpdatedAt: newVersionEntry.last_updated_at,
+      buildRangeEnd: undefined,
     };
   }
 
@@ -596,7 +605,8 @@ export class PreAggregationLoader {
       return {
         targetTableName: this.targetTableName(versionEntryByContentVersion),
         refreshKeyValues: [],
-        lastUpdatedAt: versionEntryByContentVersion.last_updated_at
+        lastUpdatedAt: versionEntryByContentVersion.last_updated_at,
+        buildRangeEnd: versionEntryByContentVersion.build_range_end,
       };
     }
 
@@ -611,7 +621,8 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
+          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+          buildRangeEnd: versionEntryByStructureVersion.build_range_end,
         };
       }
     }
@@ -648,7 +659,8 @@ export class PreAggregationLoader {
       return {
         targetTableName: this.targetTableName(lastVersion),
         refreshKeyValues: [],
-        lastUpdatedAt: lastVersion.last_updated_at
+        lastUpdatedAt: lastVersion.last_updated_at,
+        buildRangeEnd: lastVersion.build_range_end,
       };
     };
 
@@ -701,7 +713,8 @@ export class PreAggregationLoader {
     return {
       targetTableName: this.targetTableName(versionEntry),
       refreshKeyValues: [],
-      lastUpdatedAt: versionEntry.last_updated_at
+      lastUpdatedAt: versionEntry.last_updated_at,
+      buildRangeEnd: versionEntry.build_range_end,
     };
   }
 
@@ -1324,7 +1337,7 @@ export class PreAggregationPartitionRangeLoader {
           this.partitionPreAggregationDescription(range),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
-          // TODO(cristipp) Update RefreshScheduler buildRangeEnd handlimng, which may have a different PreAggregationLoader codepath.
+          // TODO(cristipp) Update RefreshScheduler buildRangeEnd handling, which may have a different PreAggregationLoader codepath.
           PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)
             ? { ...this.options, buildRangeEnd }
             : this.options,
@@ -1372,6 +1385,7 @@ export class PreAggregationPartitionRangeLoader {
           targetTableName: `(${unionTargetTableName})`,
           refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
           lastUpdatedAt: Date.now(),
+          buildRangeEnd: undefined,
         };
       } else {
         const unionTargetTableName = allTableTargetNames
@@ -1381,6 +1395,7 @@ export class PreAggregationPartitionRangeLoader {
           targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
           refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
           lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
+          buildRangeEnd: undefined,
         };
       }
     } else {

@@ -4782,7 +4782,28 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
             Row::new(vec![
                 TableValue::String("s".to_string()),
                 TableValue::String("t1".to_string()),
-                TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+
+    let r = service
+        .exec_query("SELECT table_schema, table_name, build_range_end FROM information_schema.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
         ]
     );
