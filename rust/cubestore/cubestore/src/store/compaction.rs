@@ -37,7 +37,6 @@ use datafusion::scalar::ScalarValue;
 use futures::StreamExt;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
-use num::Integer;
 use parquet::arrow::ArrowWriter;
 use std::cmp::Ordering;
 use std::fs::File;
@@ -848,7 +847,7 @@ pub(crate) async fn write_to_files(
     store: ParquetTableStore,
     files: Vec<String>,
 ) -> Result<Vec<(usize, Vec<TableValue>)>, CubeError> {
-    let rows_per_file = (num_rows as usize).div_ceil(&files.len());
+    let rows_per_file = div_ceil(num_rows as usize, files.len());
     let key_size = store.key_size() as usize;
     let partition_split_key_size = store.partition_split_key_size() as usize;
 
