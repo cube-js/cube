@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/ksql-driver",
   "description": "Cube.js ksql database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.25",
+  "version": "0.30.28",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.30.25",
-    "@cubejs-backend/schema-compiler": "^0.30.25",
+    "@cubejs-backend/schema-compiler": "^0.30.28",
     "@cubejs-backend/shared": "^0.30.25",
     "async-mutex": "0.3.2",
     "axios": "^0.21.1",
