@@ -135,6 +135,35 @@ export class RefreshScheduler {
     }
   }
 
+  /**
+   * Evaluate and returns minimal QueryQueue concurrency value.
+   */
+  protected getSchedulerConcurrency(
+    core: CubejsServerCore,
+    context: RequestContext,
+  ): null | number {
+    const preaggsQueues = core
+      .getOrchestratorApi(context)
+      .getQueryOrchestrator()
+      .getPreAggregations()
+      .getQueues();
+
+    let concurrency: null | number;
+
+    if (Object.keys(preaggsQueues).length === 0) {
+      // first execution - no queues
+      concurrency = null;
+    } else {
+      // further executions - queues ready
+      const concurrencies: number[] = [];
+      Object.keys(preaggsQueues).forEach((name) => {
+        concurrencies.push(preaggsQueues[name].concurrency);
+      });
+      concurrency = Math.min(...concurrencies);
+    }
+    return concurrency;
+  }
+
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
     const context: RequestContext = {
       authInfo: null,

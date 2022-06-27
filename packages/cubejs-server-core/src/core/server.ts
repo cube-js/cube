@@ -136,7 +136,7 @@ export class CubejsServerCore {
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
-    this.contextToDbType = <DbTypeFn> this.options.dbType;
+    this.contextToDbType = this.options.dbType;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
     this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
@@ -515,14 +515,9 @@ export class CubejsServerCore {
   }
 
   protected reloadEnvVariables() {
-    // `CUBEJS_DB_TYPE` has priority because the dbType can change in the Connection Wizard
-    this.options.dbType = <DatabaseType | undefined>process.env.CUBEJS_DB_TYPE || this.options.dbType;
-    this.options.externalDbType = this.options.externalDbType
-      || <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
-
-    driverService.decorateOpts(this.options);
     this.driver = null;
-    this.contextToDbType = <DbTypeFn> this.options.dbType;
+    this.options.externalDbType = this.options.externalDbType ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
@@ -631,18 +626,24 @@ export class CubejsServerCore {
 
     if (!compilerApi) {
       compilerApi = this.createCompilerApi(
-        this.repositoryFactory(context), {
-          dbType: (dataSourceContext) => this.contextToDbType({ ...context, ...dataSourceContext }),
+        this.repositoryFactory(context),
+        {
+          dbType: async (dataSourceContext) => {
+            const dbType = await this.contextToDbType({ ...context, ...dataSourceContext });
+            return dbType;
+          },
           externalDbType: this.contextToExternalDbType(context),
-          dialectClass: (dialectContext) => this.options.dialectFactory &&
-            this.options.dialectFactory({ ...context, ...dialectContext }),
+          dialectClass: (dialectContext) => (
+            this.options.dialectFactory &&
+            this.options.dialectFactory({ ...context, ...dialectContext })
+          ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
-        }
+        },
       );
 
       this.compilerCache.set(appId, compilerApi);
@@ -799,23 +800,27 @@ export class CubejsServerCore {
   }
 
   protected createCompilerApi(repository, options: Record<string, any> = {}) {
-    return new CompilerApi(repository, options.dbType || this.options.dbType, {
-      schemaVersion: options.schemaVersion || this.options.schemaVersion,
-      devServer: this.options.devServer,
-      logger: this.logger,
-      externalDbType: options.externalDbType,
-      preAggregationsSchema: options.preAggregationsSchema,
-      allowUngroupedWithoutPrimaryKey:
-          this.options.allowUngroupedWithoutPrimaryKey ||
-          getEnv('allowUngroupedWithoutPrimaryKey'),
-      compileContext: options.context,
-      dialectClass: options.dialectClass,
-      externalDialectClass: options.externalDialectClass,
-      allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
-      sqlCache: this.options.sqlCache,
-      standalone: this.standalone,
-      allowNodeRequire: options.allowNodeRequire,
-    });
+    return new CompilerApi(
+      repository,
+      options.dbType || this.options.dbType,
+      {
+        schemaVersion: options.schemaVersion || this.options.schemaVersion,
+        devServer: this.options.devServer,
+        logger: this.logger,
+        externalDbType: options.externalDbType,
+        preAggregationsSchema: options.preAggregationsSchema,
+        allowUngroupedWithoutPrimaryKey:
+            this.options.allowUngroupedWithoutPrimaryKey ||
+            getEnv('allowUngroupedWithoutPrimaryKey'),
+        compileContext: options.context,
+        dialectClass: options.dialectClass,
+        externalDialectClass: options.externalDialectClass,
+        allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
+        sqlCache: this.options.sqlCache,
+        standalone: this.standalone,
+        allowNodeRequire: options.allowNodeRequire,
+      },
+    );
   }
 
   protected createOrchestratorApi(
@@ -912,6 +917,30 @@ export class CubejsServerCore {
       this.driver = driver;
     }
     return this.driver;
+  }
+
+  /**
+   * Resolve driver by the data source.
+   */
+  public async resolveDriver(
+    context: DriverContext,
+    options?: OrchestratorInitedOptions,
+  ): Promise<BaseDriver> {
+    const val = await this
+      .initializer
+      .getInitializedOptions()
+      .driverFactory(context);
+    if (val instanceof BaseDriver) {
+      return val;
+    } else {
+      const type = await this
+        .initializer
+        .getInitializedOptions()
+        .dbType(context);
+      return CubejsServerCore.createDriver(type, {
+        maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
+      });
+    }
   }
 
   /**
