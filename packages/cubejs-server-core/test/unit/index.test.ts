@@ -453,7 +453,7 @@ describe('index.test', () => {
     expect(new CubejsServerCore({ jwt: { jwkUrl: 'https://test.com/j.json' } })).toBeInstanceOf(CubejsServerCore);
   });
 
-  test('Should not throw when the required options are missing in dev mode and no config file exists', () => {
+  test.only('Should not throw when the required options are missing in dev mode and no config file exists', () => {
     expect(() => {
       jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => false);
       // eslint-disable-next-line
@@ -647,6 +647,13 @@ describe('index.test', () => {
   );
 
   test('scheduledRefreshContexts option', async () => {
+    jest.spyOn(
+      CubejsServerCoreOpen.prototype,
+      'isReadyForQueryProcessing',
+    ).mockImplementation(
+      () => true,
+    );
+
     const cubejsServerCore = new CubejsServerCoreOpen({
       dbType: 'mysql',
       apiSecret: 'secret',
@@ -676,7 +683,6 @@ describe('index.test', () => {
         null
       ],
     });
-    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
 
     const timeoutKiller = withTimeout(
       () => {
@@ -688,7 +694,6 @@ describe('index.test', () => {
     const refreshSchedulerMock = {
       runScheduledRefresh: jest.fn(async () => {
         await timeoutKiller.cancel();
-
         return {
           finished: true,
         };
@@ -699,6 +704,7 @@ describe('index.test', () => {
 
     await timeoutKiller;
 
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
     expect(refreshSchedulerMock.runScheduledRefresh.mock.calls.length).toEqual(3);
     expect(refreshSchedulerMock.runScheduledRefresh.mock.calls[0]).toEqual([
       {
@@ -722,5 +728,7 @@ describe('index.test', () => {
 
     await cubejsServerCore.beforeShutdown();
     await cubejsServerCore.shutdown();
+
+    jest.restoreAllMocks();
   });
 });
