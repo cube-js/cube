@@ -414,7 +414,6 @@ impl RewriteRules for SplitRules {
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?expr",
-                    None,
                     "?granularity",
                     // It will returns new granularity for DateTrunc
                     "?date_trunc_granularity",
@@ -442,7 +441,6 @@ impl RewriteRules for SplitRules {
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?expr",
-                    None,
                     "?granularity",
                     "?alias_column",
                     Some("?alias"),
@@ -450,30 +448,27 @@ impl RewriteRules for SplitRules {
                 ),
             ),
             transforming_chain_rewrite(
-                "kek",
-                outer_aggregate_split_replacer(
+                "split-push-down-date-part-with-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer(
                     fun_expr(
                         "DatePart",
-                        vec![literal_expr("?granularity"), "?original_expr".to_string()],
+                        vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
                     "?cube",
                 ),
                 vec![(
-                    "?original_expr",
+                    "?expr",
                     fun_expr(
                         "DateTrunc",
-                        vec![
-                            literal_expr("?granularity2"),
-                            "?simplified_expr".to_string(),
-                        ],
+                        vec!["?date_trunc_granularity".to_string(), column_expr("?column")],
                     ),
                 )],
-                fun_expr(
-                    "DatePart",
-                    vec![
-                        literal_expr("?granularity"),
-                        alias_expr("?alias_column", "?alias"),
-                    ],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?date_part_granularity"), column_expr("?column")],
+                    ),
+                    "?alias",
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?original_expr",
@@ -482,39 +477,38 @@ impl RewriteRules for SplitRules {
                     "?granularity",
                     "?alias_column",
                     Some("?alias"),
-                    false,
+                    true,
                 ),
             ),
             transforming_chain_rewrite(
-                "kek2",
-                inner_aggregate_split_replacer(
+                "split-push-down-date-part-with-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
                     fun_expr(
                         "DatePart",
-                        vec![
-                            literal_expr("?granularity"),
-                            fun_expr(
-                                "DateTrunc",
-                                vec!["?granularity2".to_string(), "?expr".to_string()],
-                            ),
-                        ],
+                        vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
                     "?cube",
                 ),
-                vec![("?expr", column_expr("?column"))],
-                alias_expr(
+                vec![(
+                    "?expr",
                     fun_expr(
                         "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
+                        vec![literal_expr("?date_trunc_granularity"), column_expr("?column")],
                     ),
-                    "?alias",
+                )],
+                fun_expr(
+                    "DatePart",
+                    vec![
+                        literal_expr("?date_part_granularity"),
+                        alias_expr("?alias_column", "?alias"),
+                    ],
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?expr",
-                    None,
-                    "?granularity",
+                    "?date_part_granularity",
                     "?alias_column",
                     Some("?alias"),
-                    true,
+                    false,
                 ),
             ),
             // Aggregate function

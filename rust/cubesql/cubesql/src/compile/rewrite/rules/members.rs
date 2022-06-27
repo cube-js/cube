@@ -807,7 +807,6 @@ impl MemberRules {
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
                     )));
-
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
                 let date_trunc_granularity = match granularity {
                     ScalarValue::Utf8(Some(granularity)) => {
