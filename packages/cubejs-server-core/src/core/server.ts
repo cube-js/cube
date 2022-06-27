@@ -73,6 +73,8 @@ export class CubejsServerCore {
 
   protected devServer: DevServer | undefined;
 
+  protected readonly driversStorage: Map<string, BaseDriver> = new Map();
+
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
   protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
@@ -283,8 +285,10 @@ export class CubejsServerCore {
   protected isReadyForQueryProcessing(): boolean {
     const hasDbCredentials =
       Object.keys(process.env).filter(
-        (key) => (key.startsWith('CUBEJS_DB') && key !== 'CUBEJS_DB_TYPE') ||
+        (key) => (
+          (key.startsWith('CUBEJS_DB') && key !== 'CUBEJS_DB_TYPE') ||
           key.startsWith('CUBEJS_AWS')
+        )
       ).length > 0;
 
     return (
@@ -926,21 +930,28 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
-    const val = await this
-      .initializer
-      .getInitializedOptions()
-      .driverFactory(context);
-    if (val instanceof BaseDriver) {
-      return val;
-    } else {
-      const type = await this
+    if (!this.driversStorage.has(context.dataSource)) {
+      const val = await this
         .initializer
         .getInitializedOptions()
-        .dbType(context);
-      return CubejsServerCore.createDriver(type, {
-        maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
-      });
+        .driverFactory(context);
+      if (val instanceof BaseDriver) {
+        this.driversStorage.set(context.dataSource, val);
+      } else {
+        const { type } = val;
+        // TODO (buntarb): assertion
+        this.driversStorage.set(
+          context.dataSource,
+          CubejsServerCore.createDriver(
+            type,
+            {
+              maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
+            },
+          ),
+        );
+      }
     }
+    return this.driversStorage.get(context.dataSource);
   }
 
   /**
