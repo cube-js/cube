@@ -348,27 +348,29 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
 
   const mockDriver = new MockDriver();
 
-  const orchestratorApi = new OrchestratorApi(() => mockDriver, (msg, params) => console.log(msg, params), {
-    contextToDbType(): DatabaseType {
-      return 'postgres';
-    },
-    contextToExternalDbType(): DatabaseType {
-      return 'cubestore';
-    },
-    continueWaitTimeout: 0.1,
-    queryCacheOptions: {
-      queueOptions: () => ({
-        concurrency: 2,
-      }),
-    },
-    preAggregationsOptions: {
-      queueOptions: () => ({
-        executionTimeout: 2,
-        concurrency: 2,
-      }),
-    },
-    redisPrefix: `TEST_${testCounter++}`,
-  });
+  const orchestratorApi = new OrchestratorApi(
+    () => mockDriver,
+    (msg, params) => console.log(msg, params),
+    {
+      contextToDbType: async () => 'postgres',
+      contextToExternalDbType(): DatabaseType {
+        return 'cubestore';
+      },
+      continueWaitTimeout: 0.1,
+      queryCacheOptions: {
+        queueOptions: () => ({
+          concurrency: 2,
+        }),
+      },
+      preAggregationsOptions: {
+        queueOptions: () => ({
+          executionTimeout: 2,
+          concurrency: 2,
+        }),
+      },
+      redisPrefix: `TEST_${testCounter++}`,
+    }
+  );
 
   jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
   jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => <any>orchestratorApi);

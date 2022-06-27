@@ -5,6 +5,9 @@ import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from 
 export class CompilerApi {
   constructor(repository, dbType, options) {
     this.repository = repository;
+    /**
+     * @type {DbTypeAsyncFn}
+     */
     this.dbType = dbType;
     this.dialectClass = options.dialectClass;
     this.options = options || {};
@@ -63,12 +66,14 @@ export class CompilerApi {
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
     const cubeToQueryClass = R.fromPairs(
-      cubeEvaluator.cubeNames().map(cube => {
-        const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
-        const dbType = this.getDbType(dataSource);
-        const dialectClass = this.getDialectClass(dataSource, dbType);
-        return [cube, queryClass(dbType, dialectClass)];
-      })
+      await Promise.all(
+        cubeEvaluator.cubeNames().map(async cube => {
+          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+          const dbType = await this.getDbType(dataSource);
+          const dialectClass = this.getDialectClass(dataSource, dbType);
+          return [cube, queryClass(dbType, dialectClass)];
+        })
+      )
     );
     return new QueryFactory(cubeToQueryClass);
   }

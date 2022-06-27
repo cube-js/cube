@@ -1384,7 +1384,13 @@ export class PreAggregationPartitionRangeLoader {
 type PreAggregationsOptions = {
   preAggregationsSchemaCacheExpire?: number;
   loadCacheQueueOptions?: any;
-  queueOptions?: object | ((dataSource: String) => object);
+  queueOptions?: (dataSource: string) => Promise<{
+    concurrency: number;
+    continueWaitTimeout?: number;
+    executionTimeout?: number;
+    orphanedTimeout?: number;
+    heartBeatInterval?: number;
+  }>;
   redisPool?: any;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: 'redis' | 'memory';
@@ -1628,11 +1634,8 @@ export class PreAggregations {
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
-          ),
-          getQueueEventsBus: this.getQueueEventsBus
+          ...(await this.options.queueOptions(dataSource)),
+          getQueueEventsBus: this.getQueueEventsBus,
         }
       );
     }
@@ -1640,14 +1643,10 @@ export class PreAggregations {
   }
 
   /**
-   * Returns registered queries queues hash table if any, false otherwise.
+   * Returns registered queries queues hash table.
    */
-  public getQueues(): false | {[dataSource: string]: QueryQueue} {
-    if (Object.keys(this.queue).length > 0) {
-      return this.queue;
-    } else {
-      return false;
-    }
+  public getQueues(): {[dataSource: string]: QueryQueue} {
+    return this.queue;
   }
 
   public getLoadCacheQueue(dataSource: string = 'default') {

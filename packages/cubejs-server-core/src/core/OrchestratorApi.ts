@@ -92,11 +92,14 @@ export class OrchestratorApi {
       );
 
       if (Array.isArray(data)) {
-        return data.map((item) => ({
-          ...item,
-          dbType: extractDbType(item),
-          extDbType: extractExternalDbType(item)
-        }));
+        const res = await Promise.all(
+          data.map(async (item) => ({
+            ...item,
+            dbType: await extractDbType(item),
+            extDbType: extractExternalDbType(item),
+          }))
+        );
+        return res;
       }
 
       data.dbType = extractDbType(data);

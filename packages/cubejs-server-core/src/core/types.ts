@@ -39,6 +39,34 @@ export interface OrchestratorOptions {
   rollupOnlyMode?: boolean;
 }
 
+export interface QueueInitedOptions {
+  concurrency: number;
+  continueWaitTimeout?: number;
+  executionTimeout?: number;
+  orphanedTimeout?: number;
+  heartBeatInterval?: number;
+}
+
+export interface QueryInitedOptions {
+  queueOptions: (dataSource: string) => Promise<QueueInitedOptions>;
+  refreshKeyRenewalThreshold?: number;
+  backgroundRenew?: boolean;
+  externalQueueOptions?: QueueOptions;
+}
+
+export interface AggsInitedOptions {
+  queueOptions?: (dataSource: string) => Promise<QueueInitedOptions>;
+  externalRefresh?: boolean;
+}
+
+export interface OrchestratorInitedOptions {
+  queryCacheOptions: QueryInitedOptions;
+  preAggregationsOptions: AggsInitedOptions;
+  redisPrefix?: string;
+  redisPoolOptions?: RedisPoolOptions;
+  rollupOnlyMode?: boolean;
+}
+
 export interface RequestContext {
   // @deprecated Renamed to securityContext, please use securityContext.
   authInfo: any;
