@@ -234,17 +234,65 @@ impl AsyncPostgresShim {
 
         self.ready().await?;
 
+        // When an error is detected while processing any extended-query message, the backend issues ErrorResponse,
+        // then reads and discards messages until a Sync is reached, then issues ReadyForQuery and returns to normal message processing.
+        let mut tracked_error: Option<ConnectionError> = None;
+
         loop {
+            let mut doing_extended_query_message = false;
+
             let result = match buffer::read_message(&mut self.socket).await? {
                 protocol::FrontendMessage::Query(body) => self.process_query(body.query).await,
-                protocol::FrontendMessage::Parse(body) => self.parse(body).await,
-                protocol::FrontendMessage::Bind(body) => self.bind(body).await,
-                protocol::FrontendMessage::Execute(body) => self.execute(body).await,
-                protocol::FrontendMessage::Close(body) => self.close(body).await,
-                protocol::FrontendMessage::Describe(body) => self.describe(body).await,
-                protocol::FrontendMessage::Sync => self.sync().await,
                 protocol::FrontendMessage::Flush => self.flush().await,
                 protocol::FrontendMessage::Terminate => return Ok(()),
+                // Extended
+                protocol::FrontendMessage::Parse(body) => {
+                    if tracked_error.is_none() {
+                        doing_extended_query_message = true;
+                        self.parse(body).await
+                    } else {
+                        continue;
+                    }
+                }
+                protocol::FrontendMessage::Bind(body) => {
+                    if tracked_error.is_none() {
+                        doing_extended_query_message = true;
+                        self.bind(body).await
+                    } else {
+                        continue;
+                    }
+                }
+                protocol::FrontendMessage::Execute(body) => {
+                    if tracked_error.is_none() {
+                        doing_extended_query_message = true;
+                        self.execute(body).await
+                    } else {
+                        continue;
+                    }
+                }
+                protocol::FrontendMessage::Close(body) => {
+                    if tracked_error.is_none() {
+                        self.close(body).await
+                    } else {
+                        continue;
+                    }
+                }
+                protocol::FrontendMessage::Describe(body) => {
+                    if tracked_error.is_none() {
+                        self.describe(body).await
+                    } else {
+                        continue;
+                    }
+                }
+                protocol::FrontendMessage::Sync => {
+                    if let Some(err) = tracked_error.take() {
+                        self.handle_connection_error(err).await?;
+                    };
+
+                    self.write_ready().await?;
+
+                    continue;
+                }
                 command_id => {
                     return Err(ConnectionError::Protocol(
                         ErrorResponse::error(
@@ -256,7 +304,11 @@ impl AsyncPostgresShim {
                 }
             };
             if let Err(err) = result {
-                self.handle_connection_error(err).await?;
+                if doing_extended_query_message {
+                    tracked_error = Some(err);
+                } else {
+                    self.handle_connection_error(err).await?;
+                }
             }
         }
     }
@@ -428,12 +480,6 @@ impl AsyncPostgresShim {
             },
         ))
         .await
-    }
-
-    pub async fn sync(&mut self) -> Result<(), ConnectionError> {
-        self.write_ready().await?;
-
-        Ok(())
     }
 
     pub async fn flush(&mut self) -> Result<(), ConnectionError> {

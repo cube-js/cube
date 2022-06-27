@@ -10,6 +10,7 @@ use tokio::time::sleep;
 
 use super::utils::escape_snapshot_name;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use datafusion::assert_contains;
 use pg_srv::{PgType, PgTypeId};
 use tokio_postgres::{NoTls, Row, SimpleQueryMessage};
 
@@ -337,6 +338,25 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_extended_error(&self) -> RunResult<()> {
+        let actual_err = if let Err(err) = self
+            .client
+            .prepare("SELECT * FROM unknown_cube_will_lead_to_an_error")
+            .await
+        {
+            err
+        } else {
+            panic!("Must be an error")
+        };
+
+        assert_contains!(
+            actual_err.to_string(),
+            "Error during planning: Table or CTE with name 'unknown_cube_will_lead_to_an_error'"
+        );
+
+        Ok(())
+    }
+
     async fn test_prepare_empty_query(&self) -> RunResult<()> {
         let stmt = self.client.prepare("").await.unwrap();
 
@@ -576,6 +596,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
 
     async fn run(&mut self) -> RunResult<()> {
         self.test_prepare().await?;
+        self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
