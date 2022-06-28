@@ -1,14 +1,17 @@
 #![feature(backtrace)]
 #![feature(type_ascription)]
 
-pub mod buffer;
 mod decoding;
+mod encoding;
+
+pub mod buffer;
 pub mod extended;
 pub mod pg_type;
 pub mod protocol;
 
 pub use buffer::*;
 pub use decoding::*;
+pub use encoding::*;
 pub use extended::*;
 pub use pg_type::*;
 
