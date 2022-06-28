@@ -13,7 +13,7 @@ import {
   utcToLocalTimeZone,
   pausePromise,
   LAMBDA_RANGE_START,
-  LAMBDA_RANGE_END, QueryAlias
+  LAMBDA_RANGE_END, QueryAlias, snapTimestamp
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -1285,23 +1285,6 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private replaceLambdaRangeSqlAndParams(
-    query: QueryWithParams,
-    dateRange: QueryDateRange,
-  ): QueryWithParams {
-    const [sql, params, options] = query;
-    return [
-      sql,
-      params.map(param => {
-        switch (param) {
-          case LAMBDA_RANGE_START: return dateRange[0];
-          case LAMBDA_RANGE_END: return dateRange[1];
-          default: return param;
-        }
-      })
-    ];
-  }
-
   private partitionPreAggregationDescription(range: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
@@ -1349,17 +1332,10 @@ export class PreAggregationPartitionRangeLoader {
       console.log('PPP', '\nbuildRange: ', buildRange, '\npartitionRanges', partitionRanges);
       console.log('RRR', loadResults);
 
-      // TODO(cristipp) Load buildRangeEnd from CubeStore system.tables.build_range_end
-
-      if (this.preAggregation.lambdaView) {
-        // TODO(cristipp) Move to partition creation time.
-        // TODO(cristipp) Perhaps make it js only? See this.inDbTimeZone and this.timeSeries.
-        // Align buildRange on preAggregation.granularity
-        const lambdaRangeSql = this.replaceLambdaRangeSqlAndParams(this.preAggregation.lambdaRangeSql, buildRange);
-        const client = await this.driverFactory();
-        const rows = await client.query(lambdaRangeSql[0], lambdaRangeSql[1], {});
-        const lambdaRange: QueryDateRange = [rows[0][QueryAlias.LAMBDA_RANGE_END], partitionRanges[partitionRanges.length - 1][1]];
-
+      const lastLoadResult = loadResults[loadResults.length - 1];
+      const lambdaRangeEnd = lastLoadResult.buildRangeEnd;
+      if (this.preAggregation.lambdaView && lambdaRangeEnd) {
+        const lambdaRange: QueryDateRange = [lambdaRangeEnd, partitionRanges[partitionRanges.length - 1][1]];
         const lambdaLoader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
@@ -1374,7 +1350,7 @@ export class PreAggregationPartitionRangeLoader {
         const lambdaResult = await lambdaLoader.loadLambdaTable();
 
         const firstTableTargetNames = allTableTargetNames.slice(0, allTableTargetNames.length - 1);
-        const lastTableTargetName = allTableTargetNames[allTableTargetNames.length - 1];
+        const lastTableTargetName = lastLoadResult.targetTableName;
 
         const unionTargetTableName = [
           ...firstTableTargetNames.map(name => `SELECT * FROM ${name}`),
@@ -1387,17 +1363,17 @@ export class PreAggregationPartitionRangeLoader {
           lastUpdatedAt: Date.now(),
           buildRangeEnd: undefined,
         };
-      } else {
-        const unionTargetTableName = allTableTargetNames
-          .map(targetTableName => `SELECT * FROM ${targetTableName}`)
-          .join(' UNION ALL ');
-        return {
-          targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
-          refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
-          lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
-          buildRangeEnd: undefined,
-        };
       }
+
+      const unionTargetTableName = allTableTargetNames
+        .map(targetTableName => `SELECT * FROM ${targetTableName}`)
+        .join(' UNION ALL ');
+      return {
+        targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
+        refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
+        lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
+        buildRangeEnd: undefined,
+      };
     } else {
       return new PreAggregationLoader(
         this.redisPrefix,
@@ -1423,10 +1399,14 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private async partitionRanges(): Promise<PartitionRanges> {
-    const buildRange = await this.loadBuildRange();
+    let buildRange = await this.loadBuildRange();
     if (!buildRange[0] || !buildRange[1]) {
       return { buildRange, partitionRanges: [] };
     }
+    buildRange = [
+      PreAggregationPartitionRangeLoader.snapTimestamp(this.preAggregation, buildRange[0]),
+      PreAggregationPartitionRangeLoader.snapTimestamp(this.preAggregation, buildRange[1]),
+    ];
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
       buildRange,
       this.preAggregation.matchedTimeDimensionDateRange,
@@ -1440,7 +1420,7 @@ export class PreAggregationPartitionRangeLoader {
       this.preAggregation.partitionGranularity,
       dateRange,
     );
-    return { buildRange, partitionRanges };
+    return { buildRange: dateRange, partitionRanges };
   }
 
   public async loadBuildRange(): Promise<QueryDateRange> {
@@ -1536,6 +1516,10 @@ export class PreAggregationPartitionRangeLoader {
 
   public static inDbTimeZone(preAggregationDescription: any, timestamp: string): string {
     return inDbTimeZone(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
+  }
+
+  public static snapTimestamp(preAggregation: PreAggregationDescription, timestamp: string) {
+    return snapTimestamp(preAggregation.granularity, PreAggregationPartitionRangeLoader.inDbTimeZone(preAggregation, timestamp));
   }
 
   public static extractDate(data: any): string {

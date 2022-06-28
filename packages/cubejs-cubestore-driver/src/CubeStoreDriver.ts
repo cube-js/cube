@@ -101,7 +101,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       params.push(...options.files);
     }
 
-    console.log('SSS', sql, params);
+    if (options.buildRangeEnd) {
+      console.log('SSS', sql, params);
+    }
 
     return this.query(sql, params).catch(e => {
       e.message = `Error during create table: ${sql}: ${e.message}`;

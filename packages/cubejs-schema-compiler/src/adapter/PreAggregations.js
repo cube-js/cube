@@ -159,6 +159,7 @@ export class PreAggregations {
       lambdaTimeDimensionColumn: this.query.lambdaTimeDimensionColumn(cube, preAggregation),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
+      granularity: preAggregation.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || preAggregation.granularity) &&
