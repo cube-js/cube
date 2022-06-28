@@ -417,7 +417,6 @@ impl RewriteRules for SplitRules {
                 "?alias".to_string(),
                 self.transform_outer_projection_aggr_fun("?cube", "?expr", "?column", "?alias"),
             ),
-            // TODO handle simple counts
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-aggr-replacer",
                 outer_aggregate_split_replacer("?expr", "?cube"),
@@ -435,6 +434,26 @@ impl RewriteRules for SplitRules {
                     "?fun",
                     "?arg",
                     "?column",
+                    "?alias",
+                    "?outer_alias",
+                    "?output_fun",
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-outer-aggr-replacer-simple-count",
+                outer_aggregate_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                )],
+                alias_expr(
+                    agg_fun_expr("?output_fun", vec!["?alias".to_string()], "?distinct"),
+                    "?outer_alias",
+                ),
+                self.transform_outer_aggr_fun_simple_count(
+                    "?cube",
+                    "?expr",
+                    "?fun",
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
@@ -807,6 +826,68 @@ impl SplitRules {
                                     );
                                     return true;
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    pub fn transform_outer_aggr_fun_simple_count(
+        &self,
+        cube_var: &'static str,
+        original_expr_var: &'static str,
+        fun_expr_var: &'static str,
+        alias_expr_var: &'static str,
+        outer_alias_expr_var: &'static str,
+        output_fun_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_var = var!(cube_var);
+        let original_expr_var = var!(original_expr_var);
+        let fun_expr_var = var!(fun_expr_var);
+        let alias_expr_var = var!(alias_expr_var);
+        let outer_alias_expr_var = var!(outer_alias_expr_var);
+        let output_fun_var = var!(output_fun_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
+                let output_fun = match fun {
+                    AggregateFunction::Count => AggregateFunction::Sum,
+                    AggregateFunction::Sum => AggregateFunction::Sum,
+                    _ => continue,
+                };
+
+                for cube in
+                    var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+                {
+                    if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
+                        if let Some(cube) = meta.find_cube_with_name(&cube) {
+                            if cube
+                                .lookup_measure(&MemberRules::default_count_measure_name())
+                                .is_some()
+                            {
+                                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(Column::from_name(name.to_string())),
+                                ));
+                                subst.insert(
+                                    alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                                );
+                                subst.insert(
+                                    outer_alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(name.to_string()),
+                                    )),
+                                );
+                                subst.insert(
+                                    output_fun_var,
+                                    egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                        AggregateFunctionExprFun(output_fun),
+                                    )),
+                                );
+                                return true;
                             }
                         }
                     }
