@@ -194,14 +194,13 @@ module.exports = {
 
 ## Multiple DB Instances with Same Schema
 
-Let's consider the following example:
-
-We store data for different users in different databases, but on the same
-Postgres host. The database name is `my_app_1_2`, where `1` is **Application
-ID** and `2` is **User ID**.
+Let's consider an example where we store data for different users in different
+databases, but on the same Postgres host. The database name format is
+`my_app_<APP_ID>_<USER_ID>`, so `my_app_1_2` is a valid database name.
 
 To make it work with Cube.js, first we need to pass the `appId` and `userId` as
-context to every query. We should include them into our token generation code.
+context to every query. We should first ensure our JWTs contain those properties
+so we can access them through the [security context][ref-config-security-ctx].
 
 ```javascript
 const jwt = require('jsonwebtoken');
@@ -217,21 +216,26 @@ property inside the context object. Let's use
 [`contextToAppId`][ref-config-ctx-to-appid] and
 [`contextToOrchestratorId`][ref-config-ctx-to-orch-id] to create a dynamic
 Cube.js App ID and Orchestrator ID for every combination of `appId` and
-`userId`, then use [`driverFactory`][ref-config-driverfactory] to dynamically
-select database, again based on `appId` and `userId`:
+`userId`, as well as defining [`driverFactory`][ref-config-driverfactory] to
+dynamically select the database, based on the `appId` and `userId`:
 
 <WarningBox>
 
-Cube.js App IDs and Orchestrator IDs are used as caching keys for various
-in-memory structures like schema compilation results, connection pool, etc.
-Missing definitions for either of the above can result in unexpected caching
-issues such as a schema of one tenant being used for another one.
+The App ID (the result of [`contextToAppId`][ref-config-ctx-to-appid]) is used
+as a caching key for various in-memory structures like schema compilation
+results, connection pool. The Orchestrator ID (the result of
+[`contextToOrchestratorId`][ref-config-ctx-to-orch-id]) is used as a caching key
+for database connections, execution queues and pre-aggregation table caches. Not
+declaring these properties will result in unexpected caching issues such as
+schema or data of one tenant being used for another.
 
 </WarningBox>
 
 **cube.js:**
 
 ```javascript
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
+
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
