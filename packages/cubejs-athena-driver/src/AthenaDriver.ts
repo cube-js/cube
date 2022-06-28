@@ -63,7 +63,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     this.athena = new Athena(this.config);
   }
 
-  async tableColumnTypes(table: string) {
+  public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
 
     const columns = (await this.query(
@@ -75,6 +75,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
       ORDER BY 1, 2, 3, 4`,
       [name, schema]
+      // eslint-disable-next-line camelcase
     )) as {column_name: string, data_type: string}[];
 
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
