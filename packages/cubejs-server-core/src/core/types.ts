@@ -115,13 +115,12 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
-export type DriverOptions = {// TODO: merge to config
+export type DriverOptions = {
   maxPoolSize?: number,
 };
 export type DriverConfig = {
   type: DatabaseType,
-  options: DriverOptions,
-};
+} & DriverOptions;
 
 export type DbTypeFn = (context: DriverContext) =>
   DatabaseType | Promise<DatabaseType>;
