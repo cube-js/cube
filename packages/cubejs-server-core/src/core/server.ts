@@ -37,8 +37,9 @@ import type {
   DbTypeAsyncFn,
   DriverFactoryFn,
   ExternalDbTypeFn,
-  OrchestratorOptions,
   OrchestratorOptionsFn,
+  OrchestratorOptions,
+  OrchestratorInitedOptions,
   PreAggregationsSchemaFn,
   RequestContext,
   DriverContext,
@@ -51,7 +52,7 @@ import { ContextToOrchestratorIdFn } from './types';
 const { version } = require('../../../package.json');
 
 export type ServerCoreInitializedOptions = Required<
-  CreateOptions,
+  InitializedOptions,
   // This fields are required, because we add default values in constructor
   'dbType' | 'apiSecret' | 'devServer' | 'telemetry' | 'dashboardAppPath' | 'dashboardAppPort' |
   'driverFactory' | 'dialectFactory' |
@@ -78,7 +79,7 @@ export class CubejsServerCore {
 
   protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
-  protected contextToDbType: DbTypeFn;
+  protected contextToDbType: DbTypeAsyncFn;
 
   protected contextToExternalDbType: ExternalDbTypeFn;
 
@@ -334,10 +335,7 @@ export class CubejsServerCore {
   // eslint-disable-next-line import/no-extraneous-dependencies
   private requireCubeStoreDriver = () => require('@cubejs-backend/cubestore-driver');
 
-  protected handleConfiguration(opts: CreateOptions & {
-    driverFactory: DriverFactoryFn;
-    dbType: DbTypeFn;
-  }): ServerCoreInitializedOptions {
+  protected handleConfiguration(opts: InitializedOptions): ServerCoreInitializedOptions {
     const skipOnEnv = [
       // Default EXT_DB variables
       'CUBEJS_EXT_DB_URL',
@@ -716,7 +714,7 @@ export class CubejsServerCore {
           let driver: BaseDriver | null = null;
 
           try {
-            driver = await driverService.resolveDriver(
+            driver = await this.resolveDriver(
               {
                 ...context,
                 dataSource,
@@ -915,10 +913,10 @@ export class CubejsServerCore {
    */
   public async getDriver(
     context: DriverContext,
-    options?: OrchestratorOptions,
+    options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
     if (!this.driver) {
-      const driver = await driverService.resolveDriver(context, options);
+      const driver = await this.resolveDriver(context, options);
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
@@ -964,6 +962,31 @@ export class CubejsServerCore {
     options?: DriverOptions,
   ): BaseDriver {
     return new (CubejsServerCore.lookupDriverClass(type))(options);
+  }
+
+  /**
+   * Calculate and returns driver's max pool number.
+   */
+  public static async getDriverMaxPool(
+    context: DriverContext,
+    options?: OrchestratorInitedOptions,
+  ): Promise<undefined | number> {
+    if (!options) {
+      return undefined;
+    } else {
+      const queryQueueOptions = await options
+        .queryCacheOptions
+        .queueOptions(context.dataSource);
+    
+      const preAggregationsQueueOptions = await options
+        .preAggregationsOptions
+        .queueOptions(context.dataSource);
+    
+      return 2 * (
+        queryQueueOptions.concurrency +
+          preAggregationsQueueOptions.concurrency
+      );
+    }
   }
 
   public static lookupDriverClass(dbType): Constructor<BaseDriver> & {

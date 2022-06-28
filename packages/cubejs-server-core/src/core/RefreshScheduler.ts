@@ -6,7 +6,6 @@ import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
 import { RequestContext } from './types';
-import { getSchedulerConcurrency } from './concurrencyService';
 
 export interface ScheduledRefreshOptions {
   timezone?: string,
@@ -105,7 +104,7 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const compilers = await compilerApi.getCompilers();
-    const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
+    const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
       return { ...queryingOptions, ...preAggregation.references };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
@@ -174,7 +173,7 @@ export class RefreshScheduler {
 
     const concurrency =
       options.concurrency ||
-      getSchedulerConcurrency(this.serverCore, context) ||
+      this.getSchedulerConcurrency(this.serverCore, context) ||
       1;
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
@@ -247,7 +246,7 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
+    const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);

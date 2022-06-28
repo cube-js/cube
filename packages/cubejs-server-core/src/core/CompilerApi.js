@@ -65,6 +65,7 @@ export class CompilerApi {
 
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
+
     const cubeToQueryClass = R.fromPairs(
       await Promise.all(
         cubeEvaluator.cubeNames().map(async cube => {
@@ -78,11 +79,12 @@ export class CompilerApi {
     return new QueryFactory(cubeToQueryClass);
   }
 
-  getDbType(dataSource = 'default') {
+  async getDbType(dataSource = 'default') {
     if (typeof this.dbType === 'function') {
-      return this.dbType({ dataSource, });
+      const res = await this.dbType({ dataSource, });
+      return res;
     }
-
+    // TODO (buntarb): throw an error?
     return this.dbType;
   }
 
@@ -93,26 +95,26 @@ export class CompilerApi {
   async getSql(query, options = {}) {
     const { includeDebugInfo } = options;
 
-    const dbType = this.getDbType();
+    const dbType = await this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = this.createQueryByDataSource(compilers, query);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-
-    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+    const _dbType = await this.getDbType(dataSource);
+    if (dataSource !== 'default' && dbType !== _dbType) {
       // TODO consider more efficient way than instantiating query
-      sqlGenerator = this.createQueryByDataSource(
+      sqlGenerator = await this.createQueryByDataSource(
         compilers,
         query,
         dataSource
       );
 
       if (!sqlGenerator) {
-        throw new Error(`Can't find dialect for '${dataSource}' data source: ${this.getDbType(dataSource)}`);
+        throw new Error(`Can't find dialect for '${dataSource}' data source: ${_dbType}`);
       }
     }
 
@@ -151,8 +153,8 @@ export class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQueryByDataSource(compilers, query, dataSource) {
-    const dbType = this.getDbType(dataSource);
+  async createQueryByDataSource(compilers, query, dataSource) {
+    const dbType = await this.getDbType(dataSource);
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
