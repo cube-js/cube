@@ -722,7 +722,7 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
-Scheduled refreshes will **never** look beyond this range. By default, the build
+Data will **never** be queried beyond this range. By default, the build
 range is defined as the minimum and maximum values possible for the
 [`timeDimension`][self-timedimension] used in the rollup.
 
