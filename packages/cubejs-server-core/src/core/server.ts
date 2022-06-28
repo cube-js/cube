@@ -938,16 +938,15 @@ export class CubejsServerCore {
       if (val instanceof BaseDriver) {
         this.driversStorage.set(context.dataSource, val);
       } else {
-        const { type } = val;
-        // TODO (buntarb): assertion
+        const { type, ...rest } = val;
+        const opts = Object.keys(rest).length
+          ? rest
+          : {
+            maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
+          };
         this.driversStorage.set(
           context.dataSource,
-          CubejsServerCore.createDriver(
-            type,
-            {
-              maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
-            },
-          ),
+          CubejsServerCore.createDriver(type, opts),
         );
       }
     }
