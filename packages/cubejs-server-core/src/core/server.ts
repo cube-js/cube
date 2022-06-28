@@ -190,7 +190,9 @@ export class CubejsServerCore {
       );
     }
 
-    this.startScheduledRefreshTimer();
+    if (this.isPreAggsBuilder()) {
+      this.startScheduledRefreshTimer();
+    }
 
     this.event = async (name, props) => {
       if (!this.options.telemetry) {
@@ -302,6 +304,37 @@ export class CubejsServerCore {
 
       this.event('Server Start');
     }
+  }
+
+  /**
+   * Determines whether the current instance is a refresh worker or not.
+   * It always returns false in the dev mode.
+   */
+  protected isProdRefreshWorker(): boolean {
+    return !this.options.devServer &&
+      typeof this.detectScheduledRefreshTimer(
+        this.options.scheduledRefreshTimer,
+      ) === 'number';
+  }
+
+  /**
+   * Determines whether the current instance is an api worker or not.
+   * It always returns false in the dev mode.
+   */
+  protected isProdApiWorker(): boolean {
+    return !this.options.devServer && !this.isProdRefreshWorker();
+  }
+
+  /**
+   * Determines whether the current instance should run the pre-aggregations
+   * build scheduler or not.
+   */
+  public isPreAggsBuilder(): boolean {
+    return (
+      this.options.devServer ||
+      this.isProdRefreshWorker() ||
+      this.isProdApiWorker() && getEnv('buildPreAggregations')
+    );
   }
 
   /**
