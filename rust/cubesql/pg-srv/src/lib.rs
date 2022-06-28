@@ -1,3 +1,7 @@
+//! Bindings for emulating a PostgreSQL server (protocol v3).
+//! You can find overview of the protocol at
+//! <https://www.postgresql.org/docs/10/protocol.html>
+
 #![feature(backtrace)]
 #![feature(type_ascription)]
 

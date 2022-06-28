@@ -1,14 +1,16 @@
+//! Encoding native values to the Protocol representation
+
 use crate::ProtocolError;
 use bytes::{BufMut, BytesMut};
 
-// This trait explains how to encode values to the protocol format
+/// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
-    // Converts native type to raw value in text format
+    /// Converts native type to raw value in text format
     fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError>
     where
         Self: Sized;
 
-    // Converts native type to raw value in binary format
+    /// Converts native type to raw value in binary format
     fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError>
     where
         Self: Sized;

@@ -1,11 +1,13 @@
+//! Decoding values from the Protocol representation
+
 use crate::{
     protocol::{ErrorCode, ErrorResponse, Format},
     ProtocolError,
 };
 use byteorder::{ByteOrder, LittleEndian};
 
-// This trait explains how to decode values from the protocol
-// It's used in the Bind message
+/// This trait explains how to decode values from the protocol
+/// It's used in the Bind message
 pub trait FromProtocolValue<T> {
     // Converts native type to raw value in text format
     fn from_protocol(raw: &Vec<u8>, format: Format) -> Result<T, ProtocolError> {
@@ -15,10 +17,10 @@ pub trait FromProtocolValue<T> {
         }
     }
 
-    // Decodes raw value to native type in text format
+    /// Decodes raw value to native type in text format
     fn from_text(raw: &Vec<u8>) -> Result<T, ProtocolError>;
 
-    // Decodes raw value to native type in binary format
+    /// Decodes raw value to native type in binary format
     fn from_binary(raw: &Vec<u8>) -> Result<T, ProtocolError>;
 }
 

@@ -1,3 +1,7 @@
+//! Implementation of PostgreSQL protocol.
+//! Specification for all frontend/backend messages: <https://www.postgresql.org/docs/14/protocol-message-formats.html>
+//! Message Data Types: <https://www.postgresql.org/docs/14/protocol-message-types.html>
+
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -257,6 +261,7 @@ impl Serialize for ParameterStatus {
     }
 }
 
+/// (B) Success reply for Bind command.
 pub struct BindComplete {}
 
 impl BindComplete {
@@ -274,6 +279,7 @@ impl Serialize for BindComplete {
     }
 }
 
+/// (B) Success reply for Close command.
 pub struct CloseComplete {}
 
 impl CloseComplete {
@@ -291,6 +297,7 @@ impl Serialize for CloseComplete {
     }
 }
 
+/// (B) Success reply for Parse command.
 pub struct ParseComplete {}
 
 impl ParseComplete {
@@ -308,7 +315,9 @@ impl Serialize for ParseComplete {
     }
 }
 
-/// https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27
+/// It's used to describe client that changes was done.
+/// The command tag. This is usually a single word that identifies which SQL command was completed.
+/// See more variants from sources: <https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27>
 #[derive(PartialEq)]
 pub enum CommandComplete {
     Select(u32),
@@ -500,7 +509,11 @@ impl Deserialize for PasswordMessage {
     }
 }
 
-/// This command is used for prepared statement creation on the server side
+/// (F) Extended Query. Contains a textual query string, optionally some information about data
+/// types of parameter placeholders, and the name of a destination prepared-statement object
+/// (an empty string selects the unnamed prepared statement)
+///
+/// The response is either ParseComplete or ErrorResponse.
 #[derive(Debug, PartialEq)]
 pub struct Parse {
     /// The name of the prepared statement. Empty string is used for unamed statements
@@ -535,6 +548,7 @@ impl Deserialize for Parse {
     }
 }
 
+/// (F) Extended Query. The Execute message specifies the portal name (empty string denotes the unnamed portal) and a maximum result-row count (zero meaning “fetch all rows”).
 #[derive(Debug, PartialEq)]
 pub struct Execute {
     // The name of the portal to execute (an empty string selects the unnamed portal).
@@ -593,7 +607,7 @@ impl Deserialize for Close {
     }
 }
 
-/// This command is used for prepared statement creation on the server side
+/// (F) Extended Query.
 #[derive(Debug, PartialEq)]
 pub struct Bind {
     /// The name of the destination portal (an empty string selects the unnamed portal).
@@ -717,6 +731,7 @@ pub enum DescribeType {
     Portal,
 }
 
+// (F) Extended Query.
 #[derive(Debug, PartialEq)]
 pub struct Describe {
     pub typ: DescribeType,
@@ -782,24 +797,31 @@ impl ProtocolVersion {
     }
 }
 
+/// All frontend messages (request which client sends to the server).
 #[derive(Debug, PartialEq)]
 pub enum FrontendMessage {
     PasswordMessage(PasswordMessage),
+    /// Simple Query
     Query(Query),
-    Parse(Parse),
-    Bind(Bind),
-    Describe(Describe),
-    Execute(Execute),
-    Close(Close),
     /// Flush network buffer
     Flush,
     /// Close connection
     Terminate,
-    /// Finish
+    /// Sync primitive in Extended Query for error recovery.
     Sync,
+    /// Extended Query. Create Statement.
+    Parse(Parse),
+    /// Extended Query. Creating Portal from specific Statement by replacing placeholders by real values.
+    Bind(Bind),
+    /// Extended Query. Describe Portal/Statement
+    Describe(Describe),
+    /// Extended Query. Select n rows from existed Portal
+    Execute(Execute),
+    /// Extended Query. Close Portal/Statement
+    Close(Close),
 }
 
-/// https://www.postgresql.org/docs/14/errcodes-appendix.html
+/// <https://www.postgresql.org/docs/14/errcodes-appendix.html>
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum ErrorCode {

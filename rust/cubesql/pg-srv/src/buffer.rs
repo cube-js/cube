@@ -1,3 +1,5 @@
+//! Helpers for reading/writing from/to the connection's socket
+
 use std::{
     convert::TryFrom,
     io::{Cursor, Error, ErrorKind},
@@ -126,6 +128,7 @@ pub async fn read_format<Reader: AsyncReadExt + Unpin>(
     }
 }
 
+/// The same as write_message function, but it doesn't append header for frame (code + size).
 pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,
@@ -141,6 +144,7 @@ pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     Ok(())
 }
 
+/// Serialize F message with frame's headers.
 pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,
