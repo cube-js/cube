@@ -62,7 +62,7 @@
     "react-is": "^16.8.4",
     "react-responsive": "^8.0.1",
     "react-router-dom": "^5.1.2",
-    "react-scripts": "4.0.3",
+    "react-scripts": "5.0.0",
     "react-source-render": "4.0.0-1",
     "sql-formatter": "^3.1.0",
     "throttle-debounce": "^3.0.1",
