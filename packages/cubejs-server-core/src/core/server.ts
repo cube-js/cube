@@ -26,8 +26,7 @@ import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import DriverDependencies from './DriverDependencies';
 import optionsValidate from './optionsValidate';
-import * as driverService from './driverService';
-import * as concurrencyService from './concurrencyService';
+import { OptsHelper } from './OptsHelper';
 
 import type {
   ContextToAppIdFn,
@@ -93,6 +92,8 @@ export class CubejsServerCore {
 
   public logger: LoggerFn;
 
+  private optsHelper: OptsHelper;
+
   protected preAgentLogger: any;
 
   protected readonly options: ServerCoreInitializedOptions;
@@ -128,12 +129,11 @@ export class CubejsServerCore {
         : prodLogger(process.env.CUBEJS_LOG_LEVEL)
     );
 
-    driverService.setLogger(this.logger);
-    driverService.decorateOpts(opts);
-    this.options = this.handleConfiguration(opts as CreateOptions & {
-      driverFactory: DriverFactoryFn;
-      dbType: DbTypeFn;
-    });
+    this.optsHelper = new OptsHelper(this, opts);
+
+    this.options = this.handleConfiguration(
+      this.optsHelper.getInitializedOptions(),
+    );
 
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
@@ -686,11 +686,13 @@ export class CubejsServerCore {
 
     const externalDbType = this.contextToExternalDbType(context);
 
-    // orchestrator options can be empty, if user didnt define it
-    const orchestratorOptions = this.orchestratorOptions(context) || {};
-
-    // configuring queues concurrencies
-    concurrencyService.decorateOpts(context, orchestratorOptions);
+    // orchestrator options can be empty, if user didnt define it.
+    // so we are adding default and configuring queues concurrencies.
+    const orchestratorOptions =
+      this.optsHelper.getOrchestratorInitializedOptions(
+        context,
+        this.orchestratorOptions(context) || {},
+      );
 
     const rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
       ? orchestratorOptions.rollupOnlyMode
@@ -932,7 +934,7 @@ export class CubejsServerCore {
   ): Promise<BaseDriver> {
     if (!this.driversStorage.has(context.dataSource)) {
       const val = await this
-        .initializer
+        .optsHelper
         .getInitializedOptions()
         .driverFactory(context);
       if (val instanceof BaseDriver) {
