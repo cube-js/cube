@@ -63,6 +63,23 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     this.athena = new Athena(this.config);
   }
 
+  async tableColumnTypes(table: string) {
+    const [schema, name] = table.split('.');
+
+    const columns = (await this.query(
+      `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type  as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
+      ORDER BY 1, 2, 3, 4`,
+      [name, schema]
+    )) as {column_name: string, data_type: string}[];
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+  }
+
   public readOnly(): boolean {
     return !!this.config.readOnly;
   }
