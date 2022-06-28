@@ -1,3 +1,5 @@
+//! Implementation for Extended Query
+
 #[derive(Debug, PartialEq)]
 pub enum BindValue {
     String(String),

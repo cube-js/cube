@@ -95,14 +95,14 @@ pub enum TableValue {
     Boolean(bool),
     Float32(f32),
     Float64(f64),
-    List(ArrayRef),
+    List(ListValue),
     Decimal128(Decimal128Value),
     Timestamp(TimestampValue),
 }
 
 impl ToString for TableValue {
     fn to_string(&self) -> String {
-        match &self {
+        match self {
             TableValue::Null => "NULL".to_string(),
             TableValue::String(v) => v.clone(),
             TableValue::Int16(v) => v.to_string(),
@@ -113,43 +113,7 @@ impl ToString for TableValue {
             TableValue::Float64(v) => v.to_string(),
             TableValue::Timestamp(v) => v.to_string(),
             TableValue::Decimal128(v) => v.to_string(),
-            TableValue::List(v) => {
-                let mut values: Vec<String> = Vec::with_capacity(v.len());
-
-                macro_rules! write_native_array_as_text {
-                    ($ARRAY:expr, $ARRAY_TYPE: ident) => {{
-                        let arr = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
-
-                        for i in 0..$ARRAY.len() {
-                            if arr.is_null(i) {
-                                values.push("NULL".to_string());
-                            } else {
-                                values.push(arr.value(i).to_string());
-                            }
-                        }
-                    }};
-                }
-
-                match v.data_type() {
-                    DataType::Float16 => write_native_array_as_text!(v, Float16Array),
-                    DataType::Float32 => write_native_array_as_text!(v, Float32Array),
-                    DataType::Float64 => write_native_array_as_text!(v, Float64Array),
-                    DataType::Int8 => write_native_array_as_text!(v, Int8Array),
-                    DataType::Int16 => write_native_array_as_text!(v, Int16Array),
-                    DataType::Int32 => write_native_array_as_text!(v, Int32Array),
-                    DataType::Int64 => write_native_array_as_text!(v, Int64Array),
-                    DataType::UInt8 => write_native_array_as_text!(v, UInt8Array),
-                    DataType::UInt16 => write_native_array_as_text!(v, UInt16Array),
-                    DataType::UInt32 => write_native_array_as_text!(v, UInt32Array),
-                    DataType::UInt64 => write_native_array_as_text!(v, UInt64Array),
-                    DataType::Boolean => write_native_array_as_text!(v, BooleanArray),
-                    DataType::Utf8 => write_native_array_as_text!(v, StringArray),
-                    DataType::LargeUtf8 => write_native_array_as_text!(v, LargeStringArray),
-                    dt => unimplemented!("Unable to convert List of {} to string", dt),
-                }
-
-                "{".to_string() + &values.join(",") + "}"
-            }
+            TableValue::List(v) => v.to_string(),
         }
     }
 }
@@ -323,6 +287,58 @@ impl ToString for Decimal128Value {
                 format!("{}0.{:0>w$}", sign, rest, w = self.scale)
             }
         }
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct ListValue {
+    pub v: ArrayRef,
+}
+
+impl ListValue {
+    pub fn new(v: ArrayRef) -> Self {
+        Self { v }
+    }
+}
+
+impl ToString for ListValue {
+    fn to_string(&self) -> String {
+        let mut values: Vec<String> = Vec::with_capacity(self.v.len());
+
+        macro_rules! write_native_array_as_text {
+            ($ARRAY:expr, $ARRAY_TYPE: ident) => {{
+                let arr = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+
+                for i in 0..$ARRAY.len() {
+                    if arr.is_null(i) {
+                        values.push("NULL".to_string());
+                    } else {
+                        values.push(arr.value(i).to_string());
+                    }
+                }
+            }};
+        }
+
+        match self.v.data_type() {
+            DataType::Float16 => write_native_array_as_text!(self.v, Float16Array),
+            DataType::Float32 => write_native_array_as_text!(self.v, Float32Array),
+            DataType::Float64 => write_native_array_as_text!(self.v, Float64Array),
+            DataType::Int8 => write_native_array_as_text!(self.v, Int8Array),
+            DataType::Int16 => write_native_array_as_text!(self.v, Int16Array),
+            DataType::Int32 => write_native_array_as_text!(self.v, Int32Array),
+            DataType::Int64 => write_native_array_as_text!(self.v, Int64Array),
+            DataType::UInt8 => write_native_array_as_text!(self.v, UInt8Array),
+            DataType::UInt16 => write_native_array_as_text!(self.v, UInt16Array),
+            DataType::UInt32 => write_native_array_as_text!(self.v, UInt32Array),
+            DataType::UInt64 => write_native_array_as_text!(self.v, UInt64Array),
+            DataType::Boolean => write_native_array_as_text!(self.v, BooleanArray),
+            DataType::Utf8 => write_native_array_as_text!(self.v, StringArray),
+            DataType::LargeUtf8 => write_native_array_as_text!(self.v, LargeStringArray),
+            dt => unimplemented!("Unable to convert List of {} to string", dt),
+        }
+
+        "{".to_string() + &values.join(",") + "}"
     }
 }
 
@@ -507,7 +523,7 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::List(a.value(i))
+                            TableValue::List(ListValue::new(a.value(i)))
                         });
                     }
                 }

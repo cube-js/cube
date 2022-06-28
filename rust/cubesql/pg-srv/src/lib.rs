@@ -1,14 +1,21 @@
+//! Bindings for emulating a PostgreSQL server (protocol v3).
+//! You can find overview of the protocol at
+//! <https://www.postgresql.org/docs/10/protocol.html>
+
 #![feature(backtrace)]
 #![feature(type_ascription)]
 
-pub mod buffer;
 mod decoding;
+mod encoding;
+
+pub mod buffer;
 pub mod extended;
 pub mod pg_type;
 pub mod protocol;
 
 pub use buffer::*;
 pub use decoding::*;
+pub use encoding::*;
 pub use extended::*;
 pub use pg_type::*;
 
