@@ -630,6 +630,31 @@ cube(`Orders`, {
 This property is required when using [`incremental`][self-incremental]
 refreshes.
 
+### allowNonStrictDateRangeMatch
+
+The `allowNonStrictDateRangeMatch` property can be used to allow queries to
+match this pre-aggregation when using non-strict date ranges. This is useful
+when using a visualization tools such as [Apache
+Superset][ref-config-downstream-superset] that use loose date ranges by default.
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+
+  ...,
+
+  preAggregations: {
+    main: {
+      measure: [CUBE.count],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      partitionGranularity: `day`,
+      allowNonStrictDateRangeMatch: true,
+    },
+  },
+});
+```
+
 ### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
 Cube.js supports multi-stage pre-aggregations by reusing original SQL
@@ -722,8 +747,8 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
-Data will **never** be queried beyond this range. By default, the build
-range is defined as the minimum and maximum values possible for the
+Data will **never** be queried beyond this range. By default, the build range is
+defined as the minimum and maximum values possible for the
 [`timeDimension`][self-timedimension] used in the rollup.
 
 <InfoBox>
@@ -849,6 +874,7 @@ cube(`Orders`, {
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
+[ref-config-downstream-superset]: /config/downstream/superset
 [ref-config-driverfactory]: /config/#driver-factory
 [ref-cube-refreshkey]: /schema/reference/cube#refresh-key
 [ref-production-checklist-refresh]:
