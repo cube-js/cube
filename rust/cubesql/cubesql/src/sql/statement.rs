@@ -1,5 +1,6 @@
 use crate::sql::shim::ConnectionError;
 use itertools::Itertools;
+use log::trace;
 use msql_srv::Column as MysqlColumn;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
@@ -806,6 +807,11 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                                 return Ok(());
                             }
                         }
+
+                        trace!(
+                            r#"Unable to cast string to RegClass via CastReplacer, type "{}" is not defined"#,
+                            str_val
+                        );
                     }
                     // TODO:
                     _ => (),

@@ -128,6 +128,27 @@ pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> Sca
     )
 }
 
+pub fn create_session_user_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        if let Some(user) = &state.user() {
+            builder.append_value(user.clone()).unwrap();
+        } else {
+            builder.append_null()?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "session_user",
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
 pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = UInt32Builder::new(1);
@@ -1254,6 +1275,9 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::INT8MULTIRANGE => format!("int8multirange{}", typemod_str()),
                             PgTypeId::CHARACTERDATA => {
                                 format!("information_schema.character_data{}", typemod_str())
+                            }
+                            PgTypeId::PGNAMESPACE => {
+                                format!("pg_namespace{}", typemod_str())
                             }
                             PgTypeId::SQLIDENTIFIER => {
                                 format!("information_schema.sql_identifier{}", typemod_str())

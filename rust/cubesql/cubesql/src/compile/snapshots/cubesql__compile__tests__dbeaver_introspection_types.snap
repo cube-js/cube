@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8345
+expression: "execute_query(\"SELECT t.oid,t.*,c.relkind,format_type(nullif(t.typbasetype, 0), t.typtypmod) as base_type_name, d.description\n                FROM pg_catalog.pg_type t\n                LEFT OUTER JOIN pg_catalog.pg_type et ON et.oid=t.typelem\n                LEFT OUTER JOIN pg_catalog.pg_class c ON c.oid=t.typrelid\n                LEFT OUTER JOIN pg_catalog.pg_description d ON t.oid=d.objoid\n                WHERE t.typname IS NOT NULL\n                AND (c.relkind IS NULL OR c.relkind = 'c') AND (et.typcategory IS NULL OR et.typcategory <> 'C')\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
+++
+++
+++

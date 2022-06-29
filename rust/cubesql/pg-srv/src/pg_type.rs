@@ -1245,6 +1245,28 @@ define_pg_types![
         typreceive_oid: 0,
     },
 
+    PGNAMESPACE (12047) {
+        typname: "pg_namespace",
+        typnamespace: 11,
+        typowner: 10,
+        typlen: -1,
+        typbyval: false,
+        typtype: "c",
+        typcategory: "C",
+        typisprefered: false,
+        typisdefined: true,
+        typrelid: 2615,
+        typsubscript: "-",
+        typelem: 0,
+        typarray: 12046,
+        typalign: "c",
+        typstorage: "p",
+        typbasetype: 19,
+        typreceive: "record_recv",
+        // TODO: Get from pg_proc
+        typreceive_oid: 0,
+    },
+
     SQLIDENTIFIER (13410) {
         typname: "sql_identifier",
         typnamespace: 13000,
