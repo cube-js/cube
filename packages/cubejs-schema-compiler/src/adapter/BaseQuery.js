@@ -2434,6 +2434,10 @@ class BaseQuery {
       () => {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
+          if (preAggregation.refreshKey.every === 'never') {
+            return [];
+          }
+
           if (preAggregation.refreshKey.sql) {
             return [
               this.paramAllocator.buildSqlAndParams(

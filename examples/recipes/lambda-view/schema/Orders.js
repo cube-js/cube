@@ -45,7 +45,7 @@ cube(`Orders`, {
                 sql: `SELECT DATE('2020-06-7')`,
             },
             refreshKey: {
-                every: '1 minute',
+                every: 'never',
             },
         },
     },

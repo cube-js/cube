@@ -43,6 +43,8 @@ const everyCronInterval = Joi.string().custom((value, helper) => {
   }
 });
 
+const everyNever = Joi.string().valid('never');
+
 const everyCronTimeZone = Joi.string().custom((value, helper) => {
   try {
     cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
@@ -141,7 +143,7 @@ const PreAggregationRefreshKeySchema = condition(
   condition(
     (s) => defined(s.every),
     Joi.object().keys({
-      every: Joi.alternatives().try(everyInterval, everyCronInterval),
+      every: Joi.alternatives().try(everyInterval, everyCronInterval, everyNever),
       timezone: everyCronTimeZone,
       incremental: Joi.boolean().strict(),
       updateWindow: everyInterval
