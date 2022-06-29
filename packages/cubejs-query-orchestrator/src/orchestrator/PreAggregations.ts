@@ -1207,8 +1207,6 @@ export class PreAggregationPartitionRangeLoader {
         renewalKey,
       }
     );
-
-    console.log('LLL', query, values, partitionRange, renewalKey, result);
     return result;
   }
 
@@ -1325,9 +1323,6 @@ export class PreAggregationPartitionRangeLoader {
       });
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
-
-      console.log('PPP', '\nbuildRange: ', buildRange, '\npartitionRanges', partitionRanges);
-      console.log('RRR', loadResults);
 
       const lastLoadResult = loadResults[loadResults.length - 1];
       const lambdaRangeEnd = lastLoadResult.buildRangeEnd;

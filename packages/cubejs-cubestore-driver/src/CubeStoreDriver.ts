@@ -117,7 +117,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
-    console.log('TTT', result);
     return result;
   }
 

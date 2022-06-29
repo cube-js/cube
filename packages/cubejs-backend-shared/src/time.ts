@@ -43,9 +43,7 @@ export const snapTimestamp = (granularity: string, timestamp: string): string =>
   if (!(granularity in TIME_SERIES)) {
     throw new Error(`Unhandled granularity '${granularity}`);
   }
-  const result = TIME_SERIES[granularity](range)[0][0];
-  console.log('HHH', timestamp, result);
-  return result;
+  return TIME_SERIES[granularity](range)[0][0];
 };
 
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
