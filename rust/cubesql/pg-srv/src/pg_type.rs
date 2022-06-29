@@ -1260,9 +1260,9 @@ define_pg_types![
         typsubscript: "-",
         typelem: 0,
         typarray: 12046,
-        typalign: "c",
-        typstorage: "p",
-        typbasetype: 19,
+        typalign: "d",
+        typstorage: "x",
+        typbasetype: 0,
         typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,

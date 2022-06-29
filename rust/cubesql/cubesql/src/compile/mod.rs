@@ -8352,7 +8352,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 LEFT OUTER JOIN pg_catalog.pg_class c ON c.oid=t.typrelid
                 LEFT OUTER JOIN pg_catalog.pg_description d ON t.oid=d.objoid
                 WHERE t.typname IS NOT NULL
-                AND (c.relkind IS NULL OR c.relkind = 'c') AND (et.typcategory IS NULL OR et.typcategory <> 'C')".to_string(),
+                AND (c.relkind IS NULL OR c.relkind = 'c') AND (et.typcategory IS NULL OR et.typcategory <> 'C')
+                ORDER BY t.oid ASC".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
