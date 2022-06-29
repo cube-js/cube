@@ -64,16 +64,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async tableColumnTypes(table: string) {
-    const [schema, name] = table.split('.');
+    const [schema, name] = table.split('.', 2);
 
     const columns = (await this.query(
       `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
-             columns.table_name as ${this.quoteIdentifier('table_name')},
-             columns.table_schema as ${this.quoteIdentifier('table_schema')},
-             columns.data_type  as ${this.quoteIdentifier('data_type')}
+              columns.data_type  as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
-      ORDER BY 1, 2, 3, 4`,
+      ORDER BY ordinal_position`,
       [name, schema]
       // eslint-disable-next-line camelcase
     )) as {column_name: string, data_type: string}[];

@@ -45,9 +45,9 @@ export class DriverTests {
   ];
 
   public static CSV_ROWS = dedent`
-    orders__amount,orders__status
-    300,new
-    400,processed
+    orders__status,orders__amount
+    new,300
+    processed,400
   `;
 
   public async testQuery() {
