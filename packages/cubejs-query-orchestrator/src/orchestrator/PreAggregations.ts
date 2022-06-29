@@ -1325,9 +1325,10 @@ export class PreAggregationPartitionRangeLoader {
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
 
       const lastLoadResult = loadResults[loadResults.length - 1];
-      const lambdaRangeEnd = lastLoadResult.buildRangeEnd;
-      if (this.preAggregation.lambdaView && lambdaRangeEnd) {
-        const lambdaRange: QueryDateRange = [lambdaRangeEnd, partitionRanges[partitionRanges.length - 1][1]];
+      const lambdaRangeStart = lastLoadResult.buildRangeEnd;
+      if (this.preAggregation.lambdaView && lambdaRangeStart) {
+        const lambdaRangeEnd = '3000-01-01T00:00:00.000Z';
+        const lambdaRange: QueryDateRange = [lambdaRangeStart, lambdaRangeEnd];
         const lambdaLoader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
