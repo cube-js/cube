@@ -1183,9 +1183,9 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 
 pub fn create_format_type_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let oids = downcast_primitive_arg!(args[0], "oid", UInt32Type);
         // TODO: See pg_attribute.atttypmod
-        let typemods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typemods = downcast_primitive_arg!(args[1], "typemod", Int64Type);
 
         let result = oids
             .iter()
@@ -1305,8 +1305,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
 
 pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1353,8 +1353,8 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1448,8 +1448,8 @@ pub fn create_pg_truetypmod_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1486,7 +1486,7 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
 
 pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let role_oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let role_oids = downcast_primitive_arg!(args[0], "role_oid", UInt32Type);
 
         let result = role_oids
             .iter()
