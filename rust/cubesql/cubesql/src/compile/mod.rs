@@ -62,7 +62,9 @@ use self::{
 use crate::{
     compile::{
         builder::QueryBuilder,
-        engine::udf::{create_pg_is_other_temp_schema, create_pg_my_temp_schema},
+        engine::udf::{
+            create_pg_is_other_temp_schema, create_pg_my_temp_schema, create_session_user_udf,
+        },
         rewrite::converter::LogicalPlanToLanguageConverter,
     },
     sql::{
@@ -2432,6 +2434,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 self.state.clone(),
             ));
             ctx.register_udf(create_current_user_udf(self.state.clone(), false));
+            ctx.register_udf(create_session_user_udf(self.state.clone()));
         }
 
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
@@ -8300,6 +8303,57 @@ ORDER BY \"COUNT(count)\" DESC"
             "datagrip_introspection",
             execute_query(
                 "select current_database(), current_schema(), current_user;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn dbeaver_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "dbeaver_introspection_init",
+            execute_query(
+                "SELECT current_schema(), session_user;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dbeaver_introspection_databases",
+            execute_query(
+                "SELECT db.oid,db.* FROM pg_catalog.pg_database db WHERE datname = 'db'"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dbeaver_introspection_namespaces",
+            execute_query(
+                "SELECT n.oid,n.*,d.description FROM pg_catalog.pg_namespace n
+                LEFT OUTER JOIN pg_catalog.pg_description d ON d.objoid=n.oid AND d.objsubid=0 AND d.classoid='pg_namespace'::regclass
+                ORDER BY nspname".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dbeaver_introspection_types",
+            execute_query(
+                "SELECT t.oid,t.*,c.relkind,format_type(nullif(t.typbasetype, 0), t.typtypmod) as base_type_name, d.description
+                FROM pg_catalog.pg_type t
+                LEFT OUTER JOIN pg_catalog.pg_type et ON et.oid=t.typelem
+                LEFT OUTER JOIN pg_catalog.pg_class c ON c.oid=t.typrelid
+                LEFT OUTER JOIN pg_catalog.pg_description d ON t.oid=d.objoid
+                WHERE t.typname IS NOT NULL
+                AND (c.relkind IS NULL OR c.relkind = 'c') AND (et.typcategory IS NULL OR et.typcategory <> 'C')
+                ORDER BY t.oid ASC".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

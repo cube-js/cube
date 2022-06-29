@@ -53,6 +53,21 @@ pub fn parse_sql_to_statements(
     let query = query.replace("SIGNED INTEGER", "bigint");
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
+
+    // DBEver
+    let query = query.replace(
+        "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
+        "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
+    );
+    let query = query.replace(
+        "SELECT t.oid,t.*,c.relkind",
+        "SELECT t.oid as _oid,t.*,c.relkind",
+    );
+    let query = query.replace(
+        "SELECT n.oid,n.*,d.description FROM",
+        "SELECT n.oid as _oid,n.*,d.description FROM",
+    );
+
     // TODO support these introspection Superset queries
     let query = query.replace(
         "(SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)\
