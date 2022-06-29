@@ -41,17 +41,11 @@ cube(`Orders`, {
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `month`,
-            // buildRangeStart: {
-            //     // sql: `SELECT NOW() - interval '365 day'`,
-            //     sql: `SELECT DATE('2019-06-10')`,
-            // },
             buildRangeEnd: {
-                // sql: `SELECT NOW() - interval '3 day'`,
                 sql: `SELECT DATE('2020-06-7')`,
             },
             refreshKey: {
-                // every: '1 minute',
-                every: '1 week',
+                every: '1 minute',
             },
         },
     },

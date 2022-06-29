@@ -11,9 +11,7 @@ import {
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
   utcToLocalTimeZone,
-  pausePromise,
-  LAMBDA_RANGE_START,
-  LAMBDA_RANGE_END, QueryAlias, snapTimestamp
+  snapTimestamp
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -136,7 +134,6 @@ export type PreAggregationDescription = {
   invalidateKeyQueries: QueryWithParams[];
   sql: QueryWithParams;
   loadSql: QueryWithParams;
-  lambdaRangeSql: QueryWithParams;
   lambdaTimeDimensionColumn: string;
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;

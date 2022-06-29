@@ -6,7 +6,7 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
-describe('multidb', () => {
+describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
@@ -14,7 +14,7 @@ describe('multidb', () => {
 
   beforeAll(async () => {
     birdbox = await getBirdbox(
-      'multidb',
+      'postgres',
       {
         ...DEFAULT_CONFIG,
         CUBEJS_DB_TYPE: 'postgres',
@@ -40,7 +40,7 @@ describe('multidb', () => {
     await db.stop();
   });
 
-  test('lambda query', async () => {
+  test('query', async () => {
     const response = await client.load({
       measures: ['Orders.count'],
       dimensions: ['Orders.status'],

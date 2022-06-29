@@ -2193,29 +2193,6 @@ class BaseQuery {
     );
   }
 
-  lambdaRangeSql(cube, preAggregation) {
-    if (!preAggregation.lambdaView) {
-      return undefined;
-    }
-    return this.cacheValue(
-      ['lambdaRangeSql', cube, JSON.stringify(preAggregation)],
-      () => {
-        const start = this.timeGroupedColumn(
-          preAggregation.granularity,
-          this.convertTz(this.paramAllocator.allocateParam(LAMBDA_RANGE_START))
-        );
-        const startAlias = this.escapeColumnName(QueryAlias.LAMBDA_RANGE_START);
-        const end = this.timeGroupedColumn(
-          preAggregation.granularity,
-          this.convertTz(this.paramAllocator.allocateParam(LAMBDA_RANGE_END))
-        );
-        const endAlias = this.escapeColumnName(QueryAlias.LAMBDA_RANGE_END);
-        const sql = `SELECT ${start} ${startAlias}, ${end} ${endAlias}`;
-        return this.paramAllocator.buildSqlAndParams(sql);
-      }
-    );
-  }
-
   lambdaTimeDimensionColumn(cube, preAggregation) {
     if (!preAggregation.lambdaView) {
       return undefined;
