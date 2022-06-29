@@ -53,6 +53,7 @@ impl<'a> PgType<'a> {
                 | PgTypeId::INT4MULTIRANGE
                 | PgTypeId::INT8MULTIRANGE => "multirange_in".to_string(),
                 PgTypeId::MONEY => "cash_in".to_string(),
+                PgTypeId::PGCLASS | PgTypeId::PGNAMESPACE => "record_in".to_string(),
                 _ => self.typname.to_owned() + "in",
             }
         } else {
