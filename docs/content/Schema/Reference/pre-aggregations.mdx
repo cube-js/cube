@@ -402,8 +402,9 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This
-property is required when using [`timeDimension`][self-timedimension].
+The value can be one of `second`, `minute`, `hour`, `day`, `week`, `month`,
+`quarter` or `year`. This property is required when using
+[`timeDimension`][self-timedimension].
 
 ### <--{"id" : "Parameters"}--> segments
 
@@ -722,8 +723,8 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
-Data will **never** be queried beyond this range. By default, the build
-range is defined as the minimum and maximum values possible for the
+Data will **never** be queried beyond this range. By default, the build range is
+defined as the minimum and maximum values possible for the
 [`timeDimension`][self-timedimension] used in the rollup.
 
 <InfoBox>
