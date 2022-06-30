@@ -2,7 +2,8 @@
 
 import { withTimeout } from '@cubejs-backend/shared';
 
-import { CreateOptions, CubejsServerCore, SchemaFileRepository, ServerCoreInitializedOptions } from '../../src';
+import { ServerCoreInitializedOptions } from '../../src/core/Configurable';
+import { CreateOptions, CubejsServerCore, SchemaFileRepository } from '../../src';
 import { DatabaseType } from '../../src/core/types';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Required } from '@cubejs-backend/shared';
 import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 
-import { CubejsServerCore } from './server';
+import { CubejsServerCore } from './CubejsServerCore';
 import { CompilerApi } from './CompilerApi';
 import { RequestContext } from './types';
 

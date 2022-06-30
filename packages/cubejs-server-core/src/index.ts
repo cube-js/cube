@@ -1,7 +1,7 @@
-import { CubejsServerCore } from './core/server';
+import { CubejsServerCore } from './core/CubejsServerCore';
 
 export * from './core/logger';
-export * from './core/server';
+export * from './core/CubejsServerCore';
 export * from './core/types';
 export * from './core/FileRepository';
 
