@@ -29,6 +29,7 @@ use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::Data;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
@@ -353,6 +354,7 @@ pub enum HttpCommand {
     Query {
         query: String,
         trace_obj: Option<String>,
+        tables: HashMap<String, DataFrame>,
     },
     ResultSet {
         data_frame: Arc<DataFrame>,

@@ -12,7 +12,7 @@ table HttpMessage {
 table HttpQuery {
     query: string;
     trace_obj: string;
-    inline_tables: [HttpTable] = [];
+    tables: [HttpTable] = [];
 }
 
 table HttpTable {
