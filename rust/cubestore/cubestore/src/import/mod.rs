@@ -146,6 +146,13 @@ impl ImportFormat {
         value_buf: &mut Option<MaybeOwnedStr>,
     ) -> Result<TableValue, CubeError> {
         let value = value_buf.as_ref().unwrap().as_ref();
+        ImportFormat::parse_column_value_str(column, value)
+    }
+
+    pub fn parse_column_value_str(
+        column: &Column,
+        value: &str,
+    ) -> Result<TableValue, CubeError> {
         Ok(match column.get_column_type() {
             ColumnType::String => TableValue::String(value_buf.take().unwrap().take_string()),
             ColumnType::Int => value

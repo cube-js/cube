@@ -307,7 +307,7 @@ impl<'a> flatbuffers::Follow<'a> for HttpQuery<'a> {
 impl<'a> HttpQuery<'a> {
   pub const VT_QUERY: flatbuffers::VOffsetT = 4;
   pub const VT_TRACE_OBJ: flatbuffers::VOffsetT = 6;
-  pub const VT_INLINE_TABLES: flatbuffers::VOffsetT = 8;
+  pub const VT_TABLES: flatbuffers::VOffsetT = 8;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -319,7 +319,7 @@ impl<'a> HttpQuery<'a> {
     args: &'args HttpQueryArgs<'args>
   ) -> flatbuffers::WIPOffset<HttpQuery<'bldr>> {
     let mut builder = HttpQueryBuilder::new(_fbb);
-    if let Some(x) = args.inline_tables { builder.add_inline_tables(x); }
+    if let Some(x) = args.tables { builder.add_tables(x); }
     if let Some(x) = args.trace_obj { builder.add_trace_obj(x); }
     if let Some(x) = args.query { builder.add_query(x); }
     builder.finish()
@@ -335,8 +335,8 @@ impl<'a> HttpQuery<'a> {
     self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(HttpQuery::VT_TRACE_OBJ, None)
   }
   #[inline]
-  pub fn inline_tables(&self) -> flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable>>>>(HttpQuery::VT_INLINE_TABLES, Some(Default::default())).unwrap()
+  pub fn tables(&self) -> flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable>>>>(HttpQuery::VT_TABLES, Some(Default::default())).unwrap()
   }
 }
 
@@ -349,7 +349,7 @@ impl flatbuffers::Verifiable for HttpQuery<'_> {
     v.visit_table(pos)?
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>("query", Self::VT_QUERY, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>("trace_obj", Self::VT_TRACE_OBJ, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpTable>>>>("inline_tables", Self::VT_INLINE_TABLES, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpTable>>>>("tables", Self::VT_TABLES, false)?
      .finish();
     Ok(())
   }
@@ -357,7 +357,7 @@ impl flatbuffers::Verifiable for HttpQuery<'_> {
 pub struct HttpQueryArgs<'a> {
     pub query: Option<flatbuffers::WIPOffset<&'a str>>,
     pub trace_obj: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub inline_tables: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>>>>,
+    pub tables: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>>>>,
 }
 impl<'a> Default for HttpQueryArgs<'a> {
   #[inline]
@@ -365,7 +365,7 @@ impl<'a> Default for HttpQueryArgs<'a> {
     HttpQueryArgs {
       query: None,
       trace_obj: None,
-      inline_tables: None,
+      tables: None,
     }
   }
 }
@@ -384,8 +384,8 @@ impl<'a: 'b, 'b> HttpQueryBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_TRACE_OBJ, trace_obj);
   }
   #[inline]
-  pub fn add_inline_tables(&mut self, inline_tables: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<HttpTable<'b >>>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_INLINE_TABLES, inline_tables);
+  pub fn add_tables(&mut self, tables: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<HttpTable<'b >>>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_TABLES, tables);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpQueryBuilder<'a, 'b> {
@@ -407,7 +407,7 @@ impl std::fmt::Debug for HttpQuery<'_> {
     let mut ds = f.debug_struct("HttpQuery");
       ds.field("query", &self.query());
       ds.field("trace_obj", &self.trace_obj());
-      ds.field("inline_tables", &self.inline_tables());
+      ds.field("tables", &self.tables());
       ds.finish()
   }
 }

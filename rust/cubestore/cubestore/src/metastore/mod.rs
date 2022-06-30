@@ -389,6 +389,29 @@ impl Display for ColumnType {
 }
 
 impl ColumnType {
+    pub fn from_string(s: &str) -> Result<ColumnType, CubeError> {
+        lazy_static! {
+            static ref decimal_re: Regex = Regex::new(r"decimal\((?P<scale>\d+)\)").unwrap();
+        }
+        let tag = if decimal_re.captures(s) { "decimal" } else { s };
+        match tag {
+            "decimal" => decimal_re.captures(s).name("scale").parse::<int>().and_then(|scale| ColumnType::Decimal { scale, precision: 0 }),
+            "text" => Ok(ColumnType::String),
+            "int" => Ok(ColumnType::Int),
+            "bytes" => Ok(ColumnType::Bytes),
+            "hyperloglog" => Ok(ColumnType::HyperLogLog(HllFlavour::Airlift)),
+            "hyperloglogpp" => Ok(ColumnType::HyperLogLog(HllFlavour::ZetaSketch)),
+            "hll_postgres" => Ok(ColumnType::HyperLogLog(HllFlavour::Postgres)),
+            "hll_snowflake" => Ok(ColumnType::HyperLogLog(HllFlavour::Snowflake)),
+            "timestamp" => Ok(ColumnType::Timestamp),
+            "float" => Ok(ColumnType::Float),
+            "boolean" => Ok(ColumnType::Boolean),
+            _ => {
+                return Err(CubeError::user(format!("Column type '{}' is not supported", s)))
+            }
+        }
+    }
+
     pub fn target_scale(&self) -> i32 {
         match self {
             ColumnType::Decimal { scale, .. } => {
