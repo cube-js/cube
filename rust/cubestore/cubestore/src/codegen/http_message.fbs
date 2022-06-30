@@ -12,6 +12,14 @@ table HttpMessage {
 table HttpQuery {
     query: string;
     trace_obj: string;
+    inline_tables: [HttpTable] = [];
+}
+
+table HttpTable {
+    name: string;
+    columns: [string];
+    types: [string];
+    rows: [HttpRow];
 }
 
 table HttpError {
