@@ -14,6 +14,7 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
         DataType::Float64 => Ok(PgTypeId::FLOAT8),
         DataType::Decimal(_, _) => Ok(PgTypeId::NUMERIC),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(PgTypeId::TEXT),
+        DataType::Date32 | DataType::Date64 => Ok(PgTypeId::DATE),
         DataType::Timestamp(_, tz) => match tz {
             None => Ok(PgTypeId::TIMESTAMP),
             Some(_) => Ok(PgTypeId::TIMESTAMPTZ),

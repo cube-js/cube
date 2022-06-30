@@ -495,6 +495,7 @@ impl TableProvider for CubeTableProvider {
                     Field::new(
                         c.get_name(),
                         match c.get_column_type() {
+                            ColumnType::Date => DataType::Date32,
                             ColumnType::String => DataType::Utf8,
                             ColumnType::VarStr => DataType::Utf8,
                             ColumnType::Boolean => DataType::Boolean,

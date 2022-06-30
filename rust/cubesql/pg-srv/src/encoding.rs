@@ -2,6 +2,9 @@
 
 use crate::ProtocolError;
 use bytes::{BufMut, BytesMut};
+#[cfg(feature = "with-chrono")]
+use chrono::{NaiveDate, NaiveDateTime};
+use std::io::{Error, ErrorKind};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
@@ -92,3 +95,39 @@ impl_primitive!(i32);
 impl_primitive!(i64);
 impl_primitive!(f32);
 impl_primitive!(f64);
+
+// POSTGRES_EPOCH_JDATE
+#[cfg(feature = "with-chrono")]
+fn pg_base_date_epoch() -> NaiveDateTime {
+    NaiveDate::from_ymd(2000, 1, 1).and_hms(0, 0, 0)
+}
+
+#[cfg(feature = "with-chrono")]
+impl ToProtocolValue for NaiveDate {
+    // date_out - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L176
+    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
+        self.to_string().to_text(buf)
+    }
+
+    // date_send - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L223
+    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
+        let n = self
+            .signed_duration_since(pg_base_date_epoch().date())
+            .num_days();
+        if n > (i32::MAX as i64) {
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!(
+                    "value too large to store in the binary format (i32), actual: {}",
+                    n
+                ),
+            )
+            .into());
+        }
+
+        buf.put_i32(4);
+        buf.put_i32(n as i32);
+
+        Ok(())
+    }
+}
