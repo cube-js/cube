@@ -2514,6 +2514,7 @@ dependencies = [
  "async-trait",
  "byteorder",
  "bytes 0.5.6",
+ "chrono",
  "hex",
  "log",
  "thiserror",

@@ -10,11 +10,11 @@ use chrono_tz::Tz;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, DecimalArray, Float16Array, Float32Array, Float64Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray,
-        IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray, ListArray,
-        StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array,
-        UInt64Array, UInt8Array,
+        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
+        Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
+        ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
+        UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, TimeUnit},
     record_batch::RecordBatch,
@@ -97,6 +97,7 @@ pub enum TableValue {
     Float64(f64),
     List(ListValue),
     Decimal128(Decimal128Value),
+    Date(NaiveDate),
     Timestamp(TimestampValue),
 }
 
@@ -111,6 +112,7 @@ impl ToString for TableValue {
             TableValue::Boolean(v) => v.to_string(),
             TableValue::Float32(v) => v.to_string(),
             TableValue::Float64(v) => v.to_string(),
+            TableValue::Date(v) => v.to_string(),
             TableValue::Timestamp(v) => v.to_string(),
             TableValue::Decimal128(v) => v.to_string(),
             TableValue::List(v) => v.to_string(),
@@ -368,6 +370,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     match arrow_type {
         DataType::Binary => Ok(ColumnType::Blob),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
+        DataType::Date32 | DataType::Date64 => Ok(ColumnType::Date),
         DataType::Timestamp(_, _) => Ok(ColumnType::String),
         DataType::Interval(_) => Ok(ColumnType::String),
         DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
@@ -435,6 +438,30 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                             TableValue::Null
                         } else {
                             TableValue::String(a.value(i).to_string())
+                        });
+                    }
+                }
+                DataType::Date32 => {
+                    let a = array.as_any().downcast_ref::<Date32Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Date(a.value_as_date(i).expect(
+                                "value_as_date must return Option with NaiveDate for Date32Array",
+                            ))
+                        });
+                    }
+                }
+                DataType::Date64 => {
+                    let a = array.as_any().downcast_ref::<Date64Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Date(a.value_as_date(i).expect(
+                                "value_as_date must return Option with NaiveDate for Date64Array",
+                            ))
                         });
                     }
                 }

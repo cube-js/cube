@@ -9,7 +9,7 @@ use rust_decimal::prelude::*;
 use tokio::time::sleep;
 
 use super::utils::escape_snapshot_name;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use datafusion::assert_contains;
 use pg_srv::{PgType, PgTypeId};
 use tokio_postgres::{NoTls, Row, SimpleQueryMessage};
@@ -159,6 +159,10 @@ impl PostgresIntegrationTestSuite {
                         let value: Option<f64> = row.get(idx);
                         values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
+                    PgTypeId::DATE => {
+                        let value: Option<NaiveDate> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
+                    }
                     PgTypeId::TIMESTAMP => {
                         let value: Option<NaiveDateTime> = row.get(idx);
                         values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
@@ -227,7 +231,7 @@ impl PostgresIntegrationTestSuite {
                             values.push("NULL".to_string())
                         }
                     }
-                    oid => unimplemented!("Unsupported pg_type: {:?}", oid),
+                    tid => unimplemented!("Unsupported pg_type: {:?}({})", tid, tid.to_type().oid),
                 }
             }
 
@@ -630,10 +634,11 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 CAST(1.25 as DECIMAL(15, 2)) as d2,
                 CAST(1.25 as DECIMAL(15, 5)) as d5,
                 CAST(1.25 as DECIMAL(15, 10)) as d10,
+                CAST('2022-04-25 16:25:01.164774 +00:00' as timestamp)::date as date,
+                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp,
                 ARRAY['test1', 'test2'] as str_arr,
                 ARRAY[1,2,3] as i64_arr,
-                ARRAY[1.2,2.3,3.4] as f64_arr,
-                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp
+                ARRAY[1.2,2.3,3.4] as f64_arr
             "#
             .to_string(),
             Some("pg_test_types".to_string()),
