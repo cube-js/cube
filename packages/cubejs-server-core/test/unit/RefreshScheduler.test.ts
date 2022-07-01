@@ -337,14 +337,18 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
     dbType: 'postgres',
     apiSecret: 'foo',
   });
-  const compilerApi = new CompilerApi(repository, 'postgres', {
-    compileContext: {
-      useOriginalSqlPreAggregations,
-    },
-    logger: (msg, params) => {
-      console.log(msg, params);
-    },
-  });
+  const compilerApi = new CompilerApi(
+    repository,
+    async () => 'postgres',
+    {
+      compileContext: {
+        useOriginalSqlPreAggregations,
+      },
+      logger: (msg, params) => {
+        console.log(msg, params);
+      },
+    }
+  );
 
   const mockDriver = new MockDriver();
 

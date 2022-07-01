@@ -3,11 +3,14 @@ import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 
 export class CompilerApi {
+  /**
+   * Class constructor.
+   * @param {SchemaFileRepository} repository
+   * @param {DbTypeAsyncFn} dbType
+   * @param {*} options
+   */
   constructor(repository, dbType, options) {
     this.repository = repository;
-    /**
-     * @type {DbTypeAsyncFn}
-     */
     this.dbType = dbType;
     this.dialectClass = options.dialectClass;
     this.options = options || {};
@@ -80,12 +83,8 @@ export class CompilerApi {
   }
 
   async getDbType(dataSource = 'default') {
-    if (typeof this.dbType === 'function') {
-      const res = await this.dbType({ dataSource, });
-      return res;
-    }
-    // TODO (buntarb): throw an error?
-    return this.dbType;
+    const res = await this.dbType({ dataSource, });
+    return res;
   }
 
   getDialectClass(dataSource = 'default', dbType) {

@@ -69,27 +69,16 @@ export class OptsHandler {
   private assertOptions(opts: CreateOptions) {
     optionsValidate(opts);
 
-    if (!process.env.CUBEJS_DB_TYPE && !opts.dbType && !opts.driverFactory) {
+    if (
+      !this.configuredAsDevServer() &&
+      !process.env.CUBEJS_DB_TYPE &&
+      !opts.dbType &&
+      !opts.driverFactory
+    ) {
       throw new Error(
         'Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory ' +
         'must be specified'
       );
-    }
-    
-    if (
-      opts.dbType &&
-      typeof opts.dbType !== 'string' &&
-      typeof opts.dbType !== 'function'
-    ) {
-      throw new Error(`Unexpected CreateOptions.dbType type: ${
-        typeof opts.dbType
-      }`);
-    }
-    
-    if (opts.driverFactory && typeof opts.driverFactory !== 'function') {
-      throw new Error(`Unexpected CreateOptions.driverFactory type: ${
-        typeof opts.driverFactory
-      }`);
     }
     
     if (opts.dbType) {
@@ -116,7 +105,6 @@ export class OptsHandler {
           'returns driver instance'
         );
       }
-      // TODO (buntarb): this can be logged multiple times.
       this.core.logger(
         'Cube.js CreateOptions.driverFactory Property Deprecation',
         {
@@ -289,24 +277,31 @@ export class OptsHandler {
     const definedExtDBVariables =
       skipOnEnv.filter((field) => process.env[field] !== undefined);
 
-    const externalDbType = opts.externalDbType ||
+    const externalDbType =
+      opts.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE ||
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
-    const devServer = process.env.NODE_ENV !== 'production' || getEnv('devMode');
-    let externalDriverFactory = externalDbType && (
-      () => new (lookupDriverClass(externalDbType))({
-        url: process.env.CUBEJS_EXT_DB_URL,
-        host: process.env.CUBEJS_EXT_DB_HOST,
-        database: process.env.CUBEJS_EXT_DB_NAME,
-        port: process.env.CUBEJS_EXT_DB_PORT,
-        user: process.env.CUBEJS_EXT_DB_USER,
-        password: process.env.CUBEJS_EXT_DB_PASS,
-      })
-    );
+    const devServer =
+      process.env.NODE_ENV !== 'production' ||
+      getEnv('devMode');
 
-    let externalDialectFactory = () => typeof externalDbType === 'string' &&
+    let externalDriverFactory =
+      externalDbType &&
+      (
+        () => new (lookupDriverClass(externalDbType))({
+          url: process.env.CUBEJS_EXT_DB_URL,
+          host: process.env.CUBEJS_EXT_DB_HOST,
+          database: process.env.CUBEJS_EXT_DB_NAME,
+          port: process.env.CUBEJS_EXT_DB_PORT,
+          user: process.env.CUBEJS_EXT_DB_USER,
+          password: process.env.CUBEJS_EXT_DB_PASS,
+        })
+      );
+
+    let externalDialectFactory =
+      () => typeof externalDbType === 'string' &&
       lookupDriverClass(externalDbType).dialectClass &&
       lookupDriverClass(externalDbType).dialectClass();
 
@@ -398,9 +393,9 @@ export class OptsHandler {
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency:
         parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
-      preAggregationsSchema: getEnv('preAggregationsSchema') || (
-        devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'
-      ),
+      preAggregationsSchema:
+        getEnv('preAggregationsSchema') ||
+        (devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
@@ -472,6 +467,18 @@ export class OptsHandler {
     }
 
     return options;
+  }
+
+  /**
+   * Determines whether current instance should be bootstraped in the
+   * dev mode or not.
+   */
+  public configuredAsDevServer(): boolean {
+    return (
+      this.createOptions.devServer ||
+      process.env.NODE_ENV !== 'production' ||
+      getEnv('devMode')
+    );
   }
 
   /**
