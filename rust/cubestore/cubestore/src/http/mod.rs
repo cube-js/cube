@@ -446,7 +446,7 @@ impl HttpMessage {
         builder.finished_data().to_vec() // TODO copy
     }
 
-    fn build_columns<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
+    fn build_columns<'a: 'ma, 'ma>(builder: &'ma mut FlatBufferBuilder<'a>, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
         let columns = data_frame
             .get_columns()
             .iter()
@@ -456,7 +456,7 @@ impl HttpMessage {
         columns_vec
     }
 
-    fn build_types<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
+    fn build_types<'a: 'ma, 'ma>(builder: &'ma mut FlatBufferBuilder<'a>, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
         let types = data_frame
             .get_columns()
             .iter()
@@ -467,7 +467,7 @@ impl HttpMessage {
         types_vec
     }
 
-    fn build_rows<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<HttpRow<'a>>>> {
+    fn build_rows<'a: 'ma, 'ma>(builder: &'ma mut FlatBufferBuilder<'a>, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<HttpRow<'a>>>> {
         let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
         for row in data_frame.get_rows().iter() {
             let mut value_offsets = Vec::with_capacity(row.values().len());
