@@ -1,3 +1,4 @@
+import { Required } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -189,10 +190,25 @@ export interface CreateOptions {
   allowNodeRequire?: boolean;
 }
 
-export interface InitializedOptions extends CreateOptions {
+export interface DriverDecoratedOptions extends CreateOptions {
   dbType: DbTypeAsyncFn;
   driverFactory: DriverFactoryAsyncFn;
 }
+
+export type ServerCoreInitializedOptions = Required<
+  DriverDecoratedOptions,
+  'dbType' |
+  'apiSecret' |
+  'devServer' |
+  'telemetry' |
+  'dashboardAppPath' |
+  'dashboardAppPort' |
+  'driverFactory' |
+  'dialectFactory' |
+  'externalDriverFactory' |
+  'externalDialectFactory' |
+  'scheduledRefreshContexts'
+>;
 
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
