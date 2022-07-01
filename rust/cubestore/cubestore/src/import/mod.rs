@@ -154,7 +154,7 @@ impl ImportFormat {
         value: &str,
     ) -> Result<TableValue, CubeError> {
         Ok(match column.get_column_type() {
-            ColumnType::String => TableValue::String(value_buf.take().unwrap().take_string()),
+            ColumnType::String => TableValue::String(value.to_string()),
             ColumnType::Int => value
                 .parse()
                 .map(|v| TableValue::Int(v))

@@ -8,7 +8,7 @@ use crate::codegen::http_message_generated::{get_root_as_http_message, HttpColum
 use crate::mysql::SqlAuthService;
 use crate::sql::{SqlQueryContext, SqlService};
 use crate::store::DataFrame;
-use crate::table::TableValue;
+use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
@@ -26,13 +26,11 @@ use std::net::SocketAddr;
 use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
-use tokio_tungstenite::tungstenite::protocol::frame::coding::Data;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use crate::metastore::{Column, ColumnType, ImportFormat};
-use crate::queryplanner::serialized_plan::SerializedExpr::Column;
 
 pub struct HttpServer {
     bind_address: String,
@@ -394,7 +392,7 @@ impl HttpMessage {
                             &HttpTableArgs {
                                 name: Some(name_offset),
                                 columns: Some(columns_vec),
-                                types: Spme(types_vec),
+                                types: Some(types_vec),
                                 rows: Some(rows_vec),
                             },
                         );
@@ -448,7 +446,7 @@ impl HttpMessage {
         builder.finished_data().to_vec() // TODO copy
     }
 
-    fn build_columns(builder: &mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<ForwardsUOffset<&str>>> {
+    fn build_columns<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
         let columns = data_frame
             .get_columns()
             .iter()
@@ -458,17 +456,18 @@ impl HttpMessage {
         columns_vec
     }
 
-    fn build_types(builder: &mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<ForwardsUOffset<&str>>> {
+    fn build_types<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
         let types = data_frame
             .get_columns()
             .iter()
-            .map(|c| c.get_column_type().as_str())
+            .map(|c| c.get_column_type().to_string())
             .collect::<Vec<_>>();
-        let types_vec = builder.create_vector_of_strings(types.as_slice());
+        let str_types = types.iter().map(|t| t.as_str()).collect::<Vec<_>>();
+        let types_vec = builder.create_vector_of_strings(str_types.as_slice());
         types_vec
     }
 
-    fn build_rows(builder: &mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<ForwardsUOffset<HttpRow>>> {
+    fn build_rows<'a>(builder: &'a mut FlatBufferBuilder, data_frame: Arc<DataFrame>) -> WIPOffset<Vector<'a, ForwardsUOffset<HttpRow<'a>>>> {
         let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
         for row in data_frame.get_rows().iter() {
             let mut value_offsets = Vec::with_capacity(row.values().len());
@@ -480,7 +479,7 @@ impl HttpMessage {
                     ),
                     TableValue::String(v) => {
                         let string_value = Some(builder.create_string(v));
-                        HttpColumnValue::creyate(
+                        HttpColumnValue::create(
                             builder,
                             &HttpColumnValueArgs { string_value },
                         )
@@ -556,20 +555,25 @@ impl HttpMessage {
             command: match http_message.command_type() {
                 crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
-                    let tables = HashMap::new();
-                    for table in query.tables().unwrap() {
-                        let name = table.name().unwrap().to_string();
-                        let types = table.types()[i].unwrap();
-                        let columns = table.columns().unwrap().iter().enumerate().map(|name, i| {
-                            let column_type = ColumnType::from_string(types[i])?;
-                            Column::new(name, column_type, i)
-                        }).collect::<Vec<_>>();
-                        let rows = table.rows().unwrap().map(|r| r.iter().enumerate().map(|v, i| {
-                            let column = columns[i];
-                            ImportFormat::parse_column_value_str(column, v.unwrap())
-                        })).collect::<Vec<_>>();
-                        tables[name] = DataFrame::new(columns, rows)
-                    }
+                    let mut tables = HashMap::new();
+                    if let Some(query_tables) = query.tables() {
+                        for table in query_tables.iter() {
+                            let name = table.name().unwrap().to_string();
+                            let types = table.types().unwrap().iter().map(|column_type| {
+                                ColumnType::from_string(column_type)
+                            }).collect::<Result<Vec<_>, CubeError>>()?;
+                            let columns = table.columns().unwrap().iter().enumerate().map(|(i, name)| {
+                                Column::new(name.to_string(), types[i].clone(), i)
+                            }).collect::<Vec<_>>();
+                            let rows = table.rows().unwrap().iter().map(|r| {
+                                let values = r.values().unwrap().iter().enumerate().map(|(i, v)| {
+                                    v.string_value().map_or(Ok(TableValue::Null), |v| ImportFormat::parse_column_value_str(&columns[i], v))
+                                }).collect::<Result<Vec<_>, CubeError>>();
+                                values.map(|values| Row::new(values))
+                            }).collect::<Result<Vec<_>, CubeError>>()?;
+                            tables.insert(name, Arc::new(DataFrame::new(columns, rows)));
+                        }
+                    };
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
                         tables,

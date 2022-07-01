@@ -9,6 +9,7 @@
 #![feature(map_first_last)]
 #![feature(is_sorted)]
 #![feature(result_flattening)]
+#![feature(try_blocks)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

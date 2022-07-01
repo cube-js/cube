@@ -6,67 +6,42 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, Follow};
+use self::flatbuffers::EndianScalar;
 
-#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MIN_HTTP_COMMAND: u8 = 0;
-#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_HTTP_COMMAND: u8 = 3;
-#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_HTTP_COMMAND: [HttpCommand; 4] = [
-  HttpCommand::NONE,
-  HttpCommand::HttpQuery,
-  HttpCommand::HttpResultSet,
-  HttpCommand::HttpError,
-];
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum HttpCommand {
+  NONE = 0,
+  HttpQuery = 1,
+  HttpResultSet = 2,
+  HttpError = 3,
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[repr(transparent)]
-pub struct HttpCommand(pub u8);
-#[allow(non_upper_case_globals)]
-impl HttpCommand {
-  pub const NONE: Self = Self(0);
-  pub const HttpQuery: Self = Self(1);
-  pub const HttpResultSet: Self = Self(2);
-  pub const HttpError: Self = Self(3);
+}
 
-  pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 3;
-  pub const ENUM_VALUES: &'static [Self] = &[
-    Self::NONE,
-    Self::HttpQuery,
-    Self::HttpResultSet,
-    Self::HttpError,
-  ];
-  /// Returns the variant's name or "" if unknown.
-  pub fn variant_name(self) -> Option<&'static str> {
-    match self {
-      Self::NONE => Some("NONE"),
-      Self::HttpQuery => Some("HttpQuery"),
-      Self::HttpResultSet => Some("HttpResultSet"),
-      Self::HttpError => Some("HttpError"),
-      _ => None,
-    }
-  }
-}
-impl std::fmt::Debug for HttpCommand {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    if let Some(name) = self.variant_name() {
-      f.write_str(name)
-    } else {
-      f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
-    }
-  }
-}
+pub const ENUM_MIN_HTTP_COMMAND: u8 = 0;
+pub const ENUM_MAX_HTTP_COMMAND: u8 = 3;
+
 impl<'a> flatbuffers::Follow<'a> for HttpCommand {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = unsafe {
-      flatbuffers::read_scalar_at::<u8>(buf, loc)
-    };
-    Self(b)
+    flatbuffers::read_scalar_at::<Self>(buf, loc)
+  }
+}
+
+impl flatbuffers::EndianScalar for HttpCommand {
+  #[inline]
+  fn to_little_endian(self) -> Self {
+    let n = u8::to_le(self as u8);
+    let p = &n as *const u8 as *const HttpCommand;
+    unsafe { *p }
+  }
+  #[inline]
+  fn from_little_endian(self) -> Self {
+    let n = u8::from_le(self as u8);
+    let p = &n as *const u8 as *const HttpCommand;
+    unsafe { *p }
   }
 }
 
@@ -74,73 +49,70 @@ impl flatbuffers::Push for HttpCommand {
     type Output = HttpCommand;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
+        flatbuffers::emplace_scalar::<HttpCommand>(dst, *self);
     }
 }
 
-impl flatbuffers::EndianScalar for HttpCommand {
-  #[inline]
-  fn to_little_endian(self) -> Self {
-    let b = u8::to_le(self.0);
-    Self(b)
-  }
-  #[inline]
-  #[allow(clippy::wrong_self_convention)]
-  fn from_little_endian(self) -> Self {
-    let b = u8::from_le(self.0);
-    Self(b)
-  }
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_HTTP_COMMAND:[HttpCommand; 4] = [
+  HttpCommand::NONE,
+  HttpCommand::HttpQuery,
+  HttpCommand::HttpResultSet,
+  HttpCommand::HttpError
+];
+
+#[allow(non_camel_case_types)]
+pub const ENUM_NAMES_HTTP_COMMAND:[&'static str; 4] = [
+    "NONE",
+    "HttpQuery",
+    "HttpResultSet",
+    "HttpError"
+];
+
+pub fn enum_name_http_command(e: HttpCommand) -> &'static str {
+  let index = e as u8;
+  ENUM_NAMES_HTTP_COMMAND[index as usize]
 }
 
-impl<'a> flatbuffers::Verifiable for HttpCommand {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    u8::run_verifier(v, pos)
-  }
-}
-
-impl flatbuffers::SimpleToVerifyInSlice for HttpCommand {}
 pub struct HttpCommandUnionTableOffset {}
-
 pub enum HttpMessageOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpMessage<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpMessage<'a> {
-  type Inner = HttpMessage<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpMessage<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpMessage<'a> {
-  pub const VT_MESSAGE_ID: flatbuffers::VOffsetT = 4;
-  pub const VT_COMMAND_TYPE: flatbuffers::VOffsetT = 6;
-  pub const VT_COMMAND: flatbuffers::VOffsetT = 8;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpMessage {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpMessageArgs) -> flatbuffers::WIPOffset<HttpMessage<'bldr>> {
+      let mut builder = HttpMessageBuilder::new(_fbb);
+      if let Some(x) = args.command { builder.add_command(x); }
+      builder.add_message_id(args.message_id);
+      builder.add_command_type(args.command_type);
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpMessage { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpMessageArgs
-  ) -> flatbuffers::WIPOffset<HttpMessage<'bldr>> {
-    let mut builder = HttpMessageBuilder::new(_fbb);
-    if let Some(x) = args.command { builder.add_command(x); }
-    builder.add_message_id(args.message_id);
-    builder.add_command_type(args.command_type);
-    builder.finish()
-  }
-
+    pub const VT_MESSAGE_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_COMMAND_TYPE: flatbuffers::VOffsetT = 6;
+    pub const VT_COMMAND: flatbuffers::VOffsetT = 8;
 
   #[inline]
   pub fn message_id(&self) -> u32 {
@@ -158,7 +130,7 @@ impl<'a> HttpMessage<'a> {
   #[allow(non_snake_case)]
   pub fn command_as_http_query(&self) -> Option<HttpQuery<'a>> {
     if self.command_type() == HttpCommand::HttpQuery {
-      self.command().map(HttpQuery::init_from_table)
+      self.command().map(|u| HttpQuery::init_from_table(u))
     } else {
       None
     }
@@ -168,7 +140,7 @@ impl<'a> HttpMessage<'a> {
   #[allow(non_snake_case)]
   pub fn command_as_http_result_set(&self) -> Option<HttpResultSet<'a>> {
     if self.command_type() == HttpCommand::HttpResultSet {
-      self.command().map(HttpResultSet::init_from_table)
+      self.command().map(|u| HttpResultSet::init_from_table(u))
     } else {
       None
     }
@@ -178,7 +150,7 @@ impl<'a> HttpMessage<'a> {
   #[allow(non_snake_case)]
   pub fn command_as_http_error(&self) -> Option<HttpError<'a>> {
     if self.command_type() == HttpCommand::HttpError {
-      self.command().map(HttpError::init_from_table)
+      self.command().map(|u| HttpError::init_from_table(u))
     } else {
       None
     }
@@ -186,42 +158,21 @@ impl<'a> HttpMessage<'a> {
 
 }
 
-impl flatbuffers::Verifiable for HttpMessage<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<u32>("message_id", Self::VT_MESSAGE_ID, false)?
-     .visit_union::<HttpCommand, _>("command_type", Self::VT_COMMAND_TYPE, "command", Self::VT_COMMAND, false, |key, v, pos| {
-        match key {
-          HttpCommand::HttpQuery => v.verify_union_variant::<flatbuffers::ForwardsUOffset<HttpQuery>>("HttpCommand::HttpQuery", pos),
-          HttpCommand::HttpResultSet => v.verify_union_variant::<flatbuffers::ForwardsUOffset<HttpResultSet>>("HttpCommand::HttpResultSet", pos),
-          HttpCommand::HttpError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<HttpError>>("HttpCommand::HttpError", pos),
-          _ => Ok(()),
-        }
-     })?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpMessageArgs {
     pub message_id: u32,
     pub command_type: HttpCommand,
     pub command: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
 }
 impl<'a> Default for HttpMessageArgs {
-  #[inline]
-  fn default() -> Self {
-    HttpMessageArgs {
-      message_id: 0,
-      command_type: HttpCommand::NONE,
-      command: None,
+    #[inline]
+    fn default() -> Self {
+        HttpMessageArgs {
+            message_id: 0,
+            command_type: HttpCommand::NONE,
+            command: None,
+        }
     }
-  }
 }
-
 pub struct HttpMessageBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -254,77 +205,44 @@ impl<'a: 'b, 'b> HttpMessageBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpMessage<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpMessage");
-      ds.field("message_id", &self.message_id());
-      ds.field("command_type", &self.command_type());
-      match self.command_type() {
-        HttpCommand::HttpQuery => {
-          if let Some(x) = self.command_as_http_query() {
-            ds.field("command", &x)
-          } else {
-            ds.field("command", &"InvalidFlatbuffer: Union discriminant does not match value.")
-          }
-        },
-        HttpCommand::HttpResultSet => {
-          if let Some(x) = self.command_as_http_result_set() {
-            ds.field("command", &x)
-          } else {
-            ds.field("command", &"InvalidFlatbuffer: Union discriminant does not match value.")
-          }
-        },
-        HttpCommand::HttpError => {
-          if let Some(x) = self.command_as_http_error() {
-            ds.field("command", &x)
-          } else {
-            ds.field("command", &"InvalidFlatbuffer: Union discriminant does not match value.")
-          }
-        },
-        _ => {
-          let x: Option<()> = None;
-          ds.field("command", &x)
-        },
-      };
-      ds.finish()
-  }
-}
 pub enum HttpQueryOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpQuery<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpQuery<'a> {
-  type Inner = HttpQuery<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpQuery<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpQuery<'a> {
-  pub const VT_QUERY: flatbuffers::VOffsetT = 4;
-  pub const VT_TRACE_OBJ: flatbuffers::VOffsetT = 6;
-  pub const VT_TABLES: flatbuffers::VOffsetT = 8;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpQuery {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpQueryArgs<'args>) -> flatbuffers::WIPOffset<HttpQuery<'bldr>> {
+      let mut builder = HttpQueryBuilder::new(_fbb);
+      if let Some(x) = args.tables { builder.add_tables(x); }
+      if let Some(x) = args.trace_obj { builder.add_trace_obj(x); }
+      if let Some(x) = args.query { builder.add_query(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpQuery { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpQueryArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpQuery<'bldr>> {
-    let mut builder = HttpQueryBuilder::new(_fbb);
-    if let Some(x) = args.tables { builder.add_tables(x); }
-    if let Some(x) = args.trace_obj { builder.add_trace_obj(x); }
-    if let Some(x) = args.query { builder.add_query(x); }
-    builder.finish()
-  }
-
+    pub const VT_QUERY: flatbuffers::VOffsetT = 4;
+    pub const VT_TRACE_OBJ: flatbuffers::VOffsetT = 6;
+    pub const VT_TABLES: flatbuffers::VOffsetT = 8;
 
   #[inline]
   pub fn query(&self) -> Option<&'a str> {
@@ -335,41 +253,26 @@ impl<'a> HttpQuery<'a> {
     self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(HttpQuery::VT_TRACE_OBJ, None)
   }
   #[inline]
-  pub fn tables(&self) -> flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable>>>>(HttpQuery::VT_TABLES, Some(Default::default())).unwrap()
+  pub fn tables(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>>> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<HttpTable<'a>>>>>(HttpQuery::VT_TABLES, None)
   }
 }
 
-impl flatbuffers::Verifiable for HttpQuery<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("query", Self::VT_QUERY, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("trace_obj", Self::VT_TRACE_OBJ, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpTable>>>>("tables", Self::VT_TABLES, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpQueryArgs<'a> {
-    pub query: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub trace_obj: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub tables: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>>>>,
+    pub query: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub trace_obj: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub tables: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<HttpTable<'a >>>>>,
 }
 impl<'a> Default for HttpQueryArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpQueryArgs {
-      query: None,
-      trace_obj: None,
-      tables: None,
+    #[inline]
+    fn default() -> Self {
+        HttpQueryArgs {
+            query: None,
+            trace_obj: None,
+            tables: None,
+        }
     }
-  }
 }
-
 pub struct HttpQueryBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -402,53 +305,46 @@ impl<'a: 'b, 'b> HttpQueryBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpQuery<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpQuery");
-      ds.field("query", &self.query());
-      ds.field("trace_obj", &self.trace_obj());
-      ds.field("tables", &self.tables());
-      ds.finish()
-  }
-}
 pub enum HttpTableOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpTable<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpTable<'a> {
-  type Inner = HttpTable<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpTable<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpTable<'a> {
-  pub const VT_NAME: flatbuffers::VOffsetT = 4;
-  pub const VT_COLUMNS: flatbuffers::VOffsetT = 6;
-  pub const VT_TYPES: flatbuffers::VOffsetT = 8;
-  pub const VT_ROWS: flatbuffers::VOffsetT = 10;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpTable {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpTableArgs<'args>) -> flatbuffers::WIPOffset<HttpTable<'bldr>> {
+      let mut builder = HttpTableBuilder::new(_fbb);
+      if let Some(x) = args.rows { builder.add_rows(x); }
+      if let Some(x) = args.types { builder.add_types(x); }
+      if let Some(x) = args.columns { builder.add_columns(x); }
+      if let Some(x) = args.name { builder.add_name(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpTable { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpTableArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpTable<'bldr>> {
-    let mut builder = HttpTableBuilder::new(_fbb);
-    if let Some(x) = args.rows { builder.add_rows(x); }
-    if let Some(x) = args.types { builder.add_types(x); }
-    if let Some(x) = args.columns { builder.add_columns(x); }
-    if let Some(x) = args.name { builder.add_name(x); }
-    builder.finish()
-  }
-
+    pub const VT_NAME: flatbuffers::VOffsetT = 4;
+    pub const VT_COLUMNS: flatbuffers::VOffsetT = 6;
+    pub const VT_TYPES: flatbuffers::VOffsetT = 8;
+    pub const VT_ROWS: flatbuffers::VOffsetT = 10;
 
   #[inline]
   pub fn name(&self) -> Option<&'a str> {
@@ -456,51 +352,35 @@ impl<'a> HttpTable<'a> {
   }
   #[inline]
   pub fn columns(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>(HttpTable::VT_COLUMNS, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<&'a str>>>>(HttpTable::VT_COLUMNS, None)
   }
   #[inline]
   pub fn types(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>(HttpTable::VT_TYPES, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<&'a str>>>>(HttpTable::VT_TYPES, None)
   }
   #[inline]
   pub fn rows(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow<'a>>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow>>>>(HttpTable::VT_ROWS, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<HttpRow<'a>>>>>(HttpTable::VT_ROWS, None)
   }
 }
 
-impl flatbuffers::Verifiable for HttpTable<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>("columns", Self::VT_COLUMNS, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>("types", Self::VT_TYPES, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpRow>>>>("rows", Self::VT_ROWS, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpTableArgs<'a> {
-    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub columns: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
-    pub types: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
-    pub rows: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow<'a>>>>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub columns: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<&'a  str>>>>,
+    pub types: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<&'a  str>>>>,
+    pub rows: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<HttpRow<'a >>>>>,
 }
 impl<'a> Default for HttpTableArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpTableArgs {
-      name: None,
-      columns: None,
-      types: None,
-      rows: None,
+    #[inline]
+    fn default() -> Self {
+        HttpTableArgs {
+            name: None,
+            columns: None,
+            types: None,
+            rows: None,
+        }
     }
-  }
 }
-
 pub struct HttpTableBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -537,48 +417,40 @@ impl<'a: 'b, 'b> HttpTableBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpTable<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpTable");
-      ds.field("name", &self.name());
-      ds.field("columns", &self.columns());
-      ds.field("types", &self.types());
-      ds.field("rows", &self.rows());
-      ds.finish()
-  }
-}
 pub enum HttpErrorOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpError<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpError<'a> {
-  type Inner = HttpError<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpError<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpError<'a> {
-  pub const VT_ERROR: flatbuffers::VOffsetT = 4;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpError {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpErrorArgs<'args>) -> flatbuffers::WIPOffset<HttpError<'bldr>> {
+      let mut builder = HttpErrorBuilder::new(_fbb);
+      if let Some(x) = args.error { builder.add_error(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpError { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpErrorArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpError<'bldr>> {
-    let mut builder = HttpErrorBuilder::new(_fbb);
-    if let Some(x) = args.error { builder.add_error(x); }
-    builder.finish()
-  }
-
+    pub const VT_ERROR: flatbuffers::VOffsetT = 4;
 
   #[inline]
   pub fn error(&self) -> Option<&'a str> {
@@ -586,30 +458,17 @@ impl<'a> HttpError<'a> {
   }
 }
 
-impl flatbuffers::Verifiable for HttpError<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("error", Self::VT_ERROR, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpErrorArgs<'a> {
-    pub error: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub error: Option<flatbuffers::WIPOffset<&'a  str>>,
 }
 impl<'a> Default for HttpErrorArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpErrorArgs {
-      error: None,
+    #[inline]
+    fn default() -> Self {
+        HttpErrorArgs {
+            error: None,
+        }
     }
-  }
 }
-
 pub struct HttpErrorBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -634,85 +493,66 @@ impl<'a: 'b, 'b> HttpErrorBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpError<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpError");
-      ds.field("error", &self.error());
-      ds.finish()
-  }
-}
 pub enum HttpResultSetOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpResultSet<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpResultSet<'a> {
-  type Inner = HttpResultSet<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpResultSet<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpResultSet<'a> {
-  pub const VT_COLUMNS: flatbuffers::VOffsetT = 4;
-  pub const VT_ROWS: flatbuffers::VOffsetT = 6;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpResultSet {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpResultSetArgs<'args>) -> flatbuffers::WIPOffset<HttpResultSet<'bldr>> {
+      let mut builder = HttpResultSetBuilder::new(_fbb);
+      if let Some(x) = args.rows { builder.add_rows(x); }
+      if let Some(x) = args.columns { builder.add_columns(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpResultSet { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpResultSetArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpResultSet<'bldr>> {
-    let mut builder = HttpResultSetBuilder::new(_fbb);
-    if let Some(x) = args.rows { builder.add_rows(x); }
-    if let Some(x) = args.columns { builder.add_columns(x); }
-    builder.finish()
-  }
-
+    pub const VT_COLUMNS: flatbuffers::VOffsetT = 4;
+    pub const VT_ROWS: flatbuffers::VOffsetT = 6;
 
   #[inline]
   pub fn columns(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>(HttpResultSet::VT_COLUMNS, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<&'a str>>>>(HttpResultSet::VT_COLUMNS, None)
   }
   #[inline]
   pub fn rows(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow<'a>>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow>>>>(HttpResultSet::VT_ROWS, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<HttpRow<'a>>>>>(HttpResultSet::VT_ROWS, None)
   }
 }
 
-impl flatbuffers::Verifiable for HttpResultSet<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>("columns", Self::VT_COLUMNS, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpRow>>>>("rows", Self::VT_ROWS, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpResultSetArgs<'a> {
-    pub columns: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
-    pub rows: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow<'a>>>>>,
+    pub columns: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<&'a  str>>>>,
+    pub rows: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<HttpRow<'a >>>>>,
 }
 impl<'a> Default for HttpResultSetArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpResultSetArgs {
-      columns: None,
-      rows: None,
+    #[inline]
+    fn default() -> Self {
+        HttpResultSetArgs {
+            columns: None,
+            rows: None,
+        }
     }
-  }
 }
-
 pub struct HttpResultSetBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -741,77 +581,58 @@ impl<'a: 'b, 'b> HttpResultSetBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpResultSet<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpResultSet");
-      ds.field("columns", &self.columns());
-      ds.field("rows", &self.rows());
-      ds.finish()
-  }
-}
 pub enum HttpRowOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpRow<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpRow<'a> {
-  type Inner = HttpRow<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpRow<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpRow<'a> {
-  pub const VT_VALUES: flatbuffers::VOffsetT = 4;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpRow {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpRowArgs<'args>) -> flatbuffers::WIPOffset<HttpRow<'bldr>> {
+      let mut builder = HttpRowBuilder::new(_fbb);
+      if let Some(x) = args.values { builder.add_values(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpRow { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpRowArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpRow<'bldr>> {
-    let mut builder = HttpRowBuilder::new(_fbb);
-    if let Some(x) = args.values { builder.add_values(x); }
-    builder.finish()
-  }
-
+    pub const VT_VALUES: flatbuffers::VOffsetT = 4;
 
   #[inline]
   pub fn values(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpColumnValue<'a>>>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpColumnValue>>>>(HttpRow::VT_VALUES, None)
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<flatbuffers::ForwardsUOffset<HttpColumnValue<'a>>>>>(HttpRow::VT_VALUES, None)
   }
 }
 
-impl flatbuffers::Verifiable for HttpRow<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpColumnValue>>>>("values", Self::VT_VALUES, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpRowArgs<'a> {
-    pub values: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpColumnValue<'a>>>>>,
+    pub values: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<HttpColumnValue<'a >>>>>,
 }
 impl<'a> Default for HttpRowArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpRowArgs {
-      values: None,
+    #[inline]
+    fn default() -> Self {
+        HttpRowArgs {
+            values: None,
+        }
     }
-  }
 }
-
 pub struct HttpRowBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -836,45 +657,40 @@ impl<'a: 'b, 'b> HttpRowBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpRow<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpRow");
-      ds.field("values", &self.values());
-      ds.finish()
-  }
-}
 pub enum HttpColumnValueOffset {}
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 
 pub struct HttpColumnValue<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for HttpColumnValue<'a> {
-  type Inner = HttpColumnValue<'a>;
-  #[inline]
-  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    Self { _tab: flatbuffers::Table { buf, loc } }
-  }
+    type Inner = HttpColumnValue<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf: buf, loc: loc },
+        }
+    }
 }
 
 impl<'a> HttpColumnValue<'a> {
-  pub const VT_STRING_VALUE: flatbuffers::VOffsetT = 4;
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpColumnValue {
+            _tab: table,
+        }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpColumnValueArgs<'args>) -> flatbuffers::WIPOffset<HttpColumnValue<'bldr>> {
+      let mut builder = HttpColumnValueBuilder::new(_fbb);
+      if let Some(x) = args.string_value { builder.add_string_value(x); }
+      builder.finish()
+    }
 
-  #[inline]
-  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    HttpColumnValue { _tab: table }
-  }
-  #[allow(unused_mut)]
-  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args HttpColumnValueArgs<'args>
-  ) -> flatbuffers::WIPOffset<HttpColumnValue<'bldr>> {
-    let mut builder = HttpColumnValueBuilder::new(_fbb);
-    if let Some(x) = args.string_value { builder.add_string_value(x); }
-    builder.finish()
-  }
-
+    pub const VT_STRING_VALUE: flatbuffers::VOffsetT = 4;
 
   #[inline]
   pub fn string_value(&self) -> Option<&'a str> {
@@ -882,30 +698,17 @@ impl<'a> HttpColumnValue<'a> {
   }
 }
 
-impl flatbuffers::Verifiable for HttpColumnValue<'_> {
-  #[inline]
-  fn run_verifier(
-    v: &mut flatbuffers::Verifier, pos: usize
-  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-    use self::flatbuffers::Verifiable;
-    v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("string_value", Self::VT_STRING_VALUE, false)?
-     .finish();
-    Ok(())
-  }
-}
 pub struct HttpColumnValueArgs<'a> {
-    pub string_value: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub string_value: Option<flatbuffers::WIPOffset<&'a  str>>,
 }
 impl<'a> Default for HttpColumnValueArgs<'a> {
-  #[inline]
-  fn default() -> Self {
-    HttpColumnValueArgs {
-      string_value: None,
+    #[inline]
+    fn default() -> Self {
+        HttpColumnValueArgs {
+            string_value: None,
+        }
     }
-  }
 }
-
 pub struct HttpColumnValueBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
@@ -930,85 +733,16 @@ impl<'a: 'b, 'b> HttpColumnValueBuilder<'a, 'b> {
   }
 }
 
-impl std::fmt::Debug for HttpColumnValue<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut ds = f.debug_struct("HttpColumnValue");
-      ds.field("string_value", &self.string_value());
-      ds.finish()
-  }
-}
 #[inline]
-#[deprecated(since="2.0.0", note="Deprecated in favor of `root_as...` methods.")]
 pub fn get_root_as_http_message<'a>(buf: &'a [u8]) -> HttpMessage<'a> {
-  unsafe { flatbuffers::root_unchecked::<HttpMessage<'a>>(buf) }
+  flatbuffers::get_root::<HttpMessage<'a>>(buf)
 }
 
 #[inline]
-#[deprecated(since="2.0.0", note="Deprecated in favor of `root_as...` methods.")]
 pub fn get_size_prefixed_root_as_http_message<'a>(buf: &'a [u8]) -> HttpMessage<'a> {
-  unsafe { flatbuffers::size_prefixed_root_unchecked::<HttpMessage<'a>>(buf) }
+  flatbuffers::get_size_prefixed_root::<HttpMessage<'a>>(buf)
 }
 
-#[inline]
-/// Verifies that a buffer of bytes contains a `HttpMessage`
-/// and returns it.
-/// Note that verification is still experimental and may not
-/// catch every error, or be maximally performant. For the
-/// previous, unchecked, behavior use
-/// `root_as_http_message_unchecked`.
-pub fn root_as_http_message(buf: &[u8]) -> Result<HttpMessage, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::root::<HttpMessage>(buf)
-}
-#[inline]
-/// Verifies that a buffer of bytes contains a size prefixed
-/// `HttpMessage` and returns it.
-/// Note that verification is still experimental and may not
-/// catch every error, or be maximally performant. For the
-/// previous, unchecked, behavior use
-/// `size_prefixed_root_as_http_message_unchecked`.
-pub fn size_prefixed_root_as_http_message(buf: &[u8]) -> Result<HttpMessage, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::size_prefixed_root::<HttpMessage>(buf)
-}
-#[inline]
-/// Verifies, with the given options, that a buffer of bytes
-/// contains a `HttpMessage` and returns it.
-/// Note that verification is still experimental and may not
-/// catch every error, or be maximally performant. For the
-/// previous, unchecked, behavior use
-/// `root_as_http_message_unchecked`.
-pub fn root_as_http_message_with_opts<'b, 'o>(
-  opts: &'o flatbuffers::VerifierOptions,
-  buf: &'b [u8],
-) -> Result<HttpMessage<'b>, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::root_with_opts::<HttpMessage<'b>>(opts, buf)
-}
-#[inline]
-/// Verifies, with the given verifier options, that a buffer of
-/// bytes contains a size prefixed `HttpMessage` and returns
-/// it. Note that verification is still experimental and may not
-/// catch every error, or be maximally performant. For the
-/// previous, unchecked, behavior use
-/// `root_as_http_message_unchecked`.
-pub fn size_prefixed_root_as_http_message_with_opts<'b, 'o>(
-  opts: &'o flatbuffers::VerifierOptions,
-  buf: &'b [u8],
-) -> Result<HttpMessage<'b>, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::size_prefixed_root_with_opts::<HttpMessage<'b>>(opts, buf)
-}
-#[inline]
-/// Assumes, without verification, that a buffer of bytes contains a HttpMessage and returns it.
-/// # Safety
-/// Callers must trust the given bytes do indeed contain a valid `HttpMessage`.
-pub unsafe fn root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage {
-  flatbuffers::root_unchecked::<HttpMessage>(buf)
-}
-#[inline]
-/// Assumes, without verification, that a buffer of bytes contains a size prefixed HttpMessage and returns it.
-/// # Safety
-/// Callers must trust the given bytes do indeed contain a valid size prefixed `HttpMessage`.
-pub unsafe fn size_prefixed_root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage {
-  flatbuffers::size_prefixed_root_unchecked::<HttpMessage>(buf)
-}
 #[inline]
 pub fn finish_http_message_buffer<'a, 'b>(
     fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
