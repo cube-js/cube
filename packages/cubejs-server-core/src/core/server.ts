@@ -116,7 +116,7 @@ export class CubejsServerCore {
 
   public logger: LoggerFn;
 
-  private optsHandler: OptsHandler;
+  protected optsHandler: OptsHandler;
 
   protected preAgentLogger: any;
 

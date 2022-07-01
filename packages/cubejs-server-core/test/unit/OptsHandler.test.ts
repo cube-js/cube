@@ -1,22 +1,29 @@
 /* globals describe, jest, beforeEach, test, expect */
 
-import {
-  CreateOptions,
-  LoggerFn,
+import type {
+  DatabaseType,
   DbTypeFn,
+  DbTypeAsyncFn,
+  ExternalDbTypeFn,
   DriverFactoryFn,
   DriverContext,
-  DatabaseType,
-  DriverConfig,
-  OrchestratorOptions,
+  RequestContext,
   ServerCoreInitializedOptions,
 } from '../../src/core/types';
+import type { OptsHandler } from '../../src/core/OptsHandler';
+import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
-
-import { OptsHandler } from '../../src/core/OptsHandler';
 
 class CubejsServerCoreExposed extends CubejsServerCore {
   public options: ServerCoreInitializedOptions;
+
+  public optsHandler: OptsHandler;
+
+  public contextToDbType: DbTypeAsyncFn;
+
+  public contextToExternalDbType: ExternalDbTypeFn;
+
+  public reloadEnvVariables = super.reloadEnvVariables;
 }
 
 let message: string;
@@ -266,7 +273,7 @@ describe('OptsHandler class', () => {
       'Unexpected CreateOptions.dbType result type: <boolean>true'
     );
 
-    // Case 4
+    // Case 5
     await expect(async () => {
       const core = new CubejsServerCoreExposed({
         logger,
@@ -281,7 +288,7 @@ describe('OptsHandler class', () => {
       '["dbType" must be a string, "dbType" must be a Function]'
     );
 
-    // Case 5
+    // Case 6
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
       process.env.NODE_ENV = 'production';
@@ -294,7 +301,7 @@ describe('OptsHandler class', () => {
       'apiSecret is required option(s)'
     );
 
-    // Case 6
+    // Case 7
     expect(() => {
       delete process.env.CUBEJS_DB_TYPE;
       process.env.NODE_ENV = 'production';
@@ -308,109 +315,290 @@ describe('OptsHandler class', () => {
       'Either CUBEJS_DB_TYPE, CreateOptions.dbType or ' +
       'CreateOptions.driverFactory must be specified'
     );
+
+    delete process.env.NODE_ENV;
   });
 
-  // test('must calculate driver max pool', () => {
-  //   expect(
-  //     driverService.getDriverMaxPool(<DriverContext>{})
-  //   ).toBeUndefined();
+  test('must configure/reconfigure contextToDbType/contextToExternalDbType', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    // process.env.CUBEJS_EXT_DB_TYPE = 'postgres';
 
-  //   expect(
-  //     driverService.getDriverMaxPool(
-  //       <DriverContext>{},
-  //       {
-  //         queryCacheOptions: {
-  //           queueOptions: () => ({
-  //             concurrency: 1,
-  //           }),
-  //         },
-  //         preAggregationsOptions: {
-  //           queueOptions: () => ({
-  //             concurrency: 2,
-  //           }),
-  //         },
-  //       },
-  //     )
-  //   ).toEqual(6);
+    const core = new CubejsServerCoreExposed({
+      logger,
+      dbType: undefined,
+      driverFactory: undefined,
+    });
 
-  //   expect(
-  //     driverService.getDriverMaxPool(
-  //       <DriverContext>{},
-  //       {
-  //         queryCacheOptions: {
-  //           queueOptions: () => ({
-  //             concurrency: 3,
-  //           }),
-  //         },
-  //         preAggregationsOptions: {
-  //           queueOptions: () => ({
-  //             concurrency: 4,
-  //           }),
-  //         },
-  //       },
-  //     )
-  //   ).toEqual(14);
-  // });
+    expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
+    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
 
-  // test('must return driver concurrency value if specified', () => {
-  //   driverService.decorateOpts(<CreateOptions>{
-  //     dbType: undefined,
-  //     driverFactory: () => ({
-  //       type: 'postgres',
-  //       options: {},
-  //     }),
-  //   });
-  //   expect(
-  //     driverService.getDriverConcurrency(<DriverContext>{}),
-  //   ).toEqual(2);
+    process.env.CUBEJS_DB_TYPE = 'mysql';
+    process.env.CUBEJS_EXT_DB_TYPE = 'mysql';
 
-  //   driverService.decorateOpts(<CreateOptions>{
-  //     dbType: undefined,
-  //     driverFactory: () => ({
-  //       type: 'cubestore',
-  //       options: {},
-  //     }),
-  //   });
-  //   expect(
-  //     driverService.getDriverConcurrency(<DriverContext>{}),
-  //   ).toBeUndefined();
-  // });
+    core.reloadEnvVariables();
 
-  // test('must resolve driver', async () => {
-  //   // Case 1
-  //   driverService.decorateOpts(<CreateOptions>{
-  //     dbType: undefined,
-  //     driverFactory: () => ({
-  //       type: 'postgres',
-  //       options: {},
-  //     }),
-  //   });
-  //   expect(
-  //     JSON.stringify(await driverService.resolveDriver(<DriverContext>{})),
-  //   ).toEqual(
-  //     JSON.stringify(CubejsServerCore.createDriver('postgres')),
-  //   );
+    expect(await core.contextToDbType({} as DriverContext)).toEqual('mysql');
+    expect(core.contextToExternalDbType({} as DriverContext)).toEqual('mysql');
 
-  //   // Case 2
-  //   driverService.decorateOpts(<CreateOptions>{
-  //     dbType: 'postgres',
-  //     driverFactory: () => CubejsServerCore.createDriver('postgres'),
-  //   });
-  //   expect(
-  //     JSON.stringify(await driverService.resolveDriver(<DriverContext>{})),
-  //   ).toEqual(
-  //     JSON.stringify(CubejsServerCore.createDriver('postgres')),
-  //   );
+    process.env.CUBEJS_DB_TYPE = 'oracle';
+    process.env.CUBEJS_EXT_DB_TYPE = 'oracle';
 
-  //   // Case 3
-  //   driverService.decorateOpts(<CreateOptions>{
-  //     dbType: 'postgres',
-  //     driverFactory: async () => CubejsServerCore.createDriver('postgres'),
-  //   });
-  //   expect(
-  //     JSON.stringify(await driverService.resolveDriver(<DriverContext>{})),
-  //   ).toEqual(
-  //     JSON.stringify(CubejsServerCore.createDriver('postgres')),
-  //   );
-  // });
+    core.reloadEnvVariables();
+
+    expect(await core.contextToDbType({} as DriverContext)).toEqual('oracle');
+    // TODO (buntarb): this is VERY wierd behavior. Is it really expected behavior?
+    expect(core.contextToExternalDbType({} as DriverContext)).toEqual('mysql');
+  });
+
+  test(
+    'must configure queueOptions without orchestratorOptions, ' +
+    'without CUBEJS_CONCURRENCY and without default driver concurrency',
+    async () => {
+      delete process.env.CUBEJS_CONCURRENCY;
+      process.env.CUBEJS_DB_TYPE = 'cubestore';
+
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: {},
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+    }
+  );
+
+  test(
+    'must configure queueOptions with empty orchestratorOptions object, ' +
+    'without CUBEJS_CONCURRENCY and without default driver concurrency',
+    async () => {
+      delete process.env.CUBEJS_CONCURRENCY;
+      process.env.CUBEJS_DB_TYPE = 'cubestore';
+
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: {},
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+    }
+  );
+
+  test(
+    'must configure queueOptions with empty orchestratorOptions function, ' +
+    'without CUBEJS_CONCURRENCY and without default driver concurrency',
+    async () => {
+      delete process.env.CUBEJS_CONCURRENCY;
+      process.env.CUBEJS_DB_TYPE = 'cubestore';
+
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({}),
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+    }
+  );
+
+  test(
+    'must configure queueOptions with empty orchestratorOptions function, ' +
+    'without CUBEJS_CONCURRENCY and with default driver concurrency',
+    async () => {
+      delete process.env.CUBEJS_CONCURRENCY;
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({}),
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: lookupDriverClass(process.env.CUBEJS_DB_TYPE).getDefaultConcurrency(),
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: lookupDriverClass(process.env.CUBEJS_DB_TYPE).getDefaultConcurrency(),
+      });
+    }
+  );
+
+  test(
+    'must configure queueOptions with empty orchestratorOptions function, ' +
+    'with CUBEJS_CONCURRENCY and with default driver concurrency',
+    async () => {
+      process.env.CUBEJS_CONCURRENCY = '10';
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({}),
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: parseInt(process.env.CUBEJS_CONCURRENCY, 10),
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: parseInt(process.env.CUBEJS_CONCURRENCY, 10),
+      });
+
+      delete process.env.CUBEJS_CONCURRENCY;
+    }
+  );
+
+  test(
+    'must configure queueOptions with conficured orchestratorOptions function, ' +
+    'with CUBEJS_CONCURRENCY and with default driver concurrency',
+    async () => {
+      process.env.CUBEJS_CONCURRENCY = '10';
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const concurrency = 15;
+      const core = new CubejsServerCoreExposed({
+        logger,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({
+          queryCacheOptions: {
+            queueOptions: {
+              concurrency,
+            },
+          },
+          preAggregationsOptions: {
+            queueOptions: () => ({
+              concurrency,
+            }),
+          },
+        }),
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency,
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency,
+      });
+
+      delete process.env.CUBEJS_CONCURRENCY;
+    }
+  );
+
+  test('must configure driver pool', async () => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+
+    const concurrency1 = 15;
+    const concurrency2 = 25;
+    let core;
+    let opts;
+    let driver;
+
+    // Case 1
+    core = new CubejsServerCoreExposed({
+      logger,
+      dbType: undefined,
+      driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+      orchestratorOptions: () => ({
+        queryCacheOptions: {
+          queueOptions: {
+            concurrency: concurrency1,
+          },
+        },
+        preAggregationsOptions: {
+          queueOptions: () => ({
+            concurrency: concurrency2,
+          }),
+        },
+      }),
+    });
+    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    driver = <any>(await core.resolveDriver(<DriverContext>{}, opts));
+    
+    expect(driver.pool.options.max).toEqual(2 * (concurrency1 + concurrency2));
+
+    // Case 2
+    core = new CubejsServerCoreExposed({
+      logger,
+      dbType: undefined,
+      driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+      orchestratorOptions: () => ({
+        queryCacheOptions: {
+          queueOptions: {
+            concurrency: concurrency1,
+          },
+        },
+        preAggregationsOptions: {
+          queueOptions: () => ({
+            concurrency: concurrency2,
+          }),
+        },
+      }),
+    });
+    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    driver = <any>(await core.resolveDriver(<DriverContext>{}));
+    
+    expect(driver.pool.options.max).toEqual(8);
+  });
 });
