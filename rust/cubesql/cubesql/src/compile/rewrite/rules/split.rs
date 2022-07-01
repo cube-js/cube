@@ -786,67 +786,67 @@ impl SplitRules {
                     _ => continue,
                 };
 
-                let mut inner_and_outer_alias: Option<(String, String)> = None;
-
                 for cube in
                     var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
                 {
-                    if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
-                        if let Some(cube) = meta.find_cube_with_name(&cube) {
-                            if column_var.is_none() {
-                                if cube
-                                    .lookup_measure(&MemberRules::default_count_measure_name())
-                                    .is_some()
-                                {
-                                    inner_and_outer_alias =
-                                        Some((name.to_string(), name.to_string()));
-                                    break;
-                                }
+                    let (name, cube) = match (
+                        original_expr_name(egraph, subst[original_expr_var]),
+                        meta.find_cube_with_name(&cube),
+                    ) {
+                        (Some(name), Some(cube)) => (name, cube),
+                        _ => continue,
+                    };
 
-                                continue;
-                            }
-
-                            for column in
-                                var_iter!(egraph[subst[column_var.unwrap()]], ColumnExprColumn)
-                                    .cloned()
-                            {
-                                if cube.lookup_measure(&column.name).is_some() {
-                                    inner_and_outer_alias =
-                                        Some((name.to_string(), name.to_string()));
-                                    break;
-                                } else if cube.lookup_dimension(&column.name).is_some() {
-                                    inner_and_outer_alias =
-                                        original_expr_name(egraph, subst[arg_var])
-                                            .map(|inner| (inner, name.to_string()));
-                                    break;
-                                }
+                    let inner_and_outer_alias: Option<(String, String)> = if column_var.is_none() {
+                        if cube
+                            .lookup_measure(&MemberRules::default_count_measure_name())
+                            .is_some()
+                        {
+                            Some((name.to_string(), name.to_string()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        let mut aliases = None;
+                        for column in
+                            var_iter!(egraph[subst[column_var.unwrap()]], ColumnExprColumn).cloned()
+                        {
+                            if cube.lookup_measure(&column.name).is_some() {
+                                aliases = Some((name.to_string(), name.to_string()));
+                                break;
+                            } else if cube.lookup_dimension(&column.name).is_some() {
+                                aliases = original_expr_name(egraph, subst[arg_var])
+                                    .map(|inner| (inner, name.to_string()));
+                                break;
                             }
                         }
+
+                        aliases
+                    };
+
+                    if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
+                        let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                            ColumnExprColumn(Column::from_name(inner_alias.to_string())),
+                        ));
+                        subst.insert(
+                            alias_expr_var,
+                            egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                        );
+                        subst.insert(
+                            outer_alias_expr_var,
+                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                outer_alias.to_string(),
+                            ))),
+                        );
+                        subst.insert(
+                            output_fun_var,
+                            egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                AggregateFunctionExprFun(output_fun),
+                            )),
+                        );
+
+                        return true;
                     }
-                }
-
-                if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
-                    let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                        ColumnExprColumn(Column::from_name(inner_alias.to_string())),
-                    ));
-                    subst.insert(
-                        alias_expr_var,
-                        egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                    );
-                    subst.insert(
-                        outer_alias_expr_var,
-                        egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                            outer_alias.to_string(),
-                        ))),
-                    );
-                    subst.insert(
-                        output_fun_var,
-                        egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
-                            AggregateFunctionExprFun(output_fun),
-                        )),
-                    );
-
-                    return true;
                 }
             }
 
