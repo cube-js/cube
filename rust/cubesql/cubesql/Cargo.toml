@@ -60,6 +60,7 @@ mysql_async = "0.29"
 portpicker = "0.1.1"
 tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
+pg_interval = "0.4.1"
 
 [[test]]
 name = "e2e"

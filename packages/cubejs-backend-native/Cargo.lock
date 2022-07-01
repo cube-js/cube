@@ -1936,6 +1936,7 @@ dependencies = [
  "async-trait",
  "byteorder",
  "bytes 0.5.6",
+ "chrono",
  "log",
  "thiserror",
  "tokio",

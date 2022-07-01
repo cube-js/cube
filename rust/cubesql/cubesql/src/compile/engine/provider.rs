@@ -495,7 +495,14 @@ impl TableProvider for CubeTableProvider {
                     Field::new(
                         c.get_name(),
                         match c.get_column_type() {
-                            ColumnType::Date => DataType::Date32,
+                            ColumnType::Date(large) => {
+                                if large {
+                                    DataType::Date64
+                                } else {
+                                    DataType::Date32
+                                }
+                            }
+                            ColumnType::Interval(unit) => DataType::Interval(unit),
                             ColumnType::String => DataType::Utf8,
                             ColumnType::VarStr => DataType::Utf8,
                             ColumnType::Boolean => DataType::Boolean,

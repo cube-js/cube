@@ -791,6 +791,7 @@ dependencies = [
  "nanoid",
  "paste",
  "pg-srv",
+ "pg_interval",
  "portpicker",
  "postgres-types",
  "pretty_assertions",
@@ -2519,6 +2520,17 @@ dependencies = [
  "log",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "pg_interval"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47354dbd658c57a5ee1cc97a79937345170234d4c817768de80ea6d2e9f5b98a"
+dependencies = [
+ "bytes 1.1.0",
+ "chrono",
+ "postgres-types",
 ]
 
 [[package]]
