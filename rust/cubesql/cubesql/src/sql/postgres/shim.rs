@@ -466,8 +466,7 @@ impl AsyncPostgresShim {
             // Reports whether PostgreSQL was built with support for 64-bit-integer dates and times.
             protocol::ParameterStatus::new("integer_datetimes".to_string(), "on".to_string()),
             protocol::ParameterStatus::new("TimeZone".to_string(), "Etc/UTC".to_string()),
-            // TODO: Right now we dont support intervals, but it's an important thing
-            // protocol::ParameterStatus::new("IntervalStyle".to_string(), "postgres".to_string()),
+            protocol::ParameterStatus::new("IntervalStyle".to_string(), "postgres".to_string()),
         ];
 
         self.write_multi(params).await?;

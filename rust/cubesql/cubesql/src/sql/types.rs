@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use datafusion::arrow::datatypes::{DataType, Field};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit};
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
@@ -15,7 +15,10 @@ pub enum ColumnType {
     Int32,
     Int64,
     Blob,
-    Date,
+    // true = Date32
+    // false = Date64
+    Date(bool),
+    Interval(IntervalUnit),
     Timestamp,
     Decimal(usize, usize),
     List(Box<Field>),
@@ -42,7 +45,8 @@ impl ColumnType {
             ColumnType::Int8 => PgTypeId::INT2,
             ColumnType::Int32 => PgTypeId::INT4,
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
-            ColumnType::Date => PgTypeId::DATE,
+            ColumnType::Interval(_) => PgTypeId::INTERVAL,
+            ColumnType::Date(_) => PgTypeId::DATE,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
             ColumnType::Double => PgTypeId::NUMERIC,
             ColumnType::Decimal(_, _) => PgTypeId::NUMERIC,
