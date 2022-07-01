@@ -9474,4 +9474,52 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[test]
+    fn superset_timeout_reached() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT \"KibanaSampleDataEcommerce\".\"count\" AS \"count\",\
+             \"KibanaSampleDataEcommerce\".\"order_date\" AS \"order_date\", \
+             \"KibanaSampleDataEcommerce\".\"is_male\" AS \"is_male\",\
+             \"KibanaSampleDataEcommerce\".\"is_female\" AS \"is_female\",\
+             \"KibanaSampleDataEcommerce\".\"maxPrice\" AS \"maxPrice\",\
+             \"KibanaSampleDataEcommerce\".\"minPrice\" AS \"minPrice\",\
+             \"KibanaSampleDataEcommerce\".\"avgPrice\" AS \"avgPrice\"\
+             FROM public.\"KibanaSampleDataEcommerce\" WHERE \"order_date\" >= str_to_date('2021-06-30 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US') AND \"order_date\" < str_to_date('2022-06-30 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US') AND \"is_male\" = true ORDER BY \"order_date\" DESC LIMIT 10000
+            ".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                ]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec!["KibanaSampleDataEcommerce.is_male".to_string()]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2021-06-30T00:00:00.000Z".to_string(),
+                        "2022-06-29T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(10000),
+                offset: None,
+                filters: None
+            }
+        )
+    }
 }
