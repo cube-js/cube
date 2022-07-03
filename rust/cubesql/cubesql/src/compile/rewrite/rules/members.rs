@@ -9,20 +9,21 @@ use crate::{
             column_name_to_member_vec, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit,
-            list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr, measure_expr,
-            member_pushdown_replacer, member_replacer, original_expr_name, projection,
-            projection_expr, projection_expr_empty_tail, referenced_columns, rewrite,
+            list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+            literal_member, measure_expr, member_pushdown_replacer, member_replacer,
+            original_expr_name, projection, projection_expr, projection_expr_empty_tail,
+            referenced_columns, rewrite,
             rewriter::RewriteRules,
             rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanAliases,
             CubeScanLimit, CubeScanTableName, DimensionName, LimitN, LiteralExprValue,
-            LogicalPlanLanguage, MeasureName, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerTableName, MemberPushdownReplacerTargetTableName,
-            ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            WithColumnRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
+            MemberErrorPriority, MemberPushdownReplacerTableName,
+            MemberPushdownReplacerTargetTableName, ProjectionAlias, SegmentName,
+            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt},
@@ -152,6 +153,24 @@ impl RewriteRules for MemberRules {
                 member_replacer(column_expr("?column"), "?source_table_name"),
                 "?member".to_string(),
                 self.transform_projection_member("?source_table_name", "?column", None, "?member"),
+            ),
+            transforming_rewrite(
+                "literal-member",
+                member_replacer(literal_expr("?value"), "?source_table_name"),
+                literal_member("?literal_member_value", literal_expr("?value")),
+                self.transform_literal_member("?value", "?literal_member_value"),
+            ),
+            transforming_rewrite(
+                "literal-member-alias",
+                member_replacer(
+                    alias_expr(literal_expr("?value"), "?alias"),
+                    "?source_table_name",
+                ),
+                literal_member(
+                    "?literal_member_value",
+                    alias_expr(literal_expr("?value"), "?alias"),
+                ),
+                self.transform_literal_member("?value", "?literal_member_value"),
             ),
             transforming_chain_rewrite(
                 "date-trunc",
@@ -597,6 +616,9 @@ impl MemberRules {
         }));
         rules.extend(member_column_pushdown("time-dimension", |column| {
             time_dimension_expr("?name", "?granularity", "?date_range", column)
+        }));
+        rules.extend(member_column_pushdown("literal", |column| {
+            literal_member("?value", column)
         }));
 
         fn list_concat_terminal(
@@ -1065,6 +1087,25 @@ impl MemberRules {
                     subst.insert(member_error_var, member_error);
                     return true;
                 }
+            }
+            false
+        }
+    }
+
+    fn transform_literal_member(
+        &self,
+        literal_value_var: &'static str,
+        literal_member_value_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_value_var = var!(literal_value_var);
+        let literal_member_value_var = var!(literal_member_value_var);
+        move |egraph, subst| {
+            for value in var_iter!(egraph[subst[literal_value_var]], LiteralExprValue).cloned() {
+                let literal_member_value = egraph.add(LogicalPlanLanguage::LiteralMemberValue(
+                    LiteralMemberValue(value),
+                ));
+                subst.insert(literal_member_value_var, literal_member_value);
+                return true;
             }
             false
         }

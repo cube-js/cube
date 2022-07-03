@@ -72,6 +72,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         let cube_members = match enode {
             LogicalPlanLanguage::Measure(_) => 1,
             LogicalPlanLanguage::Dimension(_) => 1,
+            LogicalPlanLanguage::LiteralMember(_) => 1,
             LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(_))) => 1,
             LogicalPlanLanguage::MemberError(_) => 1,
             _ => 0,

@@ -6,3 +6,4 @@ upstream
 dist
 node_modules
 .vscode
+/cubesql/egraph-debug

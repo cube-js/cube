@@ -245,7 +245,7 @@ impl Portal {
         };
 
         // TODO: Split doesn't split batches, it copy the part, lets dont convert whole batch to dataframe
-        let frame = batch_to_dataframe(&vec![batch_for_write])?;
+        let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
         self.write_dataframe_to_writer(writer, frame, rows_to_read)?;
 
         Ok(unused)

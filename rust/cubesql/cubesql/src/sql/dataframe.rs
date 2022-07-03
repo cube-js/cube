@@ -16,7 +16,7 @@ use datafusion::arrow::{
         ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
         UInt32Array, UInt64Array, UInt8Array,
     },
-    datatypes::{DataType, IntervalUnit, TimeUnit},
+    datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
     temporal_conversions,
 };
@@ -388,21 +388,21 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
-pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
+pub fn batch_to_dataframe(
+    schema: &Schema,
+    batches: &Vec<RecordBatch>,
+) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
+    for (_i, field) in schema.fields().iter().enumerate() {
+        cols.push(Column::new(
+            field.name().clone(),
+            arrow_to_column_type(field.data_type().clone())?,
+            ColumnFlags::empty(),
+        ));
+    }
 
     for batch in batches.iter() {
-        if cols.is_empty() {
-            let schema = batch.schema().clone();
-            for (_i, field) in schema.fields().iter().enumerate() {
-                cols.push(Column::new(
-                    field.name().clone(),
-                    arrow_to_column_type(field.data_type().clone())?,
-                    ColumnFlags::empty(),
-                ));
-            }
-        }
         if batch.num_rows() == 0 {
             continue;
         }

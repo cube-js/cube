@@ -228,6 +228,10 @@ crate::plan_to_language! {
             name: String,
             expr: Arc<Expr>,
         },
+        LiteralMember {
+            value: ScalarValue,
+            expr: Arc<Expr>,
+        },
         Order {
             member: String,
             asc: bool,
@@ -798,6 +802,10 @@ fn dimension_expr(name: impl Display, expr: impl Display) -> String {
 
 fn segment_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Segment {} {})", name, expr)
+}
+
+fn literal_member(value: impl Display, expr: impl Display) -> String {
+    format!("(LiteralMember {} {})", value, expr)
 }
 
 fn time_dimension_expr(
