@@ -62,8 +62,11 @@ use self::{
 use crate::{
     compile::{
         builder::QueryBuilder,
-        engine::udf::{
-            create_pg_is_other_temp_schema, create_pg_my_temp_schema, create_session_user_udf,
+        engine::{
+            df::scan::MemberField,
+            udf::{
+                create_pg_is_other_temp_schema, create_pg_my_temp_schema, create_session_user_udf,
+            },
         },
         rewrite::converter::LogicalPlanToLanguageConverter,
     },
@@ -1447,13 +1450,6 @@ struct QueryPlanner {
     session_manager: Arc<SessionManager>,
 }
 
-lazy_static! {
-    static ref METABASE_WORKAROUND: regex::Regex = regex::Regex::new(
-        r#"SELECT true AS "_" FROM "public"\."(?P<tblname>.*)" WHERE 1 <> 1 LIMIT 0"#
-    )
-    .unwrap();
-}
-
 impl QueryPlanner {
     pub fn new(
         state: Arc<SessionState>,
@@ -1475,24 +1471,6 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
     ) -> CompilationResult<QueryPlan> {
-        // Metabase
-        if let Some(c) = METABASE_WORKAROUND.captures(&stmt.to_string()) {
-            let tblname = c.name("tblname").unwrap().as_str();
-            if self.meta.find_cube_with_name(tblname).is_some() {
-                return Ok(QueryPlan::MetaTabular(
-                    StatusFlags::empty(),
-                    Box::new(dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "_".to_string(),
-                            ColumnType::Int8,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![],
-                    )),
-                ));
-            }
-        }
-
         // TODO move CUBESQL_REWRITE_ENGINE env to config
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
@@ -1691,7 +1669,7 @@ impl QueryPlanner {
                     schema
                         .fields()
                         .iter()
-                        .map(|f| Some(f.name().to_string()))
+                        .map(|f| MemberField::Member(f.name().to_string()))
                         .collect(),
                     query.request,
                     // @todo Remove after split!
@@ -3986,7 +3964,9 @@ ORDER BY \"COUNT(count)\" DESC"
         );
         assert_eq!(
             &cube_scan.member_fields,
-            &vec![Some("KibanaSampleDataEcommerce.count".to_string())]
+            &vec![MemberField::Member(
+                "KibanaSampleDataEcommerce.count".to_string()
+            )]
         );
     }
 
@@ -5617,7 +5597,7 @@ ORDER BY \"COUNT(count)\" DESC"
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
                 let batches = df.collect().await?;
-                let frame = batch_to_dataframe(&batches)?;
+                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
 
                 return Ok((frame.print(), flags));
             }
@@ -5698,14 +5678,14 @@ ORDER BY \"COUNT(count)\" DESC"
     #[tokio::test]
     async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
         // This query is used by metabase for introspection
-        assert_eq!(
+        insta::assert_snapshot!(
+            "test_information_schema_stats_for_columns",
             execute_query("
             SELECT
                 A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
             FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
             WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
-            ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?,
-            "++\n++\n++"
+            ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -5986,13 +5966,13 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         // Negative test, we dont define this variable
-        assert_eq!(
+        insta::assert_snapshot!(
+            "show_variables_like_aurora",
             execute_query(
                 "show variables like 'aurora_version';".to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            "++\n++\n++"
+            .await?
         );
 
         // All variables
@@ -6134,7 +6114,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_tableau() -> Result<(), CubeError> {
-        assert_eq!(
+        insta::assert_snapshot!(
+            "tableau_table_name_column_name_query",
             execute_query(
                 "SELECT `table_name`, `column_name`
                 FROM `information_schema`.`columns`
@@ -6142,8 +6123,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     .to_string(),
                 DatabaseProtocol::MySQL
             )
-            .await?,
-            "++\n++\n++"
+            .await?
         );
 
         insta::assert_snapshot!(
@@ -9517,6 +9497,30 @@ ORDER BY \"COUNT(count)\" DESC"
                     "desc".to_string(),
                 ]]),
                 limit: Some(10000),
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[test]
+    fn metabase_limit_0() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT true AS \"_\" FROM \"public\".\"KibanaSampleDataEcommerce\" WHERE 1 <> 1 LIMIT 0".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1),
                 offset: None,
                 filters: None
             }
