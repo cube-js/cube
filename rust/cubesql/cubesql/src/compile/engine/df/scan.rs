@@ -188,14 +188,16 @@ macro_rules! build_column {
                 }
             }
             MemberField::Literal(value) => {
-                match (value, &mut builder) {
-                    $($scalar_block)*
-                    (v, _) => {
-                        return Err(DataFusionError::Execution(format!(
-                            "Unable to map value {:?} to {:?}",
-                            v,
-                            $data_type
-                        )));
+                for _ in 0..$response.data.len() {
+                    match (value, &mut builder) {
+                        $($scalar_block)*
+                        (v, _) => {
+                            return Err(DataFusionError::Execution(format!(
+                                "Unable to map value {:?} to {:?}",
+                                v,
+                                $data_type
+                            )));
+                        }
                     }
                 }
             }
@@ -525,6 +527,7 @@ mod tests {
             runtime_env::{RuntimeConfig, RuntimeEnv},
         },
         physical_plan::common,
+        scalar::ScalarValue,
     };
     use std::{collections::HashMap, result::Result};
 
@@ -588,6 +591,11 @@ mod tests {
                 false,
             ),
             Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, false),
+            Field::new(
+                "KibanaSampleDataEcommerce.is_female",
+                DataType::Boolean,
+                false,
+            ),
         ]));
 
         let scan_node = CubeScanExecutionPlan {
@@ -595,7 +603,13 @@ mod tests {
             member_fields: schema
                 .fields()
                 .iter()
-                .map(|f| MemberField::Member(f.name().to_string()))
+                .map(|f| {
+                    if f.name() == "KibanaSampleDataEcommerce.is_female" {
+                        MemberField::Literal(ScalarValue::Boolean(None))
+                    } else {
+                        MemberField::Member(f.name().to_string())
+                    }
+                })
                 .collect(),
             request: V1LoadRequestQuery {
                 measures: Some(vec![
@@ -658,6 +672,7 @@ mod tests {
                         Some(true),
                         Some(false)
                     ])) as ArrayRef,
+                    Arc::new(BooleanArray::from(vec![None, None, None, None, None,])) as ArrayRef,
                 ],
             )
             .unwrap()
