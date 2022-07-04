@@ -9526,4 +9526,32 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[test]
+    fn test_outer_aggr_simple_count() {
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT CAST(TRUNC(EXTRACT(YEAR FROM order_date)) AS INTEGER), Count(1) FROM KibanaSampleDataEcommerce GROUP BY 1
+            ".to_string(), 
+            DatabaseProtocol::PostgreSQL
+        ).as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("year".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
