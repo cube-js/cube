@@ -609,7 +609,10 @@ export class OptsHandler {
           typeof this.initializedOptions.scheduledRefreshTimer === 'boolean' &&
           this.initializedOptions.scheduledRefreshTimer
         ) ||
-        typeof this.initializedOptions.scheduledRefreshTimer === 'number'
+        (
+          typeof this.initializedOptions.scheduledRefreshTimer === 'number' &&
+          this.initializedOptions.scheduledRefreshTimer !== 0
+        )
       )
     );
   }
@@ -632,8 +635,8 @@ export class OptsHandler {
   }
 
   /**
-   * Decorate `OrchestratorOptions` with `queueOptions` property which include
-   * concurrency calculation logic.
+   * Returns `OrchestratorInitedOptions` based on provided `OrchestratorOptions`
+   * and request context.
    */
   public getOrchestratorInitializedOptions(
     context: RequestContext,
@@ -642,8 +645,8 @@ export class OptsHandler {
     const clone = cloneDeep(orchestratorOptions);
 
     // rollup only mode (querying pre-aggs only)
-    clone.rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
-      ? orchestratorOptions.rollupOnlyMode
+    clone.rollupOnlyMode = clone.rollupOnlyMode !== undefined
+      ? clone.rollupOnlyMode
       : getEnv('rollupOnlyMode');
 
     // query queue options
@@ -661,9 +664,12 @@ export class OptsHandler {
     );
 
     // pre-aggs external refresh flag (force to run pre-aggs build flow first if
-    // pre-agg is not exists/updated at the query moment).
+    // pre-agg is not exists/updated at the query moment). Initially the default
+    // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
     clone.preAggregationsOptions.externalRefresh =
-      clone.rollupOnlyMode && !this.initializedOptions.scheduledRefreshTimer;
+      clone.preAggregationsOptions.externalRefresh !== undefined
+        ? clone.preAggregationsOptions.externalRefresh
+        : !this.configuredAsPreAggsBuilder();
 
     return clone;
   }

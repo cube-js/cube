@@ -506,8 +506,7 @@ describe('index.test', () => {
 
   expectRefreshTimerOption(undefined, false);
   expectRefreshTimerOption(false, false);
-  // TODO (buntarb): previosly 0 was converted to 30000.
-  expectRefreshTimerOption(0, 0);
+  expectRefreshTimerOption(0, false);
   expectRefreshTimerOption(1, 1000);
   expectRefreshTimerOption(10, 10000);
   expectRefreshTimerOption(true, 30000);
@@ -589,7 +588,8 @@ describe('index.test', () => {
   });
 
   testRefreshWorkerAndRollupModes({ setRefreshWorker: false }, true, (options) => {
-    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    // TODO (buntarb): check breaking changes.
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
     expect(options.rollupOnlyMode).toEqual(true);
   });
 
@@ -611,7 +611,8 @@ describe('index.test', () => {
   // Old env, but anyway we should handle it
   testRefreshWorkerAndRollupModes({ setScheduledRefreshTimer: false }, true, (options) => {
     expect(options.rollupOnlyMode).toEqual(true);
-    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+    // TODO (buntarb): check breaking changes.
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
   });
 
   // Old env, but anyway we should handle it
@@ -666,7 +667,8 @@ describe('index.test', () => {
     false,
     (options) => {
       expect(options.rollupOnlyMode).toEqual(true);
-      expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
+      // TODO (buntarb): check breaking changes.
+      expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
     }
   );
 
