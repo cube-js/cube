@@ -323,37 +323,6 @@ export class CubejsServerCore {
   }
 
   /**
-   * Determines whether the current instance is a refresh worker or not.
-   * It always returns false in the dev mode.
-   */
-  protected isProdRefreshWorker(): boolean {
-    return !this.options.devServer &&
-      typeof this.detectScheduledRefreshTimer(
-        this.options.scheduledRefreshTimer,
-      ) === 'number';
-  }
-
-  /**
-   * Determines whether the current instance is an api worker or not.
-   * It always returns false in the dev mode.
-   */
-  protected isProdApiWorker(): boolean {
-    return !this.options.devServer && !this.isProdRefreshWorker();
-  }
-
-  /**
-   * Determines whether the current instance should run the pre-aggregations
-   * build scheduler or not.
-   */
-  public isPreAggsBuilder(): boolean {
-    return (
-      this.options.devServer ||
-      this.isProdRefreshWorker() ||
-      this.isProdApiWorker() && getEnv('preAggregationsBuilder')
-    );
-  }
-
-  /**
    * Determines whether current instance is ready to process queries.
    */
   protected isReadyForQueryProcessing(): boolean {
@@ -368,11 +337,8 @@ export class CubejsServerCore {
     if (this.scheduledRefreshTimerInterval) {
       return [true, null];
     }
-
-    const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      this.options.scheduledRefreshTimer,
-    );
-    if (scheduledRefreshTimer) {
+    if (this.optsHandler.configuredForScheduledRefresh()) {
+      const scheduledRefreshTimer = this.optsHandler.getScheduledRefreshInterval();
       this.scheduledRefreshTimerInterval = createCancelableInterval(
         () => this.handleScheduledRefreshInterval({}),
         {
@@ -390,18 +356,6 @@ export class CubejsServerCore {
     }
 
     return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
-  }
-
-  protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {
-    if (scheduledRefreshTimer && (typeof scheduledRefreshTimer === 'number')) {
-      return parseInt(<any>scheduledRefreshTimer, 10) * 1000;
-    }
-
-    if (scheduledRefreshTimer) {
-      return 30000;
-    }
-
-    return false;
   }
 
   protected initAgent() {

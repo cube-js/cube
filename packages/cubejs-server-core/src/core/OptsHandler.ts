@@ -529,7 +529,7 @@ export class OptsHandler {
    * Determines whether current instance should be bootstraped in the
    * dev mode or not.
    */
-  public configuredAsDevServer(): boolean {
+  private configuredAsDevServer(): boolean {
     return (
       this.createOptions.devServer ||
       process.env.NODE_ENV !== 'production' ||
@@ -538,8 +538,48 @@ export class OptsHandler {
   }
 
   /**
-   * Determines whether current configuration is sutisfied system to process
-   * queries.
+   * Determines whether the current instance is configured as a refresh worker
+   * or not. It always returns false in the dev mode.
+   */
+  private configuredAsRefreshWorker(): boolean {
+    return (
+      !this.initializedOptions.devServer &&
+      this.configuredForScheduledRefresh()
+    );
+  }
+
+  /**
+   * Determines whether the current instance is configured as an api worker or
+   * not. It always returns false in the dev mode.
+   */
+  private configuredAsApiWorker(): boolean {
+    return (
+      !this.initializedOptions.devServer &&
+      !this.configuredAsRefreshWorker()
+    );
+  }
+
+  /**
+   * Determines whether the current instance is configured as pre-aggs builder
+   * or not.
+   */
+  private configuredAsPreAggsBuilder(): boolean {
+    return (
+      this.initializedOptions.devServer ||
+      this.configuredAsRefreshWorker() ||
+      this.configuredAsApiWorker() && getEnv('preAggregationsBuilder')
+    );
+  }
+
+  /**
+   * Returns server core initialized options object.
+   */
+  public getCoreInitializedOptions(): ServerCoreInitializedOptions {
+    return this.initializedOptions;
+  }
+
+  /**
+   * Determines whether the current configuration is set to process queries.
    */
   public configuredForQueryProcessing(): boolean {
     const hasDbCredentials =
@@ -558,10 +598,37 @@ export class OptsHandler {
   }
 
   /**
-   * Returns server core initialized options object.
+   * Determines whether the current configuration is set for running scheduled
+   * refresh intervals or not.
    */
-  public getCoreInitializedOptions(): ServerCoreInitializedOptions {
-    return this.initializedOptions;
+  public configuredForScheduledRefresh(): boolean {
+    return (
+      this.initializedOptions.scheduledRefreshTimer !== undefined &&
+      (
+        (
+          typeof this.initializedOptions.scheduledRefreshTimer === 'boolean' &&
+          this.initializedOptions.scheduledRefreshTimer
+        ) ||
+        typeof this.initializedOptions.scheduledRefreshTimer === 'number'
+      )
+    );
+  }
+
+  /**
+   * Returns scheduled refresh interval value (in ms).
+   */
+  public getScheduledRefreshInterval(): number {
+    if (!this.configuredForScheduledRefresh()) {
+      throw new Error('Instance configured to skip scheduled jobs');
+    } else if (
+      typeof this.initializedOptions.scheduledRefreshTimer === 'number'
+    ) {
+      return parseInt(
+        `${this.initializedOptions.scheduledRefreshTimer}`, 10
+      ) * 1000;
+    } else {
+      return 30000;
+    }
   }
 
   /**
@@ -593,8 +660,8 @@ export class OptsHandler {
       clone.preAggregationsOptions.queueOptions,
     );
 
-    // pre-aggs external refresh flag
-    // (force to run pre-aggs build flow if pre-agg is not exists/updated)
+    // pre-aggs external refresh flag (force to run pre-aggs build flow first if
+    // pre-agg is not exists/updated at the query moment).
     clone.preAggregationsOptions.externalRefresh =
       clone.rollupOnlyMode && !this.initializedOptions.scheduledRefreshTimer;
 
