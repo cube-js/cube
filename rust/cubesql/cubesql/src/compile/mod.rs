@@ -10594,107 +10594,96 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
-    fn datastudio_dates() {
-        init_logger();
+    fn datastudio_date_aggregations() {
+        let supported_granularities = vec![
+            // date
+            [
+                "CAST(DATE_TRUNC('SECOND', \"order_date\") AS DATE)",
+                "second",
+            ],
+            // date, time
+            ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
+            // date, hour, minute
+            [
+                "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
+                "minute",
+            ],
+            // month
+            [
+                "EXTRACT(MONTH FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "month",
+            ],
+            // minute
+            [
+                "EXTRACT(MINUTE FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "minute",
+            ],
+            // hour
+            [
+                "EXTRACT(HOUR FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "hour",
+            ],
+            // day of month
+            [
+                "EXTRACT(DAY FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "day",
+            ],
+            // iso week / iso year / day of year
+            ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
+            // month, day
+            [
+                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+                "day",
+            ],
+            // date, hour, minute
+            [
+                "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
+                "minute",
+            ],
+            // date, hour
+            [
+                "DATE_TRUNC('HOUR', DATE_TRUNC('SECOND', \"order_date\"))",
+                "hour",
+            ],
+            // year, month
+            [
+                "CAST(DATE_TRUNC('MONTH', DATE_TRUNC('SECOND', \"order_date\")) AS DATE)",
+                "month",
+            ],
+            // year
+            [
+                "CAST(DATE_TRUNC('YEAR', DATE_TRUNC('SECOND', \"order_date\")) AS DATE)",
+                "year",
+            ],
+        ];
 
-        // date
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CAST(DATE_TRUNC('SECOND', \"order_date\") AS DATE) AS \"qt_u3dj8wr1vc\", COUNT(1) AS \"qt_yxk7rur1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        );
+        for [expr, expected_granularity] in supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT {} AS \"qt_u3dj8wr1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
+                    expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .as_logical_plan();
 
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("second".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-            }
-        );
-
-        // date, time
-        let query_plan = convert_select_to_query_plan(
-            "SELECT DATE_TRUNC('SECOND', \"order_date\") AS \"qt_u3dj8wr1vc\", COUNT(1) AS \"qt_yxk7rur1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("second".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-            }
-        );
-
-        // date, hour, minute
-        let query_plan = convert_select_to_query_plan(
-            "SELECT DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\")) AS \"qt_u3dj8wr1vc\", COUNT(1) AS \"qt_yxk7rur1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("minute".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-            }
-        );
-
-        // ISO week
-        let query_plan = convert_select_to_query_plan(
-            "SELECT DATE_TRUNC('SECOND', \"order_date\") AS \"__f0\" FROM KibanaSampleDataEcommerce".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("second".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-            }
-        );
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
     }
 }
