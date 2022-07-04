@@ -11,9 +11,17 @@ import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
   storeTimezone?: string;
+  maxPoolSize?: number;
 }
 
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly config: MongoBIDriverConfiguration;
 
   protected readonly pool: Pool<Connection>;
@@ -74,7 +82,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       }
     }, {
       min: 0,
-      max: 8,
+      max: this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

@@ -31,6 +31,13 @@ export interface RedshiftDriverConfiguration extends PostgresDriverConfiguration
 }
 
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   public constructor(options: RedshiftDriverConfiguration = {}) {
     super(options);
   }

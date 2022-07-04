@@ -13,6 +13,13 @@ const MSSqlToGenericType = {
 }
 
 class MSSqlDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
     this.config = {
@@ -29,7 +36,7 @@ class MSSqlDriver extends BaseDriver {
         useUTC: false
       },
       pool: {
-        max: 8,
+        max: config.maxPoolSize || 8,
         min: 0,
         evictionRunIntervalMillis: 10000,
         softIdleTimeoutMillis: 30000,

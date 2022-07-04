@@ -16,8 +16,8 @@ import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
-import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import { ExternalDbTypeFn } from './types';
+import { CubejsServerCore } from './server';
+import { ExternalDbTypeFn, ServerCoreInitializedOptions } from './types';
 import DriverDependencies from './DriverDependencies';
 
 const repo = {

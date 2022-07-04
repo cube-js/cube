@@ -24,6 +24,7 @@ import { downloadJDBCDriver } from './installer';
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
+    maxPoolSize?: number,
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
@@ -93,6 +94,13 @@ export class DatabricksDriver extends JDBCDriver {
 
   public static dialectClass() {
     return DatabricksQuery;
+  }
+
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
   }
 
   public constructor(
