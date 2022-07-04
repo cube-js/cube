@@ -346,7 +346,8 @@ describe('OptsHandler class', () => {
     core.reloadEnvVariables();
 
     expect(await core.contextToDbType({} as DriverContext)).toEqual('oracle');
-    // TODO (buntarb): this is VERY wierd behavior. Is it really expected behavior?
+    // TODO (buntarb): this is wierd behavior. We need to consider whether we want
+    // to keep it as is, or change.
     expect(core.contextToExternalDbType({} as DriverContext)).toEqual('mysql');
   });
 

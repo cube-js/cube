@@ -86,8 +86,9 @@ export class OptsHandler {
         'Cube.js `CreateOptions.dbType` Property Deprecation',
         {
           warning: (
-            'CreateOptions.dbType property is now deprecated, please migrate: ' +
-            'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType'
+            // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType
+            // link once it will be created.
+            'CreateOptions.dbType property is now deprecated, please migrate.'
           ),
         },
       );
@@ -109,8 +110,9 @@ export class OptsHandler {
         'Cube.js CreateOptions.driverFactory Property Deprecation',
         {
           warning: (
-            'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate: ' +
-            'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory'
+            // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory
+            // link once it will be created.
+            'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate.'
           ),
         },
       );
@@ -323,11 +325,11 @@ export class OptsHandler {
 
     if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
       if (!definedExtDBVariables.length) {
-        // TODO (buntarb): why can't we import this in a regular way?
-        
-        // Old note: requireFromPackage was used here. Removed as it wasn't
-        // necessary check and conflicts with local E2E test running.
-
+        // There is no @cubejs-backend/cubestore-driver dependency in the core
+        // package. At the same time, @cubejs-backend/cubestore-driver is already
+        // exist at the moment, when the core server instance is up. That is the
+        // reason why we inject it in this way.
+        //
         // eslint-disable-next-line global-require,import/no-extraneous-dependencies
         const cubeStorePackage = require('@cubejs-backend/cubestore-driver');
         if (cubeStorePackage.isCubeStoreSupported()) {
