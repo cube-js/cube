@@ -157,15 +157,15 @@ export class OrchestratorApi {
     }
   }
 
+  public async testOrchestratorConnections() {
+    return this.orchestrator.testConnections();
+  }
+
   public async testConnection() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
       this.testDriverConnection(this.options.externalDriverFactory)
     ]);
-  }
-
-  public async testOrchestratorConnections() {
-    return this.orchestrator.testConnections();
   }
 
   public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {

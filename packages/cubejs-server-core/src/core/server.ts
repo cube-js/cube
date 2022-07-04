@@ -142,6 +142,9 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
+  /**
+   * Class constructor.
+   */
   public constructor(
     opts: CreateOptions = {},
     protected readonly systemOptions?: SystemOptions,
@@ -190,9 +193,7 @@ export class CubejsServerCore {
       );
     }
 
-    if (this.isPreAggsBuilder()) {
-      this.startScheduledRefreshTimer();
-    }
+    this.startScheduledRefreshTimer();
 
     this.event = async (name, props) => {
       if (!this.options.telemetry) {
@@ -307,6 +308,21 @@ export class CubejsServerCore {
   }
 
   /**
+   * Reload global variables and updates drivers according to new values.
+   *
+   * Note: currently there is no way to change CubejsServerCore.options,
+   * as so, we are not refreshing CubejsServerCore.options.dbType and
+   * CubejsServerCore.options.driverFactory here. If this will be changed,
+   * we will need to do this in order to update driver.
+   */
+  protected reloadEnvVariables() {
+    this.driver = null;
+    this.options.externalDbType = this.options.externalDbType ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
+  }
+
+  /**
    * Determines whether the current instance is a refresh worker or not.
    * It always returns false in the dev mode.
    */
@@ -333,7 +349,7 @@ export class CubejsServerCore {
     return (
       this.options.devServer ||
       this.isProdRefreshWorker() ||
-      this.isProdApiWorker() && getEnv('buildPreAggregations')
+      this.isProdApiWorker() && getEnv('preAggregationsBuilder')
     );
   }
 
@@ -374,21 +390,6 @@ export class CubejsServerCore {
     }
 
     return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
-  }
-
-  /**
-   * Reload global variables and updates drivers according to new values.
-   *
-   * Note: currently there is no way to change CubejsServerCore.options,
-   * as so, we are not refreshing CubejsServerCore.options.dbType and
-   * CubejsServerCore.options.driverFactory here. If this will be changed,
-   * we will need to do this in order to update driver.
-   */
-  protected reloadEnvVariables() {
-    this.driver = null;
-    this.options.externalDbType = this.options.externalDbType ||
-      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
-    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
   protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {
@@ -556,14 +557,6 @@ export class CubejsServerCore {
         this.orchestratorOptions(context) || {},
       );
 
-    const rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
-      ? orchestratorOptions.rollupOnlyMode
-      : getEnv('rollupOnlyMode');
-
-    // External refresh is enabled for rollupOnlyMode, but it's disabled
-    // when it's both refreshWorkerMode & rollupOnlyMode
-    const externalRefresh: boolean = rollupOnlyMode && !this.options.scheduledRefreshTimer;
-
     const orchestratorApi = this.createOrchestratorApi(
       /**
        * Driver factory function `DriverFactoryByDataSource`.
@@ -651,14 +644,7 @@ export class CubejsServerCore {
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        // placeholder, user is able to override it from cube.js
-        rollupOnlyMode,
         ...orchestratorOptions,
-        preAggregationsOptions: {
-          // placeholder, user is able to override it from cube.js
-          externalRefresh,
-          ...orchestratorOptions.preAggregationsOptions,
-        }
       }
     );
 

@@ -341,9 +341,7 @@ export class OptsHandler {
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
-    const devServer =
-      process.env.NODE_ENV !== 'production' ||
-      getEnv('devMode');
+    const devServer = this.configuredAsDevServer();
 
     let externalDriverFactory =
       externalDbType &&
@@ -432,12 +430,12 @@ export class OptsHandler {
     }
 
     const options: ServerCoreInitializedOptions = {
-      externalDbType,
       devServer,
       dialectFactory: (ctx) => (
         lookupDriverClass(ctx.dbType).dialectClass &&
         lookupDriverClass(ctx.dbType).dialectClass()
       ),
+      externalDbType,
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
@@ -575,18 +573,31 @@ export class OptsHandler {
     orchestratorOptions: OrchestratorOptions,
   ): OrchestratorInitedOptions {
     const clone = cloneDeep(orchestratorOptions);
-    // query queue
+
+    // rollup only mode (querying pre-aggs only)
+    clone.rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
+      ? orchestratorOptions.rollupOnlyMode
+      : getEnv('rollupOnlyMode');
+
+    // query queue options
     clone.queryCacheOptions = clone.queryCacheOptions || {};
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,
     );
-    // pre-aggs queue
+
+    // pre-aggs queue options
     clone.preAggregationsOptions = clone.preAggregationsOptions || {};
     clone.preAggregationsOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.preAggregationsOptions.queueOptions,
     );
+
+    // pre-aggs external refresh flag
+    // (force to run pre-aggs build flow if pre-agg is not exists/updated)
+    clone.preAggregationsOptions.externalRefresh =
+      clone.rollupOnlyMode && !this.initializedOptions.scheduledRefreshTimer;
+
     return clone;
   }
 }
