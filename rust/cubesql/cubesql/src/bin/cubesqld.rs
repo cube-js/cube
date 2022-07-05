@@ -29,10 +29,7 @@ fn main() {
         .with_module_level("datafusion", Level::Warn.to_level_filter())
         .with_module_level("pg_srv", log_level.to_level_filter());
 
-    #[cfg(debug_assertions)]
-    {
-        console_subscriber::init();
-    }
+    // console_subscriber::init();
 
     ReportingLogger::init(
         Box::new(logger),

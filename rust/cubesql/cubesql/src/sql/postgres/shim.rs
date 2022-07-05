@@ -796,10 +796,11 @@ impl AsyncPostgresShim {
         meta: Arc<MetaContext>,
     ) -> Result<(), ConnectionError> {
         let cancel = self.session.state.begin_query(stmt.to_string());
-        let fut = self.process_simple_query(stmt, meta, cancel.clone());
 
         tokio::select! {
             _ = cancel.cancelled() => {
+                self.session.state.end_query();
+
                 self.write(protocol::ErrorResponse::error(
                     protocol::ErrorCode::QueryCanceled,
                     "canceling statement due to user request".to_string()
@@ -807,10 +808,10 @@ impl AsyncPostgresShim {
 
                 Ok(())
             },
-            _ = fut => {
-                println!("finish");
+            res = self.process_simple_query(stmt, meta, cancel.clone()) => {
+                self.session.state.end_query();
 
-                Ok(())
+                res
             },
         }
     }
@@ -1119,8 +1120,6 @@ impl AsyncPostgresShim {
 
                 self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
                     .await?;
-
-                self.session.state.end_query();
             }
         };
 
