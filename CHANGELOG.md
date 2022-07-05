@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Bug Fixes
+
+* drivers default concurrency values ([4b7296f](https://github.com/cube-js/cube.js/commit/4b7296f266b49e3d38dce1ff82ce4edd703121bc))
+* **client-react:** useIsMounted hook compatible with React 18 StrictMode ([#4740](https://github.com/cube-js/cube.js/issues/4740)) ([aa7d3a4](https://github.com/cube-js/cube.js/commit/aa7d3a4788d38027f59c77bd567270a98a43b689))
+* **cubesql:** Invalid argument error: all columns in a record batch must have the same length ([895f8cf](https://github.com/cube-js/cube.js/commit/895f8cf301a951907aa4cd3ea190ea1cfeb3be73))
+
+
+### Features
+
+* **cubesql:** Superset ILIKE support for Search all filter options feature ([2532040](https://github.com/cube-js/cube.js/commit/2532040792faa9ed0a151d85cead1c1bd425d3ce))
+* **cubesql:** Support Interval type for pg-wire ([4c8a82c](https://github.com/cube-js/cube.js/commit/4c8a82caf3b64c295bf7606e6a694f6cda50491c))
+* centralized concurrency setting ([#4735](https://github.com/cube-js/cube.js/issues/4735)) ([1c897a1](https://github.com/cube-js/cube.js/commit/1c897a13c62049e23d26009351622b2a93c0a745))
+* **cubesql:** Support for metabase literal queries ([#4843](https://github.com/cube-js/cube.js/issues/4843)) ([6d45d55](https://github.com/cube-js/cube.js/commit/6d45d558e0c58c37c515d07cae367eed5624cb3a))
+* dbt metric should take table alias into account ([#4842](https://github.com/cube-js/cube.js/issues/4842)) Thanks [@bartlomiejolma](https://github.com/bartlomiejolma) ! ([413d8df](https://github.com/cube-js/cube.js/commit/413d8dfb9b3cc6a3fcf28679b82241468dcb07e7))
+
+
+
+
+
 ## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
 
 
