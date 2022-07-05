@@ -13,7 +13,8 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use datafusion::assert_contains;
 use pg_interval::Interval;
 use pg_srv::{PgType, PgTypeId};
-use tokio_postgres::{NoTls, Row, SimpleQueryMessage};
+use tokio::join;
+use tokio_postgres::{error::SqlState, NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
@@ -259,6 +260,21 @@ impl PostgresIntegrationTestSuite {
         }
     }
 
+    async fn test_cancel(&self) -> RunResult<()> {
+        let cancel_token = self.client.cancel_token();
+        let cancel = cancel_token.cancel_query(NoTls);
+        // let cancel = time::sleep(Duration::from_millis(100)).then(|()| cancel);
+
+        let sleep = self.client.batch_execute("SELECT pg_sleep(10)");
+
+        match join!(sleep, cancel) {
+            (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
+            t => panic!("unexpected return: {:?}", t),
+        };
+
+        Ok(())
+    }
+
     async fn test_snapshot_execute_query(
         &self,
         query: String,
@@ -272,7 +288,6 @@ impl PostgresIntegrationTestSuite {
             snapshot_name.unwrap_or(escape_snapshot_name(query)),
             self.print_query_result(res, with_description, true).await
         );
-
         println!("ok");
 
         Ok(())
@@ -604,6 +619,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult<()> {
+        self.test_cancel().await.unwrap();
         self.test_prepare().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;

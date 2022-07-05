@@ -308,6 +308,7 @@ impl Portal {
         }
     }
 
+    #[tracing::instrument]
     pub async fn execute(
         &mut self,
         writer: &mut BatchWriter,

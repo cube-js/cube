@@ -18,8 +18,6 @@ use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolErro
 
 const DEFAULT_CAPACITY: usize = 64;
 
-pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
     pub protocol_version: ProtocolVersion,
@@ -27,28 +25,71 @@ pub struct StartupMessage {
 }
 
 impl StartupMessage {
-    pub async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+    async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
         let major_protocol_version = buffer.read_u16().await?;
         let minor_protocol_version = buffer.read_u16().await?;
         let protocol_version = ProtocolVersion::new(major_protocol_version, minor_protocol_version);
 
         let mut parameters = HashMap::new();
 
-        if major_protocol_version != SSL_REQUEST_PROTOCOL {
-            loop {
-                let name = buffer::read_string(&mut buffer).await?;
-                if name.is_empty() {
-                    break;
-                }
-                let value = buffer::read_string(&mut buffer).await?;
-                parameters.insert(name, value);
+        loop {
+            let name = buffer::read_string(&mut buffer).await?;
+            if name.is_empty() {
+                break;
             }
+            let value = buffer::read_string(&mut buffer).await?;
+            parameters.insert(name, value);
         }
 
         Ok(Self {
             protocol_version,
             parameters,
         })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CancelRequest {
+    pub process_id: u32,
+    pub secret: u32,
+}
+
+impl CancelRequest {
+    async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        Ok(Self {
+            process_id: buffer.read_u32().await?,
+            secret: buffer.read_u32().await?,
+        })
+    }
+}
+
+pub enum InitialMessage {
+    Startup(StartupMessage),
+    CancelRequest(CancelRequest),
+    SslRequest,
+    Gssenc,
+}
+
+// The value is chosen to contain 1234 in the most significant 16 bits, and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same as any protocol version number.)
+pub const VERSION_CANCEL: i32 = 80877102;
+pub const VERSION_SSL: i32 = (1234 << 16) + 5679;
+pub const VERSION_GSSENC: i32 = (1234 << 16) + 5680;
+
+impl InitialMessage {
+    pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, Error> {
+        let version = buffer.read_i32().await?;
+
+        match version {
+            VERSION_CANCEL => Ok(InitialMessage::CancelRequest(
+                CancelRequest::from(buffer).await?,
+            )),
+            VERSION_SSL => Ok(InitialMessage::SslRequest),
+            VERSION_GSSENC => Ok(InitialMessage::Gssenc),
+            _ => {
+                buffer.set_position(0);
+                Ok(InitialMessage::Startup(StartupMessage::from(buffer).await?))
+            }
+        }
     }
 }
 
@@ -236,6 +277,29 @@ impl Serialize for EmptyQuery {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         Some(vec![])
+    }
+}
+
+pub struct BackendKeyData {
+    process_id: u32,
+    secret: u32,
+}
+
+impl BackendKeyData {
+    pub fn new(process_id: u32, secret: u32) -> Self {
+        Self { process_id, secret }
+    }
+}
+
+impl Serialize for BackendKeyData {
+    const CODE: u8 = b'K';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(4 + 4);
+        buffer.put_u32(self.process_id);
+        buffer.put_u32(self.secret);
+
+        Some(buffer)
     }
 }
 
@@ -848,6 +912,8 @@ pub enum ErrorCode {
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
+    // Class 57 - Operator Intervention
+    QueryCanceled,
     // XX - Internal Error
     InternalError,
 }
@@ -868,6 +934,7 @@ impl Display for ErrorCode {
             Self::SyntaxError => "42601",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
+            Self::QueryCanceled => "57014",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)

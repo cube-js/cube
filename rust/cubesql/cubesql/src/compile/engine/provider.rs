@@ -50,7 +50,8 @@ use super::information_schema::postgres::{
     PgCatalogDatabaseProvider, PgCatalogDependProvider, PgCatalogDescriptionProvider,
     PgCatalogEnumProvider, PgCatalogIndexProvider, PgCatalogMatviewsProvider,
     PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogSettingsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -313,6 +314,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_database".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogRolesProvider>() {
             "pg_catalog.pg_roles".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatActivityProvider>() {
+            "pg_catalog.pg_stat_activity".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
@@ -449,6 +452,11 @@ impl DatabaseProtocol {
                 "pg_roles" => {
                     return Some(Arc::new(PgCatalogRolesProvider::new(
                         &context.session_state.user().unwrap_or("test".to_string()),
+                    )))
+                }
+                "pg_stat_activity" => {
+                    return Some(Arc::new(PgCatalogStatActivityProvider::new(
+                        context.sessions.clone(),
                     )))
                 }
                 _ => return None,
