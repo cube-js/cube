@@ -35,7 +35,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 4;
   }
 
   public constructor(options: RedshiftDriverConfiguration = {}) {

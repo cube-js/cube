@@ -21,7 +21,7 @@ export class DruidDriver extends BaseDriver {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 1;
+    return 2;
   }
 
   public constructor(config?: DruidDriverConfiguration) {

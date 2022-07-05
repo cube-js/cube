@@ -53,7 +53,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 5;
   }
 
   protected readonly pool: Pool<any>;
