@@ -9504,6 +9504,37 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[test]
+    fn superset_ilike() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT customer_gender AS customer_gender FROM public.\"KibanaSampleDataEcommerce\" WHERE customer_gender ILIKE '%fem%' GROUP BY customer_gender LIMIT 1000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["fem".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[test]
     fn metabase_limit_0() {
         init_logger();
 

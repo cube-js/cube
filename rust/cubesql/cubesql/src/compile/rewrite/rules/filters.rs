@@ -983,6 +983,7 @@ impl FilterRules {
                                     Operator::Gt => "gt",
                                     Operator::GtEq => "gte",
                                     Operator::Like => "contains",
+                                    Operator::ILike => "contains",
                                     Operator::NotLike => "notContains",
                                     _ => {
                                         continue;
@@ -1003,7 +1004,22 @@ impl FilterRules {
                                 };
 
                                 let value = match literal {
-                                    ScalarValue::Utf8(Some(value)) => value.to_string(),
+                                    ScalarValue::Utf8(Some(value)) => {
+                                        if op == "contains" {
+                                            if value.starts_with("%") && value.ends_with("%") {
+                                                let without_wildcard =
+                                                    value[1..value.len() - 1].to_string();
+                                                if without_wildcard.contains("%") {
+                                                    continue;
+                                                }
+                                                without_wildcard
+                                            } else {
+                                                value.to_string()
+                                            }
+                                        } else {
+                                            value.to_string()
+                                        }
+                                    }
                                     ScalarValue::Int64(Some(value)) => value.to_string(),
                                     ScalarValue::Boolean(Some(value)) => value.to_string(),
                                     ScalarValue::Float64(Some(value)) => value.to_string(),
