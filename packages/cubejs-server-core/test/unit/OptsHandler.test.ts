@@ -1,4 +1,4 @@
-/* globals describe, jest, beforeEach, test, expect */
+/* globals jest, describe, beforeEach, test, expect */
 
 import type {
   DatabaseType,
@@ -27,25 +27,24 @@ class CubejsServerCoreExposed extends CubejsServerCore {
 }
 
 let message: string;
-let parameters: Record<string, any>;
 
-const logger = (msg: string, params: Record<string, any>) => {
+const logger = (msg: string) => {
   message = msg;
-  parameters = params;
 };
 
 describe('OptsHandler class', () => {
   beforeEach(() => {
     message = '';
-    parameters = {};
   });
 
   test.skip(
     'deprecation warning must be printed if dbType was specified -- ' +
     'need to be restored after documentation will be added',
     () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const core = new CubejsServerCore({
         logger,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         dbType: ((context: DriverContext) => 'postgres'),
       });
       expect(message).toEqual('Cube.js `CreateOptions.dbType` Property Deprecation');
@@ -298,6 +297,7 @@ describe('OptsHandler class', () => {
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
       process.env.NODE_ENV = 'production';
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const core = new CubejsServerCoreExposed({
         logger,
         dbType: undefined,
@@ -311,6 +311,7 @@ describe('OptsHandler class', () => {
     expect(() => {
       delete process.env.CUBEJS_DB_TYPE;
       process.env.NODE_ENV = 'production';
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: 'apiSecret',
@@ -325,9 +326,10 @@ describe('OptsHandler class', () => {
     delete process.env.NODE_ENV;
   });
 
-  test('must configure/reconfigure contextToDbType/contextToExternalDbType', async () => {
+  test('must configure/reconfigure contextToDbType', async () => {
+    // TODO (buntarb): find out a way to check contextToExternalDbType reloading
+    // without driver instantiation, which causes the test failing.
     process.env.CUBEJS_DB_TYPE = 'postgres';
-    // process.env.CUBEJS_EXT_DB_TYPE = 'postgres';
 
     const core = new CubejsServerCoreExposed({
       logger,
@@ -339,22 +341,18 @@ describe('OptsHandler class', () => {
     expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
 
     process.env.CUBEJS_DB_TYPE = 'mysql';
-    process.env.CUBEJS_EXT_DB_TYPE = 'mysql';
 
     core.reloadEnvVariables();
 
     expect(await core.contextToDbType({} as DriverContext)).toEqual('mysql');
-    expect(core.contextToExternalDbType({} as DriverContext)).toEqual('mysql');
+    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
 
-    process.env.CUBEJS_DB_TYPE = 'oracle';
-    process.env.CUBEJS_EXT_DB_TYPE = 'oracle';
+    process.env.CUBEJS_DB_TYPE = 'postgres';
 
     core.reloadEnvVariables();
 
-    expect(await core.contextToDbType({} as DriverContext)).toEqual('oracle');
-    // TODO (buntarb): this is wierd behavior. We need to consider whether we want
-    // to keep it as is, or change.
-    expect(core.contextToExternalDbType({} as DriverContext)).toEqual('mysql');
+    expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
+    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
   });
 
   test(
@@ -608,4 +606,251 @@ describe('OptsHandler class', () => {
     
     expect(driver.pool.options.max).toEqual(8);
   });
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to false and test ' +
+    'driver connection for dev server',
+    async () => {
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: true,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+      await expect(async () => {
+        await oapi.testConnection();
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to true and doesn`t ' +
+    'test driver connection for dev server with externalRefresh set to true',
+    async () => {
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: true,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+        orchestratorOptions: () => ({
+          preAggregationsOptions: {
+            externalRefresh: true,
+          },
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
+      expect(async () => {
+        await oapi.testConnection();
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to false and doesn`t ' +
+    'test driver connection for dev server with rollupOnlyMode set to true',
+    async () => {
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: true,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+        orchestratorOptions: () => ({
+          rollupOnlyMode: true,
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(true);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+      expect(async () => {
+        await oapi.testConnection();
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to false and test ' +
+    'driver connection for refresh worker in the production mode',
+    async () => {
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: false,
+        scheduledRefreshTimer: true,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+      await expect(async () => {
+        await oapi.testConnection();
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to false and test ' +
+    'driver connection for api worker in the production mode if ' +
+    'CUBEJS_PRE_AGGREGATIONS_BUILDER is set',
+    async () => {
+      process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: false,
+        scheduledRefreshTimer: false,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+      await expect(async () => {
+        await oapi.testConnection();
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'driver connection for api worker in the production mode if specified in' +
+    'preAggregationsOptions.externalRefresh',
+    async () => {
+      process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: false,
+        scheduledRefreshTimer: false,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+        orchestratorOptions: () => ({
+          preAggregationsOptions: {
+            externalRefresh: true,
+          },
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
+      expect(async () => {
+        await oapi.testConnection();
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
+
+  test(
+    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'driver connection for api worker in the production mode if ' +
+    'CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
+    async () => {
+      process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+      const core = new CubejsServerCoreExposed({
+        logger,
+        apiSecret: '44b87d4309471e5d9d18738450db0e49',
+        devServer: false,
+        scheduledRefreshTimer: false,
+        driverFactory: () => ({
+          type: 'postgres',
+          user: 'user',
+          password: 'password',
+          database: 'database',
+        }),
+      });
+
+      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const opts = oapi.options;
+      const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+      oapi.seenDataSources = ['default'];
+
+      expect(opts.rollupOnlyMode).toBe(false);
+      expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
+      expect(async () => {
+        await oapi.testConnection();
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+
+      testDriverConnectionSpy.mockRestore();
+    }
+  );
 });

@@ -783,6 +783,7 @@ describe('Refresh Scheduler', () => {
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     for (let i = 0; i < 1000; i++) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
           concurrency: 1,
           workerIndices: [0],

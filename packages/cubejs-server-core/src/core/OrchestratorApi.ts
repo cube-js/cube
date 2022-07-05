@@ -163,17 +163,17 @@ export class OrchestratorApi {
 
   public async testConnection() {
     if (
-      !this.options.rollupOnlyMode &&
-      !this.options.preAggregationsOptions.externalRefresh
+      this.options.rollupOnlyMode ||
+      this.options.preAggregationsOptions.externalRefresh
     ) {
       return Promise.all([
-        ...Object.keys(this.seenDataSources).map(
-          ds => this.testDriverConnection(this.driverFactory, ds),
-        ),
         this.testDriverConnection(this.options.externalDriverFactory),
       ]);
     } else {
       return Promise.all([
+        ...Object.keys(this.seenDataSources).map(
+          ds => this.testDriverConnection(this.driverFactory, ds),
+        ),
         this.testDriverConnection(this.options.externalDriverFactory),
       ]);
     }
