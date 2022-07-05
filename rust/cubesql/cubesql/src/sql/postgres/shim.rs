@@ -629,16 +629,35 @@ impl AsyncPostgresShim {
                     self.write(protocol::EmptyQueryResponse::new()).await?;
                 }
                 Some(portal) => {
+                    let cancel = self
+                        .session
+                        .state
+                        .begin_query(format!("portal #{}", execute.portal));
                     let mut writer = BatchWriter::new(portal.get_format());
-                    let completion = portal
-                        .execute(&mut writer, execute.max_rows as usize)
-                        .await?;
 
-                    if writer.has_data() {
-                        buffer::write_direct(&mut self.socket, writer).await?
+                    tokio::select! {
+                        _ = cancel.cancelled() => {
+                            self.session.state.end_query();
+
+                            return Err(protocol::ErrorResponse::query_canceled().into());
+                        },
+                        res = portal.execute(&mut writer, execute.max_rows as usize) => {
+                            self.session.state.end_query();
+
+                            // Unwrap result after ending query
+                            let completion = res?;
+
+                            if cancel.is_cancelled() {
+                                return Err(protocol::ErrorResponse::query_canceled().into());
+                            }
+
+                            if writer.has_data() {
+                                buffer::write_direct(&mut self.socket, writer).await?
+                            }
+
+                            self.write(completion).await?;
+                        },
                     }
-
-                    self.write(completion).await?;
                 }
             }
 
@@ -801,10 +820,9 @@ impl AsyncPostgresShim {
             _ = cancel.cancelled() => {
                 self.session.state.end_query();
 
-                self.write(protocol::ErrorResponse::error(
-                    protocol::ErrorCode::QueryCanceled,
-                    "canceling statement due to user request".to_string()
-                )).await?;
+                // We don't return error, because query can contains multiple statements
+                // then cancel request will cancel only one query
+                self.write(protocol::ErrorResponse::query_canceled()).await?;
 
                 Ok(())
             },

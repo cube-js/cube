@@ -189,6 +189,14 @@ impl ErrorResponse {
             message,
         }
     }
+
+    pub fn query_canceled() -> Self {
+        Self {
+            severity: ErrorSeverity::Error,
+            code: ErrorCode::QueryCanceled,
+            message: "canceling statement due to user request".to_string(),
+        }
+    }
 }
 
 impl Serialize for ErrorResponse {
