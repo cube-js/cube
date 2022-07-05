@@ -833,12 +833,8 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
-                self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
-                    0,
-                    CancellationToken::new(),
-                )
-                .await?;
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
+                    .await?;
             }
             Statement::Rollback { .. } => {
                 if self.end_transaction()? == false {
@@ -982,8 +978,7 @@ impl AsyncPostgresShim {
 
                 let mut portal = Portal::new(plan, cursor.format, false);
 
-                self.write_portal(&mut portal, limit, CancellationToken::new())
-                    .await?;
+                self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, Some(portal));
             }
             Statement::Declare {
@@ -1059,12 +1054,8 @@ impl AsyncPostgresShim {
                 let plan =
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
-                self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
-                    0,
-                    CancellationToken::new(),
-                )
-                .await?;
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
+                    .await?;
             }
             Statement::Discard { object_type } => {
                 self.statements = HashMap::new();
@@ -1076,12 +1067,8 @@ impl AsyncPostgresShim {
                     CommandCompletion::Discard(object_type.to_string()),
                 );
 
-                self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
-                    0,
-                    CancellationToken::new(),
-                )
-                .await?;
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
+                    .await?;
             }
             Statement::Close { cursor } => {
                 let plan = match cursor {
@@ -1123,12 +1110,8 @@ impl AsyncPostgresShim {
                     }
                 }?;
 
-                self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
-                    0,
-                    CancellationToken::new(),
-                )
-                .await?;
+                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
+                    .await?;
             }
             other => {
                 let plan =
