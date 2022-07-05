@@ -12,7 +12,7 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
    * Returns default concurrency value.
    */
   static getDefaultConcurrency() {
-    return 1;
+    return 2;
   }
 
   constructor(config) {

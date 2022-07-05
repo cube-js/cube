@@ -38,7 +38,7 @@ class OracleDriver extends BaseDriver {
    * Returns default concurrency value.
    */
   static getDefaultConcurrency() {
-    return 12;
+    return 2;
   }
 
   constructor(config) {

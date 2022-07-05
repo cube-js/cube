@@ -53,7 +53,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 1;
+    return 2;
   }
 
   protected readonly config: KsqlDriverOptions;

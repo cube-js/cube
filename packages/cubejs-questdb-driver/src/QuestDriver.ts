@@ -38,7 +38,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 1;
+    return 2;
   }
 
   public constructor(
