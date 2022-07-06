@@ -1,0 +1,21 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5729
+expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
+| grantor | grantee | table_catalog | table_schema | table_name                | column_name        | privilege_type | is_grantable |
++---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | count              | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | maxPrice           | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | minPrice           | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | avgPrice           | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | order_date         | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | customer_gender    | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | taxful_total_price | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | has_subscription   | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | is_male            | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | is_female          | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | Logs                      | agentCount         | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | Logs                      | agentCountApprox   | SELECT         | YES          |
++---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+

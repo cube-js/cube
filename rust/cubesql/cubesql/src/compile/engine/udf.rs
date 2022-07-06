@@ -82,6 +82,7 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+// It's the same as current_user UDF, but with another host
 pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
@@ -103,7 +104,7 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -120,7 +121,7 @@ pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> Sca
     });
 
     create_udf(
-        "current_user",
+        name,
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,

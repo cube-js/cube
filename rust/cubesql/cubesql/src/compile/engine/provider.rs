@@ -40,6 +40,8 @@ use super::information_schema::postgres::{
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
     views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
+    InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
+    InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
@@ -273,6 +275,10 @@ impl DatabaseProtocol {
             "information_schema.referential_constraints".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
             "information_schema.table_constraints".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleTableGrantsProvider>() {
+            "information_schema.role_table_grants".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleColumnGrantsProvider>() {
+            "information_schema.role_column_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -398,9 +404,25 @@ impl DatabaseProtocol {
                 "referential_constraints" => {
                     return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()))
                 }
+                "role_table_grants" => {
+                    return Some(Arc::new(PostgresInfoSchemaRoleTableGrantsProvider::new(
+                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.meta.cubes,
+                    )))
+                }
+                "role_column_grants" => {
+                    return Some(Arc::new(PostgresInfoSchemaRoleColumnGrantsProvider::new(
+                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.meta.cubes,
+                    )))
+                }
                 "table_constraints" => {
                     return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()))
                 }
+                "constraint_column_usage" => {
+                    return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
+                }
+                "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
@@ -409,10 +431,6 @@ impl DatabaseProtocol {
                 "testing_blocking" => {
                     return Some(Arc::new(InfoSchemaTestingBlockingProvider::new()))
                 }
-                "constraint_column_usage" => {
-                    return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
-                }
-                "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
                 _ => return None,
             },
             "pg_catalog" => match table.as_str() {
