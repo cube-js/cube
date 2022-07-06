@@ -10,7 +10,7 @@ import createExampleWrapper from "cube-example-wrapper";
 const exampleDescription = {
   title: "Chart.js Metrics Dashboard",
   text: `
-    <p>This live demo shows a dashboard app created with Cube's GraphQL API, Postgres, Chart.js, and react-chartjs-2.</p>
+    <p>This live demo shows a metrics dashboard built with Cube's GraphQL API, PostgreSQL as a database, Chart.js and react-chartjs-2 for data visualization, and Cube.</p>
     <p>
       Follow 
       the <a href="https://cube.dev/blog/graphql-postgres-metrics-dashboard-with-cube">tutorial</a>
