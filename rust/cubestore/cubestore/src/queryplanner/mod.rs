@@ -212,6 +212,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
             TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { .. } | TableReference::Full { .. } => return None,
         };
+
+        if schema == "inline" {
+            return Some(Arc::new(InlineTableProvider::new(self.inline_tables.get(table)?.clone())))
+        }
+
         // Mock table path for hash set access.
         let name = TablePath {
             table: IdRow::new(
@@ -251,11 +256,6 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     schema,
                 })
             });
-        let res = res.or_else(|| if schema == "inline" {
-            Some(Arc::new(InlineTableProvider::new(self.inline_tables.get(table)?.clone())))
-        } else {
-            None
-        });
         res.or_else(|| match (schema, table) {
             ("information_schema", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),

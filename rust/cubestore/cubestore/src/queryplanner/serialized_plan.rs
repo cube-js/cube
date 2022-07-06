@@ -831,6 +831,8 @@ impl SerializedPlan {
                 table_name: table_name.clone(),
                 source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
                     SerializedTableSource::CubeTable(cube_table.clone())
+                } else if let Some(inline_table) = source.as_any().downcast_ref::<InlineTableProvider>() {
+                    SerializedTableSource::InlineTable(inline_table.clone())
                 } else {
                     panic!("Unexpected table source");
                 },

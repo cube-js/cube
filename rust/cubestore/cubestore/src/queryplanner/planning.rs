@@ -284,14 +284,15 @@ impl PlanRewriter for CollectConstraints {
                 source,
                 ..
             } => {
-                let table = source.as_any().downcast_ref::<CubeTableLogical>().unwrap();
-                self.constraints.push(IndexConstraints {
-                    sort_on: c.sort_on.clone(),
-                    table: table.table.clone(),
-                    projection: projection.clone(),
-                    filters: filters.clone(),
-                    aggregates: c.aggregates.clone(),
-                })
+                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
+                    self.constraints.push(IndexConstraints {
+                        sort_on: c.sort_on.clone(),
+                        table: table.table.clone(),
+                        projection: projection.clone(),
+                        filters: filters.clone(),
+                        aggregates: c.aggregates.clone(),
+                    })
+                };
             }
             _ => {}
         }
@@ -458,43 +459,47 @@ impl ChooseIndex<'_> {
     fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
             LogicalPlan::TableScan { source, .. } => {
-                assert!(
-                    self.next_index < self.chosen_indices.len(),
-                    "inconsistent state"
-                );
-                let table = &source
-                    .as_any()
-                    .downcast_ref::<CubeTableLogical>()
-                    .unwrap()
-                    .table;
-                assert_eq!(
-                    table.table.get_id(),
-                    self.chosen_indices[self.next_index]
-                        .table_path
-                        .table
-                        .get_id()
-                );
+                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
+                    assert!(
+                        self.next_index < self.chosen_indices.len(),
+                        "inconsistent state"
+                    );
 
-                let snapshot = self.chosen_indices[self.next_index].clone();
-                self.next_index += 1;
+                    assert_eq!(
+                        table.table.table.get_id(),
+                        self.chosen_indices[self.next_index]
+                            .table_path
+                            .table
+                            .get_id()
+                    );
 
-                let table_schema = source.schema();
-                *source = Arc::new(CubeTable::try_new(
-                    snapshot.clone(),
-                    // Filled by workers
-                    HashMap::new(),
-                    Vec::new(),
-                    NoopParquetMetadataCache::new(),
-                )?);
+                    let snapshot = self.chosen_indices[self.next_index].clone();
+                    self.next_index += 1;
 
-                let index_schema = source.schema();
-                assert_eq!(table_schema, index_schema);
+                    let table_schema = source.schema();
+                    *source = Arc::new(CubeTable::try_new(
+                        snapshot.clone(),
+                        // Filled by workers
+                        HashMap::new(),
+                        Vec::new(),
+                        NoopParquetMetadataCache::new(),
+                    )?);
 
-                return Ok(ClusterSendNode {
-                    input: Arc::new(p),
-                    snapshots: vec![vec![snapshot]],
+                    let index_schema = source.schema();
+                    assert_eq!(table_schema, index_schema);
+
+                    return Ok(ClusterSendNode {
+                        input: Arc::new(p),
+                        snapshots: vec![vec![snapshot]],
+                    }
+                        .into_plan());
+                } else {
+                    return Ok(ClusterSendNode {
+                        input: Arc::new(p),
+                        snapshots: vec![],
+                    }
+                        .into_plan());
                 }
-                .into_plan());
             }
             _ => return Ok(p),
         }

@@ -1175,12 +1175,19 @@ impl TableProvider for InlineTableProvider {
         _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let schema = self.data.get_schema();
         let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
+        let schema = self.data.get_schema();
+        let projected_schema = if let Some(p) = projection {
+            Arc::new(Schema::new(
+                p.iter().map(|i| schema.field(*i).clone()).collect(),
+            ))
+        } else {
+            schema
+        };
         let projection = (*projection).clone();
         Ok(Arc::new(MemoryExec::try_new(
             &vec![batches],
-            schema,
+            projected_schema,
             projection,
         )?))
     }
@@ -1408,10 +1415,12 @@ pub fn dataframe_to_batches(
     batch_size: usize,
 ) -> Result<Vec<RecordBatch>, CubeError> {
     let mut batches = vec![];
-    for b in 0..data.len() / batch_size {
-        let rows = &data.get_rows()[b * batch_size .. min((b + 1) * batch_size, data.len())];
+    let mut b = 0;
+    while b < data.len() {
+        let rows = &data.get_rows()[b .. min(b + batch_size, data.len())];
         let batch = rows_to_columns(&data.get_columns(), rows);
         batches.push(RecordBatch::try_new(data.get_schema(), batch)?);
+        b += batch_size;
     }
     Ok(batches)
 }

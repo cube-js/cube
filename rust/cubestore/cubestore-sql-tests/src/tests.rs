@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::timestamp_from_string;
+use cubestore::sql::{SqlQueryContext, timestamp_from_string};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -19,8 +20,10 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
+use cubestore::metastore::{Column, ColumnType};
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -183,6 +186,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("aggregate_index", aggregate_index),
         t("aggregate_index_hll", aggregate_index_hll),
         t("aggregate_index_errors", aggregate_index_errors),
+        t("inline_tables", inline_tables),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4733,6 +4737,11 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+}
+
 async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5015,9 +5024,127 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
         .expect_err("Aggregate function MERGE not allowed for column type integer");
 
 }
-async fn panic_worker(service: Box<dyn SqlClient>) {
-    let r = service.exec_query("SYS PANIC WORKER").await;
-    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+
+async fn inline_tables(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    let _ = service
+        .exec_query(
+            "CREATE TABLE Foo.Persons (
+                ID int,
+                FirstName varchar(255),
+                LastName varchar(255),
+                Timestamp timestamp
+            )",
+        )
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO Foo.Persons
+        (ID, LastName, FirstName, Timestamp)
+        VALUES
+        (23, 'LastName 1', 'FirstName 1', '2020-01-01T00:00:00.000Z'),
+        (24, 'LastName 3', 'FirstName 1', '2020-01-02T00:00:00.000Z'),
+        (25, 'LastName 4', 'FirstName 1', '2020-01-03T00:00:00.000Z'),
+        (26, 'LastName 5', 'FirstName 1', '2020-01-04T00:00:00.000Z'),
+        (35, 'LastName 24', 'FirstName 2', '2020-01-01T00:00:00.000Z'),
+        (36, 'LastName 23', 'FirstName 2', '2020-01-02T00:00:00.000Z'),
+        (37, 'LastName 22', 'FirstName 2', '2020-01-03T00:00:00.000Z'),
+        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')"
+    ).await.unwrap();
+
+    let result = service
+        .exec_query("SELECT * FROM Foo.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 8);
+    assert_eq!(result.get_rows()[0], Row::new(vec![
+        TableValue::Int(23),
+        TableValue::String("FirstName 1".to_string()),
+
+        TableValue::String("LastName 1".to_string()),
+        TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+    ]));
+
+    let result = service
+        .exec_query("SELECT * FROM system.tables")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 1);
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("LastName".to_string(), ColumnType::String, 1),
+        Column::new("FirstName".to_string(), ColumnType::String, 2),
+        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 2),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::String("Last 1".to_string()),
+            TableValue::String("First 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(2),
+            TableValue::Null,
+            TableValue::String("First 2".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(3),
+            TableValue::String("Last 3".to_string()),
+            TableValue::String("First 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(4),
+            TableValue::String("Last 4".to_string()),
+            TableValue::String("First 4".to_string()),
+            TableValue::Null,
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns, rows.clone()));
+    let inline_tables = Arc::new(HashMap::from([("Persons".to_string(), data)]));
+
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT * FROM inline.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &rows);
+
+    let partial_rows = vec![
+        Row::new(vec![
+            TableValue::String("Last 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::String("Last 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::String("Last 4".to_string()),
+            TableValue::Null,
+        ]),
+    ];
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM inline.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &partial_rows);
+
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Foo.Persons UNION ALL SELECT LastName, Timestamp FROM inline.Persons")
+        .await
+        .unwrap();
+    assert_eq!(&result.get_rows()[8..14].to_vec(), &partial_rows);
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

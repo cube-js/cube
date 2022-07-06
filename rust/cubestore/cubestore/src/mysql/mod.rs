@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::table::TableValue;
