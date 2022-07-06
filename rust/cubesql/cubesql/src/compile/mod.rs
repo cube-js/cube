@@ -1,5 +1,8 @@
 use core::fmt;
-use std::{backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, sync::Arc};
+use std::{
+    backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
+    sync::Arc,
+};
 
 use chrono::{prelude::*, Duration};
 
@@ -1444,6 +1447,7 @@ fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResu
     Ok(builder)
 }
 
+#[derive(Clone)]
 struct QueryPlanner {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
@@ -1466,7 +1470,7 @@ impl QueryPlanner {
     /// Common case for both planners: meta & olap
     /// This method tries to detect what planner to use as earlier as possible
     /// and forward context to correct planner
-    fn select_to_plan(
+    async fn select_to_plan(
         &self,
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
@@ -1477,7 +1481,7 @@ impl QueryPlanner {
             .map(|v| v.parse::<bool>().unwrap())
             .unwrap_or(self.state.protocol == DatabaseProtocol::PostgreSQL);
         if rewrite_engine {
-            return self.create_df_logical_plan(stmt.clone());
+            return self.create_df_logical_plan(stmt.clone()).await;
         }
 
         let select = match &q.body {
@@ -1498,7 +1502,7 @@ impl QueryPlanner {
         let from_table = if select.from.len() == 1 {
             &select.from[0]
         } else {
-            return self.create_df_logical_plan(stmt.clone());
+            return self.create_df_logical_plan(stmt.clone()).await;
         };
 
         let (db_name, schema_name, table_name) = match &from_table.relation {
@@ -1553,7 +1557,7 @@ impl QueryPlanner {
                 if db_name.to_lowercase() == "information_schema"
                     || db_name.to_lowercase() == "performance_schema"
                 {
-                    return self.create_df_logical_plan(stmt.clone());
+                    return self.create_df_logical_plan(stmt.clone()).await;
                 }
             }
             DatabaseProtocol::PostgreSQL => {
@@ -1561,7 +1565,7 @@ impl QueryPlanner {
                     || schema_name.to_lowercase() == "performance_schema"
                     || schema_name.to_lowercase() == "pg_catalog"
                 {
-                    return self.create_df_logical_plan(stmt.clone());
+                    return self.create_df_logical_plan(stmt.clone()).await;
                 }
             }
         };
@@ -1697,9 +1701,9 @@ impl QueryPlanner {
         }
     }
 
-    pub fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
+    pub async fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
         let plan = match (stmt, &self.state.protocol) {
-            (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q),
+            (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q).await,
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(vec![], vec![])),
@@ -1726,9 +1730,11 @@ impl QueryPlanner {
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
             }
-            (ast::Statement::ShowVariable { variable }, _) => self.show_variable_to_plan(variable),
+            (ast::Statement::ShowVariable { variable }, _) => {
+                self.show_variable_to_plan(variable).await
+            }
             (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
-                self.show_variables_to_plan(&filter)
+                self.show_variables_to_plan(&filter).await
             }
             (ast::Statement::ShowCreate { obj_name, obj_type }, DatabaseProtocol::MySQL) => {
                 self.show_create_to_plan(&obj_name, &obj_type)
@@ -1741,7 +1747,10 @@ impl QueryPlanner {
                     table_name,
                 },
                 DatabaseProtocol::MySQL,
-            ) => self.show_columns_to_plan(*extended, *full, &filter, &table_name),
+            ) => {
+                self.show_columns_to_plan(*extended, *full, &filter, &table_name)
+                    .await
+            }
             (
                 ast::Statement::ShowTables {
                     extended,
@@ -1750,12 +1759,15 @@ impl QueryPlanner {
                     db_name,
                 },
                 DatabaseProtocol::MySQL,
-            ) => self.show_tables_to_plan(*extended, *full, &filter, &db_name),
+            ) => {
+                self.show_tables_to_plan(*extended, *full, &filter, &db_name)
+                    .await
+            }
             (ast::Statement::ShowCollation { filter }, DatabaseProtocol::MySQL) => {
-                self.show_collation_to_plan(&filter)
+                self.show_collation_to_plan(&filter).await
             }
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_table_to_plan(&table_name)
+                self.explain_table_to_plan(&table_name).await
             }
             (
                 ast::Statement::Explain {
@@ -1765,7 +1777,7 @@ impl QueryPlanner {
                     ..
                 },
                 _,
-            ) => self.explain_to_plan(&statement, *verbose, *analyze),
+            ) => self.explain_to_plan(&statement, *verbose, *analyze).await,
             (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
                 self.use_to_plan(&db_name)
             }
@@ -1818,7 +1830,7 @@ impl QueryPlanner {
         }
     }
 
-    fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
+    async fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
         let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
             let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
@@ -1843,7 +1855,7 @@ impl QueryPlanner {
                 )?
             };
 
-            self.create_df_logical_plan(stmt)
+            self.create_df_logical_plan(stmt).await
         } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1874,7 +1886,7 @@ impl QueryPlanner {
                 self.state.protocol.clone(),
             )?;
 
-            self.create_df_logical_plan(stmt)
+            self.create_df_logical_plan(stmt).await
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1903,10 +1915,11 @@ impl QueryPlanner {
             self.create_df_logical_plan(ast::Statement::ShowVariable {
                 variable: variable.clone(),
             })
+            .await
         }
     }
 
-    fn show_variables_to_plan(
+    async fn show_variables_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -1934,7 +1947,7 @@ impl QueryPlanner {
             self.state.protocol.clone(),
         )?;
 
-        self.create_df_logical_plan(stmt)
+        self.create_df_logical_plan(stmt).await
     }
 
     fn show_create_to_plan(
@@ -1998,7 +2011,7 @@ impl QueryPlanner {
         )
     }
 
-    fn show_columns_to_plan(
+    async fn show_columns_to_plan(
         &self,
         extended: bool,
         full: bool,
@@ -2064,10 +2077,10 @@ impl QueryPlanner {
             self.state.protocol.clone(),
         )?;
 
-        self.create_df_logical_plan(stmt)
+        self.create_df_logical_plan(stmt).await
     }
 
-    fn show_tables_to_plan(
+    async fn show_tables_to_plan(
         &self,
         // EXTENDED is accepted but does not alter the result
         _extended: bool,
@@ -2121,10 +2134,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
             self.state.protocol.clone(),
         )?;
 
-        self.create_df_logical_plan(stmt)
+        self.create_df_logical_plan(stmt).await
     }
 
-    fn show_collation_to_plan(
+    async fn show_collation_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -2153,15 +2166,16 @@ WHERE `TABLE_SCHEMA` = '{}'",
             self.state.protocol.clone(),
         )?;
 
-        self.create_df_logical_plan(stmt)
+        self.create_df_logical_plan(stmt).await
     }
 
-    fn explain_table_to_plan(
+    async fn explain_table_to_plan(
         &self,
         table_name: &ast::ObjectName,
     ) -> Result<QueryPlan, CompilationError> {
         // EXPLAIN <table> matches the SHOW COLUMNS output exactly, reuse the plan
         self.show_columns_to_plan(false, false, &None, table_name)
+            .await
     }
 
     fn explain_to_plan(
@@ -2169,54 +2183,60 @@ WHERE `TABLE_SCHEMA` = '{}'",
         statement: &Box<ast::Statement>,
         verbose: bool,
         analyze: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        let plan = self.plan(&statement)?;
+    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send + Sync>> {
+        let self_cloned = self.clone();
 
-        match plan {
-            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![dataframe::Column::new(
-                        "Execution Plan".to_string(),
-                        ColumnType::String,
-                        ColumnFlags::empty(),
-                    )],
-                    vec![dataframe::Row::new(vec![dataframe::TableValue::String(
-                        "This query doesnt have a plan, because it already has values for response"
-                            .to_string(),
-                    )])],
+        let statement = statement.clone();
+        // This Boxing construct here because of recursive call to self.plan()
+        Box::pin(async move {
+            let plan = self_cloned.plan(&statement).await?;
+
+            match plan {
+                QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
+                    StatusFlags::empty(),
+                    Box::new(dataframe::DataFrame::new(
+                        vec![dataframe::Column::new(
+                            "Execution Plan".to_string(),
+                            ColumnType::String,
+                            ColumnFlags::empty(),
+                        )],
+                        vec![dataframe::Row::new(vec![dataframe::TableValue::String(
+                            "This query doesnt have a plan, because it already has values for response"
+                                .to_string(),
+                        )])],
+                    )),
                 )),
-            )),
-            QueryPlan::DataFusionSelect(flags, plan, context) => {
-                let plan = Arc::new(plan);
-                let schema = LogicalPlan::explain_schema();
-                let schema = schema.to_dfschema_ref().map_err(|err| {
-                    CompilationError::internal(format!(
-                        "Unable to get DF schema for explain plan: {}",
-                        err
-                    ))
-                })?;
+                QueryPlan::DataFusionSelect(flags, plan, context) => {
+                    let plan = Arc::new(plan);
+                    let schema = LogicalPlan::explain_schema();
+                    let schema = schema.to_dfschema_ref().map_err(|err| {
+                        CompilationError::internal(format!(
+                            "Unable to get DF schema for explain plan: {}",
+                            err
+                        ))
+                    })?;
 
-                let explain_plan = if analyze {
-                    LogicalPlan::Analyze(Analyze {
-                        verbose,
-                        input: plan,
-                        schema,
-                    })
-                } else {
-                    let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
+                    let explain_plan = if analyze {
+                        LogicalPlan::Analyze(Analyze {
+                            verbose,
+                            input: plan,
+                            schema,
+                        })
+                    } else {
+                        let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
 
-                    LogicalPlan::Explain(Explain {
-                        verbose,
-                        plan,
-                        stringified_plans,
-                        schema,
-                    })
-                };
+                        LogicalPlan::Explain(Explain {
+                            verbose,
+                            plan,
+                            stringified_plans,
+                            schema,
+                        })
+                    };
 
-                Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
+                    Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
+                }
             }
-        }
+        })
     }
 
     fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
@@ -2472,7 +2492,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx
     }
 
-    fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
+    async fn create_df_logical_plan(&self, stmt: ast::Statement) -> CompilationResult<QueryPlan> {
         match &stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
@@ -2517,6 +2537,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let result = converter
             .take_rewriter()
             .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(
                     format!(
@@ -2565,7 +2586,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
     }
 }
 
-pub fn convert_statement_to_cube_query(
+pub async fn convert_statement_to_cube_query(
     stmt: &ast::Statement,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
@@ -2575,7 +2596,7 @@ pub fn convert_statement_to_cube_query(
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(&stmt)
+    planner.plan(&stmt).await
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -2703,13 +2724,13 @@ impl QueryPlan {
     }
 }
 
-pub fn convert_sql_to_cube_query(
+pub async fn convert_sql_to_cube_query(
     query: &String,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone())?;
-    convert_statement_to_cube_query(&stmt, meta, session)
+    convert_statement_to_cube_query(&stmt, meta, session).await
 }
 
 #[cfg(test)]
@@ -2915,8 +2936,9 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
+    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+        let query =
+            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
 
         query.unwrap()
     }
@@ -2960,11 +2982,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_select_measure_via_function() {
+    #[tokio::test]
+    async fn test_select_measure_via_function() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(maxPrice), MEASURE(minPrice), MEASURE(avgPrice) FROM KibanaSampleDataEcommerce".to_string(),
-        DatabaseProtocol::MySQL);
+        DatabaseProtocol::MySQL).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -2986,11 +3008,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_select_compound_identifiers() {
+    #[tokio::test]
+    async fn test_select_compound_identifiers() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3011,13 +3033,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_select_measure_aggregate_functions() {
+    #[tokio::test]
+    async fn test_select_measure_aggregate_functions() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3049,12 +3072,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_order_alias_for_measure_default() {
+    #[tokio::test]
+    async fn test_order_alias_for_measure_default() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce ORDER BY cnt".to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         assert_eq!(
             query_plan.as_logical_plan().find_cube_scan().request,
@@ -3074,8 +3098,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_order_by() {
+    #[tokio::test]
+    async fn test_order_by() {
         init_logger();
 
         let supported_orders = vec![
@@ -3234,7 +3258,8 @@ mod tests {
         ];
 
         for (sql, expected_request) in supported_orders.iter() {
-            let query_plan = convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::MySQL);
+            let query_plan =
+                convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::MySQL).await;
 
             assert_eq!(
                 &query_plan.as_logical_plan().find_cube_scan().request,
@@ -3243,15 +3268,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_order_function_date() {
+    #[tokio::test]
+    async fn test_order_function_date() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
                 .to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         assert_eq!(
             query_plan.as_logical_plan().find_cube_scan().request,
@@ -3278,7 +3304,7 @@ mod tests {
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce GROUP BY DATE(order_date) ORDER BY DATE(order_date) DESC"
                 .to_string(),
             DatabaseProtocol::MySQL,
-        );
+        ).await;
 
         assert_eq!(
             query_plan.as_logical_plan().find_cube_scan().request,
@@ -3302,12 +3328,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_select_all_fields_by_asterisk_limit_100() {
+    #[tokio::test]
+    async fn test_select_all_fields_by_asterisk_limit_100() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         assert_eq!(
             query_plan
@@ -3324,12 +3351,13 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
+    #[tokio::test]
+    async fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100 OFFSET 50".to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         assert_eq!(
             query_plan
@@ -3346,12 +3374,13 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_select_two_fields() {
+    #[tokio::test]
+    async fn test_select_two_fields() {
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
             DatabaseProtocol::MySQL,
-        );
+        )
+        .await;
 
         assert_eq!(
             query_plan.as_logical_plan().find_cube_scan().request,
@@ -3371,12 +3400,12 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_select_fields_alias() {
+    #[tokio::test]
+    async fn test_select_fields_alias() {
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
                 .to_string(), DatabaseProtocol::MySQL
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3411,14 +3440,15 @@ mod tests {
         // );
     }
 
-    #[test]
-    fn test_select_where_false() {
+    #[tokio::test]
+    async fn test_select_where_false() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce WHERE 1 = 0".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        )
+        .await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3446,8 +3476,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_projection_with_casts() {
+    #[tokio::test]
+    async fn tableau_projection_with_casts() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -3473,7 +3503,7 @@ mod tests {
              \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price12\"
              FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3500,14 +3530,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_min_max() {
+    #[tokio::test]
+    async fn tableau_min_max() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT MIN(\"KibanaSampleDataEcommerce\".\"order_date\") AS \"tmn:timestamp:min\", MAX(\"KibanaSampleDataEcommerce\".\"order_date\") AS \"tmn:timestamp:max\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3529,14 +3559,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_min_max_number() {
+    #[tokio::test]
+    async fn tableau_min_max_number() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT MIN(\"KibanaSampleDataEcommerce\".\"taxful_total_price\") AS \"tmn:timestamp:min\", MAX(\"KibanaSampleDataEcommerce\".\"taxful_total_price\") AS \"tmn:timestamp:max\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3556,14 +3586,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_filter_and_group_by() {
+    #[tokio::test]
+    async fn tableau_filter_and_group_by() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE (CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) = 'female') GROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3589,14 +3619,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_having_count_on_cube_without_count() {
+    #[tokio::test]
+    async fn tableau_having_count_on_cube_without_count() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(DISTINCT \"Logs\".\"agentCount\") AS \"sum:count:ok\" FROM \"public\".\"Logs\" \"Logs\" HAVING (COUNT(1) > 0)".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3614,14 +3644,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_boolean_filter_inplace_where() {
+    #[tokio::test]
+    async fn tableau_boolean_filter_inplace_where() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE \"KibanaSampleDataEcommerce\".\"is_female\" HAVING (COUNT(1) > 0)".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3647,7 +3677,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE NOT(\"KibanaSampleDataEcommerce\".\"has_subscription\") HAVING (COUNT(1) > 0)".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3680,14 +3710,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_not_null_filter() {
+    #[tokio::test]
+    async fn tableau_not_null_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT \"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS \"taxful_total_price\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE (NOT (\"KibanaSampleDataEcommerce\".\"taxful_total_price\" IS NULL)) GROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3713,14 +3743,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_current_timestamp() {
+    #[tokio::test]
+    async fn tableau_current_timestamp() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CAST(CURRENT_TIMESTAMP AS TIMESTAMP) AS \"COL\"".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        )
+        .await;
 
         let logical_plan = &query_plan.print(true).unwrap();
 
@@ -3737,14 +3768,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn tableau_time_filter() {
+    #[tokio::test]
+    async fn tableau_time_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" WHERE ((\"KibanaSampleDataEcommerce\".\"order_date\" >= (TIMESTAMP '2020-12-25 22:48:48.000')) AND (\"KibanaSampleDataEcommerce\".\"order_date\" <= (TIMESTAMP '2022-04-01 00:00:00.000')))".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3769,8 +3800,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn superset_pg_time_filter() {
+    #[tokio::test]
+    async fn superset_pg_time_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -3783,7 +3814,8 @@ GROUP BY DATE_TRUNC('week', \"order_date\")
 ORDER BY \"COUNT(count)\" DESC"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        )
+        .await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3811,14 +3843,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn power_bi_dimension_only() {
+    #[tokio::test]
+    async fn power_bi_dimension_only() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "select \"_\".\"customer_gender\"\r\nfrom \r\n(\r\n    select \"rows\".\"customer_gender\" as \"customer_gender\"\r\n    from \r\n    (\r\n        select \"customer_gender\"\r\n        from \"public\".\"KibanaSampleDataEcommerce\" \"$Table\"\r\n    ) \"rows\"\r\n    group by \"customer_gender\"\r\n) \"_\"\r\norder by \"_\".\"customer_gender\"\r\nlimit 1001".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3839,14 +3871,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn power_bi_is_not_empty() {
+    #[tokio::test]
+    async fn power_bi_is_not_empty() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "select sum(\"rows\".\"count\") as \"a0\" from (select \"_\".\"count\" from \"public\".\"KibanaSampleDataEcommerce\" \"_\" where (not \"_\".\"customer_gender\" is null and not \"_\".\"customer_gender\" = '' or not (not \"_\".\"customer_gender\" is null))) \"rows\"".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3904,15 +3936,16 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn non_cube_filters_cast_kept() {
+    #[tokio::test]
+    async fn non_cube_filters_cast_kept() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT id FROM information_schema.testing_dataset WHERE id > CAST('0' AS INTEGER)"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        )
+        .await;
 
         let logical_plan = query_plan.print(true).unwrap();
         assert!(
@@ -3922,14 +3955,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_default_having() {
+    #[tokio::test]
+    async fn tableau_default_having() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:count:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nHAVING (COUNT(1) > 0)".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         let cube_scan = logical_plan.find_cube_scan();
@@ -3970,14 +4003,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_group_by_month() {
+    #[tokio::test]
+    async fn tableau_group_by_month() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:bytesBilled:ok\",\n  DATE_TRUNC( 'MONTH', CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS TIMESTAMP) ) AS \"tmn:timestamp:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 2".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -3999,14 +4032,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_group_by_month_and_dimension() {
+    #[tokio::test]
+    async fn tableau_group_by_month_and_dimension() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS \"query\",\n  SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:bytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4024,14 +4057,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_extract_year() {
+    #[tokio::test]
+    async fn tableau_extract_year() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CAST(TRUNC(EXTRACT(YEAR FROM \"KibanaSampleDataEcommerce\".\"order_date\")) AS INTEGER) AS \"yr:timestamp:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4055,7 +4088,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let query_plan = convert_select_to_query_plan(
             "SELECT CAST(TRUNC(EXTRACT(YEAR FROM \"KibanaSampleDataEcommerce\".\"order_date\")) AS INTEGER) AS \"yr:timestamp:ok\", SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:teraBytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4077,14 +4110,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_week() {
+    #[tokio::test]
+    async fn tableau_week() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CAST((DATE_TRUNC( 'day', CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS DATE) ) + (-EXTRACT(DOW FROM \"KibanaSampleDataEcommerce\".\"order_date\") * INTERVAL '1 DAY')) AS DATE) AS \"yr:timestamp:ok\", SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:teraBytesBilled:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nGROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4106,14 +4139,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_filter() {
+    #[tokio::test]
+    async fn tableau_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:freeCount:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nWHERE (CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) = 'female')".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4137,14 +4170,14 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn tableau_contains_filter() {
+    #[tokio::test]
+    async fn tableau_contains_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT SUM(\"KibanaSampleDataEcommerce\".\"count\") AS \"sum:freeCount:ok\"\nFROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"\nWHERE (STRPOS(CAST(LOWER(CAST(CAST(\"KibanaSampleDataEcommerce\".\"customer_gender\" AS TEXT) AS TEXT)) AS TEXT),CAST('fem' AS TEXT)) > 0)".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4168,15 +4201,15 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn measure_used_on_dimension() {
+    #[tokio::test]
+    async fn measure_used_on_dimension() {
         init_logger();
 
         let create_query = convert_sql_to_cube_query(
             &"SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
-        );
+        ).await;
 
         assert_eq!(
             create_query.err().unwrap().message(),
@@ -4184,8 +4217,8 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn powerbi_contains_filter() {
+    #[tokio::test]
+    async fn powerbi_contains_filter() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4206,7 +4239,8 @@ ORDER BY \"COUNT(count)\" DESC"
 \nlimit 1000001"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        )
+        .await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4230,8 +4264,8 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn powerbi_inner_wrapped_dates() {
+    #[tokio::test]
+    async fn powerbi_inner_wrapped_dates() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4251,7 +4285,7 @@ ORDER BY \"COUNT(count)\" DESC"
 \nlimit 1000001"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4279,8 +4313,8 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn powerbi_inner_wrapped_asterisk() {
+    #[tokio::test]
+    async fn powerbi_inner_wrapped_asterisk() {
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4307,7 +4341,7 @@ ORDER BY \"COUNT(count)\" DESC"
 \nlimit 1000001"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -4332,8 +4366,8 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn test_select_aggregations() {
+    #[tokio::test]
+    async fn test_select_aggregations() {
         let variants = vec![
             (
                 "SELECT COUNT(*) FROM KibanaSampleDataEcommerce".to_string(),
@@ -4431,14 +4465,15 @@ ORDER BY \"COUNT(count)\" DESC"
         for (input_query, expected_request) in variants.iter() {
             let logical_plan =
                 convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
+                    .await
                     .as_logical_plan();
 
             assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
         }
     }
 
-    #[test]
-    fn test_select_error() {
+    #[tokio::test]
+    async fn test_select_error() {
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
             .map(|v| v.parse::<bool>().unwrap())
@@ -4515,7 +4550,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 &input_query,
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
-            );
+            )
+            .await;
 
             match query {
                 Ok(_) => panic!("Query ({}) should return error", input_query),
@@ -4524,8 +4560,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_group_by_date_trunc() {
+    #[tokio::test]
+    async fn test_group_by_date_trunc() {
         let supported_granularities = vec![
             // all variants
             [
@@ -4566,7 +4602,7 @@ ORDER BY \"COUNT(count)\" DESC"
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
                 format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
-            ).as_logical_plan();
+            ).await.as_logical_plan();
 
             assert_eq!(
                 logical_plan.find_cube_scan().request,
@@ -4610,8 +4646,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_group_by_date_granularity_superset() {
+    #[tokio::test]
+    async fn test_group_by_date_granularity_superset() {
         let supported_granularities = vec![
             // With MAKEDATE
             ["MAKEDATE(YEAR(order_date), 1) + INTERVAL QUARTER(order_date) QUARTER - INTERVAL 1 QUARTER".to_string(), "quarter".to_string()],
@@ -4639,7 +4675,7 @@ ORDER BY \"COUNT(count)\" DESC"
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
                 format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
-            ).as_logical_plan();
+            ).await.as_logical_plan();
 
             assert_eq!(
                 logical_plan.find_cube_scan().request,
@@ -4661,8 +4697,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_date_part_quarter_granularity() {
+    #[tokio::test]
+    async fn test_date_part_quarter_granularity() {
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT CAST(TRUNC(EXTRACT(QUARTER FROM KibanaSampleDataEcommerce.order_date)) AS INTEGER)
@@ -4670,7 +4706,7 @@ ORDER BY \"COUNT(count)\" DESC"
             GROUP BY 1
             ".to_string(),
             DatabaseProtocol::PostgreSQL
-        ).as_logical_plan();
+        ).await.as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -4691,8 +4727,8 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn test_where_filter_daterange() {
+    #[tokio::test]
+    async fn test_where_filter_daterange() {
         init_logger();
 
         let to_check = vec![
@@ -4812,8 +4848,9 @@ ORDER BY \"COUNT(count)\" DESC"
                     ""
                 }
             );
-            let logical_plan =
-                convert_select_to_query_plan(query, DatabaseProtocol::MySQL).as_logical_plan();
+            let logical_plan = convert_select_to_query_plan(query, DatabaseProtocol::MySQL)
+                .await
+                .as_logical_plan();
 
             assert_eq!(
                 logical_plan.find_cube_scan().request.time_dimensions,
@@ -4822,8 +4859,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_where_filter_or() {
+    #[tokio::test]
+    async fn test_where_filter_or() {
         let query_plan = convert_select_to_query_plan(
             "SELECT
                 COUNT(*), DATE(order_date) AS __timestamp
@@ -4831,7 +4868,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
                 GROUP BY __timestamp"
             .to_string(), DatabaseProtocol::MySQL
-        );
+        ).await;
 
         assert_eq!(
             query_plan
@@ -4864,8 +4901,8 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn test_where_filter_simple() {
+    #[tokio::test]
+    async fn test_where_filter_simple() {
         let to_check = vec![
             // Binary expression with Measures
             (
@@ -5143,6 +5180,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 DatabaseProtocol::MySQL,
             )
+            .await
             .as_logical_plan();
 
             assert_eq!(
@@ -5160,9 +5198,9 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn test_filter_error() {
+    async fn test_filter_error() {
         let to_check = vec![
             // Binary expr
             (
@@ -5212,7 +5250,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 get_test_tenant_ctx(),
                 get_test_session(DatabaseProtocol::MySQL),
-            );
+            )
+            .await;
 
             match &query {
                 Ok(_) => panic!("Query ({}) should return error", sql),
@@ -5221,8 +5260,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_where_filter_complex() {
+    #[tokio::test]
+    async fn test_where_filter_complex() {
         let to_check = vec![
             (
                 "customer_gender = 'FEMALE' AND customer_gender = 'MALE'".to_string(),
@@ -5427,6 +5466,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 DatabaseProtocol::MySQL,
             )
+            .await
             .as_logical_plan();
 
             assert_eq!(
@@ -5461,8 +5501,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_str_to_date() {
+    #[tokio::test]
+    async fn test_str_to_date() {
         let compiled = compile_expression(
             &parse_expr_from_projection(
                 &"SELECT STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')"
@@ -5481,8 +5521,8 @@ ORDER BY \"COUNT(count)\" DESC"
         };
     }
 
-    #[test]
-    fn test_now_expr() {
+    #[tokio::test]
+    async fn test_now_expr() {
         let compiled = compile_expression(
             &parse_expr_from_projection(&"SELECT NOW()".to_string(), DatabaseProtocol::MySQL),
             &QueryContext::new(&get_test_meta()[0]),
@@ -5495,8 +5535,8 @@ ORDER BY \"COUNT(count)\" DESC"
         };
     }
 
-    #[test]
-    fn test_date_date_add_interval_expr() {
+    #[tokio::test]
+    async fn test_date_date_add_interval_expr() {
         let to_check = vec![
             // positive
             (
@@ -5548,8 +5588,8 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    #[test]
-    fn test_str_literal_to_date() {
+    #[tokio::test]
+    async fn test_str_literal_to_date() {
         let d = CompiledExpression::StringLiteral("2021-08-31".to_string())
             .to_date_literal()
             .unwrap();
@@ -5592,7 +5632,8 @@ ORDER BY \"COUNT(count)\" DESC"
         query: String,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
-        let query = convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db));
+        let query =
+            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
         match query.unwrap() {
             QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                 let df = DFDataFrame::new(ctx.state, &plan);
@@ -8634,7 +8675,7 @@ ORDER BY \"COUNT(count)\" DESC"
             ".to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
-        );
+        ).await;
         match create_query {
             Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS QUERY: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
             _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
@@ -8650,7 +8691,8 @@ ORDER BY \"COUNT(count)\" DESC"
             .to_string(),
             get_test_tenant_ctx(),
             get_test_session(DatabaseProtocol::PostgreSQL),
-        );
+        )
+        .await;
         match select_into_query {
             Err(CompilationError::Unsupported(msg, _)) => {
                 assert_eq!(msg, "Unsupported query type: SELECT INTO QUERY: SELECT * INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\" FROM (SELECT 1 AS COL) AS CHECKTEMP LIMIT 1")
@@ -9342,7 +9384,7 @@ ORDER BY \"COUNT(count)\" DESC"
             "SELECT count FROM KibanaSampleDataEcommerce WHERE (CAST(maxPrice AS Decimal) = CAST(100 AS Decimal));"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -9376,7 +9418,7 @@ ORDER BY \"COUNT(count)\" DESC"
             where (\"public\".\"KibanaSampleDataEcommerce\".\"maxPrice\" > 100 and \"public\".\"KibanaSampleDataEcommerce\".\"maxPrice\" < 150);
             ".to_string(),
             DatabaseProtocol::PostgreSQL,
-        );
+        ).await;
 
         let logical_plan = query_plan.as_logical_plan();
 
@@ -9412,8 +9454,8 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
-    #[test]
-    fn metabase_interval_date_range_filter() {
+    #[tokio::test]
+    async fn metabase_interval_date_range_filter() {
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT COUNT(*) 
@@ -9421,7 +9463,7 @@ ORDER BY \"COUNT(count)\" DESC"
             WHERE KibanaSampleDataEcommerce.order_date >= CAST((CAST(now() AS timestamp) + (INTERVAL '-30 day')) AS date);
             ".to_string(), 
             DatabaseProtocol::PostgreSQL
-        ).as_logical_plan();
+        ).await.as_logical_plan();
 
         let filters = logical_plan
             .find_cube_scan()
@@ -9455,8 +9497,8 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn superset_timeout_reached() {
+    #[tokio::test]
+    async fn superset_timeout_reached() {
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -9471,7 +9513,7 @@ ORDER BY \"COUNT(count)\" DESC"
              FROM public.\"KibanaSampleDataEcommerce\" WHERE \"order_date\" >= str_to_date('2021-06-30 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US') AND \"order_date\" < str_to_date('2022-06-30 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US') AND \"is_male\" = true ORDER BY \"order_date\" DESC LIMIT 10000
             ".to_string(),
             DatabaseProtocol::PostgreSQL
-        ).as_logical_plan();
+        ).await.as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -9503,14 +9545,14 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn superset_ilike() {
+    #[tokio::test]
+    async fn superset_ilike() {
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
             "SELECT customer_gender AS customer_gender FROM public.\"KibanaSampleDataEcommerce\" WHERE customer_gender ILIKE '%fem%' GROUP BY customer_gender LIMIT 1000".to_string(),
             DatabaseProtocol::PostgreSQL,
-        )
+        ).await
         .as_logical_plan();
 
         assert_eq!(
@@ -9534,14 +9576,14 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn metabase_limit_0() {
+    #[tokio::test]
+    async fn metabase_limit_0() {
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
             "SELECT true AS \"_\" FROM \"public\".\"KibanaSampleDataEcommerce\" WHERE 1 <> 1 LIMIT 0".to_string(),
             DatabaseProtocol::PostgreSQL
-        ).as_logical_plan();
+        ).await.as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -9558,14 +9600,14 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
-    #[test]
-    fn test_outer_aggr_simple_count() {
+    #[tokio::test]
+    async fn test_outer_aggr_simple_count() {
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT CAST(TRUNC(EXTRACT(YEAR FROM order_date)) AS INTEGER), Count(1) FROM KibanaSampleDataEcommerce GROUP BY 1
             ".to_string(), 
             DatabaseProtocol::PostgreSQL
-        ).as_logical_plan();
+        ).await.as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
