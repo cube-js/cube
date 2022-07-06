@@ -56,6 +56,7 @@ use std::mem::take;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
+use crate::table::data::rows_to_columns;
 
 #[automock]
 #[async_trait]
@@ -823,6 +824,24 @@ impl ExecutionPlan for CubeTableExec {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct InlineTableProvider {
+    data: Arc<DataFrame>
+}
+
+impl InlineTableProvider {
+    pub fn new(data: Arc<DataFrame>) -> InlineTableProvider {
+        InlineTableProvider { data }
+    }
+}
+
+impl Debug for InlineTableProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InlineTable")
+            .finish()
+    }
+}
+
 pub struct ClusterSendExec {
     schema: SchemaRef,
     pub partitions: Vec<(
@@ -1140,6 +1159,48 @@ impl TableProvider for CubeTable {
     }
 }
 
+impl TableProvider for InlineTableProvider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.data.get_schema()
+    }
+
+    fn scan(
+        &self,
+        projection: &Option<Vec<usize>>,
+        batch_size: usize,
+        _filters: &[Expr],
+        _limit: Option<usize>, // TODO: propagate limit
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        let schema = self.data.get_schema();
+        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
+        let projection = (*projection).clone();
+        Ok(Arc::new(MemoryExec::try_new(
+            &vec![batches],
+            schema,
+            projection,
+        )?))
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
+    }
+
+    fn supports_filter_pushdown(
+        &self,
+        _filter: &Expr,
+    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
+        return Ok(TableProviderFilterPushDown::Unsupported);
+    }
+}
+
 macro_rules! convert_array_cast_native {
     ($V: expr, (Vec<u8>)) => {{
         $V.to_vec()
@@ -1342,6 +1403,19 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
+pub fn dataframe_to_batches(
+    data: &DataFrame,
+    batch_size: usize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    let mut batches = vec![];
+    for b in 0..data.len() / batch_size {
+        let rows = &data.get_rows()[b * batch_size .. min((b + 1) * batch_size, data.len())];
+        let batch = rows_to_columns(&data.get_columns(), rows);
+        batches.push(RecordBatch::try_new(data.get_schema(), batch)?);
+    }
+    Ok(batches)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializedRecordBatchStream {
     #[serde(with = "serde_bytes")] // serde_bytes makes serialization efficient.
@@ -1382,6 +1456,7 @@ impl SerializedRecordBatchStream {
         Ok(batch)
     }
 }
+
 /// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.
 ///
 /// Combines an array of filter expressions into a single filter expression

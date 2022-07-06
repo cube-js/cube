@@ -391,9 +391,9 @@ impl Display for ColumnType {
 impl ColumnType {
     pub fn from_string(s: &str) -> Result<ColumnType, CubeError> {
         lazy_static! {
-            static ref decimal_re: Regex = Regex::new(r"decimal\((?P<scale>\d+)\)").unwrap();
+            static ref DECIMAL_RE: Regex = Regex::new(r"decimal\((?P<scale>\d+)\)").unwrap();
         }
-        if let Some(captures) = decimal_re.captures(s) {
+        if let Some(captures) = DECIMAL_RE.captures(s) {
             let scale = captures.name("scale").ok_or(CubeError::internal("missing scale capture".to_string()))?.as_str().parse::<i32>()?;
             Ok(ColumnType::Decimal { scale, precision: 0 })
         } else {

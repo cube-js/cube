@@ -29,7 +29,7 @@ use crate::queryplanner::info_schema::system_partitions::SystemPartitionsTableDe
 use crate::queryplanner::info_schema::system_tables::SystemTablesTableDef;
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
-use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec};
+use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, InlineTableProvider};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -63,11 +63,12 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::SystemTime;
+use crate::sql::InlineTables;
 
 #[automock]
 #[async_trait]
 pub trait QueryPlanner: DIService + Send + Sync {
-    async fn logical_plan(&self, statement: Statement) -> Result<QueryPlan, CubeError>;
+    async fn logical_plan(&self, statement: Statement, inline_tables: Arc<InlineTables>) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
 
@@ -87,12 +88,13 @@ pub enum QueryPlan {
 
 #[async_trait]
 impl QueryPlanner for QueryPlannerImpl {
-    async fn logical_plan(&self, statement: Statement) -> Result<QueryPlan, CubeError> {
+    async fn logical_plan(&self, statement: Statement, inline_tables: Arc<InlineTables>) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
+            inline_tables.clone(),
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -162,6 +164,7 @@ struct MetaStoreSchemaProvider {
     _data: Arc<Vec<TablePath>>,
     by_name: HashSet<TableKey>,
     meta_store: Arc<dyn MetaStore>,
+    inline_tables: Arc<InlineTables>,
 }
 
 /// Points into [MetaStoreSchemaProvider::data], never null.
@@ -192,12 +195,13 @@ impl Hash for TableKey {
 }
 
 impl MetaStoreSchemaProvider {
-    pub fn new(tables: Arc<Vec<TablePath>>, meta_store: Arc<dyn MetaStore>) -> Self {
+    pub fn new(tables: Arc<Vec<TablePath>>, meta_store: Arc<dyn MetaStore>, inline_tables: Arc<InlineTables>) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
             _data: tables,
             by_name,
             meta_store,
+            inline_tables,
         }
     }
 }
@@ -247,6 +251,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     schema,
                 })
             });
+        let res = res.or_else(|| if schema == "inline" {
+            Some(Arc::new(InlineTableProvider::new(self.inline_tables.get(table)?.clone())))
+        } else {
+            None
+        });
         res.or_else(|| match (schema, table) {
             ("information_schema", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),

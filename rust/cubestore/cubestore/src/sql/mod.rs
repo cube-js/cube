@@ -102,9 +102,12 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
+pub type InlineTables = HashMap<String, Arc<DataFrame>>;
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
+    pub inline_tables: Arc<InlineTables>,
     pub trace_obj: Option<String>,
 }
 
@@ -112,6 +115,12 @@ impl SqlQueryContext {
     pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
         let mut res = self.clone();
         res.trace_obj = trace_obj;
+        res
+    }
+
+    pub fn with_inline_tables(&self, inline_tables: Arc<InlineTables>) -> Self {
+        let mut res = self.clone();
+        res.inline_tables = inline_tables.clone();
         res
     }
 }
@@ -494,7 +503,7 @@ impl SqlServiceImpl {
         // TODO: metastore snapshot must be consistent wrt the dumped data.
         let logical_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(Statement::Query(q)))
+            .logical_plan(DFStatement::Statement(Statement::Query(q)), Arc::new(InlineTables::new()))
             .await?;
 
         let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
@@ -563,7 +572,7 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(statement))
+            .logical_plan(DFStatement::Statement(statement), Arc::new(InlineTables::new()))
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -995,7 +1004,7 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)), context.inline_tables.clone())
                     .await?;
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1066,7 +1075,7 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .logical_plan(DFStatement::Statement(Statement::Query(q)), Arc::new(InlineTables::new()))
                     .await?;
                 match logical_plan {
                     QueryPlan::Select(router_plan, _) => {

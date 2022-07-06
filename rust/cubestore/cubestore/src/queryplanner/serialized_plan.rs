@@ -2,7 +2,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
-use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::query_executor::{CubeTable, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -313,6 +313,7 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
+                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone())
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -645,6 +646,7 @@ impl SerializedExpr {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
     CubeTable(CubeTable),
+    InlineTable(InlineTableProvider),
 }
 
 impl SerializedPlan {

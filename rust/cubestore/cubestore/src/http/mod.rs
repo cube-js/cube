@@ -6,7 +6,7 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::codegen::http_message_generated::{get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs, HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs, HttpTable, HttpTableArgs};
 use crate::mysql::SqlAuthService;
-use crate::sql::{SqlQueryContext, SqlService};
+use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
@@ -91,6 +91,7 @@ impl HttpServer {
                     match res {
                         Ok(user) => Ok(SqlQueryContext {
                             user,
+                            inline_tables: Arc::new(HashMap::new()),
                             trace_obj: None,
                         }),
                         Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
@@ -301,9 +302,9 @@ impl HttpServer {
         command: HttpCommand,
     ) -> Result<HttpCommand, CubeError> {
         match command {
-            HttpCommand::Query { query, tables, trace_obj } => Ok(HttpCommand::ResultSet {
+            HttpCommand::Query { query, inline_tables, trace_obj } => Ok(HttpCommand::ResultSet {
                 data_frame: sql_service
-                    .exec_query_with_context(sql_query_context.with_trace_obj(trace_obj), &query)
+                    .exec_query_with_context(sql_query_context.with_trace_obj(trace_obj).with_inline_tables(inline_tables), &query)
                     .await?,
             }),
             x => Err(CubeError::user(format!("Unexpected command: {:?}", x))),
@@ -350,7 +351,7 @@ pub struct HttpMessage {
 pub enum HttpCommand {
     Query {
         query: String,
-        tables: HashMap<String, Arc<DataFrame>>,
+        inline_tables: Arc<InlineTables>,
         trace_obj: Option<String>,
     },
     ResultSet {
@@ -378,16 +379,16 @@ impl HttpMessage {
                 }
             },
             command: match &self.command {
-                HttpCommand::Query { query, tables, trace_obj } => {
+                HttpCommand::Query { query, inline_tables, trace_obj } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
-                    let mut table_offsets = Vec::with_capacity(tables.len());
-                    for (name, table) in tables.iter() {
+                    let mut inline_tables_offsets = Vec::with_capacity(inline_tables.len());
+                    for (name, inline_table) in inline_tables.iter() {
                         let name_offset = builder.create_string(&name);
-                        let columns_vec = HttpMessage::build_columns(&mut builder, table.clone());
-                        let types_vec = HttpMessage::build_types(&mut builder, table.clone());
-                        let rows_vec = HttpMessage::build_rows(&mut builder, table.clone());
-                        let table_offset = HttpTable::create(
+                        let columns_vec = HttpMessage::build_columns(&mut builder, inline_table.clone());
+                        let types_vec = HttpMessage::build_types(&mut builder, inline_table.clone());
+                        let rows_vec = HttpMessage::build_rows(&mut builder, inline_table.clone());
+                        let inline_table_offset = HttpTable::create(
                             &mut builder,
                             &HttpTableArgs {
                                 name: Some(name_offset),
@@ -396,15 +397,15 @@ impl HttpMessage {
                                 rows: Some(rows_vec),
                             },
                         );
-                        table_offsets.push(table_offset);
+                        inline_tables_offsets.push(inline_table_offset);
                     }
-                    let tables_offset = builder.create_vector(table_offsets.as_slice());
+                    let inline_tables_offset = builder.create_vector(inline_tables_offsets.as_slice());
                     Some(
                         HttpQuery::create(
                             &mut builder,
                             &HttpQueryArgs {
                                 query: Some(query_offset),
-                                tables: Some(tables_offset),
+                                inline_tables: Some(inline_tables_offset),
                                 trace_obj: trace_obj_offset,
                             },
                         )
@@ -555,28 +556,28 @@ impl HttpMessage {
             command: match http_message.command_type() {
                 crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
-                    let mut tables = HashMap::new();
-                    if let Some(query_tables) = query.tables() {
-                        for table in query_tables.iter() {
-                            let name = table.name().unwrap().to_string();
-                            let types = table.types().unwrap().iter().map(|column_type| {
+                    let mut inline_tables = HashMap::new();
+                    if let Some(query_inline_tables) = query.inline_tables() {
+                        for inline_table in query_inline_tables.iter() {
+                            let name = inline_table.name().unwrap().to_string();
+                            let types = inline_table.types().unwrap().iter().map(|column_type| {
                                 ColumnType::from_string(column_type)
                             }).collect::<Result<Vec<_>, CubeError>>()?;
-                            let columns = table.columns().unwrap().iter().enumerate().map(|(i, name)| {
+                            let columns = inline_table.columns().unwrap().iter().enumerate().map(|(i, name)| {
                                 Column::new(name.to_string(), types[i].clone(), i)
                             }).collect::<Vec<_>>();
-                            let rows = table.rows().unwrap().iter().map(|r| {
+                            let rows = inline_table.rows().unwrap().iter().map(|r| {
                                 let values = r.values().unwrap().iter().enumerate().map(|(i, v)| {
                                     v.string_value().map_or(Ok(TableValue::Null), |v| ImportFormat::parse_column_value_str(&columns[i], v))
                                 }).collect::<Result<Vec<_>, CubeError>>();
                                 values.map(|values| Row::new(values))
                             }).collect::<Result<Vec<_>, CubeError>>()?;
-                            tables.insert(name, Arc::new(DataFrame::new(columns, rows)));
+                            inline_tables.insert(name, Arc::new(DataFrame::new(columns, rows)));
                         }
                     };
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
-                        tables,
+                        inline_tables: Arc::new(inline_tables),
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
