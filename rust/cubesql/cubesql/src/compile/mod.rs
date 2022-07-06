@@ -9857,4 +9857,78 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn metabase_date_filters() {
+        let now = "now()";
+        let cases = vec![
+            // last 30 days
+            [
+                format!("CAST(({} + (INTERVAL '-30 day')) AS date)", now),
+                format!("CAST({} AS date)", now),
+                "".to_string(),
+                "".to_string(),
+            ],
+            // last 30 weeks
+            [
+                format!("(CAST(date_trunc('week', (({} + (INTERVAL '-30 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                "".to_string(),
+                "".to_string(),
+            ],
+            // last 30 quarters
+            [
+                format!("date_trunc('quarter', ({} + (INTERVAL '-90 month')))", now),
+                format!("date_trunc('quarter', {})", now),
+                "".to_string(),
+                "".to_string(),
+            ],
+            // this year
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '1 year')))", now),
+                "".to_string(),
+                "".to_string(),
+            ],
+            // next 2 years including current
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '3 year')))", now),
+                "".to_string(),
+                "".to_string(),
+            ],
+        ];
+        for [lte, gt, _, _] in cases {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT count FROM (SELECT count FROM KibanaSampleDataEcommerce
+                    WHERE (order_date >= {} AND order_date < {})) source",
+                    lte, gt
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            // TODO: Handle Now()
+            let _ = logical_plan.find_cube_scan().request;
+            // assert_eq!(
+            //     logical_plan.find_cube_scan().request,
+            //     V1LoadRequestQuery {
+            //         measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            //         dimensions: Some(vec![]),
+            //         segments: Some(vec![]),
+            //         time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+            //             dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            //             granularity: None,
+            //             date_range: None,
+            //         }]),
+            //         order: None,
+            //         limit: None,
+            //         offset: None,
+            //         filters: None
+            //     }
+            // )
+        }
+    }
 }
