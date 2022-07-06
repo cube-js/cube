@@ -477,6 +477,19 @@ export class DevServer {
 
       fs.writeFileSync(path.join(process.cwd(), '.env'), variables.join('\n'));
 
+      if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
+        fs.writeFileSync(
+          path.join(process.cwd(), 'package.json'),
+          JSON.stringify({
+            name: 'cube-docker',
+            version: '0.0.1',
+            private: true,
+            createdAt: new Date().toJSON(),
+            dependencies: {}
+          }, null, 2)
+        );
+      }
+
       dotenv.config({ override: true });
 
       await this.cubejsServer.resetInstanceState();
