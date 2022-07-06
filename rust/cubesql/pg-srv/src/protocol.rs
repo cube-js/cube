@@ -20,15 +20,15 @@ const DEFAULT_CAPACITY: usize = 64;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
-    pub protocol_version: ProtocolVersion,
+    pub major: u16,
+    pub minor: u16,
     pub parameters: HashMap<String, String>,
 }
 
 impl StartupMessage {
     async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
-        let major_protocol_version = buffer.read_u16().await?;
-        let minor_protocol_version = buffer.read_u16().await?;
-        let protocol_version = ProtocolVersion::new(major_protocol_version, minor_protocol_version);
+        let major = buffer.read_u16().await?;
+        let minor = buffer.read_u16().await?;
 
         let mut parameters = HashMap::new();
 
@@ -42,7 +42,8 @@ impl StartupMessage {
         }
 
         Ok(Self {
-            protocol_version,
+            major,
+            minor,
             parameters,
         })
     }
@@ -70,21 +71,33 @@ pub enum InitialMessage {
     Gssenc,
 }
 
-// The value is chosen to contain 1234 in the most significant 16 bits, and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same as any protocol version number.)
-pub const VERSION_CANCEL: i32 = 80877102;
-pub const VERSION_SSL: i32 = (1234 << 16) + 5679;
-pub const VERSION_GSSENC: i32 = (1234 << 16) + 5680;
+// The value is chosen to contain 1234 in the most significant 16 bits, this code must not be the same as any protocol version number.
+pub const VERSION_MAJOR_SPECIAL: i16 = 1234;
+pub const VERSION_MINOR_CANCEL: i16 = 5678;
+pub const VERSION_MINOR_SSL: i16 = 5679;
+pub const VERSION_MINOR_GSSENC: i16 = 5680;
 
 impl InitialMessage {
-    pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, Error> {
-        let version = buffer.read_i32().await?;
+    pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, ProtocolError> {
+        let major = buffer.read_i16().await?;
+        let minor = buffer.read_i16().await?;
 
-        match version {
-            VERSION_CANCEL => Ok(InitialMessage::CancelRequest(
-                CancelRequest::from(buffer).await?,
-            )),
-            VERSION_SSL => Ok(InitialMessage::SslRequest),
-            VERSION_GSSENC => Ok(InitialMessage::Gssenc),
+        match major {
+            VERSION_MAJOR_SPECIAL => match minor {
+                VERSION_MINOR_CANCEL => Ok(InitialMessage::CancelRequest(
+                    CancelRequest::from(buffer).await?,
+                )),
+                VERSION_MINOR_SSL => Ok(InitialMessage::SslRequest),
+                VERSION_MINOR_GSSENC => Ok(InitialMessage::Gssenc),
+                _ => Err(ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        r#"Unsupported special version in initial message with code "{}""#,
+                        minor
+                    ),
+                )
+                .into()),
+            },
             _ => {
                 buffer.set_position(0);
                 Ok(InitialMessage::Startup(StartupMessage::from(buffer).await?))
@@ -98,8 +111,8 @@ impl Serialize for StartupMessage {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer.put_u16(self.protocol_version.major);
-        buffer.put_u16(self.protocol_version.minor);
+        buffer.put_u16(self.major);
+        buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
             buffer::write_string(&mut buffer, &name);
@@ -857,18 +870,6 @@ pub enum Format {
     Binary,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProtocolVersion {
-    pub major: u16,
-    pub minor: u16,
-}
-
-impl ProtocolVersion {
-    pub fn new(major: u16, minor: u16) -> Self {
-        Self { major, minor }
-    }
-}
-
 /// All frontend messages (request which client sends to the server).
 #[derive(Debug, PartialEq)]
 pub enum FrontendMessage {
@@ -1079,7 +1080,8 @@ mod tests {
             parameters.insert("client_encoding".to_string(), "UTF8".to_string());
 
             StartupMessage {
-                protocol_version: ProtocolVersion { major: 3, minor: 0 },
+                major: 3,
+                minor: 0,
                 parameters,
             }
         };

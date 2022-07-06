@@ -407,15 +407,13 @@ impl AsyncPostgresShim {
         &mut self,
         startup_message: protocol::StartupMessage,
     ) -> Result<StartupState, ConnectionError> {
-        if startup_message.protocol_version.major != 3
-            || startup_message.protocol_version.minor != 0
-        {
+        if startup_message.major != 3 || startup_message.minor != 0 {
             let error_response = protocol::ErrorResponse::new(
                 protocol::ErrorSeverity::Fatal,
                 protocol::ErrorCode::FeatureNotSupported,
                 format!(
                     "unsupported frontend protocol {}.{}: server supports 3.0 to 3.0",
-                    startup_message.protocol_version.major, startup_message.protocol_version.minor,
+                    startup_message.major, startup_message.minor,
                 ),
             );
             buffer::write_message(&mut self.socket, error_response).await?;
