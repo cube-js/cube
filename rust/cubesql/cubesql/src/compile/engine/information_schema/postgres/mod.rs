@@ -29,6 +29,8 @@ mod pg_settings;
 mod pg_stat_activity;
 mod pg_tables;
 mod pg_type;
+mod role_column_grants;
+mod role_table_grants;
 mod testing_blocking;
 mod testing_dataset;
 
@@ -52,5 +54,7 @@ pub use pg_settings::*;
 pub use pg_stat_activity::*;
 pub use pg_tables::*;
 pub use pg_type::*;
+pub use role_column_grants::*;
+pub use role_table_grants::*;
 pub use testing_blocking::*;
 pub use testing_dataset::*;

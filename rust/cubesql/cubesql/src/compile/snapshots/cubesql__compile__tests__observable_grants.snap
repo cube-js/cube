@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5716
+expression: "execute_query(\"SELECT DISTINCT privilege_type\n                FROM information_schema.role_table_grants\n                WHERE grantee = user\n                UNION\n                SELECT DISTINCT privilege_type\n                FROM information_schema.role_column_grants\n                WHERE grantee = user\n              \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------+
+| privilege_type |
++----------------+
+| SELECT         |
++----------------+

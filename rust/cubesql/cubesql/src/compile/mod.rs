@@ -65,9 +65,9 @@ use self::{
         },
     },
     parser::parse_sql_to_statement,
+    rewrite::converter::LogicalPlanToLanguageConverter,
 };
 use crate::{
-    compile::{builder::QueryBuilder, rewrite::converter::LogicalPlanToLanguageConverter},
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
@@ -2413,7 +2413,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
             ctx.register_udf(create_version_udf("8.0.25".to_string()));
             ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
             ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
-            ctx.register_udf(create_current_user_udf(self.state.clone(), true));
+            ctx.register_udf(create_current_user_udf(
+                self.state.clone(),
+                "current_user",
+                true,
+            ));
+            ctx.register_udf(create_user_udf(self.state.clone()));
         } else if self.state.protocol == DatabaseProtocol::PostgreSQL {
             ctx.register_udf(create_version_udf(
                 "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
@@ -2426,13 +2431,17 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 "current_schema".to_string(),
                 self.state.clone(),
             ));
-            ctx.register_udf(create_current_user_udf(self.state.clone(), false));
+            ctx.register_udf(create_current_user_udf(
+                self.state.clone(),
+                "current_user",
+                false,
+            ));
+            ctx.register_udf(create_current_user_udf(self.state.clone(), "user", false));
             ctx.register_udf(create_session_user_udf(self.state.clone()));
         }
 
         ctx.register_udf(create_connection_id_udf(self.state.clone()));
         ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
-        ctx.register_udf(create_user_udf(self.state.clone()));
         ctx.register_udf(create_instr_udf());
         ctx.register_udf(create_ucase_udf());
         ctx.register_udf(create_isnull_udf());
@@ -2569,9 +2578,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn planner_meta_fields(&self) -> TransportServiceMetaFields {
         // TODO: application_name for mysql
         let mut meta_fields = HashMap::new();
-
-        if let Some(var) = self.state.get_variable("application_name") {
-            // TODO: It handles None as NULL (as string)
+        if let Some(var) = self.state.all_variables().get("application_name") {
             meta_fields.insert("appName".to_string(), var.value.to_string());
         }
 
@@ -2766,7 +2773,7 @@ mod tests {
                 .with_module_level("cubeclient", log_level.to_level_filter())
                 .with_module_level("cubesql", log_level.to_level_filter())
                 .with_module_level("datafusion", Level::Warn.to_level_filter())
-                .with_module_level("pg_srv", Level::Warn.to_level_filter());
+                .with_module_level("pg-srv", Level::Warn.to_level_filter());
 
             log::set_boxed_logger(Box::new(logger)).unwrap();
             log::set_max_level(log_level.to_level_filter());
@@ -5678,6 +5685,56 @@ ORDER BY \"COUNT(count)\" DESC"
             execute_query(
                 "SELECT * FROM information_schema.tables".to_string(),
                 DatabaseProtocol::MySQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_role_table_grants_pg() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_role_table_grants_postgresql",
+            execute_query(
+                "SELECT * FROM information_schema.role_table_grants".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_observable() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "observable_grants",
+            execute_query(
+                "SELECT DISTINCT privilege_type
+                FROM information_schema.role_table_grants
+                WHERE grantee = user
+                UNION
+                SELECT DISTINCT privilege_type
+                FROM information_schema.role_column_grants
+                WHERE grantee = user
+              "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_information_role_column_grants_pg() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "information_schema_role_column_grants_postgresql",
+            execute_query(
+                "SELECT * FROM information_schema.role_column_grants".to_string(),
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );
@@ -9602,7 +9659,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT CAST(TRUNC(EXTRACT(YEAR FROM order_date)) AS INTEGER), Count(1) FROM KibanaSampleDataEcommerce GROUP BY 1
-            ".to_string(),
+            ".to_string(), 
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 
