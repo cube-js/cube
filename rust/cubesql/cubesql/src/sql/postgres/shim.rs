@@ -642,7 +642,8 @@ impl AsyncPostgresShim {
                 .await?;
 
             let plan =
-                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
+                    .await?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             Some(Portal::new(plan, format, true))
@@ -698,7 +699,8 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query)?;
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
+            let plan =
+                convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).await?;
 
             let description = if let Some(description) = plan.to_row_description(Format::Text)? {
                 if description.len() > 0 {
@@ -897,7 +899,8 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan =
-                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())?;
+                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())
+                        .await?;
 
                 let mut portal = Portal::new(plan, cursor.format, false);
 
@@ -951,7 +954,8 @@ impl AsyncPostgresShim {
                     &select_stmt,
                     meta.clone(),
                     self.session.clone(),
-                )?;
+                )
+                .await?;
 
                 let cursor = Cursor {
                     query: select_stmt,
@@ -1038,7 +1042,8 @@ impl AsyncPostgresShim {
             }
             other => {
                 let plan =
-                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())?;
+                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())
+                        .await?;
 
                 self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
                     .await?;
