@@ -351,8 +351,11 @@ span.group-header {
 }
 
 .menuWrapperHack {
+  padding-top: 56px !important;
+  margin-top: -40px;
   @media screen and (max-width: 767px) {
     padding-top: 70px !important;
+    margin-top: 0;
   }
 }
 
