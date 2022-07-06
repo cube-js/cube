@@ -1195,10 +1195,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.1.tgz#75b4c27948c81e88ccd3a8902047bcd797f38d32"
   integrity sha512-ej5oVy6lykXsvieQtqZxCOaLT+xD4+QNarq78cIYISHmZXshCvROLudpQN3lfL8G0NL7plMSSK+zlyvCaIJ4Iw==
 
-"@cube-dev/purple-banner@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@cube-dev/purple-banner/-/purple-banner-2.0.0.tgz#0b743b95ee7355ee799cb48dda3dd2080f8b327c"
-  integrity sha512-Xu1BK4GH5W84TQaRUIyYn9FcjN0Lhp4APnYos0BoXhmUkAW/ZJ9hv4TKUVWon+ZDuVMaB0nE8TJrR95MzV50ew==
+"@cube-dev/purple-banner@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@cube-dev/purple-banner/-/purple-banner-2.0.3.tgz#bf65ace7fd25d7a61a17e0957946d01210155e6f"
+  integrity sha512-lWQ+huQyvhpH82t05R+i+wzOEvVcy5zORPDqQdXiE7g+V+mEb+SWFg6V/5Q0pH+fXtIK+ONUHvgwDeBtZR1Cmg==
   dependencies:
     classnames "^2.3.1"
 

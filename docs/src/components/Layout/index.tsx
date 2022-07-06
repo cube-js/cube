@@ -199,7 +199,7 @@ class AppLayout extends React.Component<
           render={(data: LayoutQueryResponse) => (
             <>
               <Row>
-                <PurpleBanner />
+                <PurpleBanner debugMode={true}/>
                 <Header
                   className={cx(styles.header, {
                     [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
