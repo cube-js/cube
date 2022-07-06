@@ -29,7 +29,8 @@ mod pg_settings;
 mod pg_stat_activity;
 mod pg_tables;
 mod pg_type;
-pub mod testing_dataset;
+mod testing_blocking;
+mod testing_dataset;
 
 use super::utils;
 pub use pg_am::*;
@@ -51,3 +52,5 @@ pub use pg_settings::*;
 pub use pg_stat_activity::*;
 pub use pg_tables::*;
 pub use pg_type::*;
+pub use testing_blocking::*;
+pub use testing_dataset::*;

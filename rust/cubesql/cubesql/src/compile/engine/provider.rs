@@ -13,13 +13,7 @@ use datafusion::{
 };
 
 use crate::{
-    compile::{
-        engine::information_schema::postgres::{
-            testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-            PgCatalogRolesProvider,
-        },
-        MetaContext,
-    },
+    compile::MetaContext,
     sql::{session::DatabaseProtocol, ColumnType, SessionManager, SessionState},
     transport::V1CubeMetaExt,
     CubeError,
@@ -45,13 +39,14 @@ use super::information_schema::postgres::{
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
-    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
-    PgCatalogDatabaseProvider, PgCatalogDependProvider, PgCatalogDescriptionProvider,
-    PgCatalogEnumProvider, PgCatalogIndexProvider, PgCatalogMatviewsProvider,
-    PgCatalogNamespaceProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
+    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
+    PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
+    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
+    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSettingsProvider,
+    PgCatalogStatActivityProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -316,12 +311,14 @@ impl DatabaseProtocol {
             "pg_catalog.pg_roles".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatActivityProvider>() {
             "pg_catalog.pg_stat_activity".to_string()
-        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
-            "information_schema.testing_dataset".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
             "information_schema.views".to_string()
+        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
+            "information_schema.testing_dataset".to_string()
+        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingBlockingProvider>() {
+            "information_schema.testing_blocking".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -404,8 +401,13 @@ impl DatabaseProtocol {
                 "table_constraints" => {
                     return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()))
                 }
+                #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
+                }
+                #[cfg(debug_assertions)]
+                "testing_blocking" => {
+                    return Some(Arc::new(InfoSchemaTestingBlockingProvider::new()))
                 }
                 "constraint_column_usage" => {
                     return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))

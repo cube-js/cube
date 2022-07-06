@@ -262,14 +262,20 @@ impl PostgresIntegrationTestSuite {
 
     async fn test_cancel(&self) -> RunResult<()> {
         let cancel_token = self.client.cancel_token();
-        let cancel = cancel_token.cancel_query(NoTls);
-        // let cancel = time::sleep(Duration::from_millis(100)).then(|()| cancel);
+        let cancel = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
 
-        let sleep = self.client.batch_execute("SELECT pg_sleep(10)");
+            cancel_token.cancel_query(NoTls).await
+        };
+
+        // testing_blocking tables will neven finish. It's a special testing table
+        let sleep = self
+            .client
+            .batch_execute("SELECT * FROM information_schema.testing_blocking");
 
         match join!(sleep, cancel) {
             (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
-            t => panic!("unexpected return: {:?}", t),
+            t => panic!("unexpected return {:?}", t),
         };
 
         Ok(())
@@ -619,7 +625,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult<()> {
-        self.test_cancel().await.unwrap();
+        self.test_cancel().await?;
         self.test_prepare().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;

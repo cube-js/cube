@@ -308,7 +308,7 @@ impl Portal {
         }
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(level = "trace")]
     pub async fn execute(
         &mut self,
         writer: &mut BatchWriter,
@@ -381,7 +381,7 @@ impl Portal {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider,
+        compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
         sql::{
             dataframe::{Column, DataFrame, Row, TableValue},
             extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},

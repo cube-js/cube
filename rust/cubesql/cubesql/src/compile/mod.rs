@@ -53,7 +53,7 @@ use self::{
             create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
-            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf, create_pg_sleep_udf,
+            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_truetypid_udf, create_pg_truetypmod_udf,
             create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
             create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
@@ -2463,12 +2463,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udtf(create_unnest_udtf());
         ctx.register_udtf(create_generate_subscripts_udtf());
         ctx.register_udtf(create_pg_expandarray_udtf());
-
-        // dev
-        #[cfg(debug_assertions)]
-        {
-            ctx.register_udf(create_pg_sleep_udf());
-        }
 
         ctx
     }
