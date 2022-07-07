@@ -263,24 +263,21 @@ impl RewriteRules for DateRules {
                     vec![literal_string("week"), column_expr("?column")],
                 ),
             ),
-            // rewrite(
-            //     "metabase-interval-date-range",
-            //     binary_expr(
-            //         cast_expr(fun_expr("Now", Vec::<String>::new()), "?data_type"),
-            //         "+",
-            //         literal_expr("?interval"),
-            //     ),
-            //     udf_expr(
-            //         "date_add",
-            //         vec![
-            //             fun_expr("Now", Vec::<String>::new()),
-            //             literal_expr("?interval"),
-            //         ],
-            //     ),
-            // ),
-            //--------------------------------------------------------------------------------
-            //--------------------------------------------------------------------------------
-            //--------------------------------------------------------------------------------
+            rewrite(
+                "metabase-interval-date-range",
+                binary_expr(
+                    cast_expr(fun_expr("Now", Vec::<String>::new()), "?data_type"),
+                    "+",
+                    literal_expr("?interval"),
+                ),
+                udf_expr(
+                    "date_add",
+                    vec![
+                        fun_expr("Now", Vec::<String>::new()),
+                        literal_expr("?interval"),
+                    ],
+                ),
+            ),
             transforming_rewrite("interval-binary-expr", 
                 binary_expr(
                     "?left",
@@ -296,157 +293,21 @@ impl RewriteRules for DateRules {
                 ),
                 self.transform_interval_binary_expr("?interval")
             ),
-            // transforming_rewrite("interval-binary-expr-recursive", 
-            //     binary_expr(
-            //         literal_expr("?interval"),
-            //         "+",
-            //         "?right",
-            //     ), 
-            //     udf_expr(
-            //         "date_add",
-            //         vec![
-            //             "?right".to_string(),
-            //             literal_expr("?interval"),
-            //         ],
-            //     ),
-            //     self.transform_interval_binary_expr("?interval")
-            // ),
-
-            // rewrite(
-            //     "metabase-cast-date-tranc-with-two-binary-exprs-to-date-trunc-with-two-date-add",
-            //     binary_expr(
-            //         cast_expr(
-            //             fun_expr(
-            //                 "DateTrunc",
-            //                 vec![
-            //                     "?granularity".to_string(),
-            //                     binary_expr(
-            //                         binary_expr(
-            //                             fun_expr("Now", Vec::<String>::new()),
-            //                             "+",
-            //                             literal_expr("?innermost_interval"),
-            //                         ),
-            //                         "+",
-            //                         literal_expr("?inner_interval"),
-            //                     ),
-            //                 ],
-            //             ),
-            //             "?data_type",
-            //         ),
-            //         "+",
-            //         literal_expr("?outer_interval"),
-            //     ),
-            //     udf_expr(
-            //         "date_add",
-            //         vec![
-            //             fun_expr(
-            //                 "DateTrunc",
-            //                 vec![
-            //                     "?granularity".to_string(),
-            //                     udf_expr(
-            //                         "date_add",
-            //                         vec![
-            //                             udf_expr(
-            //                                 "date_add",
-            //                                 vec![
-            //                                     fun_expr("Now", Vec::<String>::new()),
-            //                                     literal_expr("?innermost_interval"),
-            //                                 ],
-            //                             ),
-            //                             literal_expr("?inner_interval"),
-            //                         ],
-            //                     ),
-            //                 ],
-            //             ),
-            //             literal_expr("?outer_interval"),
-            //         ],
-            //     ),
-            // ),
-            // rewrite(
-            //     "metabase-cast-date-tranc-with-binary-expr-to-date-trunc-with-date-add",
-            //     binary_expr(
-            //         cast_expr(
-            //             fun_expr(
-            //                 "DateTrunc",
-            //                 vec![
-            //                     "?granularity".to_string(),
-            //                     binary_expr(
-            //                         fun_expr("Now", Vec::<String>::new()),
-            //                         "+",
-            //                         literal_expr("?inner_interval"),
-            //                     ),
-            //                 ],
-            //             ),
-            //             "?data_type",
-            //         ),
-            //         "+",
-            //         literal_expr("?outer_interval"),
-            //     ),
-            //     udf_expr(
-            //         "date_add",
-            //         vec![
-            //             fun_expr(
-            //                 "DateTrunc",
-            //                 vec![
-            //                     "?granularity".to_string(),
-            //                     udf_expr(
-            //                         "date_add",
-            //                         vec![
-            //                             fun_expr("Now", Vec::<String>::new()),
-            //                             literal_expr("?inner_interval"),
-            //                         ],
-            //                     ),
-            //                 ],
-            //             ),
-            //             literal_expr("?outer_interval"),
-            //         ],
-            //     ),
-            // ),
-            // rewrite(
-            //     "metabase-now-plus-interval-in-date-trunc-to-date-add-in-date-trunc",
-            //     fun_expr(
-            //         "DateTrunc",
-            //         vec![
-            //             "?granularity".to_string(),
-            //             binary_expr(
-            //                 fun_expr("Now", Vec::<String>::new()),
-            //                 "+",
-            //                 literal_expr("?interval"),
-            //             ),
-            //         ],
-            //     ),
-            //     fun_expr(
-            //         "DateTrunc",
-            //         vec![
-            //             "?granularity".to_string(),
-            //             udf_expr(
-            //                 "date_add",
-            //                 vec![
-            //                     fun_expr("Now", Vec::<String>::new()),
-            //                     literal_expr("?interval"),
-            //                 ],
-            //             ),
-            //         ],
-            //     ),
-            // ),
-            // rewrite(
-            //     "metabase-cast-now-plus-interval-to-date-add",
-            //     cast_expr(
-            //         binary_expr(
-            //             fun_expr("Now", Vec::<String>::new()),
-            //             "+",
-            //             literal_expr("?interval"),
-            //         ),
-            //         "?data_type",
-            //     ),
-            //     udf_expr(
-            //         "date_add",
-            //         vec![
-            //             fun_expr("Now", Vec::<String>::new()),
-            //             literal_expr("?interval"),
-            //         ],
-            //     ),
-            // ),
+            transforming_rewrite("interval-binary-expr-recursive", 
+                binary_expr(
+                    literal_expr("?interval"),
+                    "+",
+                    "?right",
+                ), 
+                udf_expr(
+                    "date_add",
+                    vec![
+                        "?right".to_string(),
+                        literal_expr("?interval"),
+                    ],
+                ),
+                self.transform_interval_binary_expr("?interval")
+            ),
         ]
     }
 }
