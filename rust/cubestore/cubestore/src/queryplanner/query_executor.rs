@@ -113,8 +113,6 @@ impl QueryExecutor for QueryExecutorImpl {
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
-        println!("RXXX {:?} {:?}", &logical_plan, &physical_plan);
-
         let split_plan = physical_plan;
 
         trace!(
@@ -123,8 +121,6 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-
-        println!("RYYY {}", split_plan.output_partitioning().partition_count());
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;
         let execution_time = execution_time.elapsed()?;
@@ -167,8 +163,6 @@ impl QueryExecutor for QueryExecutorImpl {
         let (physical_plan, logical_plan) = self
             .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
             .await?;
-
-        print!("WXXX {:?} {:?}", &logical_plan, &physical_plan);
 
         let worker_plan;
         let max_batch_rows;
@@ -237,7 +231,6 @@ impl QueryExecutor for QueryExecutorImpl {
             HashMap::new(),
             NoopParquetMetadataCache::new(),
         )?;
-        println!("RRR {:?} {:?}", plan, plan_to_move);
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
@@ -257,7 +250,6 @@ impl QueryExecutor for QueryExecutorImpl {
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
         )?;
-        println!("WWW {:?} {:?}", plan, plan_to_move);
         let plan = Arc::new(plan);
         let ctx = self.worker_context(plan.clone())?;
         let plan_ctx = ctx.clone();
@@ -1123,8 +1115,6 @@ impl ExecutionPlan for ClusterSendExec {
         let (node_name, partitions) = &self.partitions[partition];
 
         let plan = self.serialized_plan_for_partitions(partitions);
-
-        println!("EEE {} {:?} {:?}", node_name, partitions, plan);
 
         if self.use_streaming {
             Ok(self.cluster.run_select_stream(node_name, plan).await?)

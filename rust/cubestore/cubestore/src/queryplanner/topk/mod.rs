@@ -5,7 +5,6 @@ pub use execute::AggregateTopKExec;
 pub use plan::materialize_topk;
 pub use plan::plan_topk;
 
-use crate::queryplanner::serialized_plan::IndexSnapshot;
 use arrow::compute::SortOptions;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
@@ -14,6 +13,7 @@ use serde::Serialize;
 use std::any::Any;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use crate::queryplanner::planning::Snapshots;
 
 /// Workers will split their local results into batches of at least this size.
 pub const MIN_TOPK_STREAM_ROWS: usize = 1024;
@@ -29,7 +29,7 @@ pub struct ClusterAggregateTopK {
     pub aggregate_expr: Vec<Expr>,
     pub order_by: Vec<SortColumn>,
     pub schema: DFSchemaRef,
-    pub snapshots: Vec<Vec<Option<IndexSnapshot>>>,
+    pub snapshots: Snapshots,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
+use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
 use crate::queryplanner::query_executor::{CubeTable, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -192,7 +192,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Vec<Vec<Option<IndexSnapshot>>>,
+        snapshots: Snapshots,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -201,7 +201,7 @@ pub enum SerializedLogicalPlan {
         aggregate_expr: Vec<SerializedExpr>,
         sort_columns: Vec<SortColumn>,
         schema: DFSchemaRef,
-        snapshots: Vec<Vec<Option<IndexSnapshot>>>,
+        snapshots: Snapshots,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,

@@ -888,14 +888,17 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
     arrow::datatypes::Schema::new(schema_fields)
 }
 
+// None snapshot denotes an inline table and its associated fake partition.
+pub type Snapshots = Vec<Vec<Option<IndexSnapshot>>>;
+
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
     pub input: Arc<LogicalPlan>,
-    pub snapshots: Vec<Vec<Option<IndexSnapshot>>>,
+    pub snapshots: Snapshots,
 }
 
 impl ClusterSendNode {
-    pub fn new(input: Arc<LogicalPlan>, snapshots: Vec<Vec<Option<IndexSnapshot>>>) -> Self {
+    pub fn new(input: Arc<LogicalPlan>, snapshots: Snapshots) -> Self {
         ClusterSendNode { input, snapshots }
     }
 
@@ -990,7 +993,6 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                     ));
                 }
                 union_snapshots.extend(send.snapshots.concat());
-                // Code after 'match' will wrap `p` in ClusterSend.
                 *i = send.input.as_ref().clone();
             }
             snapshots = vec![union_snapshots];
@@ -1070,7 +1072,7 @@ impl CubeExtensionPlanner {
     pub fn plan_cluster_send(
         &self,
         input: Arc<dyn ExecutionPlan>,
-        snapshots: &Vec<Vec<Option<IndexSnapshot>>>,
+        snapshots: &Snapshots,
         schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
