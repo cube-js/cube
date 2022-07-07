@@ -40,13 +40,18 @@ describe('OptsHandler class', () => {
     parameters = {};
   });
 
-  test('deprecation warning must be printed if dbType was specified', () => {
-    const core = new CubejsServerCore({
-      logger,
-      dbType: ((context: DriverContext) => 'postgres'),
-    });
-    expect(message).toEqual('Cube.js `CreateOptions.dbType` Property Deprecation');
-  });
+  test.skip(
+    'deprecation warning must be printed if dbType was specified -- ' +
+    'need to be restored after documentation will be added',
+    () => {
+      const core = new CubejsServerCore({
+        logger,
+        dbType: ((context: DriverContext) => 'postgres'),
+      });
+      expect(message).toEqual('Cube.js `CreateOptions.dbType` Property Deprecation');
+    }
+  );
+
   test('must handle vanila CreateOptions', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
@@ -246,18 +251,19 @@ describe('OptsHandler class', () => {
       '["driverFactory" must be a Function]'
     );
 
-    // Case 3
-    await expect(async () => {
-      const core = new CubejsServerCoreExposed({
-        logger,
-        dbType: undefined,
-        driverFactory: () => CubejsServerCore.createDriver('postgres'),
-      });
-      await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
-    }).rejects.toThrow(
-      'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
-      'returns driver instance'
-    );
+    // Case 3 -- need to be restored after assertion will be restored.
+    //
+    // await expect(async () => {
+    //   const core = new CubejsServerCoreExposed({
+    //     logger,
+    //     dbType: undefined,
+    //     driverFactory: () => CubejsServerCore.createDriver('postgres'),
+    //   });
+    //   await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
+    // }).rejects.toThrow(
+    //   'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
+    //   'returns driver instance'
+    // );
 
     // Case 4
     await expect(async () => {
