@@ -81,18 +81,21 @@ export class OptsHandler {
       );
     }
     
-    if (opts.dbType) {
-      this.core.logger(
-        'Cube.js `CreateOptions.dbType` Property Deprecation',
-        {
-          warning: (
-            // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType
-            // link once it will be created.
-            'CreateOptions.dbType property is now deprecated, please migrate.'
-          ),
-        },
-      );
-    }
+    // TODO (buntarb): this assertion should be restored after documentation
+    // will be added.
+    //
+    // if (opts.dbType) {
+    //   this.core.logger(
+    //     'Cube.js `CreateOptions.dbType` Property Deprecation',
+    //     {
+    //       warning: (
+    //         // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType
+    //         // link once it will be created.
+    //         'CreateOptions.dbType property is now deprecated, please migrate.'
+    //       ),
+    //     },
+    //   );
+    // }
   }
 
   /**
@@ -100,22 +103,25 @@ export class OptsHandler {
    */
   private assertDriverFactoryResult(val: DriverConfig | BaseDriver) {
     if (val instanceof BaseDriver) {
-      if (this.decoratedType) {
-        throw new Error(
-          'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
-          'returns driver instance'
-        );
-      }
-      this.core.logger(
-        'Cube.js CreateOptions.driverFactory Property Deprecation',
-        {
-          warning: (
-            // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory
-            // link once it will be created.
-            'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate.'
-          ),
-        },
-      );
+      // TODO (buntarb): these assertions should be restored after documentation
+      // will be added.
+      //
+      // if (this.decoratedType) {
+      //   throw new Error(
+      //     'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
+      //     'returns driver instance'
+      //   );
+      // }
+      // this.core.logger(
+      //   'Cube.js CreateOptions.driverFactory Property Deprecation',
+      //   {
+      //     warning: (
+      //       // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory
+      //       // link once it will be created.
+      //       'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate.'
+      //     ),
+      //   },
+      // );
       return <BaseDriver>val;
     } else if (
       val && val.type && typeof val.type === 'string'
