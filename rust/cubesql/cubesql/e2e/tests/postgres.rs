@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use futures::{pin_mut, TryStreamExt};
-use portpicker::pick_unused_port;
+use portpicker::{pick_unused_port, Port};
 use rust_decimal::prelude::*;
 use tokio::time::sleep;
 
@@ -14,13 +14,14 @@ use datafusion::assert_contains;
 use pg_interval::Interval;
 use pg_srv::{PgType, PgTypeId};
 use tokio::join;
-use tokio_postgres::{error::SqlState, NoTls, Row, SimpleQueryMessage};
+use tokio_postgres::{error::SqlState, Client, NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
 #[derive(Debug)]
 pub struct PostgresIntegrationTestSuite {
     client: tokio_postgres::Client,
+    port: Port,
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
@@ -46,7 +47,7 @@ impl PostgresIntegrationTestSuite {
             );
         };
 
-        let random_port = pick_unused_port().expect("No ports free");
+        let port = pick_unused_port().expect("No ports free");
         // let random_port = 5555;
         // let random_port = 5432;
 
@@ -57,7 +58,7 @@ impl PostgresIntegrationTestSuite {
             let config = config.update_config(|mut c| {
                 // disable MySQL
                 c.bind_address = None;
-                c.postgres_bind_address = Some(format!("0.0.0.0:{}", random_port));
+                c.postgres_bind_address = Some(format!("0.0.0.0:{}", port));
 
                 c
             });
@@ -68,12 +69,14 @@ impl PostgresIntegrationTestSuite {
 
         sleep(Duration::from_millis(1 * 1000)).await;
 
+        let client = PostgresIntegrationTestSuite::create_client(port).await;
+
+        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
+    }
+
+    async fn create_client(port: Port) -> Client {
         let (client, connection) = tokio_postgres::connect(
-            format!(
-                "host=127.0.0.1 port={} user=test password=test",
-                random_port
-            )
-            .as_str(),
+            format!("host=127.0.0.1 port={} user=test password=test", port).as_str(),
             NoTls,
         )
         .await
@@ -87,7 +90,7 @@ impl PostgresIntegrationTestSuite {
             }
         });
 
-        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client }))
+        client
     }
 
     async fn print_query_result<'a>(
@@ -436,6 +439,31 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_portal_pagination(&self) -> RunResult<()> {
+        let mut client = PostgresIntegrationTestSuite::create_client(self.port).await;
+
+        let stmt = client
+            .prepare("SELECT generate_series(1, 100)")
+            .await
+            .unwrap();
+
+        let transaction = client.transaction().await.unwrap();
+
+        let portal = transaction.bind(&stmt, &[]).await.unwrap();
+        let r1 = transaction.query_portal(&portal, 25).await?;
+        assert_eq!(r1.len(), 25);
+
+        let r2 = transaction.query_portal(&portal, 50).await?;
+        assert_eq!(r2.len(), 50);
+
+        let r3 = transaction.query_portal(&portal, 75).await?;
+        assert_eq!(r3.len(), 25);
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
     async fn test_simple_cursors(&self) -> RunResult<()> {
         self.test_simple_query(
             r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 100);"#
@@ -631,6 +659,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
+        self.test_portal_pagination().await?;
         self.test_simple_cursors().await?;
         self.test_simple_cursors_without_hold().await?;
         self.test_simple_cursors_close_specific().await?;
