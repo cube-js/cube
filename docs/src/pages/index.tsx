@@ -32,7 +32,7 @@ class IndexPage extends Component<Props> {
         
         <InfoBox>
           <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
-          Building on our <a href="https://cube.dev/events/sql-api">last workshop</a>, you will learn how to make Cube available to your favorite Business Intelligence applications.<br /> 
+          Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
           Check out the agenda and resigter for the workshop today on the <a href=" ">event page</a> 👈
         </InfoBox>
 
