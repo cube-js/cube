@@ -846,6 +846,14 @@ cube(`Orders`, {
 });
 ```
 
+To maximize performance, you can introduce an index per query, so the set of dimensions used in the query is the same as in the index.
+There's no need to define measure columns in the index.
+Index column order is the sort order of all data within an index.
+Under the hood Cube Store will create table dataset copy and will sort it according to index specification.
+Cube Store works best when you define all your `equals` filter dimensions first and all dimensions from `GROUP BY` last.
+For range filter columns like `contains`, `>`, `<`, `>=`, `<=` with high selectivity, typically less than 5% of records keep those columns before `GROUP BY` dimensions.
+Otherwise, for low selectivity range filters, consider putting these columns after `GROUP BY` dimensions.
+
 For `originalSql` pre-aggregations, the original column names as strings can be
 used:
 
