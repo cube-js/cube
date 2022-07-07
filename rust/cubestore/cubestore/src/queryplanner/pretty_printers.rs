@@ -1,5 +1,7 @@
 //! Presentation of query plans for use in tests.
 
+use bigdecimal::ToPrimitive;
+
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::filter::FilterExec;
@@ -174,9 +176,11 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 .iter()
                                 .map(|is| is
                                     .iter()
-                                    .map(|i| i
-                                        .clone()
-                                        .map_or("_".to_string(), |i| i.index.get_id().to_string()))
+                                    .map(|i| i.clone().map_or(-1, |i| i
+                                        .index
+                                        .get_id()
+                                        .to_i64()
+                                        .map_or(-2, |i| i)))
                                     .collect_vec())
                                 .collect_vec()
                         )
