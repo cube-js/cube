@@ -585,7 +585,10 @@ fn compute_workers(
         workers: Vec::new(),
     };
     match p.accept(&mut v) {
-        Ok(_) => Ok(v.workers),
+        Ok(false) => Ok(v.workers),
+        Ok(true) => Err(CubeError::internal(
+            "no cluster send node found in plan".to_string(),
+        )),
         Err(_) => panic!("unexpected return value"),
     }
 }

@@ -192,7 +192,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Vec<Vec<Option<IndexSnapshot>>>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -201,7 +201,7 @@ pub enum SerializedLogicalPlan {
         aggregate_expr: Vec<SerializedExpr>,
         sort_columns: Vec<SortColumn>,
         schema: DFSchemaRef,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Vec<Vec<Option<IndexSnapshot>>>,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,

@@ -113,7 +113,7 @@ impl QueryExecutor for QueryExecutorImpl {
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
-        print!("RXXX {:?} {:?}", &logical_plan, &physical_plan);
+        println!("RXXX {:?} {:?}", &logical_plan, &physical_plan);
 
         let split_plan = physical_plan;
 
@@ -123,6 +123,8 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
+
+        println!("RYYY {}", split_plan.output_partitioning().partition_count());
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;
         let execution_time = execution_time.elapsed()?;
@@ -853,6 +855,8 @@ impl Debug for InlineTableProvider {
     }
 }
 
+pub const INLINE_PARTITION_ID: u64 = 0xffffffff;
+
 pub struct ClusterSendExec {
     schema: SchemaRef,
     pub partitions: Vec<(
@@ -871,7 +875,7 @@ impl ClusterSendExec {
         schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        union_snapshots: &[Vec<IndexSnapshot>],
+        union_snapshots: &[Vec<Option<IndexSnapshot>>],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
@@ -892,7 +896,7 @@ impl ClusterSendExec {
 
     pub(crate) fn distribute_to_workers(
         config: &dyn ConfigObj,
-        snapshots: &[Vec<IndexSnapshot>],
+        snapshots: &[Vec<Option<IndexSnapshot>>],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<(String, Vec<(u64, RowRange)>)> {
         let partitions = Self::logical_partitions(snapshots, tree);
@@ -900,7 +904,7 @@ impl ClusterSendExec {
     }
 
     fn logical_partitions(
-        snapshots: &[Vec<IndexSnapshot>],
+        snapshots: &[Vec<Option<IndexSnapshot>>],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<Vec<IdRow<Partition>>> {
         let mut to_multiply = Vec::new();
@@ -908,14 +912,21 @@ impl ClusterSendExec {
         for union in snapshots.iter() {
             let mut ordinary_partitions = Vec::new();
             for index in union {
-                for p in &index.partitions {
-                    match p.partition.get_row().multi_partition_id() {
-                        Some(id) => multi_partitions
-                            .entry(id)
-                            .or_default()
-                            .push(p.partition.clone()),
-                        None => ordinary_partitions.push(p.partition.clone()),
-                    }
+                match index {
+                    Some(index) => {
+                        for p in &index.partitions {
+                            match p.partition.get_row().multi_partition_id() {
+                                Some(id) => multi_partitions
+                                    .entry(id)
+                                    .or_default()
+                                    .push(p.partition.clone()),
+                                None => ordinary_partitions.push(p.partition.clone()),
+                            }
+                        }
+                    },
+                    None => {
+                        ordinary_partitions.push(IdRow::new(INLINE_PARTITION_ID, Partition::new(INLINE_PARTITION_ID, None, None, None)))
+                    },
                 }
             }
             if !ordinary_partitions.is_empty() {

@@ -10,7 +10,6 @@ use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
 use rewrite_plan::rewrite_physical_plan;
 use std::sync::Arc;
-use log::trace;
 
 mod distributed_partial_aggregate;
 mod prefer_inplace_aggregates;
@@ -53,10 +52,7 @@ impl QueryPlanner for CubeQueryPlanner {
             })])
             .create_physical_plan(logical_plan, ctx_state)?;
         // TODO: assert there is only a single ClusterSendExec in the plan.
-        println!("PPP {:?}", &p);
-        let p = finalize_physical_plan(p);
-        println!("PPP2 {:?}", &p);
-        p
+        finalize_physical_plan(p)
     }
 }
 

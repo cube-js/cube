@@ -170,7 +170,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             "ClusterSend, indices: {:?}",
                             cs.snapshots
                                 .iter()
-                                .map(|is| is.iter().map(|i| i.index.get_id()).collect_vec())
+                                .map(|is| is.iter().map(|i| i.clone().map_or("_".to_string(), |i| i.index.get_id().to_string())).collect_vec())
                                 .collect_vec()
                         )
                     } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()

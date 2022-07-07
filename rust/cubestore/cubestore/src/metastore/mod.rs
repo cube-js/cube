@@ -558,7 +558,6 @@ pub struct Schema {
 pub enum IndexType {
     Regular = 1,
     Aggregate = 2,
-    Inline = 3,
 }
 
 data_frame_from! {

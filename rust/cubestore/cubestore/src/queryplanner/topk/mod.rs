@@ -29,7 +29,7 @@ pub struct ClusterAggregateTopK {
     pub aggregate_expr: Vec<Expr>,
     pub order_by: Vec<SortColumn>,
     pub schema: DFSchemaRef,
-    pub snapshots: Vec<Vec<IndexSnapshot>>,
+    pub snapshots: Vec<Vec<Option<IndexSnapshot>>>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
