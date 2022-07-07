@@ -19,6 +19,10 @@ export const DB_CAST = {
     SELECT_PREFIX: 'with tmp_tbl as (\n',
     SELECT_SUFFIX: ')\nselect * from tmp_tbl',
   },
+  'databricks-jdbc': {
+    SELECT_PREFIX: '',
+    SELECT_SUFFIX: '',
+  },
 };
 export const DATE_CAST = {
   athena: {
@@ -28,6 +32,10 @@ export const DATE_CAST = {
   bigquery: {
     DATE_PREFIX: 'parse_date(\'%Y-%m-%d\', ',
     DATE_SUFFIX: ')',
+  },
+  'databricks-jdbc': {
+    DATE_PREFIX: 'to_date(',
+    DATE_SUFFIX: ', \'yyyy-MM-dd\')',
   },
   firebolt: {
     DATE_PREFIX: 'to_date(',

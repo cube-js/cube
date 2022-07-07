@@ -32,4 +32,9 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_USER',
     'CUBEJS_DB_PASS',
   ],
+  'databricks-jdbc': [
+    'CUBEJS_DB_DATABRICKS_URL',
+    'CUBEJS_DB_DATABRICKS_ACCEPT_POLICY',
+    'CUBEJS_DB_NAME',
+  ],
 };

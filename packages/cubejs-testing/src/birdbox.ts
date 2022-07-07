@@ -423,6 +423,8 @@ export async function startBirdBoxFromCli(
       }
   };
 
+  console.log(JSON.stringify(env, undefined, 2));
+
   try {
     cli = spawn(
       options.useCubejsServerBinary
@@ -592,7 +594,7 @@ export async function getBirdbox(
     }
   } catch (e) {
     clearTestData();
-    process.stderr.write(e.toString());
+    process.stderr.write((<Error>e).toString());
     process.exit(1);
   }
   return birdbox;
