@@ -9,7 +9,7 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::{Cursor, Portal},
+        extended::{Cursor, Portal, PortalFrom},
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
@@ -22,7 +22,7 @@ use crate::{
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format, InitialMessage},
+    protocol::{ErrorCode, ErrorResponse, Format, InitialMessage, PortalCompletion},
     PgType, PgTypeId, ProtocolError,
 };
 use sqlparser::{
@@ -353,6 +353,18 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    pub async fn write_completion(
+        &mut self,
+        completion: PortalCompletion,
+    ) -> Result<(), ConnectionError> {
+        match completion {
+            PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
+            PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
+        }
+
+        Ok(())
+    }
+
     pub async fn write<Message: protocol::Serialize>(
         &mut self,
         message: Message,
@@ -653,7 +665,7 @@ impl AsyncPostgresShim {
                                 buffer::write_direct(&mut self.socket, writer).await?
                             }
 
-                            self.write(completion).await?;
+                            self.write_completion(completion).await?;
                         },
                     }
                 }
@@ -705,7 +717,7 @@ impl AsyncPostgresShim {
                     .await?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-            Some(Portal::new(plan, format, true))
+            Some(Portal::new(plan, format, PortalFrom::Extended))
         } else {
             None
         };
@@ -852,8 +864,12 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Rollback { .. } => {
                 if self.end_transaction()? == false {
@@ -868,7 +884,7 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
                     0,
                     CancellationToken::new(),
                 )
@@ -887,7 +903,7 @@ impl AsyncPostgresShim {
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
 
                 self.write_portal(
-                    &mut Portal::new(plan, Format::Text, true),
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
                     0,
                     CancellationToken::new(),
                 )
@@ -996,7 +1012,7 @@ impl AsyncPostgresShim {
                     convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())
                         .await?;
 
-                let mut portal = Portal::new(plan, cursor.format, false);
+                let mut portal = Portal::new(plan, cursor.format, PortalFrom::Fetch);
 
                 self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, Some(portal));
@@ -1075,8 +1091,12 @@ impl AsyncPostgresShim {
                 let plan =
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Discard { object_type } => {
                 self.statements = HashMap::new();
@@ -1088,8 +1108,12 @@ impl AsyncPostgresShim {
                     CommandCompletion::Discard(object_type.to_string()),
                 );
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Close { cursor } => {
                 let plan = match cursor {
@@ -1131,16 +1155,24 @@ impl AsyncPostgresShim {
                     }
                 }?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             other => {
                 let plan =
                     convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())
                         .await?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0, cancel)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
         };
 
@@ -1172,7 +1204,7 @@ impl AsyncPostgresShim {
             buffer::write_direct(&mut self.socket, writer).await?;
         };
 
-        self.write(completion).await
+        self.write_completion(completion).await
     }
 
     /// Pipeline of Execution

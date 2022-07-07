@@ -324,6 +324,24 @@ impl Serialize for BackendKeyData {
     }
 }
 
+/// (B) Alternative reply for Execute command before completing the execution of a portal (due to reaching a nonzero result-row count)
+#[derive(Debug, PartialEq)]
+pub struct PortalSuspended {}
+
+impl PortalSuspended {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for PortalSuspended {
+    const CODE: u8 = b's';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 pub struct ParameterStatus {
     name: String,
     value: String,
@@ -383,6 +401,7 @@ impl Serialize for CloseComplete {
 }
 
 /// (B) Success reply for Parse command.
+#[derive(Debug)]
 pub struct ParseComplete {}
 
 impl ParseComplete {
@@ -400,10 +419,16 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PortalCompletion {
+    Complete(CommandComplete),
+    Suspended(PortalSuspended),
+}
+
 /// It's used to describe client that changes was done.
 /// The command tag. This is usually a single word that identifies which SQL command was completed.
 /// See more variants from sources: <https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27>
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Fetch(u32),
