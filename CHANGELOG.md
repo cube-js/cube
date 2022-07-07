@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.31](https://github.com/cube-js/cube.js/compare/v0.30.30...v0.30.31) (2022-07-07)
+
+
+### Bug Fixes
+
+* **playground:** member search ([#4850](https://github.com/cube-js/cube.js/issues/4850)) ([c110ca5](https://github.com/cube-js/cube.js/commit/c110ca5c517d7f513442ad17bba9d62477877fd9))
+* **server-core:** dbType assertion ([237f920](https://github.com/cube-js/cube.js/commit/237f92013ec4d8ed34f958018fb85ae8e5b41600))
+
+
+### Features
+
+* **cubesql:** Initial support for canceling queries in pg-wire ([#4847](https://github.com/cube-js/cube.js/issues/4847)) ([bce0f99](https://github.com/cube-js/cube.js/commit/bce0f994d59a48f221cce3d21e3c2f3244e5f3a1))
+
+
+
+
+
 ## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
 
 
