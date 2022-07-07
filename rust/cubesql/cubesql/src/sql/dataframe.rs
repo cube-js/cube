@@ -403,7 +403,7 @@ pub fn batch_to_dataframe(
     let mut cols = Vec::with_capacity(schema.fields().len());
     let mut all_rows = vec![];
 
-    for (_i, field) in schema.fields().iter().enumerate() {
+    for field in schema.fields().iter() {
         cols.push(Column::new(
             field.name().clone(),
             arrow_to_column_type(field.data_type().clone())?,
