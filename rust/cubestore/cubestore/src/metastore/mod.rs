@@ -394,8 +394,15 @@ impl ColumnType {
             static ref DECIMAL_RE: Regex = Regex::new(r"decimal\((?P<scale>\d+)\)").unwrap();
         }
         if let Some(captures) = DECIMAL_RE.captures(s) {
-            let scale = captures.name("scale").ok_or(CubeError::internal("missing scale capture".to_string()))?.as_str().parse::<i32>()?;
-            Ok(ColumnType::Decimal { scale, precision: 0 })
+            let scale = captures
+                .name("scale")
+                .ok_or(CubeError::internal("missing scale capture".to_string()))?
+                .as_str()
+                .parse::<i32>()?;
+            Ok(ColumnType::Decimal {
+                scale,
+                precision: 0,
+            })
         } else {
             match s {
                 "text" => Ok(ColumnType::String),
@@ -409,7 +416,10 @@ impl ColumnType {
                 "float" => Ok(ColumnType::Float),
                 "boolean" => Ok(ColumnType::Boolean),
                 _ => {
-                    return Err(CubeError::user(format!("Column type '{}' is not supported", s)))
+                    return Err(CubeError::user(format!(
+                        "Column type '{}' is not supported",
+                        s
+                    )))
                 }
             }
         }

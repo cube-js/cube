@@ -10,6 +10,7 @@ use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
+use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
@@ -56,7 +57,6 @@ use std::mem::take;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
-use crate::table::data::rows_to_columns;
 
 #[automock]
 #[async_trait]
@@ -827,7 +827,7 @@ impl ExecutionPlan for CubeTableExec {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InlineTableProvider {
-    data: Arc<DataFrame>
+    data: Arc<DataFrame>,
 }
 
 impl InlineTableProvider {
@@ -842,8 +842,7 @@ impl InlineTableProvider {
 
 impl Debug for InlineTableProvider {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InlineTable")
-            .finish()
+        f.debug_struct("InlineTable").finish()
     }
 }
 
@@ -905,6 +904,10 @@ impl ClusterSendExec {
             let mut ordinary_partitions = Vec::new();
             for index in union {
                 match index {
+                    None => ordinary_partitions.push(IdRow::new(
+                        INLINE_PARTITION_ID,
+                        Partition::new(INLINE_PARTITION_ID, None, None, None),
+                    )),
                     Some(index) => {
                         for p in &index.partitions {
                             match p.partition.get_row().multi_partition_id() {
@@ -915,10 +918,7 @@ impl ClusterSendExec {
                                 None => ordinary_partitions.push(p.partition.clone()),
                             }
                         }
-                    },
-                    None => {
-                        ordinary_partitions.push(IdRow::new(INLINE_PARTITION_ID, Partition::new(INLINE_PARTITION_ID, None, None, None)))
-                    },
+                    }
                 }
             }
             if !ordinary_partitions.is_empty() {
@@ -1431,7 +1431,7 @@ pub fn dataframe_to_batches(
     let mut batches = vec![];
     let mut b = 0;
     while b < data.len() {
-        let rows = &data.get_rows()[b .. min(b + batch_size, data.len())];
+        let rows = &data.get_rows()[b..min(b + batch_size, data.len())];
         let batch = rows_to_columns(&data.get_columns(), rows);
         batches.push(RecordBatch::try_new(data.get_schema(), batch)?);
         b += batch_size;

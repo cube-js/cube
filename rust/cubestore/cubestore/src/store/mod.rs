@@ -65,7 +65,10 @@ impl DataFrame {
 
     pub fn get_schema(&self) -> SchemaRef {
         Arc::new(Schema::new(
-            self.columns.iter().map(|c| c.clone().into()).collect::<Vec<_>>(),
+            self.columns
+                .iter()
+                .map(|c| c.clone().into())
+                .collect::<Vec<_>>(),
         ))
     }
 

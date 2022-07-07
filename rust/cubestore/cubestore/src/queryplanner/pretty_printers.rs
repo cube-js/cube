@@ -19,7 +19,9 @@ use itertools::{repeat_n, Itertools};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider};
+use crate::queryplanner::query_executor::{
+    ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
+};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
@@ -170,7 +172,12 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             "ClusterSend, indices: {:?}",
                             cs.snapshots
                                 .iter()
-                                .map(|is| is.iter().map(|i| i.clone().map_or("_".to_string(), |i| i.index.get_id().to_string())).collect_vec())
+                                .map(|is| is
+                                    .iter()
+                                    .map(|i| i
+                                        .clone()
+                                        .map_or("_".to_string(), |i| i.index.get_id().to_string()))
+                                    .collect_vec())
                                 .collect_vec()
                         )
                     } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()

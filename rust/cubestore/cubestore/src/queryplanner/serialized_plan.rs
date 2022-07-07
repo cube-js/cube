@@ -313,7 +313,7 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
-                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone())
+                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone()),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -831,7 +831,9 @@ impl SerializedPlan {
                 table_name: table_name.clone(),
                 source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
                     SerializedTableSource::CubeTable(cube_table.clone())
-                } else if let Some(inline_table) = source.as_any().downcast_ref::<InlineTableProvider>() {
+                } else if let Some(inline_table) =
+                    source.as_any().downcast_ref::<InlineTableProvider>()
+                {
                     SerializedTableSource::InlineTable(inline_table.clone())
                 } else {
                     panic!("Unexpected table source");

@@ -488,7 +488,9 @@ impl ChooseIndex<'_> {
                     let index_schema = source.schema();
                     assert_eq!(table_schema, index_schema);
 
-                    return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]]).into_plan());
+                    return Ok(
+                        ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]]).into_plan(),
+                    );
                 } else {
                     return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![None]]).into_plan());
                 }
@@ -975,7 +977,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             snapshots = send.snapshots.clone();
             *input = send.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan())
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Union { inputs, .. } => {
             // Handle UNION over constants, e.g. inline data series.
@@ -996,7 +998,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 *i = send.input.as_ref().clone();
             }
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan())
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Join { left, right, .. } => {
             let lsend;
@@ -1020,7 +1022,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 .collect();
             *left = lsend.input.clone();
             *right = rsend.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan())
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
             return Err(DataFusionError::Internal(

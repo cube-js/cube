@@ -149,10 +149,7 @@ impl ImportFormat {
         ImportFormat::parse_column_value_str(column, value)
     }
 
-    pub fn parse_column_value_str(
-        column: &Column,
-        value: &str,
-    ) -> Result<TableValue, CubeError> {
+    pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
         Ok(match column.get_column_type() {
             ColumnType::String => TableValue::String(value.to_string()),
             ColumnType::Int => value

@@ -503,7 +503,10 @@ impl SqlServiceImpl {
         // TODO: metastore snapshot must be consistent wrt the dumped data.
         let logical_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(Statement::Query(q)), Arc::new(InlineTables::new()))
+            .logical_plan(
+                DFStatement::Statement(Statement::Query(q)),
+                Arc::new(InlineTables::new()),
+            )
             .await?;
 
         let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
@@ -572,7 +575,10 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(statement), Arc::new(InlineTables::new()))
+            .logical_plan(
+                DFStatement::Statement(statement),
+                Arc::new(InlineTables::new()),
+            )
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -1004,7 +1010,10 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)), context.inline_tables.clone())
+                    .logical_plan(
+                        DFStatement::Statement(Statement::Query(q)),
+                        context.inline_tables.clone(),
+                    )
                     .await?;
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1075,7 +1084,10 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)), Arc::new(InlineTables::new()))
+                    .logical_plan(
+                        DFStatement::Statement(Statement::Query(q)),
+                        Arc::new(InlineTables::new()),
+                    )
                     .await?;
                 match logical_plan {
                     QueryPlan::Select(router_plan, _) => {
