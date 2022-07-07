@@ -204,7 +204,6 @@ crate::plan_to_language! {
             expr: Box<Expr>,
             key: Box<Expr>,
         },
-
         CubeScan {
             cube: Arc<LogicalPlan>,
             members: Vec<LogicalPlan>,

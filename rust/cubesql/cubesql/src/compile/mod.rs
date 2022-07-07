@@ -38,7 +38,10 @@ use self::{
     context::*,
     engine::{
         context::VariablesProvider,
-        df::{planner::CubeQueryPlanner, scan::CubeScanNode},
+        df::{
+            planner::CubeQueryPlanner,
+            scan::{CubeScanNode, MemberField},
+        },
         information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
         udf::{
@@ -52,27 +55,19 @@ use self::{
             create_locate_udf, create_makedate_udf, create_measure_udaf, create_minute_udf,
             create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
-            create_pg_get_userbyid_udf, create_pg_numeric_precision_udf,
-            create_pg_numeric_scale_udf, create_pg_table_is_visible_udf, create_pg_truetypid_udf,
-            create_pg_truetypmod_udf, create_pg_type_is_visible_udf, create_quarter_udf,
-            create_second_udf, create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
-            create_to_char_udf, create_ucase_udf, create_unnest_udtf, create_user_udf,
-            create_version_udf, create_year_udf,
+            create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
+            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
+            create_pg_table_is_visible_udf, create_pg_truetypid_udf, create_pg_truetypmod_udf,
+            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
+            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
+            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
+            create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
 };
 use crate::{
-    compile::{
-        builder::QueryBuilder,
-        engine::{
-            df::scan::MemberField,
-            udf::{
-                create_pg_is_other_temp_schema, create_pg_my_temp_schema, create_session_user_udf,
-            },
-        },
-        rewrite::converter::LogicalPlanToLanguageConverter,
-    },
+    compile::{builder::QueryBuilder, rewrite::converter::LogicalPlanToLanguageConverter},
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
@@ -2574,7 +2569,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn planner_meta_fields(&self) -> TransportServiceMetaFields {
         // TODO: application_name for mysql
         let mut meta_fields = HashMap::new();
-        if let Some(var) = self.state.all_variables().get("application_name") {
+
+        if let Some(var) = self.state.get_variable("application_name") {
+            // TODO: It handles None as NULL (as string)
             meta_fields.insert("appName".to_string(), var.value.to_string());
         }
 
@@ -2769,7 +2766,7 @@ mod tests {
                 .with_module_level("cubeclient", log_level.to_level_filter())
                 .with_module_level("cubesql", log_level.to_level_filter())
                 .with_module_level("datafusion", Level::Warn.to_level_filter())
-                .with_module_level("pg-srv", Level::Warn.to_level_filter());
+                .with_module_level("pg_srv", Level::Warn.to_level_filter());
 
             log::set_boxed_logger(Box::new(logger)).unwrap();
             log::set_max_level(log_level.to_level_filter());
@@ -9605,7 +9602,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT CAST(TRUNC(EXTRACT(YEAR FROM order_date)) AS INTEGER), Count(1) FROM KibanaSampleDataEcommerce GROUP BY 1
-            ".to_string(), 
+            ".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 

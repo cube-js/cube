@@ -249,6 +249,7 @@ impl ToProtocolValue for ListValue {
     }
 }
 
+#[derive(Debug)]
 pub struct BatchWriter {
     format: Format,
     // Data of whole rows
