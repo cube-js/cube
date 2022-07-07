@@ -19,7 +19,7 @@ use itertools::{repeat_n, Itertools};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
+use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
@@ -229,6 +229,8 @@ fn pp_source(t: &dyn TableProvider) -> String {
         "CubeTableLogical".to_string()
     } else if let Some(t) = t.as_any().downcast_ref::<CubeTable>() {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
+    } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
+        format!("InlineTableProvider(data: {} rows)", t.get_data().len())
     } else {
         panic!("unknown table provider");
     }

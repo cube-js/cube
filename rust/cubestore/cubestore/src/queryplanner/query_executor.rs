@@ -264,6 +264,7 @@ impl QueryExecutor for QueryExecutorImpl {
             plan_to_move,
         ))
     }
+
     async fn pp_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -838,6 +839,10 @@ pub struct InlineTableProvider {
 impl InlineTableProvider {
     pub fn new(data: Arc<DataFrame>) -> InlineTableProvider {
         InlineTableProvider { data }
+    }
+
+    pub fn get_data(self: &Self) -> Arc<DataFrame> {
+        self.data.clone()
     }
 }
 
