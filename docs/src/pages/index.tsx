@@ -30,6 +30,12 @@ class IndexPage extends Component<Props> {
         <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
         
+        <InfoBox>
+          <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+          Building on our <a href="https://cube.dev/events/sql-api">last workshop</a>, you will learn how to make Cube available to your favorite Business Intelligence applications.<br /> 
+          Check out the agenda and resigter for the workshop today on the <a href=" ">event page</a> 👈
+        </InfoBox>
+
         <Row>
           <Col span={24}>
             <p>
