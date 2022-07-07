@@ -59,6 +59,12 @@ export class OptsHandler {
   private decoratedFactory = false;
 
   /**
+   * Map to store driverFactory function result type. This map needs to be
+   * removed after dbType deprecation period will be passed.
+   */
+  private driverFactoryType: Map<string, string> = new Map();
+
+  /**
    * Initialized options.
    */
   private initializedOptions: ServerCoreInitializedOptions;
@@ -101,10 +107,13 @@ export class OptsHandler {
   /**
    * Assert value returned from the driver factory.
    */
-  private assertDriverFactoryResult(val: DriverConfig | BaseDriver) {
+  private assertDriverFactoryResult(
+    val: DriverConfig | BaseDriver,
+    ctx: DriverContext,
+  ) {
     if (val instanceof BaseDriver) {
-      // TODO (buntarb): these assertions should be restored after documentation
-      // will be added.
+      // TODO (buntarb): these assertions should be restored after dbType
+      // deprecation period will be passed.
       //
       // if (this.decoratedType) {
       //   throw new Error(
@@ -122,10 +131,16 @@ export class OptsHandler {
       //     ),
       //   },
       // );
+      if (!this.driverFactoryType.has(ctx.dataSource)) {
+        this.driverFactoryType.set(ctx.dataSource, 'BaseDriver');
+      }
       return <BaseDriver>val;
     } else if (
       val && val.type && typeof val.type === 'string'
     ) {
+      if (!this.driverFactoryType.has(ctx.dataSource)) {
+        this.driverFactoryType.set(ctx.dataSource, 'DriverConfig');
+      }
       return <DriverConfig>val;
     } else {
       throw new Error(
@@ -163,13 +178,16 @@ export class OptsHandler {
     const { dbType, driverFactory } = opts;
     this.decoratedType = !dbType;
     this.decoratedFactory = !driverFactory;
-
     return async (ctx: DriverContext) => {
       if (!driverFactory) {
+        if (!this.driverFactoryType.has(ctx.dataSource)) {
+          this.driverFactoryType.set(ctx.dataSource, 'DriverConfig');
+        }
         return this.defaultDriverFactory(ctx);
       } else {
         return this.assertDriverFactoryResult(
           await driverFactory(ctx),
+          ctx,
         );
       }
     };
@@ -186,7 +204,30 @@ export class OptsHandler {
     const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
       if (!dbType) {
-        const { type } = <DriverConfig>(await driverFactory(ctx));
+        // TODO (buntarb): this should be restored after dbType deprecation
+        // period will be passed.
+        // const { type } = <DriverConfig>(await driverFactory(ctx));
+
+        let val: undefined | BaseDriver | DriverConfig;
+        let type: DatabaseType;
+
+        if (!this.driverFactoryType.has(ctx.dataSource)) {
+          val = await driverFactory(ctx);
+        }
+
+        switch (this.driverFactoryType.get(ctx.dataSource)) {
+          case 'BaseDriver':
+            if (process.env.CUBEJS_DB_TYPE) {
+              type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+            }
+            break;
+          case 'DriverConfig':
+            type = (<DriverConfig>(val || await driverFactory(ctx))).type;
+            break;
+          default:
+            break;
+        }
+
         return type;
       } else if (typeof dbType === 'function') {
         return this.assertDbTypeResult(await dbType(ctx));
