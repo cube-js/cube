@@ -354,10 +354,11 @@ export class OptsHandler {
         })
       );
 
-    let externalDialectFactory =
-      () => typeof externalDbType === 'string' &&
+    let externalDialectFactory = () => (
+      typeof externalDbType === 'string' &&
       lookupDriverClass(externalDbType).dialectClass &&
-      lookupDriverClass(externalDbType).dialectClass();
+      lookupDriverClass(externalDbType).dialectClass()
+    );
 
     if (!this.isDevMode() && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
@@ -540,7 +541,7 @@ export class OptsHandler {
    * Determines whether the current instance is configured as a refresh worker
    * or not. It always returns false in the dev mode.
    */
-  private configuredAsRefreshWorker(): boolean {
+  private isRefreshWorker(): boolean {
     return (
       !this.isDevMode() &&
       this.configuredForScheduledRefresh()
@@ -551,10 +552,10 @@ export class OptsHandler {
    * Determines whether the current instance is configured as an api worker or
    * not. It always returns false in the dev mode.
    */
-  private configuredAsApiWorker(): boolean {
+  private isApiWorker(): boolean {
     return (
       !this.isDevMode() &&
-      !this.configuredAsRefreshWorker()
+      !this.configuredForScheduledRefresh()
     );
   }
 
@@ -562,11 +563,11 @@ export class OptsHandler {
    * Determines whether the current instance is configured as pre-aggs builder
    * or not.
    */
-  private configuredAsPreAggsBuilder(): boolean {
+  private isPreAggsBuilder(): boolean {
     return (
       this.isDevMode() ||
-      this.configuredAsRefreshWorker() ||
-      this.configuredAsApiWorker() && getEnv('preAggregationsBuilder')
+      this.isRefreshWorker() ||
+      this.isApiWorker() && getEnv('preAggregationsBuilder')
     );
   }
 
@@ -669,7 +670,7 @@ export class OptsHandler {
       clone.preAggregationsOptions.externalRefresh !== undefined
         ? clone.preAggregationsOptions.externalRefresh
         : (
-          !this.configuredAsPreAggsBuilder() ||
+          !this.isPreAggsBuilder() ||
           clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
         );
 
