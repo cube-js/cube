@@ -494,11 +494,7 @@ impl ChooseIndex<'_> {
                     }
                         .into_plan());
                 } else {
-                    return Ok(ClusterSendNode {
-                        input: Arc::new(p),
-                        snapshots: vec![],
-                    }
-                        .into_plan());
+                    return Ok(p);
                 }
             }
             _ => return Ok(p),
@@ -975,29 +971,38 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 return Ok(p);
             }
             snapshots = send.snapshots.clone();
-            // Code after 'match' will wrap `p` in ClusterSend.
             *input = send.input.clone();
+            return Ok(ClusterSendNode {
+                input: Arc::new(p),
+                snapshots,
+            }
+                .into_plan())
         }
-        LogicalPlan::Union { inputs, .. } => {
+        LogicalPlan::Union { inputs, schema, alias } => {
             // Handle UNION over constants, e.g. inline data series.
             if inputs.iter().all(|p| try_extract_cluster_send(p).is_none()) {
                 return Ok(p);
             }
+            let mut router_inputs = Vec::new();
+            let mut worker_inputs = Vec::new();
             let mut union_snapshots = Vec::new();
             for i in inputs {
-                let send;
                 if let Some(s) = try_extract_cluster_send(i) {
-                    send = s;
+                    union_snapshots.extend(s.snapshots.concat());
+                    worker_inputs.push(s.input.as_ref().clone());
                 } else {
-                    return Err(DataFusionError::Plan(
-                        "UNION argument not supported".to_string(),
-                    ));
+                    router_inputs.push(i.clone())
                 }
-                union_snapshots.extend(send.snapshots.concat());
-                // Code after 'match' will wrap `p` in ClusterSend.
-                *i = send.input.as_ref().clone();
             }
             snapshots = vec![union_snapshots];
+            router_inputs.push(
+                ClusterSendNode {
+                    input: Arc::new(LogicalPlan::Union { inputs: worker_inputs, schema: schema.clone(), alias: alias.clone() }),
+                    snapshots,
+                }
+                    .into_plan()
+            );
+            return Ok(LogicalPlan::Union { inputs: router_inputs, schema: schema.clone(), alias: alias.clone() })
         }
         LogicalPlan::Join { left, right, .. } => {
             let lsend;
@@ -1019,9 +1024,13 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 .chain(rsend.snapshots.iter())
                 .cloned()
                 .collect();
-            // Code after 'match' will wrap `p` in ClusterSend.
             *left = lsend.input.clone();
             *right = rsend.input.clone();
+            return Ok(ClusterSendNode {
+                input: Arc::new(p),
+                snapshots,
+            }
+                .into_plan())
         }
         LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
             return Err(DataFusionError::Internal(
@@ -1029,12 +1038,6 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             ))
         }
     }
-
-    Ok(ClusterSendNode {
-        input: Arc::new(p),
-        snapshots,
-    }
-    .into_plan())
 }
 
 pub struct CubeExtensionPlanner {

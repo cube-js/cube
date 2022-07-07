@@ -5061,16 +5061,9 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows()[0], Row::new(vec![
         TableValue::Int(23),
         TableValue::String("FirstName 1".to_string()),
-
         TableValue::String("LastName 1".to_string()),
         TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
     ]));
-
-    let result = service
-        .exec_query("SELECT * FROM system.tables")
-        .await
-        .unwrap();
-    assert_eq!(result.get_rows().len(), 1);
 
     let columns = vec![
         Column::new("ID".to_string(), ColumnType::Int, 0),
