@@ -611,10 +611,10 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and test ' +
     'driver connection for dev server',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: true,
         driverFactory: () => ({
           type: 'postgres',
           user: 'user',
@@ -643,10 +643,10 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to true and doesn`t ' +
     'test driver connection for dev server with externalRefresh set to true',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: true,
         driverFactory: () => ({
           type: 'postgres',
           user: 'user',
@@ -680,10 +680,10 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and doesn`t ' +
     'test driver connection for dev server with rollupOnlyMode set to true',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: true,
         driverFactory: () => ({
           type: 'postgres',
           user: 'user',
@@ -715,10 +715,10 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and test ' +
     'driver connection for refresh worker in the production mode',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'false';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: false,
         scheduledRefreshTimer: true,
         driverFactory: () => ({
           type: 'postgres',
@@ -749,11 +749,11 @@ describe('OptsHandler class', () => {
     'driver connection for api worker in the production mode if ' +
     'CUBEJS_PRE_AGGREGATIONS_BUILDER is set',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: false,
         scheduledRefreshTimer: false,
         driverFactory: () => ({
           type: 'postgres',
@@ -784,11 +784,11 @@ describe('OptsHandler class', () => {
     'driver connection for api worker in the production mode if specified in' +
     'preAggregationsOptions.externalRefresh',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: false,
         scheduledRefreshTimer: false,
         driverFactory: () => ({
           type: 'postgres',
@@ -824,11 +824,11 @@ describe('OptsHandler class', () => {
     'driver connection for api worker in the production mode if ' +
     'CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
     async () => {
+      process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
       const core = new CubejsServerCoreExposed({
         logger,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
-        devServer: false,
         scheduledRefreshTimer: false,
         driverFactory: () => ({
           type: 'postgres',

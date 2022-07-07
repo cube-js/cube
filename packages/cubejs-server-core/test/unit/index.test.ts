@@ -589,7 +589,7 @@ describe('index.test', () => {
 
   testRefreshWorkerAndRollupModes({ setRefreshWorker: false }, true, (options) => {
     // TODO (buntarb): check breaking changes.
-    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
     expect(options.rollupOnlyMode).toEqual(true);
   });
 
@@ -612,7 +612,7 @@ describe('index.test', () => {
   testRefreshWorkerAndRollupModes({ setScheduledRefreshTimer: false }, true, (options) => {
     expect(options.rollupOnlyMode).toEqual(true);
     // TODO (buntarb): check breaking changes.
-    expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+    expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
   });
 
   // Old env, but anyway we should handle it
@@ -668,7 +668,7 @@ describe('index.test', () => {
     (options) => {
       expect(options.rollupOnlyMode).toEqual(true);
       // TODO (buntarb): check breaking changes.
-      expect(options.preAggregationsOptions.externalRefresh).toEqual(false);
+      expect(options.preAggregationsOptions.externalRefresh).toEqual(true);
     }
   );
 
