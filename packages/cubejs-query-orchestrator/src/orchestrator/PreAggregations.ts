@@ -1634,7 +1634,7 @@ export class PreAggregations {
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(await this.options.queueOptions(dataSource)),
+          ...(this.options.queueOptions ? await this.options.queueOptions(dataSource) : {}),
           getQueueEventsBus: this.getQueueEventsBus,
         }
       );
