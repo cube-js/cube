@@ -29,8 +29,14 @@ class CubejsServerCoreExposed extends CubejsServerCore {
 
 let message: string;
 
-const logger = (msg: string) => {
-  message = msg;
+const conf = {
+  logger: (msg: string) => {
+    message = msg;
+  },
+  externalDbType: <DatabaseType>'postgres',
+  externalDriverFactory: async () => <BaseDriver>({
+    testConnection: async () => undefined,
+  }),
 };
 
 describe('OptsHandler class', () => {
@@ -44,14 +50,11 @@ describe('OptsHandler class', () => {
     async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const core = new CubejsServerCore({
-        logger,
+        ...conf,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         dbType: ((context: DriverContext) => 'postgres'),
       });
       expect(message).toEqual('Cube.js `CreateOptions.dbType` Property Deprecation');
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -62,7 +65,7 @@ describe('OptsHandler class', () => {
 
     // Case 1
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: undefined,
       driverFactory: undefined,
     });
@@ -78,12 +81,9 @@ describe('OptsHandler class', () => {
       type: process.env.CUBEJS_DB_TYPE,
     });
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 2
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: 'postgres',
       driverFactory: () => CubejsServerCore.createDriver('postgres'),
     });
@@ -101,12 +101,9 @@ describe('OptsHandler class', () => {
       JSON.stringify(CubejsServerCore.createDriver('postgres')),
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 3
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: () => 'postgres',
       driverFactory: () => CubejsServerCore.createDriver('postgres'),
     });
@@ -124,12 +121,9 @@ describe('OptsHandler class', () => {
       JSON.stringify(CubejsServerCore.createDriver('postgres')),
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 4
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: () => 'postgres',
       driverFactory: async () => CubejsServerCore.createDriver('postgres'),
     });
@@ -146,9 +140,6 @@ describe('OptsHandler class', () => {
     ).toEqual(
       JSON.stringify(CubejsServerCore.createDriver('postgres')),
     );
-
-    await core.beforeShutdown();
-    await core.shutdown();
   });
 
   test('must handle valid CreateOptions', async () => {
@@ -158,7 +149,7 @@ describe('OptsHandler class', () => {
 
     // Case 1
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: undefined,
       driverFactory: () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -176,12 +167,9 @@ describe('OptsHandler class', () => {
       type: process.env.CUBEJS_DB_TYPE,
     });
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 2
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: 'postgres',
       driverFactory: () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -199,12 +187,9 @@ describe('OptsHandler class', () => {
       type: process.env.CUBEJS_DB_TYPE,
     });
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 3
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: 'postgres',
       driverFactory: async () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -222,12 +207,9 @@ describe('OptsHandler class', () => {
       type: process.env.CUBEJS_DB_TYPE,
     });
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 4
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: <DbTypeFn>(async () => 'postgres'),
       driverFactory: async () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -244,9 +226,6 @@ describe('OptsHandler class', () => {
     expect(await core.options.driverFactory({} as DriverContext)).toEqual({
       type: process.env.CUBEJS_DB_TYPE,
     });
-
-    await core.beforeShutdown();
-    await core.shutdown();
   });
 
   test('must throw if CreateOptions invalid', async () => {
@@ -257,7 +236,7 @@ describe('OptsHandler class', () => {
     // Case 1
     await expect(async () => {
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: (() => true) as unknown as DriverFactoryFn,
       });
@@ -267,13 +246,10 @@ describe('OptsHandler class', () => {
       'Must be either DriverConfig or driver instance: <boolean>true'
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 2
     await expect(async () => {
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: 1 as unknown as DriverFactoryFn,
       });
@@ -283,14 +259,11 @@ describe('OptsHandler class', () => {
       '["driverFactory" must be a Function]'
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 3 -- need to be restored after assertion will be restored.
     //
     // await expect(async () => {
     //   const core = new CubejsServerCoreExposed({
-    //     logger,
+    //     ...conf,
     //     dbType: undefined,
     //     driverFactory: () => CubejsServerCore.createDriver('postgres'),
     //   });
@@ -303,7 +276,7 @@ describe('OptsHandler class', () => {
     // Case 4
     await expect(async () => {
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: (() => true) as unknown as DbTypeFn,
         driverFactory: async () => ({
           type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -314,13 +287,10 @@ describe('OptsHandler class', () => {
       'Unexpected CreateOptions.dbType result type: <boolean>true'
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 5
     await expect(async () => {
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: true as unknown as DbTypeFn,
         driverFactory: async () => ({
           type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
@@ -332,16 +302,13 @@ describe('OptsHandler class', () => {
       '["dbType" must be a string, "dbType" must be a Function]'
     );
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 6
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
       process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: undefined,
       });
@@ -355,7 +322,7 @@ describe('OptsHandler class', () => {
       process.env.NODE_ENV = 'production';
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: 'apiSecret',
         dbType: undefined,
         driverFactory: undefined,
@@ -374,7 +341,7 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
     const core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: undefined,
       driverFactory: undefined,
     });
@@ -395,9 +362,6 @@ describe('OptsHandler class', () => {
 
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
     expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
-
-    await core.beforeShutdown();
-    await core.shutdown();
   });
 
   test(
@@ -408,7 +372,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DB_TYPE = 'cubestore';
 
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: {},
@@ -427,9 +391,6 @@ describe('OptsHandler class', () => {
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
         concurrency: 2,
       });
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -441,7 +402,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DB_TYPE = 'cubestore';
 
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: {},
@@ -460,9 +421,6 @@ describe('OptsHandler class', () => {
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
         concurrency: 2,
       });
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -474,7 +432,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DB_TYPE = 'cubestore';
 
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
@@ -493,9 +451,6 @@ describe('OptsHandler class', () => {
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
         concurrency: 2,
       });
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -507,7 +462,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DB_TYPE = 'postgres';
 
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
@@ -526,9 +481,6 @@ describe('OptsHandler class', () => {
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
         concurrency: lookupDriverClass(process.env.CUBEJS_DB_TYPE).getDefaultConcurrency(),
       });
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -540,7 +492,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DB_TYPE = 'postgres';
 
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
@@ -561,9 +513,6 @@ describe('OptsHandler class', () => {
       });
 
       delete process.env.CUBEJS_CONCURRENCY;
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -576,7 +525,7 @@ describe('OptsHandler class', () => {
 
       const concurrency = 15;
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({
@@ -608,9 +557,6 @@ describe('OptsHandler class', () => {
       });
 
       delete process.env.CUBEJS_CONCURRENCY;
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -625,7 +571,7 @@ describe('OptsHandler class', () => {
 
     // Case 1
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: undefined,
       driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
       orchestratorOptions: () => ({
@@ -646,12 +592,9 @@ describe('OptsHandler class', () => {
     
     expect(driver.pool.options.max).toEqual(2 * (concurrency1 + concurrency2));
 
-    await core.beforeShutdown();
-    await core.shutdown();
-
     // Case 2
     core = new CubejsServerCoreExposed({
-      logger,
+      ...conf,
       dbType: undefined,
       driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
       orchestratorOptions: () => ({
@@ -671,28 +614,21 @@ describe('OptsHandler class', () => {
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
     
     expect(driver.pool.options.max).toEqual(8);
-
-    await core.beforeShutdown();
-    await core.shutdown();
   });
 
-  test.only(
+  test(
     'must set preAggregationsOptions.externalRefresh to false and test ' +
     'driver connection for dev server',
     async () => {
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         driverFactory: () => ({
           type: 'postgres',
           user: 'user',
           password: 'password',
           database: 'database',
-        }),
-        externalDbType: 'postgres',
-        externalDriverFactory: async () => <BaseDriver>({
-          testConnection: async () => undefined,
         }),
       });
 
@@ -701,6 +637,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
       await expect(async () => {
@@ -714,11 +651,12 @@ describe('OptsHandler class', () => {
 
   test(
     'must set preAggregationsOptions.externalRefresh to true and doesn`t ' +
-    'test driver connection for dev server with externalRefresh set to true',
+    'test driver connection for dev server with preAggregationsOptions.' +
+    'externalRefresh set to true',
     async () => {
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         driverFactory: () => ({
           type: 'postgres',
@@ -738,6 +676,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
       expect(async () => {
@@ -746,9 +685,6 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -758,7 +694,7 @@ describe('OptsHandler class', () => {
     async () => {
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         driverFactory: () => ({
           type: 'postgres',
@@ -776,6 +712,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(true);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
       expect(async () => {
@@ -784,9 +721,6 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -796,7 +730,7 @@ describe('OptsHandler class', () => {
     async () => {
       process.env.CUBEJS_DEV_MODE = 'false';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         scheduledRefreshTimer: true,
         driverFactory: () => ({
@@ -812,6 +746,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
       await expect(async () => {
@@ -820,9 +755,6 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
@@ -834,7 +766,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         scheduledRefreshTimer: false,
         driverFactory: () => ({
@@ -850,6 +782,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
       await expect(async () => {
@@ -858,13 +791,10 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
-  test(
+  test.only(
     'must set preAggregationsOptions.externalRefresh to true and do not test ' +
     'driver connection for api worker in the production mode if specified in' +
     'preAggregationsOptions.externalRefresh',
@@ -872,7 +802,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         scheduledRefreshTimer: false,
         driverFactory: () => ({
@@ -893,6 +823,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
       expect(async () => {
@@ -901,13 +832,10 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 
-  test(
+  test.only(
     'must set preAggregationsOptions.externalRefresh to true and do not test ' +
     'driver connection for api worker in the production mode if ' +
     'CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
@@ -915,7 +843,7 @@ describe('OptsHandler class', () => {
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
       const core = new CubejsServerCoreExposed({
-        logger,
+        ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
         scheduledRefreshTimer: false,
         driverFactory: () => ({
@@ -931,6 +859,7 @@ describe('OptsHandler class', () => {
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
 
+      expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
       expect(async () => {
@@ -939,9 +868,6 @@ describe('OptsHandler class', () => {
       expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
-
-      await core.beforeShutdown();
-      await core.shutdown();
     }
   );
 });
