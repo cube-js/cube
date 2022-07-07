@@ -1,6 +1,9 @@
 use crate::{
     compile::{
-        engine::{df::scan::CubeScanNode, provider::CubeContext},
+        engine::{
+            df::scan::{CubeScanNode, MemberField},
+            provider::CubeContext,
+        },
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
@@ -8,12 +11,12 @@ use crate::{
             CubeScanLimit, CubeScanTableName, DimensionName, EmptyRelationProduceOneRow,
             FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
             JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue,
-            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
-            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
-            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
-            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanLimit,
-            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
+            TableScanLimit, TableScanProjection, TableScanSourceTableName, TableScanTableName,
+            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
@@ -33,6 +36,7 @@ use datafusion::{
         LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
+    scalar::ScalarValue,
     sql::planner::ContextProvider,
 };
 use egg::{EGraph, Id, RecExpr};
@@ -1081,7 +1085,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO actually nullable. Just to fit tests
                                             false,
                                         ),
-                                        Some(measure.to_string()),
+                                        MemberField::Member(measure.to_string()),
                                     ));
                                 }
                                 LogicalPlanLanguage::TimeDimension(params) => {
@@ -1120,7 +1124,10 @@ impl LanguageToLogicalPlanConverter {
                                                 // TODO actually nullable. Just to fit tests
                                                 false,
                                             ),
-                                            Some(format!("{}.{}", dimension, granularity)),
+                                            MemberField::Member(format!(
+                                                "{}.{}",
+                                                dimension, granularity
+                                            )),
                                         ));
                                     }
                                 }
@@ -1146,7 +1153,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO actually nullable. Just to fit tests
                                             false,
                                         ),
-                                        Some(dimension),
+                                        MemberField::Member(dimension),
                                     ));
                                 }
                                 LogicalPlanLanguage::Segment(params) => {
@@ -1160,7 +1167,22 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO actually nullable. Just to fit tests
                                             false,
                                         ),
-                                        None,
+                                        MemberField::Literal(ScalarValue::Boolean(None)),
+                                    ));
+                                }
+                                LogicalPlanLanguage::LiteralMember(params) => {
+                                    let value =
+                                        match_data_node!(node_by_id, params[0], LiteralMemberValue);
+                                    let expr = self.to_expr(params[1])?;
+                                    fields.push((
+                                        DFField::new(
+                                            Some(&table_name),
+                                            &expr_name(&expr)?,
+                                            value.get_datatype(),
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ),
+                                        MemberField::Literal(value),
                                     ));
                                 }
                                 LogicalPlanLanguage::MemberError(params) => {
@@ -1321,10 +1343,7 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
-                        if query_measures.len() == 0
-                            && query_dimensions.len() == 0
-                            && query_time_dimensions.len() == 0
-                        {
+                        if fields.len() == 0 {
                             return Err(CubeError::internal(
                                 "Can't detect Cube query and it may be not supported yet"
                                     .to_string(),

@@ -9,7 +9,7 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::{Cursor, Portal},
+        extended::{Cursor, Portal, PortalFrom},
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
@@ -22,7 +22,7 @@ use crate::{
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format},
+    protocol::{ErrorCode, ErrorResponse, Format, InitialMessage, PortalCompletion},
     PgType, PgTypeId, ProtocolError,
 };
 use sqlparser::{
@@ -30,6 +30,7 @@ use sqlparser::{
     ast::{CloseCursor, FetchDirection, Statement, Value},
 };
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio_util::sync::CancellationToken;
 
 pub struct AsyncPostgresShim {
     socket: TcpStream,
@@ -48,6 +49,7 @@ pub enum StartupState {
     Success(HashMap<String, String>),
     SslRequested,
     Denied,
+    CancelRequest,
 }
 
 pub trait QueryPlanExt {
@@ -211,13 +213,13 @@ impl AsyncPostgresShim {
     }
 
     pub async fn run(&mut self) -> Result<(), ConnectionError> {
-        let initial_parameters = match self.process_startup_message().await? {
+        let initial_parameters = match self.process_initial_message().await? {
             StartupState::Success(parameters) => parameters,
-            StartupState::SslRequested => match self.process_startup_message().await? {
+            StartupState::SslRequested => match self.process_initial_message().await? {
                 StartupState::Success(parameters) => parameters,
                 _ => return Ok(()),
             },
-            StartupState::Denied => return Ok(()),
+            StartupState::Denied | StartupState::CancelRequest => return Ok(()),
         };
 
         match buffer::read_message(&mut self.socket).await? {
@@ -351,6 +353,18 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
+    pub async fn write_completion(
+        &mut self,
+        completion: PortalCompletion,
+    ) -> Result<(), ConnectionError> {
+        match completion {
+            PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
+            PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
+        }
+
+        Ok(())
+    }
+
     pub async fn write<Message: protocol::Serialize>(
         &mut self,
         message: Message,
@@ -360,25 +374,58 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn process_startup_message(&mut self) -> Result<StartupState, ConnectionError> {
+    pub async fn process_initial_message(&mut self) -> Result<StartupState, ConnectionError> {
         let mut buffer = buffer::read_contents(&mut self.socket, 0).await?;
 
-        let startup_message = protocol::StartupMessage::from(&mut buffer).await?;
+        let initial_message = protocol::InitialMessage::from(&mut buffer).await?;
+        match initial_message {
+            InitialMessage::Startup(startup) => self.process_startup_message(startup).await,
+            InitialMessage::CancelRequest(cancel) => self.process_cancel(cancel).await,
+            InitialMessage::Gssenc | InitialMessage::SslRequest => {
+                self.write(protocol::SSLResponse::new()).await?;
+                return Ok(StartupState::SslRequested);
+            }
+        }
+    }
 
-        if startup_message.protocol_version.major == protocol::SSL_REQUEST_PROTOCOL {
-            self.write(protocol::SSLResponse::new()).await?;
-            return Ok(StartupState::SslRequested);
+    pub async fn process_cancel(
+        &mut self,
+        cancel_message: protocol::CancelRequest,
+    ) -> Result<StartupState, ConnectionError> {
+        trace!("Cancel request {:?}", cancel_message);
+
+        if let Some(s) = self
+            .session
+            .session_manager
+            .get_session(cancel_message.process_id)
+        {
+            if s.state.secret == cancel_message.secret {
+                s.state.cancel_query();
+            } else {
+                trace!(
+                    "Unable to process cancel: wrong secret, {} != {}",
+                    s.state.secret,
+                    cancel_message.secret
+                );
+            }
+        } else {
+            trace!("Unable to process cancel: unknown session");
         }
 
-        if startup_message.protocol_version.major != 3
-            || startup_message.protocol_version.minor != 0
-        {
+        Ok(StartupState::CancelRequest)
+    }
+
+    pub async fn process_startup_message(
+        &mut self,
+        startup_message: protocol::StartupMessage,
+    ) -> Result<StartupState, ConnectionError> {
+        if startup_message.major != 3 || startup_message.minor != 0 {
             let error_response = protocol::ErrorResponse::new(
                 protocol::ErrorSeverity::Fatal,
                 protocol::ErrorCode::FeatureNotSupported,
                 format!(
                     "unsupported frontend protocol {}.{}: server supports 3.0 to 3.0",
-                    startup_message.protocol_version.major, startup_message.protocol_version.minor,
+                    startup_message.major, startup_message.minor,
                 ),
             );
             buffer::write_message(&mut self.socket, error_response).await?;
@@ -405,7 +452,7 @@ impl AsyncPostgresShim {
         ))
         .await?;
 
-        return Ok(StartupState::Success(parameters));
+        Ok(StartupState::Success(parameters))
     }
 
     pub async fn authenticate(
@@ -466,11 +513,15 @@ impl AsyncPostgresShim {
             // Reports whether PostgreSQL was built with support for 64-bit-integer dates and times.
             protocol::ParameterStatus::new("integer_datetimes".to_string(), "on".to_string()),
             protocol::ParameterStatus::new("TimeZone".to_string(), "Etc/UTC".to_string()),
-            // TODO: Right now we dont support intervals, but it's an important thing
-            // protocol::ParameterStatus::new("IntervalStyle".to_string(), "postgres".to_string()),
+            protocol::ParameterStatus::new("IntervalStyle".to_string(), "postgres".to_string()),
         ];
 
         self.write_multi(params).await?;
+        self.write(protocol::BackendKeyData::new(
+            self.session.state.connection_id,
+            self.session.state.secret,
+        ))
+        .await?;
         self.write(protocol::ReadyForQuery::new(
             protocol::TransactionStatus::Idle,
         ))
@@ -588,16 +639,35 @@ impl AsyncPostgresShim {
                     self.write(protocol::EmptyQueryResponse::new()).await?;
                 }
                 Some(portal) => {
+                    let cancel = self
+                        .session
+                        .state
+                        .begin_query(format!("portal #{}", execute.portal));
                     let mut writer = BatchWriter::new(portal.get_format());
-                    let completion = portal
-                        .execute(&mut writer, execute.max_rows as usize)
-                        .await?;
 
-                    if writer.has_data() {
-                        buffer::write_direct(&mut self.socket, writer).await?
+                    tokio::select! {
+                        _ = cancel.cancelled() => {
+                            self.session.state.end_query();
+
+                            return Err(protocol::ErrorResponse::query_canceled().into());
+                        },
+                        res = portal.execute(&mut writer, execute.max_rows as usize) => {
+                            self.session.state.end_query();
+
+                            // Unwrap result after ending query
+                            let completion = res?;
+
+                            if cancel.is_cancelled() {
+                                return Err(protocol::ErrorResponse::query_canceled().into());
+                            }
+
+                            if writer.has_data() {
+                                buffer::write_direct(&mut self.socket, writer).await?
+                            }
+
+                            self.write_completion(completion).await?;
+                        },
                     }
-
-                    self.write(completion).await?;
                 }
             }
 
@@ -643,10 +713,11 @@ impl AsyncPostgresShim {
                 .await?;
 
             let plan =
-                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())?;
+                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
+                    .await?;
 
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-            Some(Portal::new(plan, format, true))
+            Some(Portal::new(plan, format, PortalFrom::Extended))
         } else {
             None
         };
@@ -699,7 +770,8 @@ impl AsyncPostgresShim {
             let stmt_replacer = StatementPlaceholderReplacer::new();
             let hacked_query = stmt_replacer.replace(&query)?;
 
-            let plan = convert_statement_to_cube_query(&hacked_query, meta, self.session.clone())?;
+            let plan =
+                convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).await?;
 
             let description = if let Some(description) = plan.to_row_description(Format::Text)? {
                 if description.len() > 0 {
@@ -749,10 +821,36 @@ impl AsyncPostgresShim {
         }
     }
 
+    pub async fn handle_simple_query(
+        &mut self,
+        stmt: ast::Statement,
+        meta: Arc<MetaContext>,
+    ) -> Result<(), ConnectionError> {
+        let cancel = self.session.state.begin_query(stmt.to_string());
+
+        tokio::select! {
+            _ = cancel.cancelled() => {
+                self.session.state.end_query();
+
+                // We don't return error, because query can contains multiple statements
+                // then cancel request will cancel only one query
+                self.write(protocol::ErrorResponse::query_canceled()).await?;
+
+                Ok(())
+            },
+            res = self.process_simple_query(stmt, meta, cancel.clone()) => {
+                self.session.state.end_query();
+
+                res
+            },
+        }
+    }
+
     pub async fn process_simple_query(
         &mut self,
         stmt: ast::Statement,
         meta: Arc<MetaContext>,
+        cancel: CancellationToken,
     ) -> Result<(), ConnectionError> {
         match stmt {
             Statement::StartTransaction { .. } => {
@@ -766,8 +864,12 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Begin);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Rollback { .. } => {
                 if self.end_transaction()? == false {
@@ -781,8 +883,12 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Rollback);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    CancellationToken::new(),
+                )
+                .await?;
             }
             Statement::Commit { .. } => {
                 if self.end_transaction()? == false {
@@ -796,8 +902,12 @@ impl AsyncPostgresShim {
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Commit);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    CancellationToken::new(),
+                )
+                .await?;
             }
             Statement::Fetch {
                 name,
@@ -854,7 +964,8 @@ impl AsyncPostgresShim {
 
                 if let Some(portal) = self.portals.remove(&name.value) {
                     if let Some(mut portal) = portal {
-                        self.write_portal(&mut portal, limit).await?;
+                        self.write_portal(&mut portal, limit, CancellationToken::new())
+                            .await?;
                         self.portals.insert(name.value.clone(), Some(portal));
 
                         return Ok(());
@@ -898,11 +1009,12 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan =
-                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())?;
+                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())
+                        .await?;
 
-                let mut portal = Portal::new(plan, cursor.format, false);
+                let mut portal = Portal::new(plan, cursor.format, PortalFrom::Fetch);
 
-                self.write_portal(&mut portal, limit).await?;
+                self.write_portal(&mut portal, limit, cancel).await?;
                 self.portals.insert(name.value, Some(portal));
             }
             Statement::Declare {
@@ -952,7 +1064,8 @@ impl AsyncPostgresShim {
                     &select_stmt,
                     meta.clone(),
                     self.session.clone(),
-                )?;
+                )
+                .await?;
 
                 let cursor = Cursor {
                     query: select_stmt,
@@ -978,8 +1091,12 @@ impl AsyncPostgresShim {
                 let plan =
                     QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::DeclareCursor);
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Discard { object_type } => {
                 self.statements = HashMap::new();
@@ -991,8 +1108,12 @@ impl AsyncPostgresShim {
                     CommandCompletion::Discard(object_type.to_string()),
                 );
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             Statement::Close { cursor } => {
                 let plan = match cursor {
@@ -1034,15 +1155,24 @@ impl AsyncPostgresShim {
                     }
                 }?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
             other => {
                 let plan =
-                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())?;
+                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())
+                        .await?;
 
-                self.write_portal(&mut Portal::new(plan, Format::Text, true), 0)
-                    .await?;
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
             }
         };
 
@@ -1053,7 +1183,15 @@ impl AsyncPostgresShim {
         &mut self,
         portal: &mut Portal,
         max_rows: usize,
+        cancel: CancellationToken,
     ) -> Result<(), ConnectionError> {
+        let mut writer = BatchWriter::new(portal.get_format());
+        let completion = portal.execute(&mut writer, max_rows).await?;
+
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         // Special handling for special queries, such as DISCARD ALL.
         if let Some(description) = portal.get_description()? {
             match description.len() {
@@ -1062,21 +1200,19 @@ impl AsyncPostgresShim {
             };
         }
 
-        let mut writer = BatchWriter::new(portal.get_format());
-        let completion = portal.execute(&mut writer, max_rows).await?;
-
         if writer.has_data() {
             buffer::write_direct(&mut self.socket, writer).await?;
         };
 
-        self.write(completion).await
+        self.write_completion(completion).await
     }
 
     /// Pipeline of Execution
     /// process_query -> (&str)
     ///     execute_query -> (&str)
-    ///         process_simple_query -> (portal)
-    ///             write_portal
+    ///         handle_simple_query
+    ///             process_simple_query -> (portal)
+    ///                 write_portal
     pub async fn execute_query(&mut self, query: &str) -> Result<(), ConnectionError> {
         let meta = self
             .session
@@ -1091,7 +1227,7 @@ impl AsyncPostgresShim {
             self.write(protocol::EmptyQuery::new()).await?;
         } else {
             for statement in statements {
-                self.process_simple_query(statement, meta.clone()).await?;
+                self.handle_simple_query(statement, meta.clone()).await?;
             }
         }
 

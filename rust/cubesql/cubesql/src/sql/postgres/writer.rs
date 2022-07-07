@@ -249,6 +249,7 @@ impl ToProtocolValue for ListValue {
     }
 }
 
+#[derive(Debug)]
 pub struct BatchWriter {
     format: Format,
     // Data of whole rows
@@ -338,9 +339,6 @@ mod tests {
 
     #[test]
     fn test_text_encoders() -> Result<(), ConnectionError> {
-        assert_text_encode(true, &[0, 0, 0, 1, 116]);
-        assert_text_encode(false, &[0, 0, 0, 1, 102]);
-        assert_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
         assert_text_encode(
             TimestampValue::new(1650890322, None),
             &[
@@ -368,8 +366,6 @@ mod tests {
 
     #[test]
     fn test_binary_encoders() -> Result<(), ConnectionError> {
-        assert_bind_encode(true, &[0, 0, 0, 1, 1]);
-        assert_bind_encode(false, &[0, 0, 0, 1, 0]);
         assert_bind_encode(
             TimestampValue::new(1650890322, None),
             &[0, 0, 0, 8, 255, 252, 162, 254, 196, 225, 80, 202],

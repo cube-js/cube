@@ -53,7 +53,13 @@ export class QueryCache {
       externalQueueOptions?: any;
       externalDriverFactory?: DriverFactory;
       backgroundRenew?: Boolean;
-      queueOptions?: object | ((dataSource: String) => object);
+      queueOptions?: (dataSource: string) => Promise<{
+        concurrency: number;
+        continueWaitTimeout?: number;
+        executionTimeout?: number;
+        orphanedTimeout?: number;
+        heartBeatInterval?: number;
+      }>;
       redisPool?: any;
       continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
@@ -78,8 +84,9 @@ export class QueryCache {
       // uses its internal queue which managed separately.
       return;
     }
-    if (this.getQueue(datasource)) {
-      await this.getQueue(datasource).reconcileQueue();
+    const queue = await this.getQueue(datasource);
+    if (queue) {
+      await queue.reconcileQueue();
     }
   }
 
@@ -111,7 +118,7 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource
-        })
+        }),
       };
     }
 
@@ -203,7 +210,7 @@ export class QueryCache {
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
   }
 
-  public queryWithRetryAndRelease(query, values, {
+  public async queryWithRetryAndRelease(query, values, {
     priority, cacheKey, external, requestId, dataSource
   }: {
     priority?: number,
@@ -212,7 +219,9 @@ export class QueryCache {
     requestId?: string,
     dataSource: string
   }) {
-    const queue = external ? this.getExternalQueue() : this.getQueue(dataSource);
+    const queue = external
+      ? this.getExternalQueue()
+      : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
       queryKey: cacheKey, query, values, requestId
     }, priority, {
@@ -221,7 +230,7 @@ export class QueryCache {
     });
   }
 
-  public getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
@@ -231,16 +240,14 @@ export class QueryCache {
             ...q
           });
           return client.query(q.query, q.values, q);
-        }, {
+        },
+        {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
-          )
+          ...(await this.options.queueOptions(dataSource)),
         }
       );
     }
@@ -312,6 +319,13 @@ export class QueryCache {
     queue.cancelHandlerCounter = 0;
     queue.handles = {};
     return queue;
+  }
+
+  /**
+   * Returns registered queries queues hash table.
+   */
+  public getQueues(): {[dataSource: string]: QueryQueue} {
+    return this.queue;
   }
 
   public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {

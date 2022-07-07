@@ -11,6 +11,13 @@ export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
 };
 
 export class MaterializeDriver extends PostgresDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   public constructor(options: PostgresDriverConfiguration) {
     super(options);
   }

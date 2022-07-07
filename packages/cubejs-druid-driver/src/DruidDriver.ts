@@ -17,6 +17,13 @@ export class DruidDriver extends BaseDriver {
     return DruidQuery;
   }
 
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   public constructor(config?: DruidDriverConfiguration) {
     super();
 

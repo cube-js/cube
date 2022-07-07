@@ -204,7 +204,6 @@ crate::plan_to_language! {
             expr: Box<Expr>,
             key: Box<Expr>,
         },
-
         CubeScan {
             cube: Arc<LogicalPlan>,
             members: Vec<LogicalPlan>,
@@ -226,6 +225,10 @@ crate::plan_to_language! {
         },
         Segment {
             name: String,
+            expr: Arc<Expr>,
+        },
+        LiteralMember {
+            value: ScalarValue,
             expr: Arc<Expr>,
         },
         Order {
@@ -798,6 +801,10 @@ fn dimension_expr(name: impl Display, expr: impl Display) -> String {
 
 fn segment_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Segment {} {})", name, expr)
+}
+
+fn literal_member(value: impl Display, expr: impl Display) -> String {
+    format!("(LiteralMember {} {})", value, expr)
 }
 
 fn time_dimension_expr(

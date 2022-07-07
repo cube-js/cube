@@ -7,10 +7,10 @@ import {
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeFn;
+  contextToDbType: DbTypeAsyncFn;
   contextToExternalDbType: ExternalDbTypeFn;
   redisPrefix?: string;
 }
@@ -35,6 +35,13 @@ export class OrchestratorApi {
       logger,
       options
     );
+  }
+
+  /**
+   * Returns QueryOrchestrator instance.
+   */
+  public getQueryOrchestrator(): QueryOrchestrator {
+    return this.orchestrator;
   }
 
   /**
@@ -70,12 +77,13 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = (response) => (
-        this.options.contextToDbType({
+      const extractDbType = async (response) => {
+        const dbType = await this.options.contextToDbType({
           ...query.context,
           dataSource: response.dataSource,
-        })
-      );
+        });
+        return dbType;
+      };
 
       const extractExternalDbType = (response) => (
         this.options.contextToExternalDbType({
@@ -85,14 +93,17 @@ export class OrchestratorApi {
       );
 
       if (Array.isArray(data)) {
-        return data.map((item) => ({
-          ...item,
-          dbType: extractDbType(item),
-          extDbType: extractExternalDbType(item)
-        }));
+        const res = await Promise.all(
+          data.map(async (item) => ({
+            ...item,
+            dbType: await extractDbType(item),
+            extDbType: extractExternalDbType(item),
+          }))
+        );
+        return res;
       }
 
-      data.dbType = extractDbType(data);
+      data.dbType = await extractDbType(data);
       data.extDbType = extractExternalDbType(data);
 
       return data;

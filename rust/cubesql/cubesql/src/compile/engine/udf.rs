@@ -1,4 +1,4 @@
-use std::{any::type_name, sync::Arc};
+use std::{any::type_name, sync::Arc, thread};
 
 use chrono::{Duration, NaiveDateTime};
 use datafusion::{
@@ -82,6 +82,7 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+// It's the same as current_user UDF, but with another host
 pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
@@ -103,7 +104,7 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -120,7 +121,7 @@ pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> Sca
     });
 
     create_udf(
-        "current_user",
+        name,
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -1587,6 +1588,32 @@ pub fn create_pg_table_is_visible_udf() -> ScalarUDF {
             vec![TypeSignature::Exact(vec![DataType::UInt32])],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_sleep_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let secs_arr = downcast_primitive_arg!(args[0], "secs", Int64Type);
+
+        if !secs_arr.is_null(0) {
+            thread::sleep(core::time::Duration::new(secs_arr.value(0) as u64, 0));
+        }
+
+        let mut result = StringBuilder::new(1);
+        result.append_null()?;
+
+        Ok(Arc::new(result.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_sleep",
+        &Signature::exact(vec![DataType::Int64], Volatility::Volatile),
         &return_type,
         &fun,
     )

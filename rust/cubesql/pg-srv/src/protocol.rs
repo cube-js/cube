@@ -18,37 +18,91 @@ use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolErro
 
 const DEFAULT_CAPACITY: usize = 64;
 
-pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
-    pub protocol_version: ProtocolVersion,
+    pub major: u16,
+    pub minor: u16,
     pub parameters: HashMap<String, String>,
 }
 
 impl StartupMessage {
-    pub async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
-        let major_protocol_version = buffer.read_u16().await?;
-        let minor_protocol_version = buffer.read_u16().await?;
-        let protocol_version = ProtocolVersion::new(major_protocol_version, minor_protocol_version);
+    async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        let major = buffer.read_u16().await?;
+        let minor = buffer.read_u16().await?;
 
         let mut parameters = HashMap::new();
 
-        if major_protocol_version != SSL_REQUEST_PROTOCOL {
-            loop {
-                let name = buffer::read_string(&mut buffer).await?;
-                if name.is_empty() {
-                    break;
-                }
-                let value = buffer::read_string(&mut buffer).await?;
-                parameters.insert(name, value);
+        loop {
+            let name = buffer::read_string(&mut buffer).await?;
+            if name.is_empty() {
+                break;
             }
+            let value = buffer::read_string(&mut buffer).await?;
+            parameters.insert(name, value);
         }
 
         Ok(Self {
-            protocol_version,
+            major,
+            minor,
             parameters,
         })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CancelRequest {
+    pub process_id: u32,
+    pub secret: u32,
+}
+
+impl CancelRequest {
+    async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        Ok(Self {
+            process_id: buffer.read_u32().await?,
+            secret: buffer.read_u32().await?,
+        })
+    }
+}
+
+pub enum InitialMessage {
+    Startup(StartupMessage),
+    CancelRequest(CancelRequest),
+    SslRequest,
+    Gssenc,
+}
+
+// The value is chosen to contain 1234 in the most significant 16 bits, this code must not be the same as any protocol version number.
+pub const VERSION_MAJOR_SPECIAL: i16 = 1234;
+pub const VERSION_MINOR_CANCEL: i16 = 5678;
+pub const VERSION_MINOR_SSL: i16 = 5679;
+pub const VERSION_MINOR_GSSENC: i16 = 5680;
+
+impl InitialMessage {
+    pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, ProtocolError> {
+        let major = buffer.read_i16().await?;
+        let minor = buffer.read_i16().await?;
+
+        match major {
+            VERSION_MAJOR_SPECIAL => match minor {
+                VERSION_MINOR_CANCEL => Ok(InitialMessage::CancelRequest(
+                    CancelRequest::from(buffer).await?,
+                )),
+                VERSION_MINOR_SSL => Ok(InitialMessage::SslRequest),
+                VERSION_MINOR_GSSENC => Ok(InitialMessage::Gssenc),
+                _ => Err(ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        r#"Unsupported special version in initial message with code "{}""#,
+                        minor
+                    ),
+                )
+                .into()),
+            },
+            _ => {
+                buffer.set_position(0);
+                Ok(InitialMessage::Startup(StartupMessage::from(buffer).await?))
+            }
+        }
     }
 }
 
@@ -57,8 +111,8 @@ impl Serialize for StartupMessage {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer.put_u16(self.protocol_version.major);
-        buffer.put_u16(self.protocol_version.minor);
+        buffer.put_u16(self.major);
+        buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
             buffer::write_string(&mut buffer, &name);
@@ -146,6 +200,14 @@ impl ErrorResponse {
             severity: ErrorSeverity::Fatal,
             code,
             message,
+        }
+    }
+
+    pub fn query_canceled() -> Self {
+        Self {
+            severity: ErrorSeverity::Error,
+            code: ErrorCode::QueryCanceled,
+            message: "canceling statement due to user request".to_string(),
         }
     }
 }
@@ -239,6 +301,47 @@ impl Serialize for EmptyQuery {
     }
 }
 
+pub struct BackendKeyData {
+    process_id: u32,
+    secret: u32,
+}
+
+impl BackendKeyData {
+    pub fn new(process_id: u32, secret: u32) -> Self {
+        Self { process_id, secret }
+    }
+}
+
+impl Serialize for BackendKeyData {
+    const CODE: u8 = b'K';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(4 + 4);
+        buffer.put_u32(self.process_id);
+        buffer.put_u32(self.secret);
+
+        Some(buffer)
+    }
+}
+
+/// (B) Alternative reply for Execute command before completing the execution of a portal (due to reaching a nonzero result-row count)
+#[derive(Debug, PartialEq)]
+pub struct PortalSuspended {}
+
+impl PortalSuspended {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for PortalSuspended {
+    const CODE: u8 = b's';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 pub struct ParameterStatus {
     name: String,
     value: String,
@@ -298,6 +401,7 @@ impl Serialize for CloseComplete {
 }
 
 /// (B) Success reply for Parse command.
+#[derive(Debug)]
 pub struct ParseComplete {}
 
 impl ParseComplete {
@@ -315,10 +419,16 @@ impl Serialize for ParseComplete {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PortalCompletion {
+    Complete(CommandComplete),
+    Suspended(PortalSuspended),
+}
+
 /// It's used to describe client that changes was done.
 /// The command tag. This is usually a single word that identifies which SQL command was completed.
 /// See more variants from sources: <https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27>
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum CommandComplete {
     Select(u32),
     Fetch(u32),
@@ -785,18 +895,6 @@ pub enum Format {
     Binary,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProtocolVersion {
-    pub major: u16,
-    pub minor: u16,
-}
-
-impl ProtocolVersion {
-    pub fn new(major: u16, minor: u16) -> Self {
-        Self { major, minor }
-    }
-}
-
 /// All frontend messages (request which client sends to the server).
 #[derive(Debug, PartialEq)]
 pub enum FrontendMessage {
@@ -848,6 +946,8 @@ pub enum ErrorCode {
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
+    // Class 57 - Operator Intervention
+    QueryCanceled,
     // XX - Internal Error
     InternalError,
 }
@@ -868,6 +968,7 @@ impl Display for ErrorCode {
             Self::SyntaxError => "42601",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
+            Self::QueryCanceled => "57014",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -1004,7 +1105,8 @@ mod tests {
             parameters.insert("client_encoding".to_string(), "UTF8".to_string());
 
             StartupMessage {
-                protocol_version: ProtocolVersion { major: 3, minor: 0 },
+                major: 3,
+                minor: 0,
                 parameters,
             }
         };

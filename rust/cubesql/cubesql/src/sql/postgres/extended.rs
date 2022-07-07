@@ -15,6 +15,7 @@ use std::fmt;
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
 use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
 use futures::StreamExt;
+use pg_srv::protocol::{PortalCompletion, PortalSuspended};
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -110,13 +111,18 @@ pub enum PortalState {
     Finished(FinishedState),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PortalFrom {
+    Simple,
+    Fetch,
+    Extended,
+}
+
 #[derive(Debug)]
 pub struct Portal {
     // Format which is used to return data
     format: protocol::Format,
-    // If true = Selection
-    // If false = Fetch
-    is_select: bool,
+    from: PortalFrom,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
 }
@@ -125,10 +131,10 @@ unsafe impl Send for Portal {}
 unsafe impl Sync for Portal {}
 
 impl Portal {
-    pub fn new(plan: QueryPlan, format: protocol::Format, is_select: bool) -> Self {
+    pub fn new(plan: QueryPlan, format: protocol::Format, from: PortalFrom) -> Self {
         Self {
             format,
-            is_select,
+            from,
             state: Some(PortalState::Prepared(PreparedState { plan })),
         }
     }
@@ -154,7 +160,7 @@ impl Portal {
         writer: &mut BatchWriter,
         frame_state: InExecutionFrameState,
         max_rows: usize,
-    ) -> Result<(PortalState, protocol::CommandComplete), ProtocolError> {
+    ) -> Result<(PortalState, protocol::PortalCompletion), ProtocolError> {
         let rows_read = frame_state.batch.len();
         if max_rows > 0 && rows_read > 0 && rows_read > max_rows {
             Err(protocol::ErrorResponse::error(
@@ -176,8 +182,26 @@ impl Portal {
                 PortalState::Finished(FinishedState {
                     description: frame_state.description,
                 }),
-                protocol::CommandComplete::new_selection(self.is_select, writer.num_rows() as u32),
+                self.new_portal_completion(writer.num_rows() as u32, false),
             ))
+        }
+    }
+
+    pub fn new_portal_completion(&self, rows: u32, has_more: bool) -> protocol::PortalCompletion {
+        match self.from {
+            PortalFrom::Simple => {
+                protocol::PortalCompletion::Complete(protocol::CommandComplete::Select(rows))
+            }
+            PortalFrom::Fetch => {
+                protocol::PortalCompletion::Complete(protocol::CommandComplete::Fetch(rows))
+            }
+            PortalFrom::Extended => {
+                if has_more {
+                    protocol::PortalCompletion::Suspended(PortalSuspended::new())
+                } else {
+                    protocol::PortalCompletion::Complete(protocol::CommandComplete::Select(rows))
+                }
+            }
         }
     }
 
@@ -205,7 +229,9 @@ impl Portal {
                     TableValue::Float64(v) => writer.write_value(*v)?,
                     TableValue::List(v) => writer.write_value(v.clone())?,
                     TableValue::Timestamp(v) => writer.write_value(v.clone())?,
+                    TableValue::Date(v) => writer.write_value(v.clone())?,
                     TableValue::Decimal128(v) => writer.write_value(v.clone())?,
+                    TableValue::Interval(v) => writer.write_value(v.clone())?,
                 };
             }
 
@@ -244,7 +270,7 @@ impl Portal {
         };
 
         // TODO: Split doesn't split batches, it copy the part, lets dont convert whole batch to dataframe
-        let frame = batch_to_dataframe(&vec![batch_for_write])?;
+        let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
         self.write_dataframe_to_writer(writer, frame, rows_to_read)?;
 
         Ok(unused)
@@ -255,7 +281,7 @@ impl Portal {
         writer: &mut BatchWriter,
         mut stream_state: InExecutionStreamState,
         max_rows: usize,
-    ) -> Result<(PortalState, protocol::CommandComplete), ConnectionError> {
+    ) -> Result<(PortalState, protocol::PortalCompletion), ConnectionError> {
         let mut left: usize = max_rows;
 
         if let Some(unused_batch) = stream_state.unused.take() {
@@ -266,7 +292,7 @@ impl Portal {
         if max_rows > 0 && left == 0 {
             return Ok((
                 PortalState::InExecutionStream(stream_state),
-                protocol::CommandComplete::new_selection(self.is_select, writer.num_rows() as u32),
+                self.new_portal_completion(writer.num_rows() as u32, true),
             ));
         }
 
@@ -277,10 +303,7 @@ impl Portal {
                         PortalState::Finished(FinishedState {
                             description: stream_state.description,
                         }),
-                        protocol::CommandComplete::new_selection(
-                            self.is_select,
-                            writer.num_rows() as u32,
-                        ),
+                        self.new_portal_completion(writer.num_rows() as u32, false),
                     ))
                 }
                 Some(res) => match res {
@@ -291,10 +314,7 @@ impl Portal {
                         if max_rows > 0 && left == 0 {
                             return Ok((
                                 PortalState::InExecutionStream(stream_state),
-                                protocol::CommandComplete::new_selection(
-                                    self.is_select,
-                                    writer.num_rows() as u32,
-                                ),
+                                self.new_portal_completion(writer.num_rows() as u32, true),
                             ));
                         }
                     }
@@ -306,11 +326,12 @@ impl Portal {
         }
     }
 
+    #[tracing::instrument(level = "trace")]
     pub async fn execute(
         &mut self,
         writer: &mut BatchWriter,
         max_rows: usize,
-    ) -> Result<protocol::CommandComplete, ConnectionError> {
+    ) -> Result<protocol::PortalCompletion, ConnectionError> {
         if let Some(state) = self.state.take() {
             match state {
                 PortalState::Prepared(state) => {
@@ -319,7 +340,9 @@ impl Portal {
                         QueryPlan::MetaOk(_, completion) => {
                             self.state = Some(PortalState::Finished(FinishedState { description }));
 
-                            Ok(completion.clone().to_pg_command())
+                            Ok(PortalCompletion::Complete(
+                                completion.clone().to_pg_command(),
+                            ))
                         }
                         QueryPlan::MetaTabular(_, batch) => {
                             let new_state = InExecutionFrameState::new(*batch, description);
@@ -366,7 +389,7 @@ impl Portal {
                 PortalState::Finished(finish_state) => {
                     self.state = Some(PortalState::Finished(finish_state));
 
-                    Ok(protocol::CommandComplete::new_selection(self.is_select, 0))
+                    Ok(self.new_portal_completion(0, false))
                 }
             }
         } else {
@@ -378,7 +401,7 @@ impl Portal {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider,
+        compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
         sql::{
             dataframe::{Column, DataFrame, Row, TableValue},
             extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},
@@ -386,9 +409,9 @@ mod tests {
             ColumnFlags, ColumnType,
         },
     };
-    use pg_srv::protocol::Format;
+    use pg_srv::protocol::{CommandComplete, Format, PortalCompletion, PortalSuspended};
 
-    use crate::sql::shim::ConnectionError;
+    use crate::sql::{extended::PortalFrom, shim::ConnectionError};
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
 
@@ -415,7 +438,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            is_select: true,
+            from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -435,7 +458,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            is_select: true,
+            from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -460,7 +483,7 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            is_select: true,
+            from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
                 None,
@@ -483,23 +506,35 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            is_select: true,
+            from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream, None,
             ))),
         };
 
-        portal.execute(&mut writer, 1).await?;
+        let completion = portal.execute(&mut writer, 1).await?;
         // batch 1 will be spited to 250 -1 (unused) and 1
         assert_eq!(1, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Suspended(PortalSuspended::new())
+        );
 
         // usage of unused batch, 249 - 6 (unused) and 6
-        portal.execute(&mut writer, 5).await?;
+        let completion = portal.execute(&mut writer, 5).await?;
         assert_eq!(6, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Suspended(PortalSuspended::new())
+        );
 
         // usage of unused batch
-        portal.execute(&mut writer, 1000).await?;
+        let completion = portal.execute(&mut writer, 1000).await?;
         assert_eq!(250, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Complete(CommandComplete::Select(250))
+        );
 
         Ok(())
     }
@@ -514,19 +549,27 @@ mod tests {
 
         let mut portal = Portal {
             format: Format::Binary,
-            is_select: true,
+            from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
                 stream, None,
             ))),
         };
 
         // use 1 batch
-        portal.execute(&mut writer, 10).await.unwrap();
+        let completion = portal.execute(&mut writer, 10).await.unwrap();
         assert_eq!(10, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Suspended(PortalSuspended::new())
+        );
 
         // use 2 batch
-        portal.execute(&mut writer, 20).await.unwrap();
+        let completion = portal.execute(&mut writer, 20).await.unwrap();
         assert_eq!(30, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Suspended(PortalSuspended::new())
+        );
 
         // use 0.5 batch
         portal.execute(&mut writer, 5).await.unwrap();
@@ -536,8 +579,12 @@ mod tests {
         assert_eq!(50, writer.num_rows());
 
         // use 7 batches
-        portal.execute(&mut writer, 1000).await.unwrap();
+        let completion = portal.execute(&mut writer, 1000).await.unwrap();
         assert_eq!(150, writer.num_rows());
+        assert_eq!(
+            completion,
+            PortalCompletion::Complete(CommandComplete::Select(150))
+        );
 
         Ok(())
     }

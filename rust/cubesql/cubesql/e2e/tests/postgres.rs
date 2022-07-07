@@ -4,21 +4,24 @@ use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use futures::{pin_mut, TryStreamExt};
-use portpicker::pick_unused_port;
+use portpicker::{pick_unused_port, Port};
 use rust_decimal::prelude::*;
 use tokio::time::sleep;
 
 use super::utils::escape_snapshot_name;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use datafusion::assert_contains;
+use pg_interval::Interval;
 use pg_srv::{PgType, PgTypeId};
-use tokio_postgres::{NoTls, Row, SimpleQueryMessage};
+use tokio::join;
+use tokio_postgres::{error::SqlState, Client, NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
 #[derive(Debug)]
 pub struct PostgresIntegrationTestSuite {
     client: tokio_postgres::Client,
+    port: Port,
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
@@ -44,7 +47,7 @@ impl PostgresIntegrationTestSuite {
             );
         };
 
-        let random_port = pick_unused_port().expect("No ports free");
+        let port = pick_unused_port().expect("No ports free");
         // let random_port = 5555;
         // let random_port = 5432;
 
@@ -55,7 +58,7 @@ impl PostgresIntegrationTestSuite {
             let config = config.update_config(|mut c| {
                 // disable MySQL
                 c.bind_address = None;
-                c.postgres_bind_address = Some(format!("0.0.0.0:{}", random_port));
+                c.postgres_bind_address = Some(format!("0.0.0.0:{}", port));
 
                 c
             });
@@ -66,12 +69,14 @@ impl PostgresIntegrationTestSuite {
 
         sleep(Duration::from_millis(1 * 1000)).await;
 
+        let client = PostgresIntegrationTestSuite::create_client(port).await;
+
+        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
+    }
+
+    async fn create_client(port: Port) -> Client {
         let (client, connection) = tokio_postgres::connect(
-            format!(
-                "host=127.0.0.1 port={} user=test password=test",
-                random_port
-            )
-            .as_str(),
+            format!("host=127.0.0.1 port={} user=test password=test", port).as_str(),
             NoTls,
         )
         .await
@@ -85,7 +90,7 @@ impl PostgresIntegrationTestSuite {
             }
         });
 
-        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client }))
+        client
     }
 
     async fn print_query_result<'a>(
@@ -159,6 +164,14 @@ impl PostgresIntegrationTestSuite {
                         let value: Option<f64> = row.get(idx);
                         values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
+                    PgTypeId::DATE => {
+                        let value: Option<NaiveDate> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
+                    }
+                    PgTypeId::INTERVAL => {
+                        let value: Option<Interval> = row.get(idx);
+                        values.push(value.map(|v| v.to_postgres()).unwrap_or("NULL".to_string()));
+                    }
                     PgTypeId::TIMESTAMP => {
                         let value: Option<NaiveDateTime> = row.get(idx);
                         values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
@@ -227,7 +240,7 @@ impl PostgresIntegrationTestSuite {
                             values.push("NULL".to_string())
                         }
                     }
-                    oid => unimplemented!("Unsupported pg_type: {:?}", oid),
+                    tid => unimplemented!("Unsupported pg_type: {:?}({})", tid, tid.to_type().oid),
                 }
             }
 
@@ -250,6 +263,27 @@ impl PostgresIntegrationTestSuite {
         }
     }
 
+    async fn test_cancel(&self) -> RunResult<()> {
+        let cancel_token = self.client.cancel_token();
+        let cancel = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            cancel_token.cancel_query(NoTls).await
+        };
+
+        // testing_blocking tables will neven finish. It's a special testing table
+        let sleep = self
+            .client
+            .batch_execute("SELECT * FROM information_schema.testing_blocking");
+
+        match join!(sleep, cancel) {
+            (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
+            t => panic!("unexpected return {:?}", t),
+        };
+
+        Ok(())
+    }
+
     async fn test_snapshot_execute_query(
         &self,
         query: String,
@@ -263,7 +297,6 @@ impl PostgresIntegrationTestSuite {
             snapshot_name.unwrap_or(escape_snapshot_name(query)),
             self.print_query_result(res, with_description, true).await
         );
-
         println!("ok");
 
         Ok(())
@@ -402,6 +435,31 @@ impl PostgresIntegrationTestSuite {
             .query_one(&stmt, &[&"2000"])
             .await
             .expect("Unable to execute query");
+
+        Ok(())
+    }
+
+    async fn test_portal_pagination(&self) -> RunResult<()> {
+        let mut client = PostgresIntegrationTestSuite::create_client(self.port).await;
+
+        let stmt = client
+            .prepare("SELECT generate_series(1, 100)")
+            .await
+            .unwrap();
+
+        let transaction = client.transaction().await.unwrap();
+
+        let portal = transaction.bind(&stmt, &[]).await.unwrap();
+        let r1 = transaction.query_portal(&portal, 25).await?;
+        assert_eq!(r1.len(), 25);
+
+        let r2 = transaction.query_portal(&portal, 50).await?;
+        assert_eq!(r2.len(), 50);
+
+        let r3 = transaction.query_portal(&portal, 75).await?;
+        assert_eq!(r3.len(), 25);
+
+        transaction.commit().await?;
 
         Ok(())
     }
@@ -595,11 +653,13 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult<()> {
+        self.test_cancel().await?;
         self.test_prepare().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
+        self.test_portal_pagination().await?;
         self.test_simple_cursors().await?;
         self.test_simple_cursors_without_hold().await?;
         self.test_simple_cursors_close_specific().await?;
@@ -630,10 +690,14 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 CAST(1.25 as DECIMAL(15, 2)) as d2,
                 CAST(1.25 as DECIMAL(15, 5)) as d5,
                 CAST(1.25 as DECIMAL(15, 10)) as d10,
+                CAST('2022-04-25 16:25:01.164774 +00:00' as timestamp)::date as date,
+                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp,
+                interval '13 month' as interval_year_month,
+                interval '1 hour 30 minutes' as interval_day_time,
+                interval '13 month 1 day 1 hour 30 minutes' as interval_month_day_nano,
                 ARRAY['test1', 'test2'] as str_arr,
                 ARRAY[1,2,3] as i64_arr,
-                ARRAY[1.2,2.3,3.4] as f64_arr,
-                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp
+                ARRAY[1.2,2.3,3.4] as f64_arr
             "#
             .to_string(),
             Some("pg_test_types".to_string()),

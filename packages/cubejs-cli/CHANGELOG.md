@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.32](https://github.com/cube-js/cube.js/compare/v0.30.31...v0.30.32) (2022-07-07)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
+## [0.30.31](https://github.com/cube-js/cube.js/compare/v0.30.30...v0.30.31) (2022-07-07)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+**Note:** Version bump only for package cubejs-cli
+
+
+
+
+
 ## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
 
 **Note:** Version bump only for package cubejs-cli

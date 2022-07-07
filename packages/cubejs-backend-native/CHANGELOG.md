@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.32](https://github.com/cube-js/cube.js/compare/v0.30.31...v0.30.32) (2022-07-07)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.31](https://github.com/cube-js/cube.js/compare/v0.30.30...v0.30.31) (2022-07-07)
+
+
+### Features
+
+* **cubesql:** Initial support for canceling queries in pg-wire ([#4847](https://github.com/cube-js/cube.js/issues/4847)) ([bce0f99](https://github.com/cube-js/cube.js/commit/bce0f994d59a48f221cce3d21e3c2f3244e5f3a1))
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Features
+
+* **cubesql:** Support for metabase literal queries ([#4843](https://github.com/cube-js/cube.js/issues/4843)) ([6d45d55](https://github.com/cube-js/cube.js/commit/6d45d558e0c58c37c515d07cae367eed5624cb3a))
+
+
+
+
+
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+
+### Features
+
+* **cubesql:** Support Date type in pg-wire (Date32, Date64) ([d0d08cf](https://github.com/cube-js/cube.js/commit/d0d08cf8ee848903a3b49849cace34046371a90f))
+
+
+
+
+
 ## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
 
 

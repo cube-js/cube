@@ -22,9 +22,9 @@ use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
-    remote_path: String,
-    updated: DateTime<Utc>,
-    file_size: u64,
+    pub remote_path: String,
+    pub updated: DateTime<Utc>,
+    pub file_size: u64,
 }
 
 impl RemoteFile {
@@ -284,7 +284,7 @@ impl LocalDirRemoteFs {
         async move { Self::remove_empty_paths(root, path).await }.boxed()
     }
 
-    async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
+    pub async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
             if dir.next_entry().await?.is_none() {

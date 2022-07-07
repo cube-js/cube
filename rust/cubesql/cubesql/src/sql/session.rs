@@ -1,7 +1,11 @@
+use datafusion::scalar::ScalarValue;
+use log::trace;
+use rand::Rng;
 use std::sync::{Arc, RwLock as RwLockSync};
+use tokio_util::sync::CancellationToken;
 
 use crate::sql::database_variables::{
-    mysql_default_session_variables, postgres_default_session_variables,
+    mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
 };
 
 use super::{
@@ -51,9 +55,20 @@ pub enum TransactionState {
 }
 
 #[derive(Debug)]
+pub enum QueryState {
+    None,
+    Active {
+        query: String,
+        cancel: CancellationToken,
+    },
+}
+
+#[derive(Debug)]
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
+    // secret for this session
+    pub secret: u32,
     // client address, immutable
     pub host: String,
     // client protocol, mysql/postgresql, immutable
@@ -69,6 +84,8 @@ pub struct SessionState {
     auth_context: RwLockSync<Option<AuthContext>>,
 
     transaction: RwLockSync<TransactionState>,
+
+    query: RwLockSync<QueryState>,
 }
 
 impl SessionState {
@@ -78,14 +95,18 @@ impl SessionState {
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContext>,
     ) -> Self {
+        let mut rng = rand::thread_rng();
+
         Self {
             connection_id,
+            secret: rng.gen(),
             host,
             protocol,
             variables: RwLockSync::new(None),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new(auth_context),
             transaction: RwLockSync::new(TransactionState::None),
+            query: RwLockSync::new(QueryState::None),
         }
     }
 
@@ -115,6 +136,72 @@ impl SessionState {
             }
             TransactionState::Active(_) => false,
         }
+    }
+
+    pub fn cancel_query(&self) {
+        let mut guard = self
+            .query
+            .write()
+            .expect("failed to unlock query for cancel_query");
+
+        match &*guard {
+            QueryState::None => {
+                trace!("cancel_query - QueryState::None");
+            }
+            QueryState::Active { cancel, .. } => {
+                cancel.cancel();
+
+                trace!("cancel_query - Ok");
+
+                *guard = QueryState::None;
+            }
+        }
+    }
+
+    pub fn current_query(&self) -> Option<String> {
+        let guard = self
+            .query
+            .read()
+            .expect("failed to unlock query for current_query");
+
+        match &*guard {
+            QueryState::Active { query, .. } => Some(query.clone()),
+            QueryState::None => None,
+        }
+    }
+
+    pub fn end_query(&self) {
+        let mut guard = self
+            .query
+            .write()
+            .expect("failed to unlock query for begin_query");
+
+        match *guard {
+            QueryState::Active { .. } => {
+                *guard = QueryState::None;
+            }
+            QueryState::None => {}
+        }
+    }
+
+    pub fn begin_query(&self, query: String) -> CancellationToken {
+        let mut guard = self
+            .query
+            .write()
+            .expect("failed to unlock query for begin_query");
+
+        if let QueryState::Active { .. } = &*guard {
+            trace!("Unable to begin new query while previous is still active.")
+        };
+
+        let cancel = CancellationToken::new();
+
+        *guard = QueryState::Active {
+            query,
+            cancel: cancel.clone(),
+        };
+
+        cancel
     }
 
     pub fn end_transaction(&self) -> Option<u64> {
@@ -196,6 +283,24 @@ impl SessionState {
         }
     }
 
+    pub fn get_variable(&self, name: &str) -> Option<DatabaseVariable> {
+        let guard = self
+            .variables
+            .read()
+            .expect("failed to unlock variables for reading")
+            .clone();
+
+        match guard {
+            Some(vars) => vars.get(name).map(|v| v.clone()),
+            _ => match self.protocol {
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
+                DatabaseProtocol::PostgreSQL => {
+                    POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
+                }
+            },
+        }
+    }
+
     pub fn set_variables(&self, variables: DatabaseVariables) {
         let mut to_override = false;
 
@@ -240,6 +345,35 @@ pub struct Session {
 }
 
 impl Session {
+    // For PostgreSQL
+    pub fn to_stat_activity(self: &Arc<Self>) -> SessionStatActivity {
+        let query = self.state.current_query();
+
+        let application_name = if let Some(v) = self.state.get_variable("application_name") {
+            match v.value {
+                ScalarValue::Utf8(r) => r,
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        SessionStatActivity {
+            oid: self.state.connection_id,
+            datname: self.state.database(),
+            pid: self.state.connection_id,
+            leader_pid: None,
+            usesysid: 0,
+            usename: self.state.user(),
+            application_name,
+            client_addr: None,
+            client_hostname: None,
+            client_port: None,
+            query,
+        }
+    }
+
+    // For MySQL
     pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
         SessionProcessList {
             id: self.state.connection_id,
@@ -256,4 +390,19 @@ pub struct SessionProcessList {
     pub user: Option<String>,
     pub host: String,
     pub database: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct SessionStatActivity {
+    pub oid: u32,
+    pub datname: Option<String>,
+    pub pid: u32,
+    pub leader_pid: Option<u32>,
+    pub usesysid: u32,
+    pub usename: Option<String>,
+    pub application_name: Option<String>,
+    pub client_addr: Option<String>,
+    pub client_hostname: Option<String>,
+    pub client_port: Option<String>,
+    pub query: Option<String>,
 }

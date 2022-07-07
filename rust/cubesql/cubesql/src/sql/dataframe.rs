@@ -10,16 +10,17 @@ use chrono_tz::Tz;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, DecimalArray, Float16Array, Float32Array, Float64Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray,
-        IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray, ListArray,
-        StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array,
-        UInt64Array, UInt8Array,
+        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
+        Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
+        ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
+        UInt32Array, UInt64Array, UInt8Array,
     },
-    datatypes::{DataType, IntervalUnit, TimeUnit},
+    datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
     temporal_conversions,
 };
+use pg_srv::IntervalValue;
 use rust_decimal::prelude::*;
 use std::{
     fmt::{self, Debug, Formatter},
@@ -27,11 +28,7 @@ use std::{
 };
 
 use super::{ColumnFlags, ColumnType};
-
-use crate::{
-    make_string_interval_day_time, make_string_interval_month_day_nano,
-    make_string_interval_year_month, CubeError,
-};
+use crate::CubeError;
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -97,7 +94,9 @@ pub enum TableValue {
     Float64(f64),
     List(ListValue),
     Decimal128(Decimal128Value),
+    Date(NaiveDate),
     Timestamp(TimestampValue),
+    Interval(IntervalValue),
 }
 
 impl ToString for TableValue {
@@ -111,8 +110,10 @@ impl ToString for TableValue {
             TableValue::Boolean(v) => v.to_string(),
             TableValue::Float32(v) => v.to_string(),
             TableValue::Float64(v) => v.to_string(),
+            TableValue::Date(v) => v.to_string(),
             TableValue::Timestamp(v) => v.to_string(),
             TableValue::Decimal128(v) => v.to_string(),
+            TableValue::Interval(v) => v.to_string(),
             TableValue::List(v) => v.to_string(),
         }
     }
@@ -368,8 +369,10 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     match arrow_type {
         DataType::Binary => Ok(ColumnType::Blob),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
+        DataType::Date32 => Ok(ColumnType::Date(false)),
+        DataType::Date64 => Ok(ColumnType::Date(true)),
         DataType::Timestamp(_, _) => Ok(ColumnType::String),
-        DataType::Interval(_) => Ok(ColumnType::String),
+        DataType::Interval(unit) => Ok(ColumnType::Interval(unit)),
         DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::List(field) => Ok(ColumnType::List(field)),
@@ -385,21 +388,21 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
-pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
+pub fn batch_to_dataframe(
+    schema: &Schema,
+    batches: &Vec<RecordBatch>,
+) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
+    for (_i, field) in schema.fields().iter().enumerate() {
+        cols.push(Column::new(
+            field.name().clone(),
+            arrow_to_column_type(field.data_type().clone())?,
+            ColumnFlags::empty(),
+        ));
+    }
 
     for batch in batches.iter() {
-        if cols.is_empty() {
-            let schema = batch.schema().clone();
-            for (_i, field) in schema.fields().iter().enumerate() {
-                cols.push(Column::new(
-                    field.name().clone(),
-                    arrow_to_column_type(field.data_type().clone())?,
-                    ColumnFlags::empty(),
-                ));
-            }
-        }
         if batch.num_rows() == 0 {
             continue;
         }
@@ -438,6 +441,30 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         });
                     }
                 }
+                DataType::Date32 => {
+                    let a = array.as_any().downcast_ref::<Date32Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Date(a.value_as_date(i).expect(
+                                "value_as_date must return Option with NaiveDate for Date32Array",
+                            ))
+                        });
+                    }
+                }
+                DataType::Date64 => {
+                    let a = array.as_any().downcast_ref::<Date64Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Date(a.value_as_date(i).expect(
+                                "value_as_date must return Option with NaiveDate for Date64Array",
+                            ))
+                        });
+                    }
+                }
                 DataType::Timestamp(TimeUnit::Microsecond, tz) => {
                     let a = array
                         .as_any()
@@ -473,10 +500,28 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if let Some(as_str) = make_string_interval_day_time!(a, i) {
-                            rows[i].push(TableValue::String(as_str));
-                        } else {
+                        if a.is_null(i) {
                             rows[i].push(TableValue::Null);
+                        } else {
+                            let value: u64 = a.value(i) as u64;
+                            let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
+                            let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
+
+                            let secs = milliseconds_part / 1000;
+                            let mins = secs / 60;
+                            let hours = mins / 60;
+
+                            let secs = secs - (mins * 60);
+                            let mins = mins - (hours * 60);
+
+                            rows[i].push(TableValue::Interval(IntervalValue::new(
+                                0,
+                                days,
+                                hours,
+                                mins,
+                                secs,
+                                milliseconds_part % 1000,
+                            )));
                         }
                     }
                 }
@@ -486,10 +531,17 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if let Some(as_str) = make_string_interval_year_month!(a, i) {
-                            rows[i].push(TableValue::String(as_str));
-                        } else {
+                        if a.is_null(i) {
                             rows[i].push(TableValue::Null);
+                        } else {
+                            rows[i].push(TableValue::Interval(IntervalValue::new(
+                                a.value(i),
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                            )));
                         }
                     }
                 }
@@ -499,10 +551,30 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                         .downcast_ref::<IntervalMonthDayNanoArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if let Some(as_str) = make_string_interval_month_day_nano!(a, i) {
-                            rows[i].push(TableValue::String(as_str));
-                        } else {
+                        if a.is_null(i) {
                             rows[i].push(TableValue::Null);
+                        } else {
+                            let value: u128 = a.value(i) as u128;
+                            let months: i32 =
+                                ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
+                            let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
+                            let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
+
+                            let secs = nanoseconds_part / 1000000000;
+                            let mins = secs / 60;
+                            let hours = mins / 60;
+
+                            let secs = secs - (mins * 60);
+                            let mins = mins - (hours * 60);
+
+                            rows[i].push(TableValue::Interval(IntervalValue::new(
+                                months,
+                                days,
+                                hours as i32,
+                                mins as i32,
+                                secs as i32,
+                                (nanoseconds_part % 1000000000) as i32,
+                            )));
                         }
                     }
                 }

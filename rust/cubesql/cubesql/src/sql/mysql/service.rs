@@ -217,7 +217,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
@@ -231,7 +231,7 @@ impl MySqlConnection {
                         &plan,
                     );
                     let batches = df.collect().await?;
-                    let response =  batch_to_dataframe(&batches)?;
+                    let response = batch_to_dataframe(&df.schema().into(), &batches)?;
 
                     return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }

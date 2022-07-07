@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.32](https://github.com/cube-js/cube.js/compare/v0.30.31...v0.30.32) (2022-07-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Correct portal pagination (use PortalSuspended) in pg-wire ([#4872](https://github.com/cube-js/cube.js/issues/4872)) ([63aad19](https://github.com/cube-js/cube.js/commit/63aad191ea2be58291b0ce8709e1352a62cbd8a4))
+
+
+### Features
+
+* **cubesql:** Support grant tables (columns, tables) ([a3d9493](https://github.com/cube-js/cube.js/commit/a3d949324e1ac879606b45faed4812b30b07173b))
+
+
+
+
+
+## [0.30.31](https://github.com/cube-js/cube.js/compare/v0.30.30...v0.30.31) (2022-07-07)
+
+
+### Features
+
+* **cubesql:** Initial support for canceling queries in pg-wire ([#4847](https://github.com/cube-js/cube.js/issues/4847)) ([bce0f99](https://github.com/cube-js/cube.js/commit/bce0f994d59a48f221cce3d21e3c2f3244e5f3a1))
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Bug Fixes
+
+* **cubesql:** Invalid argument error: all columns in a record batch must have the same length ([895f8cf](https://github.com/cube-js/cube.js/commit/895f8cf301a951907aa4cd3ea190ea1cfeb3be73))
+
+
+### Features
+
+* **cubesql:** Superset ILIKE support for Search all filter options feature ([2532040](https://github.com/cube-js/cube.js/commit/2532040792faa9ed0a151d85cead1c1bd425d3ce))
+* **cubesql:** Support for metabase literal queries ([#4843](https://github.com/cube-js/cube.js/issues/4843)) ([6d45d55](https://github.com/cube-js/cube.js/commit/6d45d558e0c58c37c515d07cae367eed5624cb3a))
+* **cubesql:** Support Interval type for pg-wire ([4c8a82c](https://github.com/cube-js/cube.js/commit/4c8a82caf3b64c295bf7606e6a694f6cda50491c))
+
+
+
+
+
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+
+### Bug Fixes
+
+* **cubesql:** Can't find rewrite due to timeout reached for bigger ORDER BY queries ([b765838](https://github.com/cube-js/cube.js/commit/b765838ff6c27ae34272feec00f1b60e7932b2c7))
+
+
+### Features
+
+* **cubesql:** Initial support for DBeaver ([#4831](https://github.com/cube-js/cube.js/issues/4831)) ([0a63152](https://github.com/cube-js/cube.js/commit/0a6315210fd7115f4649ec12a68a2d9b1479a23f))
+* **cubesql:** Send parameters at once (initial handshake) for pg-wire ([#4812](https://github.com/cube-js/cube.js/issues/4812)) ([645253f](https://github.com/cube-js/cube.js/commit/645253f9b21ef08f7fc908e6577878f97b3ef6b0))
+* **cubesql:** Support Date type in pg-wire (Date32, Date64) ([d0d08cf](https://github.com/cube-js/cube.js/commit/d0d08cf8ee848903a3b49849cace34046371a90f))
+* **pg-srv:** Introduce ToProtocolValue trait (encoding) ([#4818](https://github.com/cube-js/cube.js/issues/4818)) ([4e35aee](https://github.com/cube-js/cube.js/commit/4e35aeec993cdeecab9d64fdb0392c33c35913e4))
+
+
+
+
+
 ## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
 
 
