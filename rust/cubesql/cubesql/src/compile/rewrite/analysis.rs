@@ -427,6 +427,7 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         expr: &Expr,
     ) -> Option<ScalarValue> {
+        println!("{:?}", &expr);
         let schema = DFSchema::empty();
         let arrow_schema = Arc::new(schema.to_owned().into());
         let physical_expr = match egraph.analysis.planner.create_physical_expr(
