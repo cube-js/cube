@@ -77,6 +77,10 @@ impl Row {
         &self.values
     }
 
+    pub fn to_values(self) -> Vec<TableValue> {
+        self.values
+    }
+
     pub fn push(&mut self, val: TableValue) {
         self.values.push(val);
     }
@@ -140,6 +144,10 @@ impl DataFrame {
 
     pub fn get_rows(&self) -> &Vec<Row> {
         &self.data
+    }
+
+    pub fn to_rows(self) -> Vec<Row> {
+        self.data
     }
 
     pub fn mut_rows(&mut self) -> &mut Vec<Row> {
@@ -392,8 +400,9 @@ pub fn batch_to_dataframe(
     schema: &Schema,
     batches: &Vec<RecordBatch>,
 ) -> Result<DataFrame, CubeError> {
-    let mut cols = vec![];
+    let mut cols = Vec::with_capacity(schema.fields().len());
     let mut all_rows = vec![];
+
     for (_i, field) in schema.fields().iter().enumerate() {
         cols.push(Column::new(
             field.name().clone(),
@@ -406,7 +415,8 @@ pub fn batch_to_dataframe(
         if batch.num_rows() == 0 {
             continue;
         }
-        let mut rows = vec![];
+
+        let mut rows = Vec::with_capacity(batch.num_rows());
 
         for _ in 0..batch.num_rows() {
             rows.push(Row::new(Vec::with_capacity(batch.num_columns())));

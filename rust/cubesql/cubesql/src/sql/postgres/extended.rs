@@ -14,7 +14,10 @@ use sqlparser::ast;
 use std::fmt;
 
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
-use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
+use datafusion::{
+    arrow::array::Array, dataframe::DataFrame as DFDataFrame,
+    physical_plan::SendableRecordBatchStream,
+};
 use futures::*;
 use pg_srv::protocol::{PortalCompletion, PortalSuspended};
 
@@ -181,6 +184,26 @@ pub struct Portal {
 unsafe impl Send for Portal {}
 unsafe impl Sync for Portal {}
 
+fn split_record_batch(batch: RecordBatch, mid: usize) -> (RecordBatch, Option<RecordBatch>) {
+    if batch.num_rows() <= mid {
+        return (batch, None);
+    }
+
+    let schema = batch.schema();
+    let mut left = Vec::with_capacity(schema.fields().len());
+    let mut right = Vec::with_capacity(schema.fields().len());
+
+    for column in batch.columns() {
+        left.push(column.slice(0, mid));
+        right.push(column.slice(mid, column.len() - mid));
+    }
+
+    (
+        RecordBatch::try_new(schema.clone(), left).unwrap(),
+        Some(RecordBatch::try_new(schema, right).unwrap()),
+    )
+}
+
 impl Portal {
     pub fn new(plan: QueryPlan, format: protocol::Format, from: PortalFrom) -> Self {
         Self {
@@ -241,11 +264,7 @@ impl Portal {
             )
             .into())
         } else {
-            self.write_dataframe_to_writer(
-                writer,
-                frame_state.batch,
-                if max_rows == 0 { rows_read } else { max_rows },
-            )?;
+            self.write_dataframe_to_writer(writer, frame_state.batch)?;
 
             Ok((
                 PortalState::Finished(FinishedState {
@@ -278,29 +297,23 @@ impl Portal {
         &self,
         writer: &mut BatchWriter,
         frame: DataFrame,
-        rows_to_read: usize,
     ) -> Result<(), ProtocolError> {
-        for (idx, row) in frame.get_rows().iter().enumerate() {
-            // TODO: It's a hack, because we dont limit batch_to_dataframe by number of expected rows
-            if idx >= rows_to_read {
-                break;
-            }
-
-            for value in row.values() {
+        for (idx, row) in frame.to_rows().into_iter().enumerate() {
+            for value in row.to_values() {
                 match value {
                     TableValue::Null => writer.write_value::<Option<bool>>(None)?,
-                    TableValue::String(v) => writer.write_value(v.clone())?,
-                    TableValue::Int16(v) => writer.write_value(*v)?,
-                    TableValue::Int32(v) => writer.write_value(*v)?,
-                    TableValue::Int64(v) => writer.write_value(*v)?,
-                    TableValue::Boolean(v) => writer.write_value(*v)?,
-                    TableValue::Float32(v) => writer.write_value(*v)?,
-                    TableValue::Float64(v) => writer.write_value(*v)?,
-                    TableValue::List(v) => writer.write_value(v.clone())?,
-                    TableValue::Timestamp(v) => writer.write_value(v.clone())?,
-                    TableValue::Date(v) => writer.write_value(v.clone())?,
-                    TableValue::Decimal128(v) => writer.write_value(v.clone())?,
-                    TableValue::Interval(v) => writer.write_value(v.clone())?,
+                    TableValue::String(v) => writer.write_value(v)?,
+                    TableValue::Int16(v) => writer.write_value(v)?,
+                    TableValue::Int32(v) => writer.write_value(v)?,
+                    TableValue::Int64(v) => writer.write_value(v)?,
+                    TableValue::Boolean(v) => writer.write_value(v)?,
+                    TableValue::Float32(v) => writer.write_value(v)?,
+                    TableValue::Float64(v) => writer.write_value(v)?,
+                    TableValue::List(v) => writer.write_value(v)?,
+                    TableValue::Timestamp(v) => writer.write_value(v)?,
+                    TableValue::Date(v) => writer.write_value(v)?,
+                    TableValue::Decimal128(v) => writer.write_value(v)?,
+                    TableValue::Interval(v) => writer.write_value(v)?,
                 };
             }
 
@@ -319,28 +332,23 @@ impl Portal {
     ) -> Result<Option<RecordBatch>, ConnectionError> {
         let mut unused: Option<RecordBatch> = None;
 
-        let (batch_for_write, rows_to_read) = if max_rows == 0 {
-            let batch_num_rows = batch.num_rows();
-            (batch, batch_num_rows)
+        let batch_for_write = if max_rows == 0 {
+            batch
         } else {
             if batch.num_rows() > *left {
-                let unused_batch = batch.slice(*left, batch.num_rows() - *left);
-                unused = Some(unused_batch);
-
-                let r = (batch, *left);
+                let (batch, right) = split_record_batch(batch, *left);
+                unused = right;
                 *left = 0;
 
-                r
+                batch
             } else {
                 *left = *left - batch.num_rows();
-                let batch_num_rows = batch.num_rows();
-                (batch, batch_num_rows)
+                batch
             }
         };
 
-        // TODO: Split doesn't split batches, it copy the part, lets dont convert whole batch to dataframe
         let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
-        self.write_dataframe_to_writer(writer, frame, rows_to_read)?;
+        self.write_dataframe_to_writer(writer, frame)?;
 
         Ok(unused)
     }
