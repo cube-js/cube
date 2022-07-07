@@ -186,7 +186,15 @@ export class OptsHandler {
     const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
       if (!dbType) {
-        const { type } = <DriverConfig>(await driverFactory(ctx));
+        // TODO (buntarb): this should be restored after deprecation term end.
+        // const { type } = <DriverConfig>(await driverFactory(ctx));
+        let type: DatabaseType;
+        const val = await driverFactory(ctx);
+        if (val instanceof BaseDriver && process.env.CUBEJS_DB_TYPE) {
+          type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+        } else {
+          type = (<DriverConfig>val).type;
+        }
         return type;
       } else if (typeof dbType === 'function') {
         return this.assertDbTypeResult(await dbType(ctx));
