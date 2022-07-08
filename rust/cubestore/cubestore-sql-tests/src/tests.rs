@@ -5101,7 +5101,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
 
     let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
     let result = service
-        .exec_query_with_context(context, "SELECT * FROM inline.Persons")
+        .exec_query_with_context(context, "SELECT * FROM Persons")
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &rows);
@@ -5137,7 +5137,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
             SELECT *
             FROM (
                 SELECT LastName, Timestamp FROM Foo.Persons
-                UNION ALL SELECT LastName, Timestamp FROM inline.Persons
+                UNION ALL SELECT LastName, Timestamp FROM Persons
             )
             ORDER BY LastName
         "#)

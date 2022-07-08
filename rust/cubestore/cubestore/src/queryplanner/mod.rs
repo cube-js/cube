@@ -224,14 +224,13 @@ impl ContextProvider for MetaStoreSchemaProvider {
     fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
         let (schema, table) = match name {
             TableReference::Partial { schema, table } => (schema, table),
-            TableReference::Bare { .. } | TableReference::Full { .. } => return None,
+            TableReference::Bare { table } => {
+                return Some(Arc::new(InlineTableProvider::new(
+                    self.inline_tables.get(table)?.clone(),
+                )));
+            }
+            TableReference::Full { .. } => return None,
         };
-
-        if schema == "inline" {
-            return Some(Arc::new(InlineTableProvider::new(
-                self.inline_tables.get(table)?.clone(),
-            )));
-        }
 
         // Mock table path for hash set access.
         let name = TablePath {
