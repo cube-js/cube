@@ -49,7 +49,7 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 | `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
 | `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to               | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
-| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcs`                                                                   |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcp`                                                                   |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
