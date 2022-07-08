@@ -75,7 +75,7 @@ export class OptsHandler {
     optionsValidate(opts);
 
     if (
-      !this.configuredAsDevServer() &&
+      !this.isDevMode() &&
       !process.env.CUBEJS_DB_TYPE &&
       !opts.dbType &&
       !opts.driverFactory
@@ -174,6 +174,22 @@ export class OptsHandler {
       }`);
     }
     return val;
+  }
+
+  /**
+   * Assert orchestration options.
+   */
+  private asserOrchestratorOptions(opts: OrchestratorOptions) {
+    if (
+      opts.rollupOnlyMode &&
+      this.isApiWorker() &&
+      getEnv('preAggregationsBuilder')
+    ) {
+      throw new Error(
+        'CreateOptions.orchestratorOptions.rollupOnlyMode cannot be trusly ' +
+        'for API instance if CUBEJS_PRE_AGGREGATIONS_BUILDER is set to true'
+      );
+    }
   }
 
   /**
@@ -341,10 +357,6 @@ export class OptsHandler {
       (getEnv('devMode') || definedExtDBVariables.length > 0) && 'cubestore' ||
       undefined;
 
-    const devServer =
-      process.env.NODE_ENV !== 'production' ||
-      getEnv('devMode');
-
     let externalDriverFactory =
       externalDbType &&
       (
@@ -358,12 +370,13 @@ export class OptsHandler {
         })
       );
 
-    let externalDialectFactory =
-      () => typeof externalDbType === 'string' &&
+    let externalDialectFactory = () => (
+      typeof externalDbType === 'string' &&
       lookupDriverClass(externalDbType).dialectClass &&
-      lookupDriverClass(externalDbType).dialectClass();
+      lookupDriverClass(externalDbType).dialectClass()
+    );
 
-    if (!devServer && getEnv('externalDefault') && !externalDbType) {
+    if (!this.isDevMode() && getEnv('externalDefault') && !externalDbType) {
       displayCLIWarning(
         'Cube Store is not found. Please follow this documentation ' +
         'to configure Cube Store ' +
@@ -371,7 +384,7 @@ export class OptsHandler {
       );
     }
 
-    if (devServer && externalDbType !== 'cubestore') {
+    if (this.isDevMode() && externalDbType !== 'cubestore') {
       displayCLIWarning(
         `Using ${externalDbType} as an external database is deprecated. ` +
         'Please use Cube Store instead: ' +
@@ -379,7 +392,7 @@ export class OptsHandler {
       );
     }
 
-    if (externalDbType === 'cubestore' && devServer && !opts.serverless) {
+    if (externalDbType === 'cubestore' && this.isDevMode() && !opts.serverless) {
       if (!definedExtDBVariables.length) {
         // There is no @cubejs-backend/cubestore-driver dependency in the core
         // package. At the same time, @cubejs-backend/cubestore-driver is already
@@ -432,12 +445,12 @@ export class OptsHandler {
     }
 
     const options: ServerCoreInitializedOptions = {
-      externalDbType,
-      devServer,
+      devServer: this.isDevMode(),
       dialectFactory: (ctx) => (
         lookupDriverClass(ctx.dbType).dialectClass &&
         lookupDriverClass(ctx.dbType).dialectClass()
       ),
+      externalDbType,
       externalDriverFactory,
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
@@ -453,7 +466,9 @@ export class OptsHandler {
         parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
-        (devServer ? 'dev_pre_aggregations' : 'prod_pre_aggregations'),
+        this.isDevMode()
+          ? 'dev_pre_aggregations'
+          : 'prod_pre_aggregations',
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
@@ -531,17 +546,56 @@ export class OptsHandler {
    * Determines whether current instance should be bootstraped in the
    * dev mode or not.
    */
-  public configuredAsDevServer(): boolean {
+  private isDevMode(): boolean {
     return (
-      this.createOptions.devServer ||
       process.env.NODE_ENV !== 'production' ||
       getEnv('devMode')
     );
   }
 
   /**
-   * Determines whether current configuration is sutisfied system to process
-   * queries.
+   * Determines whether the current instance is configured as a refresh worker
+   * or not. It always returns false in the dev mode.
+   */
+  private isRefreshWorker(): boolean {
+    return (
+      !this.isDevMode() &&
+      this.configuredForScheduledRefresh()
+    );
+  }
+
+  /**
+   * Determines whether the current instance is configured as an api worker or
+   * not. It always returns false in the dev mode.
+   */
+  private isApiWorker(): boolean {
+    return (
+      !this.isDevMode() &&
+      !this.configuredForScheduledRefresh()
+    );
+  }
+
+  /**
+   * Determines whether the current instance is configured as pre-aggs builder
+   * or not.
+   */
+  private isPreAggsBuilder(): boolean {
+    return (
+      this.isDevMode() ||
+      this.isRefreshWorker() ||
+      this.isApiWorker() && getEnv('preAggregationsBuilder')
+    );
+  }
+
+  /**
+   * Returns server core initialized options object.
+   */
+  public getCoreInitializedOptions(): ServerCoreInitializedOptions {
+    return this.initializedOptions;
+  }
+
+  /**
+   * Determines whether the current configuration is set to process queries.
    */
   public configuredForQueryProcessing(): boolean {
     const hasDbCredentials =
@@ -560,33 +614,84 @@ export class OptsHandler {
   }
 
   /**
-   * Returns server core initialized options object.
+   * Determines whether the current configuration is set for running scheduled
+   * refresh intervals or not.
    */
-  public getCoreInitializedOptions(): ServerCoreInitializedOptions {
-    return this.initializedOptions;
+  public configuredForScheduledRefresh(): boolean {
+    return (
+      this.initializedOptions.scheduledRefreshTimer !== undefined &&
+      (
+        (
+          typeof this.initializedOptions.scheduledRefreshTimer === 'boolean' &&
+          this.initializedOptions.scheduledRefreshTimer
+        ) ||
+        (
+          typeof this.initializedOptions.scheduledRefreshTimer === 'number' &&
+          this.initializedOptions.scheduledRefreshTimer !== 0
+        )
+      )
+    );
   }
 
   /**
-   * Decorate `OrchestratorOptions` with `queueOptions` property which include
-   * concurrency calculation logic.
+   * Returns scheduled refresh interval value (in ms).
+   */
+  public getScheduledRefreshInterval(): number {
+    if (!this.configuredForScheduledRefresh()) {
+      throw new Error('Instance configured to skip scheduled jobs');
+    } else if (
+      typeof this.initializedOptions.scheduledRefreshTimer === 'number'
+    ) {
+      return parseInt(
+        `${this.initializedOptions.scheduledRefreshTimer}`, 10
+      ) * 1000;
+    } else {
+      return 30000;
+    }
+  }
+
+  /**
+   * Returns `OrchestratorInitedOptions` based on provided `OrchestratorOptions`
+   * and request context.
    */
   public getOrchestratorInitializedOptions(
     context: RequestContext,
     orchestratorOptions: OrchestratorOptions,
   ): OrchestratorInitedOptions {
+    this.asserOrchestratorOptions(orchestratorOptions);
+
     const clone = cloneDeep(orchestratorOptions);
-    // query queue
+
+    // rollup only mode (querying pre-aggs only)
+    clone.rollupOnlyMode = clone.rollupOnlyMode !== undefined
+      ? clone.rollupOnlyMode
+      : getEnv('rollupOnlyMode');
+
+    // query queue options
     clone.queryCacheOptions = clone.queryCacheOptions || {};
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,
     );
-    // pre-aggs queue
+
+    // pre-aggs queue options
     clone.preAggregationsOptions = clone.preAggregationsOptions || {};
     clone.preAggregationsOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.preAggregationsOptions.queueOptions,
     );
+
+    // pre-aggs external refresh flag (force to run pre-aggs build flow first if
+    // pre-agg is not exists/updated at the query moment). Initially the default
+    // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
+    clone.preAggregationsOptions.externalRefresh =
+      clone.preAggregationsOptions.externalRefresh !== undefined
+        ? clone.preAggregationsOptions.externalRefresh
+        : (
+          !this.isPreAggsBuilder() ||
+          clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
+        );
+
     return clone;
   }
 }

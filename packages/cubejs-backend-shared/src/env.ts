@@ -115,6 +115,7 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')

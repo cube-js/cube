@@ -8,15 +8,16 @@ import {
   SchemaFileRepository,
   ServerCoreInitializedOptions
 } from '../../src';
+import { OptsHandler } from '../../src/core/OptsHandler';
 import { DatabaseType } from '../../src/core/types';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly options: ServerCoreInitializedOptions;
+  public readonly optsHandler: OptsHandler;
 
-  public detectScheduledRefreshTimer = super.detectScheduledRefreshTimer;
+  public readonly options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 
@@ -490,18 +491,25 @@ describe('index.test', () => {
         scheduledRefreshTimer: input
       });
       expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
-      expect(cubejsServerCore.detectScheduledRefreshTimer(input)).toBe(output);
+      if (!cubejsServerCore.optsHandler.configuredForScheduledRefresh()) {
+        expect(output).toBeFalsy();
+      } else {
+        expect(
+          cubejsServerCore.optsHandler.getScheduledRefreshInterval()
+        ).toEqual(output);
+      }
 
       await cubejsServerCore.beforeShutdown();
       await cubejsServerCore.shutdown();
     });
   };
 
+  expectRefreshTimerOption(undefined, false);
+  expectRefreshTimerOption(false, false);
   expectRefreshTimerOption(0, false);
   expectRefreshTimerOption(1, 1000);
   expectRefreshTimerOption(10, 10000);
   expectRefreshTimerOption(true, 30000);
-  expectRefreshTimerOption(false, false);
 
   test('scheduledRefreshTimer is disabled with CUBEJS_REFRESH_WORKER', async () => {
     process.env.CUBEJS_REFRESH_WORKER = 'false';

@@ -157,18 +157,29 @@ export class OrchestratorApi {
     }
   }
 
-  public async testConnection() {
-    return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
-      this.testDriverConnection(this.options.externalDriverFactory)
-    ]);
-  }
-
   public async testOrchestratorConnections() {
     return this.orchestrator.testConnections();
   }
 
-  public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
+  public async testConnection() {
+    if (this.options.preAggregationsOptions.externalRefresh) {
+      return Promise.all([
+        this.testDriverConnection(this.options.externalDriverFactory),
+      ]);
+    } else {
+      return Promise.all([
+        ...Object.keys(this.seenDataSources).map(
+          ds => this.testDriverConnection(this.driverFactory, ds),
+        ),
+        this.testDriverConnection(this.options.externalDriverFactory),
+      ]);
+    }
+  }
+
+  public async testDriverConnection(
+    driverFn?: DriverFactoryByDataSource,
+    dataSource: string = 'default',
+  ) {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await driver.testConnection();

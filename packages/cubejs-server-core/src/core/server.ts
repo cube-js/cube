@@ -142,6 +142,9 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
+  /**
+   * Class constructor.
+   */
   public constructor(
     opts: CreateOptions = {},
     protected readonly systemOptions?: SystemOptions,
@@ -319,11 +322,8 @@ export class CubejsServerCore {
     if (this.scheduledRefreshTimerInterval) {
       return [true, null];
     }
-
-    const scheduledRefreshTimer = this.detectScheduledRefreshTimer(
-      this.options.scheduledRefreshTimer,
-    );
-    if (scheduledRefreshTimer) {
+    if (this.optsHandler.configuredForScheduledRefresh()) {
+      const scheduledRefreshTimer = this.optsHandler.getScheduledRefreshInterval();
       this.scheduledRefreshTimerInterval = createCancelableInterval(
         () => this.handleScheduledRefreshInterval({}),
         {
@@ -356,18 +356,6 @@ export class CubejsServerCore {
     this.options.externalDbType = this.options.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
-  }
-
-  protected detectScheduledRefreshTimer(scheduledRefreshTimer: number | boolean): number | false {
-    if (scheduledRefreshTimer && (typeof scheduledRefreshTimer === 'number')) {
-      return parseInt(<any>scheduledRefreshTimer, 10) * 1000;
-    }
-
-    if (scheduledRefreshTimer) {
-      return 30000;
-    }
-
-    return false;
   }
 
   protected initAgent() {
@@ -523,14 +511,6 @@ export class CubejsServerCore {
         this.orchestratorOptions(context) || {},
       );
 
-    const rollupOnlyMode = orchestratorOptions.rollupOnlyMode !== undefined
-      ? orchestratorOptions.rollupOnlyMode
-      : getEnv('rollupOnlyMode');
-
-    // External refresh is enabled for rollupOnlyMode, but it's disabled
-    // when it's both refreshWorkerMode & rollupOnlyMode
-    const externalRefresh: boolean = rollupOnlyMode && !this.options.scheduledRefreshTimer;
-
     const orchestratorApi = this.createOrchestratorApi(
       /**
        * Driver factory function `DriverFactoryByDataSource`.
@@ -618,14 +598,7 @@ export class CubejsServerCore {
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        // placeholder, user is able to override it from cube.js
-        rollupOnlyMode,
         ...orchestratorOptions,
-        preAggregationsOptions: {
-          // placeholder, user is able to override it from cube.js
-          externalRefresh,
-          ...orchestratorOptions.preAggregationsOptions,
-        }
       }
     );
 
